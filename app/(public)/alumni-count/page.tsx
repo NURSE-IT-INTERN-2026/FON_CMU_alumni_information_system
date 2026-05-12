@@ -109,7 +109,7 @@ export default function AlumniCountPage() {
       },
       title: {
         display: true,
-        text: "จำนวนศิษย์เก่าตามปีที่เข้าศึกษา",
+        text: "จำนวนนักศึกษาเก่าตามปีที่เข้าศึกษา",
         font: { size: 18 },
       },
     },
@@ -136,7 +136,7 @@ export default function AlumniCountPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="mb-8 text-center text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-        จำนวนศิษย์เก่าตามปีที่เข้าศึกษา
+        จำนวนนักศึกษาเก่าตามปีที่เข้าศึกษา
       </h1>
 
       <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
@@ -149,7 +149,7 @@ export default function AlumniCountPage() {
 
         <div className="mt-6 border-t border-[var(--border)] pt-4 text-center">
           <p className="text-lg font-semibold text-[var(--primary)]">
-            จำนวนศิษย์เก่าทั้งหมด: {totalCount.toLocaleString()} คน
+            จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
           </p>
         </div>
       </div>

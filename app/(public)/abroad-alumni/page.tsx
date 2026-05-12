@@ -72,7 +72,7 @@ export default function AbroadAlumniPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="mb-8 text-center text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-        ศิษย์เก่าต่างประเทศ
+        ข้อมูลการทำงานต่างประเทศ
       </h1>
 
       {/* Filters */}

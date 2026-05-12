@@ -799,7 +799,7 @@ export default function AlumniAdminPage() {
                     }
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  ศักยภาพศิษย์เก่า
+                  ศักยภาพ
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
@@ -813,7 +813,7 @@ export default function AlumniAdminPage() {
                     }
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  ศิษย์เก่าแบบอย่าง
+                  ผู้แทนรุ่น
                 </label>
               </div>
 

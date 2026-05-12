@@ -23,13 +23,13 @@ export const AWARD_TYPE_OPTIONS = Object.entries(AWARD_TYPE_LABELS).map(([value,
 
 export const NAV_ITEMS = [
   { href: "/", label: "หน้าหลัก" },
-  { href: "/alumni-count", label: "จำนวนศิษย์เก่า" },
+  { href: "/alumni-count", label: "จำนวนนักศึกษาเก่า" },
   { href: "/awards", label: "รางวัล" },
-  { href: "/potentials", label: "ศักยภาพศิษย์เก่า" },
+  { href: "/potentials", label: "ศักยภาพ" },
   { href: "/associations", label: "สมาคม/ชมรม" },
-  { href: "/graduate-committee", label: "คณะกรรมการบัณฑิต" },
-  { href: "/model-representatives", label: "ศิษย์เก่าแบบอย่าง" },
-  { href: "/abroad-alumni", label: "ศิษย์เก่าต่างประเทศ" },
+  { href: "/graduate-committee", label: "กรรมการบัณฑิต" },
+  { href: "/model-representatives", label: "ผู้แทนรุ่น" },
+  { href: "/abroad-alumni", label: "ข้อมูลการทำงานต่างประเทศ" },
 ];
 
 export const ADMIN_NAV_ITEMS = [

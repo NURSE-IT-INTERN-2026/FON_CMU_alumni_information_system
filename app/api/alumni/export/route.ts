@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       "สถานที่ทำงาน": a.currentWorkplace || "",
       "ประเทศ": a.country || "",
       "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
-      "ศิษย์เก่าแบบอย่าง": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
+      "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
       "ความเชี่ยวชาญ": a.expertise || "",
       "สรุปผลงาน": a.achievementSummary || "",
     }));
