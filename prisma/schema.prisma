@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DegreeLevel {
+  DOCTORAL
+  MASTER
+  BACHELOR
+  NURSING_CERTIFICATE
+}
+
+enum AwardType {
+  INTERNATIONAL
+  NATIONAL
+  LOCAL
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Alumni {
+  id                    String    @id @default(uuid())
+  studentId             String    @unique
+  firstName             String
+  lastName              String
+  degreeLevel           DegreeLevel
+  initialYear           Int
+  graduationYear        Int
+  email                 String?
+  phone                 String?
+  currentWorkplace      String?
+  country               String?
+  isPotential           Boolean   @default(false)
+  isModelRepresentative Boolean   @default(false)
+  expertise             String?
+  achievementSummary    String?
+  photoUrl              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  awards               Award[]
+  associationMembers   AssociationMember[]
+  graduateCommittees   GraduateCommittee[]
+
+  @@map("alumni")
+}
+
+model Award {
+  id          String    @id @default(uuid())
+  alumniId    String
+  awardName   String
+  awardType   AwardType
+  year        Int
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@map("awards")
+}
+
+model AssociationMember {
+  id              String    @id @default(uuid())
+  alumniId        String
+  associationName String
+  position        String
+  termYear        Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@map("association_members")
+}
+
+model GraduateCommittee {
+  id          String    @id @default(uuid())
+  alumniId    String
+  role        String
+  termYear    Int
+  degreeLevel DegreeLevel
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@map("graduate_committees")
+}
+
+model News {
+  id            String     @id @default(uuid())
+  title         String
+  body          String
+  coverImageUrl String?
+  status        NewsStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("news")
+}
+
+model AdminUser {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("admin")
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions Session[]
+
+  @@map("admin_users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}

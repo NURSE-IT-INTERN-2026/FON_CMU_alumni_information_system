@@ -1,0 +1,66 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { PAGE_SIZE } from "@/lib/constants";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const search = searchParams.get("search") || "";
+    const awardType = searchParams.get("awardType") || "";
+    const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+
+    const where: Record<string, unknown> = {};
+
+    if (awardType) {
+      where.awardType = awardType;
+    }
+
+    if (search) {
+      where.OR = [
+        { awardName: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        {
+          alumni: {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+            ],
+          },
+        },
+      ];
+    }
+
+    const [awards, total] = await Promise.all([
+      prisma.award.findMany({
+        where,
+        include: {
+          alumni: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: { year: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.award.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      data: awards,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (error) {
+    console.error("Failed to fetch awards:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch awards" },
+      { status: 500 }
+    );
+  }
+}
