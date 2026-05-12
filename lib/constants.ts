@@ -38,4 +38,4 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin/users", label: "จัดการผู้ใช้งาน" },
 ];
 
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 10;
