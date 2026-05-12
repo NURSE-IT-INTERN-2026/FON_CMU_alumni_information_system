@@ -9,37 +9,32 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-[var(--primary)] text-white shadow-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
+      {/* Top bar with cyan gradient overlay on the right */}
+      <div className="relative">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-2/5"
+          style={{
+            background:
+              "linear-gradient(to right, rgba(0, 188, 212, 0.7) 0%, rgba(0, 188, 212, 0.4) 40%, transparent 100%)",
+          }}
+        />
+
+        <div className="relative mx-auto flex max-w-full items-center justify-between px-5 py-3 sm:px-7 lg:px-9">
           {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
             <img
               src="/fon-cmu-logo.png"
               alt="FON CMU Logo"
-              height={40}
-              className="h-10 w-auto"
+              className="h-16 w-auto"
             />
-            <span className="hidden text-sm font-semibold leading-tight sm:block md:text-base">
+            <span className="hidden text-sm font-semibold leading-snug sm:block md:text-base">
               ระบบสารสนเทศศิษย์เก่า
               <br />
               คณะพยาบาลศาสตร์ มช.
             </span>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex lg:items-center lg:gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-2.5 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right side: Login + Mobile toggle */}
+          {/* Login + Mobile toggle */}
           <div className="flex items-center gap-2">
             <Link
               href="/login"
@@ -48,7 +43,7 @@ export default function Header() {
               เข้าสู่ระบบ
             </Link>
 
-            {/* Hamburger button */}
+            {/* Hamburger button (mobile only) */}
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-md p-2 text-white hover:bg-white/10 lg:hidden"
