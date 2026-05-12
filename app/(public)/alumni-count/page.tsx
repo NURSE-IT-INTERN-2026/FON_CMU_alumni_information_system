@@ -5,14 +5,23 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface Dataset {
   degreeLevel: string;
@@ -86,7 +95,9 @@ export default function AlumniCountPage() {
   const datasets = chartData.datasets.map((ds) => ({
     label: DEGREE_LABELS[ds.degreeLevel] || ds.degreeLevel,
     data: ds.data,
+    borderColor: DEGREE_COLORS[ds.degreeLevel] || "#999",
     backgroundColor: DEGREE_COLORS[ds.degreeLevel] || "#999",
+    tension: 0.3,
   }));
 
   const options = {
@@ -104,14 +115,12 @@ export default function AlumniCountPage() {
     },
     scales: {
       x: {
-        stacked: true,
         title: {
           display: true,
           text: "ปีที่เข้าศึกษา (พ.ศ.)",
         },
       },
       y: {
-        stacked: true,
         title: {
           display: true,
           text: "จำนวน (คน)",
@@ -132,7 +141,7 @@ export default function AlumniCountPage() {
 
       <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
         <div className="h-[500px]">
-          <Bar
+          <Line
             data={{ labels, datasets }}
             options={options}
           />
