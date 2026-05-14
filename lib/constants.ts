@@ -34,6 +34,8 @@ export const NAV_ITEMS = [
 
 export const ADMIN_NAV_ITEMS = [
   { href: "/admin/alumni", label: "จัดการข้อมูลศิษย์เก่า" },
+  { href: "/admin/potentials", label: "จัดการข้อมูลศักยภาพ" },
+  { href: "/admin/associations", label: "จัดการข้อมูลสมาคม/ชมรม" },
   { href: "/admin/news", label: "จัดการข่าวสาร" },
   { href: "/admin/users", label: "จัดการผู้ใช้งาน" },
 ];

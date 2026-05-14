@@ -12,7 +12,6 @@ export async function GET(
       where: { id },
       include: {
         awards: true,
-        associationMembers: true,
         graduateCommittees: true,
       },
     });
@@ -97,7 +96,6 @@ export async function PUT(
       data: updateData,
       include: {
         awards: true,
-        associationMembers: true,
         graduateCommittees: true,
       },
     });

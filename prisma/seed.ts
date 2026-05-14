@@ -9,9 +9,10 @@ async function main() {
   console.log("Cleaning existing data...");
   await prisma.session.deleteMany();
   await prisma.award.deleteMany();
-  await prisma.associationMember.deleteMany();
+  await prisma.association.deleteMany();
   await prisma.graduateCommittee.deleteMany();
   await prisma.news.deleteMany();
+  await prisma.potential.deleteMany();
   await prisma.alumni.deleteMany();
   await prisma.adminUser.deleteMany();
   console.log("All existing data cleared.\n");
@@ -251,8 +252,8 @@ async function main() {
   }
   console.log(`  Created ${awards.length} award records\n`);
 
-  // ── 5. Create association members ──
-  console.log("Creating association members...");
+  // ── 5. Create associations ──
+  console.log("Creating associations...");
 
   const associationNames = [
     "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.",
@@ -268,33 +269,27 @@ async function main() {
     "ที่ปรึกษา",
   ];
 
-  const associationData = [];
-  const usedAssociationSlots = new Set<string>();
+  const associationSeedData = [
+    { studentId: "51430001", fullName: "สมชาย สุขใจ", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ประธาน", recordedYear: 2568 },
+    { studentId: "51440002", fullName: "สมหญิง บุญมี", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "รองประธาน", recordedYear: 2568 },
+    { studentId: "51450003", fullName: "วิชัย ศรีสวัสดิ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "เลขานุการ", recordedYear: 2568 },
+    { studentId: "51460004", fullName: "นภา วงศ์สวัสดิ์", associationName: "ชมรมพยาบาลภาคเหนือ", position: "ประธาน", recordedYear: 2569 },
+    { studentId: "51470005", fullName: "พรรณี แก้วมณี", associationName: "ชมรมพยาบาลภาคเหนือ", position: "รองประธาน", recordedYear: 2569 },
+    { studentId: "51480006", fullName: "ธนา ธนาพร", associationName: "ชมรมพยาบาลภาคเหนือ", position: "กรรมการ", recordedYear: 2569 },
+    { studentId: "51490007", fullName: "ประภาส รัตนชัย", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ประธาน", recordedYear: 2567 },
+    { studentId: "51500008", fullName: "จิตรา พงษ์ประเสริฐ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ที่ปรึกษา", recordedYear: 2567 },
+    { studentId: "51510009", fullName: "สุภาพ สิทธิโชค", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "กรรมการ", recordedYear: 2569 },
+    { studentId: "51520010", fullName: "วันดี เจริญสุข", associationName: "ชมรมพยาบาลภาคเหนือ", position: "เลขานุการ", recordedYear: 2568 },
+    { studentId: "51530011", fullName: "อรุณ วิเชียรเจริญ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "กรรมการ", recordedYear: 2568 },
+    { studentId: "51540012", fullName: "ปิยะ สมบูรณ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ที่ปรึกษา", recordedYear: 2567 },
+  ];
 
-  for (let i = 0; i < 20; i++) {
-    const alumniIdx = (i * 5 + 1) % alumni.length;
-    const assocIdx = i % associationNames.length;
-    const posIdx = i % positions.length;
-    const termYear = Math.min(2560 + Math.floor(i * 8 / 20), 2569);
-
-    const key = `${alumni[alumniIdx].id}-${assocIdx}-${termYear}`;
-    if (usedAssociationSlots.has(key)) continue;
-    usedAssociationSlots.add(key);
-
-    associationData.push({
-      alumniId: alumni[alumniIdx].id,
-      associationName: associationNames[assocIdx],
-      position: positions[posIdx],
-      termYear,
-    });
+  const associations = [];
+  for (const data of associationSeedData) {
+    const record = await prisma.association.create({ data });
+    associations.push(record);
   }
-
-  const associationMembers = [];
-  for (const data of associationData) {
-    const record = await prisma.associationMember.create({ data });
-    associationMembers.push(record);
-  }
-  console.log(`  Created ${associationMembers.length} association member records\n`);
+  console.log(`  Created ${associations.length} association records\n`);
 
   // ── 6. Create graduate committee members ──
   console.log("Creating graduate committee members...");
@@ -420,15 +415,44 @@ async function main() {
   }
   console.log(`  Created ${newsRecords.length} news articles\n`);
 
+  // ── 8. Create potentials ──
+  console.log("Creating potentials...");
+
+  const potentialData = [
+    { studentId: "51430001", fullName: "สมชาย สุขใจ", career: "พยาบาลวิชาชีพ", position: "ผู้จัดการแผนกผู้ป่วยใน", recordedYear: 2568 },
+    { studentId: "51440002", fullName: "สมหญิง บุญมี", career: "อาจารย์พยาบาล", position: "รองศาสตราจารย์", recordedYear: 2568 },
+    { studentId: "51450003", fullName: "วิชัย ศรีสวัสดิ์", career: "ผู้บริหารโรงพยาบาล", position: "ผู้อำนวยการโรงพยาบาล", recordedYear: 2568 },
+    { studentId: "51460004", fullName: "นภา วงศ์สวัสดิ์", career: "นักวิจัยทางการพยาบาล", position: "หัวหน้าทีมวิจัย", recordedYear: 2569 },
+    { studentId: "51470005", fullName: "พรรณี แก้วมณี", career: "พยาบาลผู้ป่วยวิกฤต", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
+    { studentId: "51480006", fullName: "ธนา ธนาพร", career: "ที่ปรึกษาด้านสาธารณสุข", position: "ที่ปรึกษาองค์การอนามัยโลก", recordedYear: 2569 },
+    { studentId: "51490007", fullName: "ประภาส รัตนชัย", career: "พยาบาลสูติกรรม", position: "หัวหน้าหอผู้ป่วย", recordedYear: 2567 },
+    { studentId: "51500008", fullName: "จิตรา พงษ์ประเสริฐ", career: "นักวิชาการสาธารณสุข", position: "ผู้เชี่ยวชาญด้านนโยบายสาธารณสุข", recordedYear: 2567 },
+    { studentId: "51510009", fullName: "สุภาพ สิทธิโชค", career: "พยาบาลจิตเวช", position: "พยาบาลวิชาชีพชำนาญการ", recordedYear: 2567 },
+    { studentId: "51520010", fullName: "วันดี เจริญสุข", career: "ผู้จัดการโครงการสุขภาพ", position: "ผู้จัดการโครงการ", recordedYear: 2568 },
+    { studentId: "51530011", fullName: "อรุณ วิเชียรเจริญ", career: "อาจารย์คลินิก", position: "อาจารย์ ระดับ 9", recordedYear: 2569 },
+    { studentId: "51540012", fullName: "ปิยะ สมบูรณ์", career: "พยาบาลเด็กแรกเกิด", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
+    { studentId: "51550013", fullName: "มนัส กิจเจริญ", career: "ผู้บริหารการพยาบาล", position: "ผู้อำนวยการกองการพยาบาล", recordedYear: 2568 },
+    { studentId: "51560014", fullName: "กานดา ภูมิพัฒน์", career: "นักวิจัยด้านมะเร็งวิทยา", position: "นักวิจัยหลังปริญญาเอก", recordedYear: 2567 },
+    { studentId: "51570015", fullName: "ธีรพงษ์ มณีรัตน์", career: "พยาบาลชุมชน", position: "หัวหน้าสถานีอนามัย", recordedYear: 2568 },
+  ];
+
+  const potentials = [];
+  for (const data of potentialData) {
+    const record = await prisma.potential.create({ data });
+    potentials.push(record);
+  }
+  console.log(`  Created ${potentials.length} potential records\n`);
+
   // ── Summary ──
   console.log("=".repeat(50));
   console.log("Seeding complete! Summary:");
   console.log(`  Admin Users      : 2`);
   console.log(`  Alumni           : ${alumni.length}`);
   console.log(`  Awards           : ${awards.length}`);
-  console.log(`  Association Mbrs : ${associationMembers.length}`);
+  console.log(`  Associations     : ${associations.length}`);
   console.log(`  Graduate Comm.   : ${committees.length}`);
   console.log(`  News Articles    : ${newsRecords.length}`);
+  console.log(`  Potentials       : ${potentials.length}`);
   console.log("=".repeat(50));
 }
 

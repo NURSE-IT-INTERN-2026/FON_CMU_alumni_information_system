@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           awards: true,
-          associationMembers: true,
           graduateCommittees: true,
         },
         orderBy: { [validSortField]: validSortOrder },
@@ -140,7 +139,6 @@ export async function POST(request: NextRequest) {
       },
       include: {
         awards: true,
-        associationMembers: true,
         graduateCommittees: true,
       },
     });

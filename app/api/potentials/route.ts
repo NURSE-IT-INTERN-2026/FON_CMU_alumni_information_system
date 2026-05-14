@@ -9,30 +9,29 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
 
-    const where: Record<string, unknown> = {
-      isPotential: true,
-    };
+    const where: Record<string, unknown> = {};
 
     if (search) {
       where.OR = [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { expertise: { contains: search, mode: "insensitive" } },
+        { studentId: { contains: search, mode: "insensitive" } },
+        { fullName: { contains: search, mode: "insensitive" } },
+        { career: { contains: search, mode: "insensitive" } },
+        { position: { contains: search, mode: "insensitive" } },
       ];
     }
 
-    const [alumni, total] = await Promise.all([
-      prisma.alumni.findMany({
+    const [potentials, total] = await Promise.all([
+      prisma.potential.findMany({
         where,
-        orderBy: { graduationYear: "desc" },
+        orderBy: { recordedYear: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
-      prisma.alumni.count({ where }),
+      prisma.potential.count({ where }),
     ]);
 
     return NextResponse.json({
-      data: alumni,
+      data: potentials,
       total,
       page,
       pageSize,
@@ -41,7 +40,39 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Failed to fetch potentials:", error);
     return NextResponse.json(
-      { error: "Failed to fetch potential alumni" },
+      { error: "Failed to fetch potentials" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { studentId, fullName, career, position, recordedYear } = body;
+
+    if (!studentId || !fullName || !career || !position || !recordedYear) {
+      return NextResponse.json(
+        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
+        { status: 400 }
+      );
+    }
+
+    const potential = await prisma.potential.create({
+      data: {
+        studentId: studentId.trim(),
+        fullName: fullName.trim(),
+        career: career.trim(),
+        position: position.trim(),
+        recordedYear: Number(recordedYear),
+      },
+    });
+
+    return NextResponse.json(potential, { status: 201 });
+  } catch (error) {
+    console.error("Failed to create potential:", error);
+    return NextResponse.json(
+      { error: "Failed to create potential" },
       { status: 500 }
     );
   }

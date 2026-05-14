@@ -1,50 +1,47 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { DEGREE_LABELS, PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE } from "@/lib/constants";
 
-interface Alumni {
+interface Potential {
   id: string;
-  firstName: string;
-  lastName: string;
-  degreeLevel: string;
-  graduationYear: number;
-  expertise: string | null;
-  photoUrl: string | null;
+  studentId: string;
+  fullName: string;
+  career: string;
+  position: string;
+  recordedYear: number;
 }
 
 interface ApiResponse {
-  data: Alumni[];
+  data: Potential[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
 }
 
-function getInitials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`;
-}
-
 export default function PotentialsPage() {
-  const [alumni, setAlumni] = useState<Alumni[]>([]);
+  const [potentials, setPotentials] = useState<Potential[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
 
-  const fetchAlumni = useCallback(async () => {
+  const fetchPotentials = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
-        search,
       });
+      if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/potentials?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
-      setAlumni(data.data);
+      setPotentials(data.data);
       setTotalPages(data.totalPages);
+      setTotal(data.total);
     } catch (err) {
       console.error(err);
     } finally {
@@ -53,13 +50,15 @@ export default function PotentialsPage() {
   }, [page, search]);
 
   useEffect(() => {
-    fetchAlumni();
-  }, [fetchAlumni]);
+    fetchPotentials();
+  }, [fetchPotentials]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
   };
+
+  const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -71,65 +70,60 @@ export default function PotentialsPage() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="ค้นหาชื่อหรือความเชี่ยวชาญ..."
+          placeholder="ค้นหารหัสนักศึกษา, ชื่อ-สกุล, อาชีพ, ตำแหน่ง..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
         />
       </div>
 
-      {/* Card Grid */}
+      {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
-      ) : alumni.length === 0 ? (
+      ) : potentials.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
           <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {alumni.map((a) => (
-            <div
-              key={a.id}
-              className="overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-center gap-4 p-5">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--primary)]/10">
-                  {a.photoUrl ? (
-                    <img
-                      src={a.photoUrl}
-                      alt={`${a.firstName} ${a.lastName}`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-[var(--primary)]">
-                      {getInitials(a.firstName, a.lastName)}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-base font-semibold text-[var(--foreground)]">
-                    {a.firstName} {a.lastName}
-                  </h3>
-                  <p className="text-sm text-[var(--muted)]">
-                    {DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}
-                  </p>
-                  <p className="text-sm text-[var(--muted)]">
-                    ปีที่จบ: {a.graduationYear}
-                  </p>
-                </div>
-              </div>
-              {a.expertise && (
-                <div className="border-t border-[var(--border)] px-5 py-3">
-                  <p className="text-sm text-[var(--muted)]">
-                    <span className="font-medium text-[var(--foreground)]">ความเชี่ยวชาญ:</span>{" "}
-                    {a.expertise}
-                  </p>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[var(--primary)] text-white">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  ลำดับ
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  รหัสนักศึกษา
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  ชื่อ-สกุล
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  อาชีพ
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  ตำแหน่ง
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  ปีที่บันทึก
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {potentials.map((p, i) => (
+                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
+                  <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
+                  <td className="px-4 py-3">{p.fullName}</td>
+                  <td className="px-4 py-3">{p.career}</td>
+                  <td className="px-4 py-3">{p.position}</td>
+                  <td className="px-4 py-3 text-center">{p.recordedYear}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

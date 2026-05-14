@@ -46,7 +46,6 @@ model Alumni {
   updatedAt             DateTime  @updatedAt
 
   awards               Award[]
-  associationMembers   AssociationMember[]
   graduateCommittees   GraduateCommittee[]
 
   @@map("alumni")
@@ -67,18 +66,17 @@ model Award {
   @@map("awards")
 }
 
-model AssociationMember {
-  id              String    @id @default(uuid())
-  alumniId        String
+model Association {
+  id              String   @id @default(uuid())
+  studentId       String
+  fullName        String
   associationName String
   position        String
-  termYear        Int
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  recordedYear    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
-
-  @@map("association_members")
+  @@map("associations")
 }
 
 model GraduateCommittee {
@@ -106,6 +104,19 @@ model News {
   updatedAt     DateTime   @updatedAt
 
   @@map("news")
+}
+
+model Potential {
+  id           String   @id @default(uuid())
+  studentId    String
+  fullName     String
+  career       String
+  position     String
+  recordedYear Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("potentials")
 }
 
 model AdminUser {
