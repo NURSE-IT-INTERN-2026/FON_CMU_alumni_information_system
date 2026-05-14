@@ -119,6 +119,19 @@ model Potential {
   @@map("potentials")
 }
 
+model AbroadAlumni {
+  id         String   @id @default(uuid())
+  name       String
+  address    String?
+  country    String
+  university String?
+  order      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("abroad_alumni")
+}
+
 model AdminUser {
   id           String    @id @default(uuid())
   name         String

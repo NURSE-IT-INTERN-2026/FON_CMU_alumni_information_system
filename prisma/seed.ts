@@ -13,6 +13,7 @@ async function main() {
   await prisma.graduateCommittee.deleteMany();
   await prisma.news.deleteMany();
   await prisma.potential.deleteMany();
+  await prisma.abroadAlumni.deleteMany();
   await prisma.alumni.deleteMany();
   await prisma.adminUser.deleteMany();
   console.log("All existing data cleared.\n");
@@ -443,6 +444,153 @@ async function main() {
   }
   console.log(`  Created ${potentials.length} potential records\n`);
 
+  // ── 9. Create abroad alumni (scraped from reference site) ──
+  console.log("Creating abroad alumni...");
+
+  const abroadAlumniData = [
+    // USA alumni (1-45)
+    { name: "สุดฤทัย ศรีกำพล", address: "14300 Terra Bella #29 Panorama City CA.91402", country: "สหรัฐอเมริกา", university: null, order: 1 },
+    { name: "Vachareeratang Sererut", address: "5545 N.California Chicago IL.60625", country: "สหรัฐอเมริกา", university: null, order: 2 },
+    { name: "กาญจนา แต่งสอน", address: "81-60 247 th St.Bellerose, N.Y. 11426", country: "สหรัฐอเมริกา", university: null, order: 3 },
+    { name: "วไลลักษณ์ ภัณธนเกษม", address: "373 ถ.วานิช 1 ต.จักรวรรดิ สัมพันธวงศ์ กทม. 10100", country: "สหรัฐอเมริกา", university: null, order: 4 },
+    { name: "อรพรรณ พันธาภิรัตน์", address: "624 LongHilll RN River Valr N.S. 07672", country: "สหรัฐอเมริกา", university: null, order: 5 },
+    { name: "Thida Petchor", address: "965 Ramsden Run, Alpharetta, CA. 30022-4702", country: "สหรัฐอเมริกา", university: null, order: 6 },
+    { name: "พิศมัย ตันพัฒนาเจริญ", address: "500 Ackly St.Monterey Park CA. 91755 USA.", country: "สหรัฐอเมริกา", university: null, order: 7 },
+    { name: "Orapin Chullasavock", address: "4035 N.Sawyer Chicago Illinois 60618", country: "สหรัฐอเมริกา", university: null, order: 8 },
+    { name: "จินตนา ไกรลาศ (กูรมะโรหิต)", address: "1461 LA Lome Drive, Santa ANA, CA. 92705", country: "สหรัฐอเมริกา", university: null, order: 9 },
+    { name: "ฉวีวรรณ สีละวิทย์", address: "3308, W. 189 th St.Torrance, CA. 90504", country: "สหรัฐอเมริกา", university: null, order: 10 },
+    { name: "กัลยาณี นาคประดิษฐ์ (เนตรอัคคี)", address: "33-12 86 Street Jackson Heights, N.Y. 11372-1536", country: "สหรัฐอเมริกา", university: null, order: 11 },
+    { name: "Pimpaka Suriyong", address: "4035 N.Sawyer Chicago IL. 60618", country: "สหรัฐอเมริกา", university: null, order: 12 },
+    { name: "ผกาวรรณ อุณหะสูต", address: "711 Prospect Ave Mamaroneck N.Y. 10543", country: "สหรัฐอเมริกา", university: null, order: 13 },
+    { name: "พวงทรัพย์ เปรื่องการ สูณัฐตระกูล", address: "7338 Wolfreen Trail Fairview Heights, IL. 62208", country: "สหรัฐอเมริกา", university: null, order: 14 },
+    { name: "ประจง (วิญิบุตร) พิทยาธิคุณ", address: "705 Campbell Drive Sparta IL.62286", country: "สหรัฐอเมริกา", university: null, order: 15 },
+    { name: "ลดารัตน์ (เกียรติพลพจน์) ตั้งชีวินศิริกุล", address: "7346 Wolfreen Trail, Fairview Heights, IL.62208.", country: "สหรัฐอเมริกา", university: null, order: 16 },
+    { name: "เจือจันทร์ จัยสิน", address: "1165 Cruknit Lane Coring CA.92880", country: "สหรัฐอเมริกา", university: null, order: 17 },
+    { name: "เครือวัลย์ ศรีวภา (Kruewan Srivapa)", address: "1 EI Vaquero, Rnch Snta Margar, CA 92688", country: "สหรัฐอเมริกา", university: null, order: 18 },
+    { name: "จำนง นิ่มตระกูล (C. Nimtragool)", address: "13130 Caravel St., Cerritos, CA 90703", country: "สหรัฐอเมริกา", university: null, order: 19 },
+    { name: "ชวนพิศ (เกิดเนียม) สังขกิจกรณีย์ (C.Sungkakitkoranee)", address: "5896 Sycamore Ave., Rialto, CA 92377-3910", country: "สหรัฐอเมริกา", university: null, order: 20 },
+    { name: "ทัสนีย์ (ธนานุรักษ์) (Thasani Chandra)", address: "1168 Barbara Dr., Cherry Hill, NJ. 08003", country: "สหรัฐอเมริกา", university: null, order: 21 },
+    { name: "พัฒนา บุญมี (P.Boonmee)", address: "19625 Sabrina Ct. Cerritos, CA 90701", country: "สหรัฐอเมริกา", university: null, order: 22 },
+    { name: "เพ็ญศรี (กุยยกานนท์) อติภัทธะ (Pensri Athipatha)", address: "7852 West Park Ave., Niles, IL 60714", country: "สหรัฐอเมริกา", university: null, order: 23 },
+    { name: "วรรธนา (การุณยุญญานันท์) ชุณห์ถนอม (Wadhana Choontanom)", address: "1825 Jacaranda Place, Fullerton, CA 92833", country: "สหรัฐอเมริกา", university: null, order: 24 },
+    { name: "วัลลภา (ศุภศิริรัตน์) รักสกุลไทย (V.Rukskulthai)", address: "201 Williams, Fredericktown, MO 63645", country: "สหรัฐอเมริกา", university: null, order: 25 },
+    { name: "สมสุข (เครือวรรณ) สาระชัย (S.K. Sarachai)", address: "3318 76th St., Flushing, NY. 11372-1152", country: "สหรัฐอเมริกา", university: null, order: 26 },
+    { name: "เสาวนีย์ (สุทธพินธุ) จุฬามรกต (S.Chulamorakodt)", address: "R.R. #3 Box 94, Vandalia, IL 62471 E-mail: Chulamorkodt@yahoo.com.", country: "สหรัฐอเมริกา", university: null, order: 27 },
+    { name: "โสมนัส (ไชยเพ็ชร) เสริมชีพ (S.Sermchief)", address: "1222 Stonewolf Tr., Fairveiw Height, IL. 62208", country: "สหรัฐอเมริกา", university: null, order: 28 },
+    { name: "อารียา (จินตธรรม) Adams", address: "8634 Forsythe St., Sunland, CA 91041", country: "สหรัฐอเมริกา", university: null, order: 29 },
+    { name: "พริ้มเพรา สุชาตานนท์ (P. SUTATANOND)", address: "1209 E. CLARK TRAIL HERRIN IL 62948 U.S.A. H: 618-942-2807", country: "สหรัฐอเมริกา", university: null, order: 30 },
+    { name: "ประคองศรี ศักดิ์ศรี (P. SAKDISRI)", address: "121 CRESTMOOR St COLLINSVILLE IL 62234 U.S.A. H: 618-346-2549 C: 618-210-7679", country: "สหรัฐอเมริกา", university: null, order: 31 },
+    { name: "พวงทรัพย์ สุณัฐตระกูล (P. SOONATTRAKUL)", address: "7338 WOLF RUN TRAIL FAIRVIEW HEIGHTS IL 62208 U.S.A. H: 618-628-7262 C: 573-888-2128", country: "สหรัฐอเมริกา", university: null, order: 32 },
+    { name: "พิจิตร พฤติธรรม (P. PHRUTTITUM)", address: "3 FLAG STICK COURT St. LOUIS MO 63127 U.S.A. H: 641-228-6084 C: 641-330-5736", country: "สหรัฐอเมริกา", university: null, order: 33 },
+    { name: "ละเอียด ฉัตรคุปต์", address: "1213 JILL LANE EXELSIOR SPRING, MO 64024 U.S.A. H: 816-630-5269 C: 816-686-5069", country: "สหรัฐอเมริกา", university: null, order: 34 },
+    { name: "ลิบดา ติวรศักดิ์ (L. TIVORSAK)", address: "1716 COUNTRY LANE AT CHINSON KA 66002 U.S.A. H: 913-367-0089", country: "สหรัฐอเมริกา", university: null, order: 35 },
+    { name: "อัมพร ศุภวนิช (A. SUPAWANICH)", address: "9841 CANNON GATE PKWY VILLA RICA, GA 30180 U.S.A. H: 770-456-0666 C: 678-371-8006", country: "สหรัฐอเมริกา", university: null, order: 36 },
+    { name: "แสงดาว ตุลยเสถียร (S. TULYASATHIEN)", address: "4306 156Th AVE NE APT PP 147 REDMOND, WA 98052 U.S.A. C: 425-885-2636", country: "สหรัฐอเมริกา", university: null, order: 37 },
+    { name: "จุไร ไกรสร (J. KRAISORN)", address: "1104 S. CALIFORNIA AVE W. COVINA, CA 91790 U.S.A. H: 626-960-7134 C: 626-806-2133", country: "สหรัฐอเมริกา", university: null, order: 38 },
+    { name: "จิตราภรณ์ Kanares", address: "840 E LIVE OAK St. APT. B GABRIEL, CA 91776 U.S.A. 626-291-2594", country: "สหรัฐอเมริกา", university: null, order: 39 },
+    { name: "พรรณี CLARK", address: "2175 DE COTO APT # 192 UNION CITY CA 94587 U.S.A.", country: "สหรัฐอเมริกา", university: null, order: 40 },
+    { name: "ขวัญใจ Narangajavana (K. NARANGAJAVANA)", address: "2804 A WELSH ROAD PHILADELPHIA. PA 19152 U.S.A. 215-969-4872", country: "สหรัฐอเมริกา", university: null, order: 41 },
+    { name: "สุทธิลักษณ์ BRENT", address: "6441 lock LOCK LOMMOND DR. KEYSTONE HEIGHTS FL 32656 U.S.A. H: 352-473-2350", country: "สหรัฐอเมริกา", university: null, order: 42 },
+    { name: "ปานจิต ฮันตระกูล (P. HUNTRAKUL)", address: "1501 METROPOLITAN AVE #8 D BRONX, NY 10462 U.S.A. 718-863-0800", country: "สหรัฐอเมริกา", university: null, order: 43 },
+    { name: "ศุภนิตย์ Sethakorn", address: "541 Meadow Dr. Gibson city, IL 60931 U.S.A. H. 217-784-4104", country: "สหรัฐอเมริกา", university: null, order: 44 },
+    { name: "เกสร จันทร์ประภาพ", address: "S. 308 Birnam Trail Willow Brook, IL 60527 U.S.A. / 6 ถ. สันติรักษ์ ต. ช้างเผือก อ. เมือง จ. เชียงใหม่ 50300 H: 053-219-831", country: "สหรัฐอเมริกา", university: null, order: 45 },
+    // Central South University Xiang-Ya School of Nursing
+    { name: "Prof. He Guoping (Dean)", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 1 },
+    { name: "Cai Yimin [G 5]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 2 },
+    { name: "Huang Jin [G 1]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 3 },
+    { name: "Li Lezhi [G 2]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 4 },
+    { name: "Wang Honghong [G 1]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 5 },
+    { name: "Yan Jin [G 2]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 6 },
+    { name: "Zeng Hui [G 5]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 7 },
+    { name: "Zhang Jingping [G 3]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 8 },
+    // China Medical University
+    { name: "Prof. Qiao Min (Dean)", address: null, country: "ประเทศจีน", university: "China Medical University", order: 1 },
+    { name: "Prof. Yu Yan Gin (Director of Nursing College)", address: null, country: "ประเทศจีน", university: "China Medical University", order: 2 },
+    { name: "Cao Ying [G 3]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 3 },
+    { name: "Fan Ling [G 5]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 4 },
+    { name: "Guo Hong [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 5 },
+    { name: "Li Xiaohan [G 1]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 6 },
+    { name: "Sun Tianjie [G 5]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 7 },
+    { name: "Wang Jian [G 1]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 8 },
+    { name: "Zhang Bo [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 9 },
+    { name: "Zhang Xiuyue [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 10 },
+    { name: "Zhao Haping [G 2]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 11 },
+    // Fudan University
+    { name: "Dr. Jai Hongli (Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 1 },
+    { name: "Prof. Dai Baozhen (Former Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 2 },
+    { name: "Prof. Yang Yinghua (Former Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 3 },
+    { name: "Cheng Yun [G 3]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 4 },
+    { name: "Hu Yan [G 1]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 5 },
+    { name: "Li Xiaoying [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 6 },
+    { name: "Shao Wenli [G 1]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 7 },
+    { name: "Xi Shuxin [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 8 },
+    { name: "Xia Haiou [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 9 },
+    { name: "Xu Hong [G 3]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 10 },
+    { name: "Yan Meiqiong [G 2]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 11 },
+    // Peking Union Medical College
+    { name: "Dr. Huaping Liu (Dean)", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 1 },
+    { name: "Chen Jingli [G 2]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 2 },
+    { name: "Li Zheng [G 1]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 3 },
+    { name: "Liang Xiaokun [G 3]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 4 },
+    { name: "Liu Jianfen [G 2]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 5 },
+    { name: "Sheng Yu [G 5]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 6 },
+    { name: "Zhao Yan [G 4]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 7 },
+    // Peking University Health Science Center
+    { name: "Prof. Zheng Xiuxia (Dean)", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 1 },
+    { name: "Prof. Yao Jingpeng (Former Dean)", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 2 },
+    { name: "Liu Jun-e [G 3]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 3 },
+    { name: "Liu Yu [G 4]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 4 },
+    { name: "Wang Chenguang [G 5]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 5 },
+    { name: "Wang Qun [G 3]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 6 },
+    { name: "Zhang Haiyan [G 2]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 7 },
+    // Sichuan University
+    { name: "Prof. Jiang Xiaolian (Dean)", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 1 },
+    { name: "Prof. Yin Kei (Former Dean)", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 2 },
+    { name: "Feng Xiangqiong [G 5]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 3 },
+    { name: "Li Xiao lin [G 3]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 4 },
+    { name: "Li Xiaoling [G 1]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 5 },
+    { name: "Liu Suzhen [G 3]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 6 },
+    { name: "Song Jingping [G 5]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 7 },
+    { name: "Wang Shiping [G 1]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 8 },
+    { name: "Wang Yuqiong [G 2]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 9 },
+    { name: "Zhao Xiufang [G 4]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 10 },
+    { name: "Zhu Mingxia [G 2]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 11 },
+    // Sun Yat-Sen University, Guangzhou
+    { name: "Assoc.Prof. You Liming (Dean)", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 1 },
+    { name: "Chen Xhi Qun [G 4]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 2 },
+    { name: "Gao Lingling [G 5]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 3 },
+    { name: "Liu Ke [G 3]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 4 },
+    { name: "Lin Xiyin [G 1]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 5 },
+    { name: "Luo Xhimin [G 3]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 6 },
+    { name: "Yan Jun [G 4]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 7 },
+    { name: "Zeng Wen [G 1]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 8 },
+    { name: "Zhang Meifen [G 2]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 9 },
+    { name: "Zhu Yanli", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 10 },
+    // Xi'an Jiaotong University
+    { name: "Prof. Zheng Nanning (President)", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 1 },
+    { name: "Prof. Ren Huimin", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 2 },
+    { name: "Dr. Yan Jianqun", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 3 },
+    { name: "Dr. Yan Hong", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 4 },
+    { name: "Dr. Li Wei", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 5 },
+    { name: "Dr. Zhu Hongliang", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 6 },
+    { name: "Assoc.Prof. Li Xiaomei (Dean) [G 1]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 7 },
+    { name: "Gao Rui [G 4]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 8 },
+    { name: "Gu Wei [G 3]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 9 },
+    { name: "Jiang Wenhui [G 2]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 10 },
+    { name: "Li Jing [G 2]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 11 },
+    { name: "Liu Ming [G 4]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 12 },
+    { name: "Lu Aili [G 5]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 13 },
+    { name: "Wang Wenru [G 1]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 14 },
+    { name: "Wang Xiaoquin [G 5]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 15 },
+  ];
+
+  const abroadAlumni = [];
+  for (const data of abroadAlumniData) {
+    const record = await prisma.abroadAlumni.create({ data });
+    abroadAlumni.push(record);
+  }
+  console.log(`  Created ${abroadAlumni.length} abroad alumni records\n`);
+
   // ── Summary ──
   console.log("=".repeat(50));
   console.log("Seeding complete! Summary:");
@@ -453,6 +601,7 @@ async function main() {
   console.log(`  Graduate Comm.   : ${committees.length}`);
   console.log(`  News Articles    : ${newsRecords.length}`);
   console.log(`  Potentials       : ${potentials.length}`);
+  console.log(`  Abroad Alumni    : ${abroadAlumni.length}`);
   console.log("=".repeat(50));
 }
 

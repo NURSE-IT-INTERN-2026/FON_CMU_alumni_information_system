@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { PAGE_SIZE } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
     const country = searchParams.get("country") || "";
-    const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
 
-    const where: Record<string, unknown> = {
-      country: { not: null },
-    };
+    const where: Record<string, unknown> = {};
 
     if (country) {
       where.country = country;
@@ -20,37 +15,28 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { address: { contains: search, mode: "insensitive" } },
+        { university: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
-        { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
     }
 
-    const [alumni, total] = await Promise.all([
-      prisma.alumni.findMany({
+    const [alumni, countries] = await Promise.all([
+      prisma.abroadAlumni.findMany({
         where,
-        orderBy: { graduationYear: "desc" },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        orderBy: [{ country: "asc" }, { university: "asc" }, { order: "asc" }],
       }),
-      prisma.alumni.count({ where }),
+      prisma.abroadAlumni.findMany({
+        select: { country: true },
+        distinct: ["country"],
+        orderBy: { country: "asc" },
+      }),
     ]);
-
-    const countries = await prisma.alumni.findMany({
-      where: { country: { not: null } },
-      select: { country: true },
-      distinct: ["country"],
-      orderBy: { country: "asc" },
-    });
 
     return NextResponse.json({
       data: alumni,
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-      countries: countries.map((c) => c.country).filter(Boolean),
+      countries: countries.map((c) => c.country),
     });
   } catch (error) {
     console.error("Failed to fetch abroad alumni:", error);
