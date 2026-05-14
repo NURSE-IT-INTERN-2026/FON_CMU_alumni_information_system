@@ -279,7 +279,7 @@ export default function AwardsPage() {
                         {AWARD_TYPE_LABELS[award.awardType] || award.awardType}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{award.year + 543}</td>
+                    <td className="px-4 py-3">{award.year}</td>
                     <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]">
                       {award.description || "-"}
                     </td>

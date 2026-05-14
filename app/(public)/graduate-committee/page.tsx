@@ -120,7 +120,7 @@ export default function GraduateCommitteePage() {
                       {c.alumni.firstName} {c.alumni.lastName}
                     </td>
                     <td className="px-4 py-3">{c.role}</td>
-                    <td className="px-4 py-3">{c.termYear + 543}</td>
+                    <td className="px-4 py-3">{c.termYear}</td>
                     <td className="px-4 py-3">
                       <span className="inline-block rounded-full bg-[var(--primary)]/10 px-3 py-1 text-xs font-medium text-[var(--primary)]">
                         {DEGREE_LABELS[c.degreeLevel] || c.degreeLevel}

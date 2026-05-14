@@ -116,7 +116,7 @@ export default function PotentialsPage() {
                     {DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}
                   </p>
                   <p className="text-sm text-[var(--muted)]">
-                    ปีที่จบ: {a.graduationYear + 543}
+                    ปีที่จบ: {a.graduationYear}
                   </p>
                 </div>
               </div>

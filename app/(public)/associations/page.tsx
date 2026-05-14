@@ -130,7 +130,7 @@ export default function AssociationsPage() {
                           {member.alumni.firstName} {member.alumni.lastName}
                         </td>
                         <td className="px-4 py-2.5">{member.position}</td>
-                        <td className="px-4 py-2.5">{member.termYear + 543}</td>
+                        <td className="px-4 py-2.5">{member.termYear}</td>
                       </tr>
                     ))}
                   </tbody>

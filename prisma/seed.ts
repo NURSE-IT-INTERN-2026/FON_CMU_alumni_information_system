@@ -22,16 +22,20 @@ async function main() {
   const superadminHash = await hashPassword("password123");
 
   const [admin, superadmin] = await Promise.all([
-    prisma.adminUser.create({
-      data: {
+    prisma.adminUser.upsert({
+      where: { email: "admin@fon.cmu.ac.th" },
+      update: {},
+      create: {
         name: "ผู้ดูแลระบบ",
         email: "admin@fon.cmu.ac.th",
         passwordHash: adminHash,
         role: "admin",
       },
     }),
-    prisma.adminUser.create({
-      data: {
+    prisma.adminUser.upsert({
+      where: { email: "superadmin@fon.cmu.ac.th" },
+      update: {},
+      create: {
         name: "ผู้ดูแลระบบสูงสุด",
         email: "superadmin@fon.cmu.ac.th",
         passwordHash: superadminHash,
@@ -134,7 +138,7 @@ async function main() {
     const firstName = firstNames[i];
     const lastName = lastNames[i % lastNames.length];
     const degreeLevel = degreeLevels[i];
-    const initialYear = 2540 + Math.floor(i * 21 / 50); // spread 2540-2560
+    const initialYear = Math.min(2540 + Math.floor(i * 21 / 50), 2569);
 
     let graduationYear: number;
     if (degreeLevel === "DOCTORAL") {
@@ -144,6 +148,7 @@ async function main() {
     } else {
       graduationYear = initialYear + 4;
     }
+    graduationYear = Math.min(graduationYear, 2569);
 
     const hasEmail = i % 3 !== 2;
     const hasPhone = i % 2 === 0;
@@ -173,7 +178,11 @@ async function main() {
 
   const alumni = [];
   for (const data of alumniData) {
-    const record = await prisma.alumni.create({ data });
+    const record = await prisma.alumni.upsert({
+      where: { studentId: data.studentId },
+      update: {},
+      create: data,
+    });
     alumni.push(record);
   }
   console.log(`  Created ${alumni.length} alumni records\n`);
@@ -225,7 +234,7 @@ async function main() {
   const awardData = [];
   for (let i = 0; i < 30; i++) {
     const alumniIdx = (i * 7 + 3) % alumni.length;
-    const year = 2550 + Math.floor(i * 18 / 30); // spread 2550-2568
+    const year = Math.min(2550 + Math.floor(i * 18 / 30), 2569);
     awardData.push({
       alumniId: alumni[alumniIdx].id,
       awardName: awardNames[i % awardNames.length],
@@ -266,7 +275,7 @@ async function main() {
     const alumniIdx = (i * 5 + 1) % alumni.length;
     const assocIdx = i % associationNames.length;
     const posIdx = i % positions.length;
-    const termYear = 2560 + Math.floor(i * 8 / 20); // spread 2560-2568
+    const termYear = Math.min(2560 + Math.floor(i * 8 / 20), 2569);
 
     const key = `${alumni[alumniIdx].id}-${assocIdx}-${termYear}`;
     if (usedAssociationSlots.has(key)) continue;
@@ -309,7 +318,7 @@ async function main() {
 
   for (let i = 0; i < 15; i++) {
     const alumniIdx = (i * 3 + 7) % alumni.length;
-    const termYear = 2560 + Math.floor(i * 8 / 15); // spread 2560-2568
+    const termYear = Math.min(2560 + Math.floor(i * 8 / 15), 2569);
 
     const key = `${alumni[alumniIdx].id}-${committeeRoles[i % committeeRoles.length]}-${termYear}`;
     if (usedCommitteeSlots.has(key)) continue;

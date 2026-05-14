@@ -90,7 +90,7 @@ export default function AlumniCountPage() {
     );
   }
 
-  const labels = chartData.labels.map((y) => String(y + 543));
+  const labels = chartData.labels.map((y) => String(y));
 
   const datasets = chartData.datasets.map((ds) => ({
     label: DEGREE_LABELS[ds.degreeLevel] || ds.degreeLevel,

@@ -150,7 +150,7 @@ export default function AbroadAlumniPage() {
                         {DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{a.graduationYear + 543}</td>
+                    <td className="px-4 py-3">{a.graduationYear}</td>
                     <td className="px-4 py-3">{a.country || "-"}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">
                       {a.currentWorkplace || "-"}
