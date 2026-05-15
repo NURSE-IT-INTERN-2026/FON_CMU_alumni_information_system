@@ -147,10 +147,34 @@ export default function AlumniCountPage() {
           />
         </div>
 
-        <div className="mt-6 border-t border-[var(--border)] pt-4 text-center">
-          <p className="text-lg font-semibold text-[var(--primary)]">
+        <div className="mt-6 border-t border-[var(--border)] pt-4">
+          <p className="mb-4 text-center text-lg font-semibold text-[var(--primary)]">
             จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
           </p>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {chartData.datasets.map((ds) => {
+              const count = ds.data.reduce((s, v) => s + v, 0);
+              return (
+                <div
+                  key={ds.degreeLevel}
+                  className="rounded-lg border border-[var(--border)] p-4 text-center"
+                >
+                  <div
+                    className="mx-auto mb-2 h-3 w-12 rounded-full"
+                    style={{ backgroundColor: DEGREE_COLORS[ds.degreeLevel] || "#999" }}
+                  />
+                  <p className="text-sm text-[var(--muted)]">
+                    {DEGREE_LABELS[ds.degreeLevel] || ds.degreeLevel}
+                  </p>
+                  <p className="text-2xl font-bold text-[var(--primary)]">
+                    {count.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-[var(--muted)]">คน</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -213,32 +213,32 @@ export default function AwardsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-gray-50">
+              <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
                 <th
-                  className="cursor-pointer px-4 py-3 text-left font-semibold text-[var(--primary)]"
+                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                   onClick={() => handleSort("name")}
                 >
                   ชื่อ-นามสกุล <SortIcon field="name" />
                 </th>
                 <th
-                  className="cursor-pointer px-4 py-3 text-left font-semibold text-[var(--primary)]"
+                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                   onClick={() => handleSort("award")}
                 >
                   ชื่อรางวัล <SortIcon field="award" />
                 </th>
                 <th
-                  className="cursor-pointer px-4 py-3 text-left font-semibold text-[var(--primary)]"
+                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                   onClick={() => handleSort("type")}
                 >
                   ประเภท <SortIcon field="type" />
                 </th>
                 <th
-                  className="cursor-pointer px-4 py-3 text-left font-semibold text-[var(--primary)]"
+                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                   onClick={() => handleSort("year")}
                 >
                   ปี <SortIcon field="year" />
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-[var(--primary)]">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                   รายละเอียด
                 </th>
               </tr>
