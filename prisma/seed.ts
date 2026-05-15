@@ -14,6 +14,7 @@ async function main() {
   await prisma.news.deleteMany();
   await prisma.potential.deleteMany();
   await prisma.abroadAlumni.deleteMany();
+  await prisma.modelRepresentative.deleteMany();
   await prisma.alumni.deleteMany();
   await prisma.adminUser.deleteMany();
   console.log("All existing data cleared.\n");
@@ -583,17 +584,158 @@ async function main() {
   }
   console.log(`  Created ${abroadAlumni.length} abroad alumni records\n`);
 
+  // ── 10. Create model representatives (from reference site) ──
+  console.log("Creating model representatives...");
+
+  const ASSIST = "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล (รุ่น  1 – 38)";
+  const MASTER = "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท (รุ่น  1 – 20)";
+  const ASSOC = "รายชื่อเครือข่ายศิษย์เก่าอนุปริญญาพยาบาล (รุ่น  1 – 13)";
+  const BACHELOR = "รายชื่อเครือข่ายศิษย์เก่าปริญญาพยาบาล (รุ่น  1 – 38)";
+  const DOCTORAL = "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก (รุ่น  1 – 6)";
+
+  const modelRepData = [
+    // ผู้ช่วยพยาบาล รุ่น 1–38
+    { name: "คุณบุญชู   วรรณฤทธิ์", cohort: ASSIST, generation: 1 },
+    { name: "คุณพีระพงษ์  สุทธโทธน", cohort: ASSIST, generation: 2 },
+    { name: "คุณพิมพ์ทอง   วรรณฤทธิ์", cohort: ASSIST, generation: 3 },
+    { name: "คุณนวลจันทร์  จันทรประเสริฐ", cohort: ASSIST, generation: 4 },
+    { name: "คุณมาลินี   รุ่งตานนท์", cohort: ASSIST, generation: 5 },
+    { name: "คุณสมเจตต์  ไตรวุฒิวัฒนา", cohort: ASSIST, generation: 6 },
+    { name: "คุณเทียมนิล  ปินตาศรี", cohort: ASSIST, generation: 7 },
+    { name: "คุณปทุมวรรณ  บูรณะศิริ", cohort: ASSIST, generation: 8 },
+    { name: "คุณนิเวศน์  คันธรส", cohort: ASSIST, generation: 9 },
+    { name: "คุณอารีย์  สิทธิน้อย", cohort: ASSIST, generation: 10 },
+    { name: "คุณสายทอง  พิจการ", cohort: ASSIST, generation: 11 },
+    { name: "คุณสุมาลี  สุขศรี", cohort: ASSIST, generation: 12 },
+    { name: "คุณกนกพัชร์  สุวรรณภัค", cohort: ASSIST, generation: 13 },
+    { name: "คุณพงษ์พันธ์  รัตนะ", cohort: ASSIST, generation: 14 },
+    { name: "คุณสมบูรณ์  วิศร", cohort: ASSIST, generation: 15 },
+    { name: "คุณเรืองรอง  โสภา", cohort: ASSIST, generation: 16 },
+    { name: "คุณนงพงา  บุญสูง", cohort: ASSIST, generation: 17 },
+    { name: "คุณถนอม   ยอดยา", cohort: ASSIST, generation: 18 },
+    { name: "คุณธีรารัตน์   ธีระอัครพงษ์", cohort: ASSIST, generation: 19 },
+    { name: "คุณปราณี  สินธพอาชากุล", cohort: ASSIST, generation: 20 },
+    { name: "คุณวรดิษฐ์   คุณยศยิ่ง", cohort: ASSIST, generation: 21 },
+    { name: "คุณกนกพร   สุมนต์ศาสตร์", cohort: ASSIST, generation: 22 },
+    { name: "คุณเสกสรร   จิตสุทธิ", cohort: ASSIST, generation: 23 },
+    { name: "คุณแน่งน้อย   ทองทา", cohort: ASSIST, generation: 24 },
+    { name: "คุณขวัญใจ   แดงสด", cohort: ASSIST, generation: 25 },
+    { name: "คุณวาริกา   นาวารี", cohort: ASSIST, generation: 26 },
+    { name: "คุณอิงอร  งามศรี", cohort: ASSIST, generation: 27 },
+    { name: "คุณพรรณา  รอบรู้", cohort: ASSIST, generation: 28 },
+    { name: "คุณอุดร  ศรีประดิษฐ์", cohort: ASSIST, generation: 29 },
+    { name: "คุณดวงใจ  อนุขุน", cohort: ASSIST, generation: 30 },
+    { name: "คุณนงคราญ  อินถาเขียว", cohort: ASSIST, generation: 31 },
+    { name: "คุณประภาส  รัตนพงษ์พิทักษ์", cohort: ASSIST, generation: 32 },
+    { name: "คุณทักษิน  ดีออน", cohort: ASSIST, generation: 33 },
+    { name: "คุณอรพินธ์   ใจโต", cohort: ASSIST, generation: 34 },
+    { name: "คุณชูวงษ์   ตันธรัตน์", cohort: ASSIST, generation: 35 },
+    { name: "คุณประทุมพร  ขันแก้ว", cohort: ASSIST, generation: 36 },
+    { name: "คุณเดือนวรางค์   อินทวิชัย", cohort: ASSIST, generation: 37 },
+    { name: "คุณสหภณ   ดีสอน", cohort: ASSIST, generation: 38 },
+    // ปริญญาโท รุ่น 1–21
+    { name: "อ.จันทร์ฉาย  หวันแก้ว", cohort: MASTER, generation: 1 },
+    { name: "คุณศิริลักษณ์  กิจศรีไพศาล", cohort: MASTER, generation: 2 },
+    { name: "ผศ.ดร.ฐิติณัฎฐ์  อัคคะเดชอนันต์", cohort: MASTER, generation: 3 },
+    { name: "คุณวิภา  เอี่ยมสำอางค์", cohort: MASTER, generation: 4 },
+    { name: "คุณสุพิณ  ชัยรัตนภิวงศ์", cohort: MASTER, generation: 5 },
+    { name: "รศ.ดร.ยุพิน  เพียงมงคล", cohort: MASTER, generation: 6 },
+    { name: "คุณมาลินี  วัฒนากูล", cohort: MASTER, generation: 7 },
+    { name: "คุณพวงเพชร  ยัพวัฒนพันธ์", cohort: MASTER, generation: 8 },
+    { name: "อ.ดร.นงเยาว์   เกษตร์ภิบาล", cohort: MASTER, generation: 9 },
+    { name: "อ.สมใจ  ศิระกมล", cohort: MASTER, generation: 10 },
+    { name: "คุณศิริพร  พรพุทธษา", cohort: MASTER, generation: 11 },
+    { name: "คุณจิตตวดี  เหรียญทอง", cohort: MASTER, generation: 12 },
+    { name: "อ.ดร.สุดารัตน์  ชัยอาจ", cohort: MASTER, generation: 13 },
+    { name: "คุณฉัตรชัย  ใหม่เขียว", cohort: MASTER, generation: 14 },
+    { name: "คุณสุคนทา  คุณาพันธ์", cohort: MASTER, generation: 15 },
+    { name: "คุณศักรินทร์   สุวรรณเวหา", cohort: MASTER, generation: 16 },
+    { name: "คุณกัลยาณี  ตันตรานนท์", cohort: MASTER, generation: 17 },
+    { name: "คุณขวัญหทัย  กัณทะโรจน์", cohort: MASTER, generation: 18 },
+    { name: "คุณธนพัฒน์  ชัยป้อ", cohort: MASTER, generation: 19 },
+    { name: "คุณบุญธิดา  เทือกสุบรรณ", cohort: MASTER, generation: 20 },
+    { name: "คุณเยาวมาลย์   เหลืองอร่าม", cohort: MASTER, generation: 21 },
+    // อนุปริญญาพยาบาล รุ่น 1–13
+    { name: "รศ.นิลพรรณ   รัตนดิลกพานิชย์", cohort: ASSOC, generation: 1 },
+    { name: "ผศ.วันเพ็ญ   เอี่ยมจ้อย", cohort: ASSOC, generation: 2 },
+    { name: "คุณลัดดา  ธารนพ", cohort: ASSOC, generation: 3 },
+    { name: "รศ.ศิริพร  สิงหเนตร", cohort: ASSOC, generation: 4 },
+    { name: "รศ.มล.อัครอนงค์  ปราโมช", cohort: ASSOC, generation: 5 },
+    { name: "คุณพรพิมล  จุลาสัย", cohort: ASSOC, generation: 6 },
+    { name: "รศ.อุดมรัตน์   สงวนศิริธรรม", cohort: ASSOC, generation: 7 },
+    { name: "คุณสมลักษณ์  บุญมา", cohort: ASSOC, generation: 8 },
+    { name: "คุณประทิน  ไชยศรี", cohort: ASSOC, generation: 9 },
+    { name: "คุณดรรชนี  ลิ้มสุคนธ์", cohort: ASSOC, generation: 10 },
+    { name: "คุณปติลักษณ์   เยาวภาคย์โสภณ", cohort: ASSOC, generation: 11 },
+    { name: "รศ.ดร.ดวงฤดี  ลาศุขะ", cohort: ASSOC, generation: 12 },
+    { name: "คุณสุนทรี   เหลียวตระกูล", cohort: ASSOC, generation: 13 },
+    // ปริญญาพยาบาล รุ่น 1–38
+    { name: "รศ.กรรณิการ์  พงษ์สนิท", cohort: BACHELOR, generation: 1 },
+    { name: "รศ.ดร.เรมวล  นันท์ศุภวัฒน์", cohort: BACHELOR, generation: 2 },
+    { name: "รศ ดร.สุจิตรา  เหลืองอมรเลิศ", cohort: BACHELOR, generation: 3 },
+    { name: "คุณกรองกาญจน์  จิรพรเจริญ", cohort: BACHELOR, generation: 4 },
+    { name: "คุณวิไล    อุตวิชัย", cohort: BACHELOR, generation: 5 },
+    { name: "คุณอาภรณ์   ชัยรัต", cohort: BACHELOR, generation: 6 },
+    { name: "ผศ.วราภรณ์   เลิศพูนวิไลกุล", cohort: BACHELOR, generation: 7 },
+    { name: "คุณผาณิต   สกุลวัฒนะ", cohort: BACHELOR, generation: 8 },
+    { name: "คุณสิริลักษณ์  สลักคำ", cohort: BACHELOR, generation: 9 },
+    { name: "ผศ.อำไพ   จารุวัชรพาณิชกุล", cohort: BACHELOR, generation: 10 },
+    { name: "คุณเพชรา   หาญศิริวัฒนกิจ", cohort: BACHELOR, generation: 11 },
+    { name: "รศ.ดร.ภารดี   นานาศิลป์", cohort: BACHELOR, generation: 12 },
+    { name: "คุณชลอ   น้อยเผ่า", cohort: BACHELOR, generation: 13 },
+    { name: "คุณปริศนา   เรืองรองรัตน์", cohort: BACHELOR, generation: 14 },
+    { name: "คุณบุญเรือง  ตั้งสินมั่นคง", cohort: BACHELOR, generation: 15 },
+    { name: "อ.ดร.โรจนี   จินตนาวัฒน์", cohort: BACHELOR, generation: 16 },
+    { name: "คุณพรศิริ  ใจสม", cohort: BACHELOR, generation: 17 },
+    { name: "อ.สมบัติ   สกุลพรรณ์", cohort: BACHELOR, generation: 18 },
+    { name: "คุณสดับพร   เกษชนก", cohort: BACHELOR, generation: 19 },
+    { name: "อ.ธารีวรรณ  ไชยบุญเรือง", cohort: BACHELOR, generation: 20 },
+    { name: "ผศ.ดร.วันชัย   มุ้งตุ้ย", cohort: BACHELOR, generation: 21 },
+    { name: "คุณศรีทัย    สีทิพย์", cohort: BACHELOR, generation: 22 },
+    { name: "คุณดาราลักษณ์  ถาวรประสิทธิ์", cohort: BACHELOR, generation: 23 },
+    { name: "คุณนพวรรณ   รัตนดำรงค์อักษร", cohort: BACHELOR, generation: 24 },
+    { name: "อ.เนตรทอง   นามพรม", cohort: BACHELOR, generation: 25 },
+    { name: "ผศ.พัชรี   วรกิจพูนผล", cohort: BACHELOR, generation: 26 },
+    { name: "คุณสมาคม  บุญยงค์", cohort: BACHELOR, generation: 27 },
+    { name: "คุณอรุณศรี   มุงเมือง", cohort: BACHELOR, generation: 28 },
+    { name: "คุณสิริรัตน์  จำปา", cohort: BACHELOR, generation: 29 },
+    { name: "คุณขวัญจิต  มหากิตติคุณ", cohort: BACHELOR, generation: 30 },
+    { name: "คุณฉันทนา  จันทร์แจ่ม", cohort: BACHELOR, generation: 31 },
+    { name: "คุณเกษมณี  มูลปานันท์", cohort: BACHELOR, generation: 32 },
+    { name: "คุณทัศนย์  ฟองใจ", cohort: BACHELOR, generation: 33 },
+    { name: "คุณเกรียงไกร  ทวีหอม", cohort: BACHELOR, generation: 34 },
+    { name: "คุณสมคิด  ขัติยะ", cohort: BACHELOR, generation: 35 },
+    { name: "คุณลัดดาวัลย์   ภีระคำ", cohort: BACHELOR, generation: 36 },
+    { name: "คุณอรรธางค์   ปัญญางาม", cohort: BACHELOR, generation: 37 },
+    { name: "คุณวราภรณ์   ประพันธ์ศรี", cohort: BACHELOR, generation: 38 },
+    // ปริญญาเอก รุ่น 1–6
+    { name: "อ.ดร.นัทธมน  วุทธานนท์", cohort: DOCTORAL, generation: 1 },
+    { name: "อ.ดร.สุดารัตน์   ชัยอาจ", cohort: DOCTORAL, generation: 2 },
+    { name: "อ.ดร.ประทุม  สร้อยวงศ์", cohort: DOCTORAL, generation: 3 },
+    { name: "ผศ.ดร.อุษณีย์  จินตะเวช", cohort: DOCTORAL, generation: 4 },
+    { name: "ผศ.ดร.ทศพร  คำผลศิริ", cohort: DOCTORAL, generation: 5 },
+    { name: "อ.ดร.เพชรสุนีย์   ทั้งเจริญกุล", cohort: DOCTORAL, generation: 6 },
+  ];
+
+  const modelReps = [];
+  for (const data of modelRepData) {
+    const record = await prisma.modelRepresentative.create({ data });
+    modelReps.push(record);
+  }
+  console.log(`  Created ${modelReps.length} model representative records\n`);
+
   // ── Summary ──
   console.log("=".repeat(50));
   console.log("Seeding complete! Summary:");
-  console.log(`  Admin Users      : 2`);
-  console.log(`  Alumni           : ${alumni.length}`);
-  console.log(`  Awards           : ${awards.length}`);
-  console.log(`  Associations     : ${associations.length}`);
-  console.log(`  Graduate Comm.   : ${committees.length}`);
-  console.log(`  News Articles    : ${newsRecords.length}`);
-  console.log(`  Potentials       : ${potentials.length}`);
-  console.log(`  Abroad Alumni    : ${abroadAlumni.length}`);
+  console.log(`  Admin Users        : 2`);
+  console.log(`  Alumni             : ${alumni.length}`);
+  console.log(`  Awards             : ${awards.length}`);
+  console.log(`  Associations       : ${associations.length}`);
+  console.log(`  Graduate Comm.     : ${committees.length}`);
+  console.log(`  News Articles      : ${newsRecords.length}`);
+  console.log(`  Potentials         : ${potentials.length}`);
+  console.log(`  Abroad Alumni      : ${abroadAlumni.length}`);
+  console.log(`  Model Reps         : ${modelReps.length}`);
   console.log("=".repeat(50));
 }
 

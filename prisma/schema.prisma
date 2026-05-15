@@ -118,6 +118,17 @@ model Potential {
   @@map("potentials")
 }
 
+model ModelRepresentative {
+  id         String   @id @default(uuid())
+  name       String
+  cohort     String
+  generation Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("model_representatives")
+}
+
 model AbroadAlumni {
   id         String   @id @default(uuid())
   name       String
