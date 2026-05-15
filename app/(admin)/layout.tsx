@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import AdminHeader from "@/components/AdminHeader";
-import AdminSidebar from "@/components/AdminSidebar";
+import Header from "@/components/Header";
+import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
 
 export default async function AdminLayout({
   children,
@@ -15,11 +16,14 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <AdminHeader />
+    <div className="flex min-h-screen flex-col">
+      <Header />
       <div className="flex flex-1">
-        <AdminSidebar />
-        <main className="flex-1 p-6 bg-gray-50">{children}</main>
+        <Sidebar />
+        <div className="flex flex-1 flex-col">
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </div>
       </div>
     </div>
   );

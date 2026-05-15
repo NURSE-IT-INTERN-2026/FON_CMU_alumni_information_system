@@ -16,11 +16,8 @@ export async function POST() {
 
     cookieStore.set(clearSessionCookie());
 
-    return NextResponse.json({ success: true });
+    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"));
   } catch {
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในระบบ" },
-      { status: 500 }
-    );
+    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"));
   }
 }

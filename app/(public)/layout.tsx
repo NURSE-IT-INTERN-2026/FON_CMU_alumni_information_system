@@ -1,12 +1,20 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getSession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />

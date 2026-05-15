@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { NAV_ITEMS } from "@/lib/constants";
+import { usePathname } from "next/navigation";
+import { NAV_ITEMS, ADMIN_NAV_ITEMS } from "@/lib/constants";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isAdmin = pathname.startsWith("/admin");
+  const items = isAdmin ? ADMIN_NAV_ITEMS : NAV_ITEMS;
+  const showLogout = pathname !== "/login";
 
   return (
     <header className="sticky top-0 z-50 bg-[var(--primary)] text-white shadow-md">
@@ -34,8 +39,19 @@ export default function Header() {
             </span>
           </div>
 
-          {/* Mobile toggle */}
-          <div className="flex items-center gap-2">
+          {/* Right side actions */}
+          <div className="flex items-center gap-3">
+            {showLogout && (
+              <form action="/api/auth/logout" method="POST">
+                <button
+                  type="submit"
+                  className="rounded-md bg-white/20 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/30 cursor-pointer"
+                >
+                  ออกจากระบบ
+                </button>
+              </form>
+            )}
+
             {/* Hamburger button (mobile only) */}
             <button
               type="button"
@@ -82,7 +98,7 @@ export default function Header() {
       {mobileMenuOpen && (
         <nav className="border-t border-white/10 lg:hidden">
           <div className="space-y-1 px-4 py-3">
-            {NAV_ITEMS.map((item) => (
+            {items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -92,6 +108,25 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block rounded-md px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                กลับหน้าหลัก
+              </Link>
+            )}
+            {showLogout && (
+              <form action="/api/auth/logout" method="POST">
+                <button
+                  type="submit"
+                  className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
+                >
+                  ออกจากระบบ
+                </button>
+              </form>
+            )}
           </div>
         </nav>
       )}

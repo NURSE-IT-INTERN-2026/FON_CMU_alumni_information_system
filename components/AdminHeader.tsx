@@ -16,12 +16,14 @@ export default function AdminHeader() {
       </div>
       <div className="flex items-center gap-4">
         <span className="text-sm text-white">ผู้ดูแลระบบ</span>
-        <Link
-          href="/api/auth/logout"
-          className="rounded bg-white/20 px-4 py-1.5 text-sm text-white hover:bg-white/30 transition-colors"
-        >
-          ออกจากระบบ
-        </Link>
+        <form action="/api/auth/logout" method="POST">
+          <button
+            type="submit"
+            className="rounded bg-white/20 px-4 py-1.5 text-sm text-white hover:bg-white/30 transition-colors cursor-pointer"
+          >
+            ออกจากระบบ
+          </button>
+        </form>
       </div>
     </header>
   );
