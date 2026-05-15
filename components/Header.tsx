@@ -34,15 +34,8 @@ export default function Header() {
             </span>
           </div>
 
-          {/* Login + Mobile toggle */}
+          {/* Mobile toggle */}
           <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="rounded-md border border-white/30 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
-            >
-              เข้าสู่ระบบ
-            </Link>
-
             {/* Hamburger button (mobile only) */}
             <button
               type="button"
