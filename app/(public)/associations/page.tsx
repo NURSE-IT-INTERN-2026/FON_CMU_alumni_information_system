@@ -20,6 +20,9 @@ interface ApiResponse {
   totalPages: number;
 }
 
+type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
+type SortDir = "asc" | "desc";
+
 export default function AssociationsPage() {
   const [items, setItems] = useState<Association[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +30,18 @@ export default function AssociationsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("associationName");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  };
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -34,8 +49,8 @@ export default function AssociationsPage() {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
-        sortField: "associationName",
-        sortOrder: "asc",
+        sortField,
+        sortOrder: sortDir,
       });
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/associations?${params}`);
@@ -49,7 +64,7 @@ export default function AssociationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sortField, sortDir]);
 
   useEffect(() => {
     fetchItems();
@@ -128,20 +143,20 @@ export default function AssociationsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    รหัสนักศึกษา
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
+                    รหัสนักศึกษา {sortField === "studentId" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ชื่อ-สกุล
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
+                    ชื่อ-สกุล {sortField === "fullName" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ชื่อสมาคม/ชมรม
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("associationName")}>
+                    ชื่อสมาคม/ชมรม {sortField === "associationName" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ตำแหน่ง
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
+                    ตำแหน่ง {sortField === "position" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ปีที่บันทึก
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
+                    ปีที่บันทึก {sortField === "recordedYear" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
                 </tr>
               </thead>

@@ -295,38 +295,30 @@ async function main() {
   // ── 6. Create graduate committee members ──
   console.log("Creating graduate committee members...");
 
-  const committeeRoles = [
+  const committeePositions = [
     "ประธานกรรมการ",
     "กรรมการ",
     "เลขานุการกรรมการ",
     "ที่ปรึกษา",
   ];
 
-  const committeeDegreeLevels: ("BACHELOR" | "MASTER" | "DOCTORAL" | "NURSING_CERTIFICATE")[] = [
-    "MASTER", "DOCTORAL", "BACHELOR", "MASTER",
-    "DOCTORAL", "BACHELOR", "MASTER", "MASTER",
-    "DOCTORAL", "MASTER", "BACHELOR", "DOCTORAL",
-    "MASTER", "MASTER", "DOCTORAL",
+  const committeeData = [
+    { termYear: 2568, studentId: "51430001", fullName: "สมชาย สุขใจ", cohort: "1", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: "51440002", fullName: "สมหญิง บุญมี", cohort: "1", position: "กรรมการ", remarks: null },
+    { termYear: 2568, studentId: "51450003", fullName: "วิชัย ศรีสวัสดิ์", cohort: "2", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2569, studentId: "51460004", fullName: "นภา วงศ์สวัสดิ์", cohort: "2", position: "ที่ปรึกษา", remarks: null },
+    { termYear: 2569, studentId: "51470005", fullName: "พรรณี แก้วมณี", cohort: "3", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2569, studentId: "51480006", fullName: "ธนา ธนาพร", cohort: "3", position: "กรรมการ", remarks: "ด้านวิชาการ" },
+    { termYear: 2567, studentId: "51490007", fullName: "ประภาส รัตนชัย", cohort: "4", position: "กรรมการ", remarks: null },
+    { termYear: 2567, studentId: "51500008", fullName: "จิตรา พงษ์ประเสริฐ", cohort: "4", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2567, studentId: "51510009", fullName: "สุภาพ สิทธิโชค", cohort: "5", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: "51520010", fullName: "วันดี เจริญสุข", cohort: "5", position: "ที่ปรึกษา", remarks: null },
+    { termYear: 2568, studentId: "51530011", fullName: "อรุณ วิเชียรเจริญ", cohort: "6", position: "กรรมการ", remarks: null },
+    { termYear: 2569, studentId: "51540012", fullName: "ปิยะ สมบูรณ์", cohort: "6", position: "กรรมการ", remarks: null },
+    { termYear: 2569, studentId: "51550013", fullName: "มนัส กิจเจริญ", cohort: "7", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: "51560014", fullName: "กานดา ภูมิพัฒน์", cohort: "7", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2567, studentId: "51570015", fullName: "ธีรพงษ์ มณีรัตน์", cohort: "8", position: "ที่ปรึกษา", remarks: "ด้านบริหาร" },
   ];
-
-  const committeeData = [];
-  const usedCommitteeSlots = new Set<string>();
-
-  for (let i = 0; i < 15; i++) {
-    const alumniIdx = (i * 3 + 7) % alumni.length;
-    const termYear = Math.min(2560 + Math.floor(i * 8 / 15), 2569);
-
-    const key = `${alumni[alumniIdx].id}-${committeeRoles[i % committeeRoles.length]}-${termYear}`;
-    if (usedCommitteeSlots.has(key)) continue;
-    usedCommitteeSlots.add(key);
-
-    committeeData.push({
-      alumniId: alumni[alumniIdx].id,
-      role: committeeRoles[i % committeeRoles.length],
-      termYear,
-      degreeLevel: committeeDegreeLevels[i % committeeDegreeLevels.length],
-    });
-  }
 
   const committees = [];
   for (const data of committeeData) {
@@ -494,94 +486,94 @@ async function main() {
     { name: "ปานจิต ฮันตระกูล (P. HUNTRAKUL)", address: "1501 METROPOLITAN AVE #8 D BRONX, NY 10462 U.S.A. 718-863-0800", country: "สหรัฐอเมริกา", university: null, order: 43 },
     { name: "ศุภนิตย์ Sethakorn", address: "541 Meadow Dr. Gibson city, IL 60931 U.S.A. H. 217-784-4104", country: "สหรัฐอเมริกา", university: null, order: 44 },
     { name: "เกสร จันทร์ประภาพ", address: "S. 308 Birnam Trail Willow Brook, IL 60527 U.S.A. / 6 ถ. สันติรักษ์ ต. ช้างเผือก อ. เมือง จ. เชียงใหม่ 50300 H: 053-219-831", country: "สหรัฐอเมริกา", university: null, order: 45 },
-    // Central South University Xiang-Ya School of Nursing
-    { name: "Prof. He Guoping (Dean)", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 1 },
-    { name: "Cai Yimin [G 5]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 2 },
-    { name: "Huang Jin [G 1]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 3 },
-    { name: "Li Lezhi [G 2]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 4 },
-    { name: "Wang Honghong [G 1]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 5 },
-    { name: "Yan Jin [G 2]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 6 },
-    { name: "Zeng Hui [G 5]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 7 },
-    { name: "Zhang Jingping [G 3]", address: null, country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 8 },
-    // China Medical University
-    { name: "Prof. Qiao Min (Dean)", address: null, country: "ประเทศจีน", university: "China Medical University", order: 1 },
-    { name: "Prof. Yu Yan Gin (Director of Nursing College)", address: null, country: "ประเทศจีน", university: "China Medical University", order: 2 },
-    { name: "Cao Ying [G 3]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 3 },
-    { name: "Fan Ling [G 5]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 4 },
-    { name: "Guo Hong [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 5 },
-    { name: "Li Xiaohan [G 1]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 6 },
-    { name: "Sun Tianjie [G 5]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 7 },
-    { name: "Wang Jian [G 1]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 8 },
-    { name: "Zhang Bo [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 9 },
-    { name: "Zhang Xiuyue [G 4]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 10 },
-    { name: "Zhao Haping [G 2]", address: null, country: "ประเทศจีน", university: "China Medical University", order: 11 },
-    // Fudan University
-    { name: "Dr. Jai Hongli (Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 1 },
-    { name: "Prof. Dai Baozhen (Former Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 2 },
-    { name: "Prof. Yang Yinghua (Former Dean)", address: null, country: "ประเทศจีน", university: "Fudan University", order: 3 },
-    { name: "Cheng Yun [G 3]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 4 },
-    { name: "Hu Yan [G 1]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 5 },
-    { name: "Li Xiaoying [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 6 },
-    { name: "Shao Wenli [G 1]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 7 },
-    { name: "Xi Shuxin [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 8 },
-    { name: "Xia Haiou [G 4]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 9 },
-    { name: "Xu Hong [G 3]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 10 },
-    { name: "Yan Meiqiong [G 2]", address: null, country: "ประเทศจีน", university: "Fudan University", order: 11 },
-    // Peking Union Medical College
-    { name: "Dr. Huaping Liu (Dean)", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 1 },
-    { name: "Chen Jingli [G 2]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 2 },
-    { name: "Li Zheng [G 1]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 3 },
-    { name: "Liang Xiaokun [G 3]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 4 },
-    { name: "Liu Jianfen [G 2]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 5 },
-    { name: "Sheng Yu [G 5]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 6 },
-    { name: "Zhao Yan [G 4]", address: null, country: "ประเทศจีน", university: "Peking Union Medical College", order: 7 },
-    // Peking University Health Science Center
-    { name: "Prof. Zheng Xiuxia (Dean)", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 1 },
-    { name: "Prof. Yao Jingpeng (Former Dean)", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 2 },
-    { name: "Liu Jun-e [G 3]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 3 },
-    { name: "Liu Yu [G 4]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 4 },
-    { name: "Wang Chenguang [G 5]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 5 },
-    { name: "Wang Qun [G 3]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 6 },
-    { name: "Zhang Haiyan [G 2]", address: null, country: "ประเทศจีน", university: "Peking University Health Science Center", order: 7 },
-    // Sichuan University
-    { name: "Prof. Jiang Xiaolian (Dean)", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 1 },
-    { name: "Prof. Yin Kei (Former Dean)", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 2 },
-    { name: "Feng Xiangqiong [G 5]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 3 },
-    { name: "Li Xiao lin [G 3]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 4 },
-    { name: "Li Xiaoling [G 1]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 5 },
-    { name: "Liu Suzhen [G 3]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 6 },
-    { name: "Song Jingping [G 5]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 7 },
-    { name: "Wang Shiping [G 1]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 8 },
-    { name: "Wang Yuqiong [G 2]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 9 },
-    { name: "Zhao Xiufang [G 4]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 10 },
-    { name: "Zhu Mingxia [G 2]", address: null, country: "ประเทศจีน", university: "Sichuan University", order: 11 },
-    // Sun Yat-Sen University, Guangzhou
-    { name: "Assoc.Prof. You Liming (Dean)", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 1 },
-    { name: "Chen Xhi Qun [G 4]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 2 },
-    { name: "Gao Lingling [G 5]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 3 },
-    { name: "Liu Ke [G 3]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 4 },
-    { name: "Lin Xiyin [G 1]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 5 },
-    { name: "Luo Xhimin [G 3]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 6 },
-    { name: "Yan Jun [G 4]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 7 },
-    { name: "Zeng Wen [G 1]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 8 },
-    { name: "Zhang Meifen [G 2]", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 9 },
-    { name: "Zhu Yanli", address: null, country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 10 },
-    // Xi'an Jiaotong University
-    { name: "Prof. Zheng Nanning (President)", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 1 },
-    { name: "Prof. Ren Huimin", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 2 },
-    { name: "Dr. Yan Jianqun", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 3 },
-    { name: "Dr. Yan Hong", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 4 },
-    { name: "Dr. Li Wei", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 5 },
-    { name: "Dr. Zhu Hongliang", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 6 },
-    { name: "Assoc.Prof. Li Xiaomei (Dean) [G 1]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 7 },
-    { name: "Gao Rui [G 4]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 8 },
-    { name: "Gu Wei [G 3]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 9 },
-    { name: "Jiang Wenhui [G 2]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 10 },
-    { name: "Li Jing [G 2]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 11 },
-    { name: "Liu Ming [G 4]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 12 },
-    { name: "Lu Aili [G 5]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 13 },
-    { name: "Wang Wenru [G 1]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 14 },
-    { name: "Wang Xiaoquin [G 5]", address: null, country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 15 },
+    // Central South University Xiang-Ya School of Nursing — Changsha, Hunan
+    { name: "Prof. He Guoping (Dean)", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 1 },
+    { name: "Cai Yimin [G 5]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 2 },
+    { name: "Huang Jin [G 1]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 3 },
+    { name: "Li Lezhi [G 2]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 4 },
+    { name: "Wang Honghong [G 1]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 5 },
+    { name: "Yan Jin [G 2]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 6 },
+    { name: "Zeng Hui [G 5]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 7 },
+    { name: "Zhang Jingping [G 3]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 8 },
+    // China Medical University — Shenyang, Liaoning
+    { name: "Prof. Qiao Min (Dean)", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 1 },
+    { name: "Prof. Yu Yan Gin (Director of Nursing College)", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 2 },
+    { name: "Cao Ying [G 3]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 3 },
+    { name: "Fan Ling [G 5]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 4 },
+    { name: "Guo Hong [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 5 },
+    { name: "Li Xiaohan [G 1]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 6 },
+    { name: "Sun Tianjie [G 5]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 7 },
+    { name: "Wang Jian [G 1]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 8 },
+    { name: "Zhang Bo [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 9 },
+    { name: "Zhang Xiuyue [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 10 },
+    { name: "Zhao Haping [G 2]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 11 },
+    // Fudan University — Shanghai
+    { name: "Dr. Jai Hongli (Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 1 },
+    { name: "Prof. Dai Baozhen (Former Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 2 },
+    { name: "Prof. Yang Yinghua (Former Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 3 },
+    { name: "Cheng Yun [G 3]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 4 },
+    { name: "Hu Yan [G 1]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 5 },
+    { name: "Li Xiaoying [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 6 },
+    { name: "Shao Wenli [G 1]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 7 },
+    { name: "Xi Shuxin [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 8 },
+    { name: "Xia Haiou [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 9 },
+    { name: "Xu Hong [G 3]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 10 },
+    { name: "Yan Meiqiong [G 2]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 11 },
+    // Peking Union Medical College — Beijing
+    { name: "Dr. Huaping Liu (Dean)", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 1 },
+    { name: "Chen Jingli [G 2]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 2 },
+    { name: "Li Zheng [G 1]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 3 },
+    { name: "Liang Xiaokun [G 3]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 4 },
+    { name: "Liu Jianfen [G 2]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 5 },
+    { name: "Sheng Yu [G 5]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 6 },
+    { name: "Zhao Yan [G 4]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 7 },
+    // Peking University Health Science Center — Beijing
+    { name: "Prof. Zheng Xiuxia (Dean)", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 1 },
+    { name: "Prof. Yao Jingpeng (Former Dean)", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 2 },
+    { name: "Liu Jun-e [G 3]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 3 },
+    { name: "Liu Yu [G 4]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 4 },
+    { name: "Wang Chenguang [G 5]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 5 },
+    { name: "Wang Qun [G 3]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 6 },
+    { name: "Zhang Haiyan [G 2]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 7 },
+    // Sichuan University — Chengdu, Sichuan
+    { name: "Prof. Jiang Xiaolian (Dean)", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 1 },
+    { name: "Prof. Yin Kei (Former Dean)", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 2 },
+    { name: "Feng Xiangqiong [G 5]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 3 },
+    { name: "Li Xiao lin [G 3]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 4 },
+    { name: "Li Xiaoling [G 1]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 5 },
+    { name: "Liu Suzhen [G 3]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 6 },
+    { name: "Song Jingping [G 5]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 7 },
+    { name: "Wang Shiping [G 1]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 8 },
+    { name: "Wang Yuqiong [G 2]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 9 },
+    { name: "Zhao Xiufang [G 4]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 10 },
+    { name: "Zhu Mingxia [G 2]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 11 },
+    // Sun Yat-Sen University, Guangzhou — Guangdong
+    { name: "Assoc.Prof. You Liming (Dean)", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 1 },
+    { name: "Chen Xhi Qun [G 4]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 2 },
+    { name: "Gao Lingling [G 5]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 3 },
+    { name: "Liu Ke [G 3]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 4 },
+    { name: "Lin Xiyin [G 1]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 5 },
+    { name: "Luo Xhimin [G 3]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 6 },
+    { name: "Yan Jun [G 4]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 7 },
+    { name: "Zeng Wen [G 1]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 8 },
+    { name: "Zhang Meifen [G 2]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 9 },
+    { name: "Zhu Yanli", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 10 },
+    // Xi'an Jiaotong University — Xi'an, Shaanxi
+    { name: "Prof. Zheng Nanning (President)", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 1 },
+    { name: "Prof. Ren Huimin", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 2 },
+    { name: "Dr. Yan Jianqun", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 3 },
+    { name: "Dr. Yan Hong", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 4 },
+    { name: "Dr. Li Wei", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 5 },
+    { name: "Dr. Zhu Hongliang", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 6 },
+    { name: "Assoc.Prof. Li Xiaomei (Dean) [G 1]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 7 },
+    { name: "Gao Rui [G 4]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 8 },
+    { name: "Gu Wei [G 3]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 9 },
+    { name: "Jiang Wenhui [G 2]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 10 },
+    { name: "Li Jing [G 2]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 11 },
+    { name: "Liu Ming [G 4]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 12 },
+    { name: "Lu Aili [G 5]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 13 },
+    { name: "Wang Wenru [G 1]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 14 },
+    { name: "Wang Xiaoquin [G 5]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 15 },
   ];
 
   const abroadAlumni = [];

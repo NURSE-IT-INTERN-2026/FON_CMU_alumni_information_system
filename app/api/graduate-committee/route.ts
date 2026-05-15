@@ -8,35 +8,42 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    const cohort = searchParams.get("cohort") || "";
+    const position = searchParams.get("position") || "";
+    const sortBy = searchParams.get("sortBy") || "termYear";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
     const where: Record<string, unknown> = {};
 
+    const andConditions: Record<string, unknown>[] = [];
+
     if (search) {
-      where.OR = [
-        { role: { contains: search, mode: "insensitive" } },
-        {
-          alumni: {
-            OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
-            ],
-          },
-        },
-      ];
+      andConditions.push({
+        OR: [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
+          { remarks: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    if (cohort) {
+      andConditions.push({ cohort });
+    }
+
+    if (position) {
+      andConditions.push({ position });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [committees, total] = await Promise.all([
       prisma.graduateCommittee.findMany({
         where,
-        include: {
-          alumni: {
-            select: {
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy: { termYear: "desc" },
+        orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -54,6 +61,39 @@ export async function GET(request: NextRequest) {
     console.error("Failed to fetch graduate committees:", error);
     return NextResponse.json(
       { error: "Failed to fetch graduate committees" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { termYear, studentId, fullName, cohort, position, remarks } = body;
+
+    if (!termYear || !studentId || !fullName || !cohort || !position) {
+      return NextResponse.json(
+        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
+        { status: 400 }
+      );
+    }
+
+    const committee = await prisma.graduateCommittee.create({
+      data: {
+        termYear: Number(termYear),
+        studentId: studentId.trim(),
+        fullName: fullName.trim(),
+        cohort: cohort.trim(),
+        position: position.trim(),
+        remarks: remarks?.trim() || null,
+      },
+    });
+
+    return NextResponse.json(committee, { status: 201 });
+  } catch (error) {
+    console.error("Failed to create graduate committee:", error);
+    return NextResponse.json(
+      { error: "Failed to create graduate committee" },
       { status: 500 }
     );
   }

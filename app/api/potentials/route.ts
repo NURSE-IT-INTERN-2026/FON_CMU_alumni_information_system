@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    const sortBy = searchParams.get("sortBy") || "recordedYear";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
     const where: Record<string, unknown> = {};
 
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     const [potentials, total] = await Promise.all([
       prisma.potential.findMany({
         where,
-        orderBy: { recordedYear: "desc" },
+        orderBy: { [sortBy]: sortOrder },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

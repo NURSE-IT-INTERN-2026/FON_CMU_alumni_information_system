@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           awards: true,
-          graduateCommittees: true,
         },
         orderBy: { [validSortField]: validSortOrder },
         skip: (page - 1) * pageSize,
@@ -139,7 +138,6 @@ export async function POST(request: NextRequest) {
       },
       include: {
         awards: true,
-        graduateCommittees: true,
       },
     });
 

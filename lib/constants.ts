@@ -37,6 +37,7 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin/potentials", label: "จัดการข้อมูลศักยภาพ" },
   { href: "/admin/associations", label: "จัดการข้อมูลสมาคม/ชมรม" },
   { href: "/admin/news", label: "จัดการข่าวสาร" },
+  { href: "/admin/graduate-committee", label: "จัดการข้อมูลกรรมการบัณฑิต" },
   { href: "/admin/users", label: "จัดการผู้ใช้งาน" },
 ];
 

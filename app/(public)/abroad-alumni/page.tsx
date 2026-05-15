@@ -27,7 +27,7 @@ export default function AbroadAlumniPage() {
   const perGroupPage = 10;
 
   const toggle = (label: string) =>
-    setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
+    setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
 
   const pageFor = (label: string) => pageByGroup[label] ?? 1;
   const setPageFor = (label: string, p: number) =>
@@ -156,18 +156,16 @@ export default function AbroadAlumniPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-[var(--border)] bg-gray-50">
-                            <th className="w-16 px-4 py-3 text-center font-semibold text-[var(--primary)]">
+                          <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+                            <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                               ที่
                             </th>
-                            <th className="px-4 py-3 text-left font-semibold text-[var(--primary)]">
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                               ชื่อ - นามสกุล
                             </th>
-                            {!group.isUniversity && (
-                              <th className="px-4 py-3 text-left font-semibold text-[var(--primary)]">
-                                ที่อยู่
-                              </th>
-                            )}
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                              ที่อยู่
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -180,11 +178,9 @@ export default function AbroadAlumniPage() {
                                 {(page - 1) * perGroupPage + idx + 1}
                               </td>
                               <td className="px-4 py-3">{a.name}</td>
-                              {!group.isUniversity && (
-                                <td className="px-4 py-3 text-[var(--muted)]">
-                                  {a.address || "-"}
-                                </td>
-                              )}
+                              <td className="px-4 py-3 text-[var(--muted)]">
+                                {a.address || "-"}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

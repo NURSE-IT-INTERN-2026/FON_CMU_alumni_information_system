@@ -20,6 +20,9 @@ interface ApiResponse {
   totalPages: number;
 }
 
+type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
+type SortDir = "asc" | "desc";
+
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potential[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +30,18 @@ export default function PotentialsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("recordedYear");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  };
 
   const fetchPotentials = useCallback(async () => {
     setLoading(true);
@@ -34,6 +49,8 @@ export default function PotentialsPage() {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
+        sortBy: sortField,
+        sortOrder: sortDir,
       });
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/potentials?${params}`);
@@ -47,7 +64,7 @@ export default function PotentialsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sortField, sortDir]);
 
   useEffect(() => {
     fetchPotentials();
@@ -94,20 +111,20 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                   ลำดับ
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                  รหัสนักศึกษา
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
+                  รหัสนักศึกษา {sortField === "studentId" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                  ชื่อ-สกุล
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
+                  ชื่อ-สกุล {sortField === "fullName" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                  อาชีพ
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("career")}>
+                  อาชีพ {sortField === "career" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                  ตำแหน่ง
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
+                  ตำแหน่ง {sortField === "position" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                  ปีที่บันทึก
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
+                  ปีที่บันทึก {sortField === "recordedYear" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
               </tr>
             </thead>

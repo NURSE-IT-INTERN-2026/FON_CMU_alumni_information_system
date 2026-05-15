@@ -46,7 +46,6 @@ model Alumni {
   updatedAt             DateTime  @updatedAt
 
   awards               Award[]
-  graduateCommittees   GraduateCommittee[]
 
   @@map("alumni")
 }
@@ -80,15 +79,15 @@ model Association {
 }
 
 model GraduateCommittee {
-  id          String    @id @default(uuid())
-  alumniId    String
-  role        String
-  termYear    Int
-  degreeLevel DegreeLevel
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  termYear  Int
+  studentId String
+  fullName  String
+  cohort    String
+  position  String
+  remarks   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("graduate_committees")
 }
