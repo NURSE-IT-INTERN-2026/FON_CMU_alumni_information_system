@@ -8,18 +8,28 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    const searchField = searchParams.get("searchField") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
+    const validSearchFields = ["studentId", "fullName", "associationName", "position", "recordedYear"];
     const where: Record<string, unknown> = {};
 
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { fullName: { contains: search, mode: "insensitive" } },
-        { associationName: { contains: search, mode: "insensitive" } },
-        { position: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "recordedYear") {
+          where[searchField] = Number(search) || undefined;
+        } else {
+          where[searchField] = { contains: search, mode: "insensitive" };
+        }
+      } else {
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { associationName: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const [data, total] = await Promise.all([

@@ -23,6 +23,16 @@ interface ApiResponse {
 
 type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "remarks";
 type SortDir = "asc" | "desc";
+type SearchField = "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
+
+const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "studentId", label: "รหัสนักศึกษา" },
+  { value: "fullName", label: "ชื่อ-สกุล" },
+  { value: "cohort", label: "รุ่นที่" },
+  { value: "position", label: "ตำแหน่ง" },
+  { value: "remarks", label: "หมายเหตุ" },
+  { value: "termYear", label: "ปี พ.ศ." },
+];
 
 const EMPTY_FORM = { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" };
 
@@ -33,6 +43,7 @@ export default function GraduateCommitteePage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("studentId");
   const [filterCohort, setFilterCohort] = useState("");
   const [filterPosition, setFilterPosition] = useState("");
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
@@ -83,6 +94,7 @@ export default function GraduateCommitteePage() {
         sortOrder: sortDir,
       });
       if (search) params.set("search", search);
+      params.set("searchField", searchField);
       if (filterCohort) params.set("cohort", filterCohort);
       if (filterPosition) params.set("position", filterPosition);
 
@@ -97,7 +109,7 @@ export default function GraduateCommitteePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterCohort, filterPosition, sortField, sortDir]);
+  }, [page, search, searchField, filterCohort, filterPosition, sortField, sortDir]);
 
   useEffect(() => { fetchCommittees(); }, [fetchCommittees]);
 
@@ -282,33 +294,22 @@ export default function GraduateCommitteePage() {
 
       {/* Search & Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <select
+          value={searchField}
+          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          {SEARCH_FIELDS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="ค้นหารหัสนักศึกษา, ชื่อ-สกุล, ตำแหน่ง..."
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         />
-        <select
-          value={filterCohort}
-          onChange={(e) => { setFilterCohort(e.target.value); setPage(1); }}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] bg-white"
-        >
-          <option value="">ทุกรุ่น</option>
-          {cohortOptions.map((c) => (
-            <option key={c} value={c}>รุ่น {c}</option>
-          ))}
-        </select>
-        <select
-          value={filterPosition}
-          onChange={(e) => { setFilterPosition(e.target.value); setPage(1); }}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] bg-white"
-        >
-          <option value="">ทุกตำแหน่ง</option>
-          {positionOptions.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
       </div>
 
       {/* Table */}
@@ -326,7 +327,7 @@ export default function GraduateCommitteePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
                     ปี พ.ศ. {sortField === "termYear" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
@@ -335,7 +336,7 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
                     ชื่อ-สกุล {sortField === "fullName" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
                     รุ่นที่ {sortField === "cohort" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>

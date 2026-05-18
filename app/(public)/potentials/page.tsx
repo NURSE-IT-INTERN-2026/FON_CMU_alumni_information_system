@@ -22,6 +22,15 @@ interface ApiResponse {
 
 type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
 type SortDir = "asc" | "desc";
+type SearchField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
+
+const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "studentId", label: "รหัสนักศึกษา" },
+  { value: "fullName", label: "ชื่อ-สกุล" },
+  { value: "career", label: "อาชีพ" },
+  { value: "position", label: "ตำแหน่ง" },
+  { value: "recordedYear", label: "ปีที่บันทึก" },
+];
 
 const EMPTY_FORM = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
 
@@ -32,6 +41,7 @@ export default function PotentialsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("studentId");
   const [sortField, setSortField] = useState<SortField>("recordedYear");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -64,6 +74,7 @@ export default function PotentialsPage() {
         sortOrder: sortDir,
       });
       if (search.trim()) params.set("search", search.trim());
+      params.set("searchField", searchField);
       const res = await fetch(`/api/potentials?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
@@ -75,7 +86,7 @@ export default function PotentialsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortField, sortDir]);
+  }, [page, search, searchField, sortField, sortDir]);
 
   useEffect(() => {
     fetchPotentials();
@@ -271,10 +282,19 @@ export default function PotentialsPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-6 flex gap-2">
+        <select
+          value={searchField}
+          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          {SEARCH_FIELDS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="ค้นหารหัสนักศึกษา, ชื่อ-สกุล, อาชีพ, ตำแหน่ง..."
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
@@ -295,7 +315,7 @@ export default function PotentialsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                   ลำดับ
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
@@ -310,7 +330,7 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
                   ตำแหน่ง {sortField === "position" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
                 {manageMode && (

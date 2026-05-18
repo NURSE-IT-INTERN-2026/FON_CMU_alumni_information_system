@@ -10,22 +10,32 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const cohort = searchParams.get("cohort") || "";
     const position = searchParams.get("position") || "";
+    const searchField = searchParams.get("searchField") || "";
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
+    const validSearchFields = ["studentId", "fullName", "cohort", "position", "remarks", "termYear"];
     const where: Record<string, unknown> = {};
 
     const andConditions: Record<string, unknown>[] = [];
 
     if (search) {
-      andConditions.push({
-        OR: [
-          { studentId: { contains: search, mode: "insensitive" } },
-          { fullName: { contains: search, mode: "insensitive" } },
-          { position: { contains: search, mode: "insensitive" } },
-          { remarks: { contains: search, mode: "insensitive" } },
-        ],
-      });
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "termYear") {
+          andConditions.push({ [searchField]: Number(search) || undefined });
+        } else {
+          andConditions.push({ [searchField]: { contains: search, mode: "insensitive" } });
+        }
+      } else {
+        andConditions.push({
+          OR: [
+            { studentId: { contains: search, mode: "insensitive" } },
+            { fullName: { contains: search, mode: "insensitive" } },
+            { position: { contains: search, mode: "insensitive" } },
+            { remarks: { contains: search, mode: "insensitive" } },
+          ],
+        });
+      }
     }
 
     if (cohort) {
