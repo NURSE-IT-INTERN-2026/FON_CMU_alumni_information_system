@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { alumniId, awardName, awardType, year, description } = body;
+
+    if (!alumniId || !awardName || !awardType || !year) {
+      return NextResponse.json(
+        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
+        { status: 400 }
+      );
+    }
+
+    const award = await prisma.award.create({
+      data: {
+        alumniId,
+        awardName: awardName.trim(),
+        awardType,
+        year: Number(year),
+        description: description?.trim() || null,
+      },
+      include: {
+        alumni: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    return NextResponse.json(award, { status: 201 });
+  } catch (error) {
+    console.error("Failed to create award:", error);
+    return NextResponse.json(
+      { error: "Failed to create award" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

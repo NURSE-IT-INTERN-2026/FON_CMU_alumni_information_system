@@ -3,13 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS, ADMIN_NAV_ITEMS } from "@/lib/constants";
+import { NAV_ITEMS } from "@/lib/constants";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const isAdmin = pathname.startsWith("/admin");
-  const items = isAdmin ? ADMIN_NAV_ITEMS : NAV_ITEMS;
   const showLogout = pathname !== "/login";
 
   return (
@@ -98,7 +96,7 @@ export default function Header() {
       {mobileMenuOpen && (
         <nav className="border-t border-white/10 lg:hidden">
           <div className="space-y-1 px-4 py-3">
-            {items.map((item) => (
+            {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -108,15 +106,6 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            {isAdmin && (
-              <Link
-                href="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                กลับหน้าหลัก
-              </Link>
-            )}
             {showLogout && (
               <form action="/api/auth/logout" method="POST">
                 <button

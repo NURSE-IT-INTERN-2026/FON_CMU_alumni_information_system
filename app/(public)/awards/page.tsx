@@ -8,12 +8,13 @@ import {
   Legend,
 } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { AWARD_TYPE_LABELS, PAGE_SIZE } from "@/lib/constants";
+import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE } from "@/lib/constants";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 interface Award {
   id: string;
+  alumniId: string;
   awardName: string;
   awardType: string;
   year: number;
@@ -41,16 +42,33 @@ const AWARD_COLORS: Record<string, string> = {
 type SortField = "name" | "award" | "type" | "year";
 type SortDir = "asc" | "desc";
 
+const EMPTY_FORM = { alumniId: "", awardName: "", awardType: "INTERNATIONAL", year: "", description: "" };
+
 export default function AwardsPage() {
   const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [awardTypeFilter, setAwardTypeFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("year");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
+
+  const [manageMode, setManageMode] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Alumni search for form
+  const [alumniSearch, setAlumniSearch] = useState("");
+  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; firstName: string; lastName: string }[]>([]);
+  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
   const fetchAwards = useCallback(async () => {
     setLoading(true);
@@ -66,6 +84,7 @@ export default function AwardsPage() {
       const data: ApiResponse = await res.json();
       setAwards(data.data);
       setTotalPages(data.totalPages);
+      setTotal(data.total);
     } catch (err) {
       console.error(err);
     } finally {
@@ -80,90 +99,253 @@ export default function AwardsPage() {
         fetch("/api/awards?pageSize=1&awardType=NATIONAL").then((r) => r.json()),
         fetch("/api/awards?pageSize=1&awardType=LOCAL").then((r) => r.json()),
       ]);
-      setTypeCounts({
-        INTERNATIONAL: international.total,
-        NATIONAL: national.total,
-        LOCAL: local.total,
-      });
+      setTypeCounts({ INTERNATIONAL: international.total, NATIONAL: national.total, LOCAL: local.total });
     } catch (err) {
       console.error(err);
     }
   }, []);
 
-  useEffect(() => {
-    fetchTypeCounts();
-  }, [fetchTypeCounts]);
+  useEffect(() => { fetchTypeCounts(); }, [fetchTypeCounts]);
+  useEffect(() => { fetchAwards(); }, [fetchAwards]);
 
-  useEffect(() => {
-    fetchAwards();
-  }, [fetchAwards]);
-
-  const handleSearch = (value: string) => {
-    setSearch(value);
-    setPage(1);
-  };
-
-  const handleFilter = (value: string) => {
-    setAwardTypeFilter(value);
-    setPage(1);
-  };
+  const handleSearch = (value: string) => { setSearch(value); setPage(1); };
+  const handleFilter = (value: string) => { setAwardTypeFilter(value); setPage(1); };
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDir("asc");
-    }
+    if (sortField === field) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
+    else { setSortField(field); setSortDir("asc"); }
   };
 
   const sortedAwards = [...awards].sort((a, b) => {
     let cmp = 0;
     switch (sortField) {
-      case "name":
-        cmp = `${a.alumni.firstName} ${a.alumni.lastName}`.localeCompare(
-          `${b.alumni.firstName} ${b.alumni.lastName}`
-        );
-        break;
-      case "award":
-        cmp = a.awardName.localeCompare(b.awardName);
-        break;
-      case "type":
-        cmp = a.awardType.localeCompare(b.awardType);
-        break;
-      case "year":
-        cmp = a.year - b.year;
-        break;
+      case "name": cmp = `${a.alumni.firstName} ${a.alumni.lastName}`.localeCompare(`${b.alumni.firstName} ${b.alumni.lastName}`); break;
+      case "award": cmp = a.awardName.localeCompare(b.awardName); break;
+      case "type": cmp = a.awardType.localeCompare(b.awardType); break;
+      case "year": cmp = a.year - b.year; break;
     }
     return sortDir === "asc" ? cmp : -cmp;
   });
 
   const SortIcon = ({ field }: { field: SortField }) => (
-    <span className="ml-1 inline-block">
-      {sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
-    </span>
+    <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
   );
 
   const chartData = {
     labels: Object.keys(typeCounts).map((k) => AWARD_TYPE_LABELS[k] || k),
-    datasets: [
-      {
-        data: Object.values(typeCounts),
-        backgroundColor: Object.keys(typeCounts).map((k) => AWARD_COLORS[k] || "#999"),
-        borderWidth: 2,
-        borderColor: "#ffffff",
-      },
-    ],
+    datasets: [{
+      data: Object.values(typeCounts),
+      backgroundColor: Object.keys(typeCounts).map((k) => AWARD_COLORS[k] || "#999"),
+      borderWidth: 2,
+      borderColor: "#ffffff",
+    }],
+  };
+
+  const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(page * PAGE_SIZE, total);
+
+  const paginationNumbers = (() => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push("...");
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (page < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  })();
+
+  // Alumni search for form
+  const searchAlumni = useCallback(async (term: string) => {
+    if (term.length < 2) { setAlumniResults([]); return; }
+    try {
+      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setAlumniResults(data.data || []);
+      setShowAlumniDropdown(true);
+    } catch {}
+  }, []);
+
+  const selectAlumni = (a: { id: string; studentId: string; firstName: string; lastName: string }) => {
+    setForm((f) => ({ ...f, alumniId: a.id }));
+    setAlumniSearch(`${a.studentId} - ${a.firstName} ${a.lastName}`);
+    setShowAlumniDropdown(false);
+    setAlumniResults([]);
+  };
+
+  const openCreate = () => {
+    setForm(EMPTY_FORM);
+    setAlumniSearch("");
+    setFormErrors({});
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (a: Award) => {
+    setForm({
+      alumniId: a.alumniId,
+      awardName: a.awardName,
+      awardType: a.awardType,
+      year: String(a.year),
+      description: a.description || "",
+    });
+    setAlumniSearch(`${a.alumni.firstName} ${a.alumni.lastName}`);
+    setFormErrors({});
+    setEditingId(a.id);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setAlumniSearch("");
+    setFormErrors({});
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!form.alumniId) errors.alumniId = "กรุณาเลือกศิษย์เก่า";
+    if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
+    if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
+    if (!form.year) errors.year = "กรุณากรอกปี";
+    if (form.year && isNaN(Number(form.year))) errors.year = "ปีต้องเป็นตัวเลข";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const payload = {
+        alumniId: form.alumniId,
+        awardName: form.awardName.trim(),
+        awardType: form.awardType,
+        year: Number(form.year),
+        description: form.description.trim() || null,
+      };
+      const res = editingId
+        ? await fetch(`/api/awards/${editingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/awards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      closeForm();
+      fetchAwards();
+      fetchTypeCounts();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const res = await fetch(`/api/awards/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setDeleteId(null);
+      fetchAwards();
+      fetchTypeCounts();
+    } catch {
+      setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
+    }
   };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-8 text-center text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-        รางวัลที่ได้รับ
-      </h1>
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รางวัลที่ได้รับ</h1>
+        {!manageMode ? (
+          <button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+            จัดการข้อมูล
+          </button>
+        ) : (
+          <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+            กลับหน้าเดิม
+          </button>
+        )}
+      </div>
 
-      {/* Doughnut Chart */}
-      {Object.keys(typeCounts).length > 0 && (
+      {errorMsg && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg("")} className="ml-4 text-red-500 hover:text-red-700 font-bold">&times;</button>
+        </div>
+      )}
+
+      {manageMode && showForm && (
+        <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
+          <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
+            {editingId ? "แก้ไขข้อมูลรางวัล" : "เพิ่มข้อมูลรางวัล"}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="relative">
+              <label className="mb-1 block text-sm font-medium text-gray-700">ศิษย์เก่า *</label>
+              <input type="text" value={alumniSearch} onChange={(e) => { setAlumniSearch(e.target.value); searchAlumni(e.target.value); }} placeholder="ค้นหารหัสนักศึกษาหรือชื่อ..." className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.alumniId ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.alumniId && <p className="mt-1 text-xs text-red-500">{formErrors.alumniId}</p>}
+              {showAlumniDropdown && alumniResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {alumniResults.map((a) => (
+                    <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                      {a.studentId} - {a.firstName} {a.lastName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อรางวัล *</label>
+              <input type="text" value={form.awardName} onChange={(e) => setForm((f) => ({ ...f, awardName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.awardName ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.awardName && <p className="mt-1 text-xs text-red-500">{formErrors.awardName}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ประเภท *</label>
+              <select value={form.awardType} onChange={(e) => setForm((f) => ({ ...f, awardType: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
+                {AWARD_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ปี (พ.ศ.) *</label>
+              <input type="number" value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))} placeholder="เช่น 2568" className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.year ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.year && <p className="mt-1 text-xs text-red-500">{formErrors.year}</p>}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">รายละเอียด</label>
+              <input type="text" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-3">
+            <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+              {saving ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Doughnut Chart - only in view mode */}
+      {!manageMode && Object.keys(typeCounts).length > 0 && (
         <div className="mb-8 flex justify-center">
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
             <Doughnut
@@ -171,13 +353,7 @@ export default function AwardsPage() {
               options={{
                 responsive: true,
                 plugins: {
-                  legend: {
-                    position: "bottom",
-                    labels: {
-                      padding: 16,
-                      font: { size: 13 },
-                    },
-                  },
+                  legend: { position: "bottom", labels: { padding: 16, font: { size: 13 } } },
                 },
               }}
             />
@@ -201,12 +377,19 @@ export default function AwardsPage() {
         >
           <option value="">ทุกประเภท</option>
           {Object.entries(AWARD_TYPE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
+            <option key={value} value={value}>{label}</option>
           ))}
         </select>
       </div>
+
+      {manageMode && (
+        <div className="mb-4">
+          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            เพิ่มข้อมูล
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg bg-white shadow-sm">
@@ -214,39 +397,30 @@ export default function AwardsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
-                <th
-                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                  onClick={() => handleSort("name")}
-                >
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                   ชื่อ-นามสกุล <SortIcon field="name" />
                 </th>
-                <th
-                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                  onClick={() => handleSort("award")}
-                >
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("award")}>
                   ชื่อรางวัล <SortIcon field="award" />
                 </th>
-                <th
-                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                  onClick={() => handleSort("type")}
-                >
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("type")}>
                   ประเภท <SortIcon field="type" />
                 </th>
-                <th
-                  className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                  onClick={() => handleSort("year")}
-                >
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
                   ปี <SortIcon field="year" />
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                   รายละเอียด
                 </th>
+                {manageMode && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={manageMode ? 6 : 5} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -254,73 +428,74 @@ export default function AwardsPage() {
                 </tr>
               ) : sortedAwards.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-[var(--muted)]">
-                    ไม่พบข้อมูล
-                  </td>
+                  <td colSpan={manageMode ? 6 : 5} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
                 sortedAwards.map((award) => (
-                  <tr
-                    key={award.id}
-                    className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-3">
-                      {award.alumni.firstName} {award.alumni.lastName}
-                    </td>
+                  <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                    <td className="px-4 py-3">{award.alumni.firstName} {award.alumni.lastName}</td>
                     <td className="px-4 py-3">{award.awardName}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white"
-                        style={{
-                          backgroundColor:
-                            AWARD_COLORS[award.awardType] || "#999",
-                        }}
-                      >
+                      <span className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: AWARD_COLORS[award.awardType] || "#999" }}>
                         {AWARD_TYPE_LABELS[award.awardType] || award.awardType}
                       </span>
                     </td>
                     <td className="px-4 py-3">{award.year}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]">
-                      {award.description || "-"}
-                    </td>
+                    <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]">{award.description || "-"}</td>
+                    {manageMode && (
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openEdit(award)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100" title="แก้ไข">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                          </button>
+                          <button onClick={() => setDeleteId(award.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        {manageMode && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+            <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40">ก่อนหน้า</button>
+              {paginationNumbers.map((p, i) =>
+                p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
+                  <button key={p} onClick={() => setPage(p)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${page === p ? "bg-[var(--primary)] text-white" : "text-gray-600 hover:bg-gray-50"}`}>{p}</button>
+                )
+              )}
+              <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40">ถัดไป</button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {!manageMode && totalPages > 1 && (
         <div className="mt-6 flex justify-center gap-2">
-          <button
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-          >
-            ก่อนหน้า
-          </button>
+          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ก่อนหน้า</button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPage(p)}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                p === page
-                  ? "bg-[var(--primary)] text-white"
-                  : "border border-[var(--border)] hover:bg-gray-50"
-              }`}
-            >
-              {p}
-            </button>
+            <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] hover:bg-gray-50"}`}>{p}</button>
           ))}
-          <button
-            onClick={() => setPage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-          >
-            ถัดไป
-          </button>
+          <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ถัดไป</button>
+        </div>
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
+            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข้อมูลรางวัลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -31,7 +31,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/admin/alumni");
+      router.push("/");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {

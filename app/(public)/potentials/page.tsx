@@ -23,6 +23,8 @@ interface ApiResponse {
 type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
 type SortDir = "asc" | "desc";
 
+const EMPTY_FORM = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
+
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potential[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,15 @@ export default function PotentialsPage() {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("recordedYear");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const [manageMode, setManageMode] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -77,11 +88,187 @@ export default function PotentialsPage() {
 
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
+  const openCreate = () => {
+    setForm(EMPTY_FORM);
+    setFormErrors({});
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (p: Potential) => {
+    setForm({
+      studentId: p.studentId,
+      fullName: p.fullName,
+      career: p.career,
+      position: p.position,
+      recordedYear: String(p.recordedYear),
+    });
+    setFormErrors({});
+    setEditingId(p.id);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setFormErrors({});
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+    if (!form.fullName.trim()) errors.fullName = "กรุณากรอกชื่อ-สกุล";
+    if (!form.career.trim()) errors.career = "กรุณากรอกอาชีพ";
+    if (!form.position.trim()) errors.position = "กรุณากรอกตำแหน่ง";
+    if (!form.recordedYear) errors.recordedYear = "กรุณากรอกปีที่บันทึก";
+    if (form.recordedYear && isNaN(Number(form.recordedYear)))
+      errors.recordedYear = "ปีที่บันทึกต้องเป็นตัวเลข";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+    setSaving(true);
+    setErrorMsg("");
+    try {
+      const payload = { ...form, recordedYear: Number(form.recordedYear) };
+      const res = editingId
+        ? await fetch(`/api/potentials/${editingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/potentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      closeForm();
+      fetchPotentials();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const res = await fetch(`/api/potentials/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setDeleteId(null);
+      fetchPotentials();
+    } catch {
+      setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
+    }
+  };
+
+  const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(page * PAGE_SIZE, total);
+
+  const paginationNumbers = (() => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push("...");
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (page < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  })();
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-8 text-center text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-        ศักยภาพ
-      </h1>
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+          ศักยภาพ
+        </h1>
+        {!manageMode ? (
+          <button
+            onClick={() => setManageMode(true)}
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
+          >
+            จัดการข้อมูล
+          </button>
+        ) : (
+          <button
+            onClick={() => { setManageMode(false); setShowForm(false); }}
+            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
+          >
+            กลับหน้าเดิม
+          </button>
+        )}
+      </div>
+
+      {errorMsg && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg("")} className="ml-4 text-red-500 hover:text-red-700 font-bold">&times;</button>
+        </div>
+      )}
+
+      {manageMode && showForm && (
+        <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
+          <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
+            {editingId ? "แก้ไขข้อมูลศักยภาพ" : "เพิ่มข้อมูลศักยภาพ"}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
+              <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุล *</label>
+              <input type="text" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">อาชีพ *</label>
+              <input type="text" value={form.career} onChange={(e) => setForm((f) => ({ ...f, career: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.career ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.career && <p className="mt-1 text-xs text-red-500">{formErrors.career}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ตำแหน่ง *</label>
+              <input type="text" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.position ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.position && <p className="mt-1 text-xs text-red-500">{formErrors.position}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ปีที่บันทึก (พ.ศ.) *</label>
+              <input type="number" value={form.recordedYear} onChange={(e) => setForm((f) => ({ ...f, recordedYear: e.target.value }))} placeholder="เช่น 2568" className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.recordedYear ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.recordedYear && <p className="mt-1 text-xs text-red-500">{formErrors.recordedYear}</p>}
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-3">
+            <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+              {saving ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {manageMode && (
+        <div className="mb-4">
+          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            เพิ่มข้อมูล
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-6">
@@ -126,6 +313,9 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" && (sortDir === "asc" ? "▲" : "▼")}
                 </th>
+                {manageMode && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -137,43 +327,59 @@ export default function PotentialsPage() {
                   <td className="px-4 py-3">{p.career}</td>
                   <td className="px-4 py-3">{p.position}</td>
                   <td className="px-4 py-3 text-center">{p.recordedYear}</td>
+                  {manageMode && (
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => openEdit(p)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100" title="แก้ไข">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                        </button>
+                        <button onClick={() => setDeleteId(p.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+          {manageMode && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+              <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40">ก่อนหน้า</button>
+                {paginationNumbers.map((p, i) =>
+                  p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
+                    <button key={p} onClick={() => setPage(p)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${page === p ? "bg-[var(--primary)] text-white" : "text-gray-600 hover:bg-gray-50"}`}>{p}</button>
+                  )
+                )}
+                <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40">ถัดไป</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {!manageMode && totalPages > 1 && (
         <div className="mt-6 flex justify-center gap-2">
-          <button
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-          >
-            ก่อนหน้า
-          </button>
+          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ก่อนหน้า</button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPage(p)}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                p === page
-                  ? "bg-[var(--primary)] text-white"
-                  : "border border-[var(--border)] hover:bg-gray-50"
-              }`}
-            >
-              {p}
-            </button>
+            <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] hover:bg-gray-50"}`}>{p}</button>
           ))}
-          <button
-            onClick={() => setPage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-          >
-            ถัดไป
-          </button>
+          <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ถัดไป</button>
+        </div>
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
+            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข้อมูลศักยภาพนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

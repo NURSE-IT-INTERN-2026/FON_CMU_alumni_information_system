@@ -30,15 +30,7 @@ export const NAV_ITEMS = [
   { href: "/graduate-committee", label: "กรรมการบัณฑิต" },
   { href: "/model-representatives", label: "ผู้แทนรุ่น" },
   { href: "/abroad-alumni", label: "ข้อมูลการทำงานต่างประเทศ" },
-];
-
-export const ADMIN_NAV_ITEMS = [
-  { href: "/admin/alumni", label: "จัดการข้อมูลศิษย์เก่า" },
-  { href: "/admin/potentials", label: "จัดการข้อมูลศักยภาพ" },
-  { href: "/admin/associations", label: "จัดการข้อมูลสมาคม/ชมรม" },
-  { href: "/admin/news", label: "จัดการข่าวสาร" },
-  { href: "/admin/graduate-committee", label: "จัดการข้อมูลกรรมการบัณฑิต" },
-  { href: "/admin/users", label: "จัดการผู้ใช้งาน" },
+  { href: "/news", label: "ข่าวสาร" },
 ];
 
 export const PAGE_SIZE = 10;
