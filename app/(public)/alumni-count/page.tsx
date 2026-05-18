@@ -1,55 +1,38 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend,
-} from "chart.js";
-import { Line } from "react-chartjs-2";
-import { DEGREE_OPTIONS, DEGREE_LABELS, PAGE_SIZE } from "@/lib/constants";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
-interface Dataset {
-  degreeLevel: string;
-  data: number[];
-}
+  ResponsiveContainer,
+} from "recharts";
+import { PAGE_SIZE, PREFIX_OPTIONS } from "@/lib/constants";
 
 interface ChartData {
-  labels: number[];
-  datasets: Dataset[];
+  labels: string[];
+  data: number[];
 }
 
 interface Alumni {
   id: string;
   studentId: string;
+  prefix: string;
   firstName: string;
-  lastName: string;
-  degreeLevel: string;
-  initialYear: number;
-  graduationYear: number;
+  maidenLastName: string;
+  newLastName: string | null;
+  cohort: string | null;
+  province: string | null;
   email: string | null;
   phone: string | null;
   currentWorkplace: string | null;
   country: string | null;
   isPotential: boolean;
   isModelRepresentative: boolean;
-  expertise: string | null;
-  achievementSummary: string | null;
   photoUrl: string | null;
 }
 
@@ -58,31 +41,23 @@ interface AlumniApiResponse {
   total: number;
 }
 
-const DEGREE_COLORS: Record<string, string> = {
-  DOCTORAL: "#1e3a5f",
-  MASTER: "#2c5282",
-  BACHELOR: "#4299e1",
-  NURSING_CERTIFICATE: "#e8a838",
-};
-
-const EMPTY_FORM = {
+const EMPTY_EDIT_FORM = {
   studentId: "",
+  prefix: "",
   firstName: "",
-  lastName: "",
-  degreeLevel: "",
-  initialYear: "",
-  graduationYear: "",
+  maidenLastName: "",
+  cohort: "",
+  newLastName: "",
+  province: "",
   email: "",
   phone: "",
   currentWorkplace: "",
   country: "",
-  isPotential: false,
-  isModelRepresentative: false,
-  expertise: "",
-  achievementSummary: "",
 };
 
 export default function AlumniCountPage() {
+  const router = useRouter();
+
   // View mode state
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -94,17 +69,19 @@ export default function AlumniCountPage() {
   const [totalAlumni, setTotalAlumni] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [degreeFilter, setDegreeFilter] = useState("");
   const [tableLoading, setTableLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(EMPTY_EDIT_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: { row: number; message: string }[];
+  } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Fetch chart data
@@ -115,10 +92,7 @@ export default function AlumniCountPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ChartData = await res.json();
       setChartData(data);
-      const total = data.datasets.reduce(
-        (sum, ds) => sum + ds.data.reduce((s, v) => s + v, 0),
-        0
-      );
+      const total = data.data.reduce((sum, v) => sum + v, 0);
       setTotalCount(total);
     } catch (err) {
       console.error(err);
@@ -135,7 +109,6 @@ export default function AlumniCountPage() {
         page: String(page),
         pageSize: String(PAGE_SIZE),
         search,
-        degreeLevel: degreeFilter,
       });
       const res = await fetch(`/api/alumni?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -147,7 +120,7 @@ export default function AlumniCountPage() {
     } finally {
       setTableLoading(false);
     }
-  }, [page, search, degreeFilter]);
+  }, [page, search]);
 
   useEffect(() => {
     fetchChartData();
@@ -166,55 +139,37 @@ export default function AlumniCountPage() {
     setPage(1);
   };
 
-  const handleDegreeFilter = (value: string) => {
-    setDegreeFilter(value);
-    setPage(1);
-  };
-
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
-  };
-
   const openEdit = (a: Alumni) => {
     setForm({
       studentId: a.studentId,
+      prefix: a.prefix,
       firstName: a.firstName,
-      lastName: a.lastName,
-      degreeLevel: a.degreeLevel,
-      initialYear: String(a.initialYear),
-      graduationYear: String(a.graduationYear),
+      maidenLastName: a.maidenLastName,
+      cohort: a.cohort || "",
+      newLastName: a.newLastName || "",
+      province: a.province || "",
       email: a.email || "",
       phone: a.phone || "",
       currentWorkplace: a.currentWorkplace || "",
       country: a.country || "",
-      isPotential: a.isPotential,
-      isModelRepresentative: a.isModelRepresentative,
-      expertise: a.expertise || "",
-      achievementSummary: a.achievementSummary || "",
     });
     setFormErrors({});
     setEditingId(a.id);
-    setShowForm(true);
   };
 
   const closeForm = () => {
-    setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(EMPTY_EDIT_FORM);
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+    if (!form.prefix) errors.prefix = "กรุณาเลือกคำนำหน้า";
     if (!form.firstName.trim()) errors.firstName = "กรุณากรอกชื่อ";
-    if (!form.lastName.trim()) errors.lastName = "กรุณากรอกนามสกุล";
-    if (!form.degreeLevel) errors.degreeLevel = "กรุณาเลือกระดับปริญญา";
-    if (!form.initialYear) errors.initialYear = "กรุณากรอกปีที่เข้าศึกษา";
-    if (!form.graduationYear) errors.graduationYear = "กรุณากรอกปีที่จบ";
+    if (!form.maidenLastName.trim())
+      errors.maidenLastName = "กรุณากรอกนามสกุลเดิม";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -226,31 +181,22 @@ export default function AlumniCountPage() {
     try {
       const payload = {
         studentId: form.studentId.trim(),
+        prefix: form.prefix,
         firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        degreeLevel: form.degreeLevel,
-        initialYear: Number(form.initialYear),
-        graduationYear: Number(form.graduationYear),
+        maidenLastName: form.maidenLastName.trim(),
+        cohort: form.cohort.trim() || null,
+        newLastName: form.newLastName.trim() || null,
+        province: form.province.trim() || null,
         email: form.email.trim() || null,
         phone: form.phone.trim() || null,
         currentWorkplace: form.currentWorkplace.trim() || null,
         country: form.country.trim() || null,
-        isPotential: form.isPotential,
-        isModelRepresentative: form.isModelRepresentative,
-        expertise: form.expertise.trim() || null,
-        achievementSummary: form.achievementSummary.trim() || null,
       };
-      const res = editingId
-        ? await fetch(`/api/alumni/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch("/api/alumni", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+      const res = await fetch(`/api/alumni/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -268,7 +214,9 @@ export default function AlumniCountPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/alumni/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/alumni/${deleteId}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchAlumni();
@@ -282,13 +230,11 @@ export default function AlumniCountPage() {
     setManageMode(true);
     setPage(1);
     setSearch("");
-    setDegreeFilter("");
-    setShowForm(false);
+    setEditingId(null);
   };
 
   const exitManageMode = () => {
     setManageMode(false);
-    setShowForm(false);
     setEditingId(null);
     setErrorMsg("");
   };
@@ -305,53 +251,31 @@ export default function AlumniCountPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/alumni/import", { method: "POST", body: formData });
+      const res = await fetch("/api/alumni/import", {
+        method: "POST",
+        body: formData,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);
       fetchAlumni();
       fetchChartData();
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
+      setErrorMsg(
+        err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า"
+      );
     } finally {
       setImporting(false);
       if (importFileRef.current) importFileRef.current.value = "";
     }
   };
 
-  // Chart rendering (view mode)
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      title: {
-        display: true,
-        text: "จำนวนนักศึกษาเก่าตามปีที่เข้าศึกษา",
-        font: { size: 18 },
-      },
-    },
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: "ปีที่เข้าศึกษา (พ.ศ.)",
-        },
-      },
-      y: {
-        title: {
-          display: true,
-          text: "จำนวน (คน)",
-        },
-        beginAtZero: true,
-        ticks: {
-          stepSize: 1,
-        },
-      },
-    },
-  };
+  // Prepare recharts data from API response
+  const rechartsData =
+    chartData?.labels.map((label, i) => ({
+      name: label,
+      count: chartData.data[i],
+    })) ?? [];
 
   // View mode loading
   if (!manageMode && chartLoading) {
@@ -376,7 +300,7 @@ export default function AlumniCountPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          จำนวนนักศึกษาเก่าตามปีที่เข้าศึกษา
+          จำนวนนักศึกษาเก่าตามรุ่น
         </h1>
         {!manageMode ? (
           <button
@@ -412,17 +336,32 @@ export default function AlumniCountPage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.skipped > 0 && ` (ข้าม ${importResult.skipped} รายการ)`}</span>
-            <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
+            <span>
+              นำเข้าสำเร็จ {importResult.imported} รายการ
+              {importResult.skipped > 0 &&
+                ` (ข้าม ${importResult.skipped} รายการ)`}
+            </span>
+            <button
+              onClick={() => setImportResult(null)}
+              className="ml-4 font-bold text-green-500 hover:text-green-700"
+            >
+              &times;
+            </button>
           </div>
           {importResult.errors.length > 0 && (
             <div className="mt-2 border-t border-green-200 pt-2">
-              <p className="font-medium">ข้อผิดพลาด ({importResult.errors.length} รายการ):</p>
+              <p className="font-medium">
+                ข้อผิดพลาด ({importResult.errors.length} รายการ):
+              </p>
               <ul className="mt-1 list-disc pl-4 text-xs">
                 {importResult.errors.slice(0, 10).map((err, i) => (
-                  <li key={i}>แถวที่ {err.row}: {err.message}</li>
+                  <li key={i}>
+                    แถวที่ {err.row}: {err.message}
+                  </li>
                 ))}
-                {importResult.errors.length > 10 && <li>...และอีก {importResult.errors.length - 10} รายการ</li>}
+                {importResult.errors.length > 10 && (
+                  <li>...และอีก {importResult.errors.length - 10} รายการ</li>
+                )}
               </ul>
             </div>
           )}
@@ -431,11 +370,11 @@ export default function AlumniCountPage() {
 
       {manageMode ? (
         <>
-          {/* Create/Edit form */}
-          {showForm && (
+          {/* Edit form */}
+          {editingId && (
             <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
-                {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
+                แก้ไขข้อมูล
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
@@ -455,6 +394,32 @@ export default function AlumniCountPage() {
                   {formErrors.studentId && (
                     <p className="mt-1 text-xs text-red-500">
                       {formErrors.studentId}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    คำนำหน้า *
+                  </label>
+                  <select
+                    value={form.prefix}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, prefix: e.target.value }))
+                    }
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
+                      formErrors.prefix ? "border-red-400" : "border-gray-300"
+                    }`}
+                  >
+                    <option value="">-- เลือกคำนำหน้า --</option>
+                    {PREFIX_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.prefix && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {formErrors.prefix}
                     </p>
                   )}
                 </div>
@@ -480,94 +445,67 @@ export default function AlumniCountPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    นามสกุล *
+                    นามสกุลเดิม *
                   </label>
                   <input
                     type="text"
-                    value={form.lastName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, lastName: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.lastName ? "border-red-400" : "border-gray-300"
-                    }`}
-                  />
-                  {formErrors.lastName && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.lastName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ระดับปริญญา *
-                  </label>
-                  <select
-                    value={form.degreeLevel}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, degreeLevel: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.degreeLevel ? "border-red-400" : "border-gray-300"
-                    }`}
-                  >
-                    <option value="">-- เลือกระดับปริญญา --</option>
-                    {DEGREE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.degreeLevel && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.degreeLevel}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ปีที่เข้าศึกษา (พ.ศ.) *
-                  </label>
-                  <input
-                    type="number"
-                    value={form.initialYear}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, initialYear: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.initialYear ? "border-red-400" : "border-gray-300"
-                    }`}
-                  />
-                  {formErrors.initialYear && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.initialYear}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ปีที่จบ (พ.ศ.) *
-                  </label>
-                  <input
-                    type="number"
-                    value={form.graduationYear}
+                    value={form.maidenLastName}
                     onChange={(e) =>
                       setForm((f) => ({
                         ...f,
-                        graduationYear: e.target.value,
+                        maidenLastName: e.target.value,
                       }))
                     }
                     className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.graduationYear
+                      formErrors.maidenLastName
                         ? "border-red-400"
                         : "border-gray-300"
                     }`}
                   />
-                  {formErrors.graduationYear && (
+                  {formErrors.maidenLastName && (
                     <p className="mt-1 text-xs text-red-500">
-                      {formErrors.graduationYear}
+                      {formErrors.maidenLastName}
                     </p>
                   )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    นามสกุลใหม่
+                  </label>
+                  <input
+                    type="text"
+                    value={form.newLastName}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, newLastName: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    รุ่น/สาขา
+                  </label>
+                  <input
+                    type="text"
+                    value={form.cohort}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cohort: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    จังหวัด
+                  </label>
+                  <input
+                    type="text"
+                    value={form.province}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, province: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -624,67 +562,6 @@ export default function AlumniCountPage() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
-                <div className="flex items-center gap-6 sm:col-span-2 lg:col-span-1">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.isPotential}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          isPotential: e.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
-                    />
-                    ศักยภาพ
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.isModelRepresentative}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          isModelRepresentative: e.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
-                    />
-                    ผู้แทนรุ่น
-                  </label>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ความเชี่ยวชาญ
-                  </label>
-                  <textarea
-                    value={form.expertise}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, expertise: e.target.value }))
-                    }
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    สรุปผลงาน
-                  </label>
-                  <textarea
-                    value={form.achievementSummary}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        achievementSummary: e.target.value,
-                      }))
-                    }
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
               </div>
               <div className="mt-4 flex justify-end gap-3">
                 <button
@@ -704,11 +581,11 @@ export default function AlumniCountPage() {
             </div>
           )}
 
-          {/* Add button */}
-          {!showForm && (
+          {/* Action buttons */}
+          {!editingId && (
             <div className="mb-4 flex flex-wrap gap-2">
               <button
-                onClick={openCreate}
+                onClick={() => router.push("/new-alumni")}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
                 <svg
@@ -726,39 +603,64 @@ export default function AlumniCountPage() {
                 </svg>
                 เพิ่มข้อมูล
               </button>
-              <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              <button
+                onClick={handleExport}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
                 ส่งออก Excel
               </button>
-              <input type="file" accept=".xlsx,.xls" ref={importFileRef} onChange={handleImport} className="hidden" />
-              <button onClick={() => importFileRef.current?.click()} disabled={importing} className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                ref={importFileRef}
+                onChange={handleImport}
+                className="hidden"
+              />
+              <button
+                onClick={() => importFileRef.current?.click()}
+                disabled={importing}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21"
+                  />
+                </svg>
                 {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
               </button>
             </div>
           )}
 
-          {/* Filters */}
+          {/* Search */}
           <div className="mb-6 flex flex-col gap-3 sm:flex-row">
             <input
               type="text"
-              placeholder="ค้นหาชื่อ, รหัสนักศึกษา..."
+              placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
-            <select
-              value={degreeFilter}
-              onChange={(e) => handleDegreeFilter(e.target.value)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-            >
-              <option value="">ทุกระดับปริญญา</option>
-              {DEGREE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Alumni table */}
@@ -766,7 +668,10 @@ export default function AlumniCountPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+                  <tr
+                    className="text-white text-left"
+                    style={{ backgroundColor: "#1e3a5f" }}
+                  >
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
@@ -774,28 +679,22 @@ export default function AlumniCountPage() {
                       รหัสนักศึกษา
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      คำนำหน้า
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       ชื่อ
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุล
+                      นามสกุลเดิม
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ระดับปริญญา
+                      นามสกุลใหม่
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ปีที่เข้าศึกษา
+                      รุ่น/สาขา
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ปีที่จบ
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      อีเมล
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      เบอร์โทร
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      สถานที่ทำงาน
+                      จังหวัด
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       จัดการ
@@ -805,7 +704,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={11} className="px-4 py-12 text-center">
+                      <td colSpan={9} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -814,7 +713,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={9}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -830,31 +729,17 @@ export default function AlumniCountPage() {
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
                         <td className="px-4 py-3">{a.studentId}</td>
+                        <td className="px-4 py-3">{a.prefix}</td>
                         <td className="px-4 py-3">{a.firstName}</td>
-                        <td className="px-4 py-3">{a.lastName}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white"
-                            style={{
-                              backgroundColor:
-                                DEGREE_COLORS[a.degreeLevel] || "#999",
-                            }}
-                          >
-                            {DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">{a.initialYear}</td>
-                        <td className="px-4 py-3 text-center">
-                          {a.graduationYear}
+                        <td className="px-4 py-3">{a.maidenLastName}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          {a.newLastName || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.email || "-"}
+                          {a.cohort || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.phone || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.currentWorkplace || "-"}
+                          {a.province || "-"}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -941,55 +826,56 @@ export default function AlumniCountPage() {
           </div>
         </>
       ) : (
-        /* View mode: chart and breakdown */
+        /* View mode: bar chart and total count */
         <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
           <div className="h-[500px]">
-            <Line
-              data={{
-                labels: chartData!.labels.map((y) => String(y)),
-                datasets: chartData!.datasets.map((ds) => ({
-                  label: DEGREE_LABELS[ds.degreeLevel] || ds.degreeLevel,
-                  data: ds.data,
-                  borderColor: DEGREE_COLORS[ds.degreeLevel] || "#999",
-                  backgroundColor: DEGREE_COLORS[ds.degreeLevel] || "#999",
-                  tension: 0.3,
-                })),
-              }}
-              options={chartOptions}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={rechartsData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  tick={{ fontSize: 12 }}
+                  label={{
+                    value: "รุ่น/สาขา",
+                    position: "insideBottom",
+                    offset: -20,
+                    style: { fontSize: 14, fontWeight: 600 },
+                  }}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  label={{
+                    value: "จำนวน (คน)",
+                    angle: -90,
+                    position: "insideLeft",
+                    style: { fontSize: 14, fontWeight: 600 },
+                  }}
+                />
+                <Tooltip
+                  formatter={(value) => [
+                    `${value} คน`,
+                    "จำนวน",
+                  ]}
+                />
+                <Bar
+                  dataKey="count"
+                  fill="#1e3a5f"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           <div className="mt-6 border-t border-[var(--border)] pt-4">
             <p className="mb-4 text-center text-lg font-semibold text-[var(--primary)]">
               จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
             </p>
-
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {chartData!.datasets.map((ds) => {
-                const count = ds.data.reduce((s, v) => s + v, 0);
-                return (
-                  <div
-                    key={ds.degreeLevel}
-                    className="rounded-lg border border-[var(--border)] p-4 text-center"
-                  >
-                    <div
-                      className="mx-auto mb-2 h-3 w-12 rounded-full"
-                      style={{
-                        backgroundColor:
-                          DEGREE_COLORS[ds.degreeLevel] || "#999",
-                      }}
-                    />
-                    <p className="text-sm text-[var(--muted)]">
-                      {DEGREE_LABELS[ds.degreeLevel] || ds.degreeLevel}
-                    </p>
-                    <p className="text-2xl font-bold text-[var(--primary)]">
-                      {count.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-[var(--muted)]">คน</p>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       )}

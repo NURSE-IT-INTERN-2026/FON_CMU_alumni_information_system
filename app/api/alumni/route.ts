@@ -9,11 +9,6 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const search = searchParams.get("search") || "";
-    const degreeLevel = searchParams.get("degreeLevel") || "";
-    const initialYearFrom = searchParams.get("initialYearFrom");
-    const initialYearTo = searchParams.get("initialYearTo");
-    const graduationYearFrom = searchParams.get("graduationYearFrom");
-    const graduationYearTo = searchParams.get("graduationYearTo");
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
@@ -21,11 +16,10 @@ export async function GET(request: NextRequest) {
       "createdAt",
       "updatedAt",
       "firstName",
-      "lastName",
+      "maidenLastName",
+      "newLastName",
       "studentId",
-      "initialYear",
-      "graduationYear",
-      "degreeLevel",
+      "cohort",
     ];
     const validSortField = allowedSortFields.includes(sortField) ? sortField : "createdAt";
     const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
@@ -35,28 +29,11 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
+        { maidenLastName: { contains: search, mode: "insensitive" } },
+        { newLastName: { contains: search, mode: "insensitive" } },
         { studentId: { contains: search, mode: "insensitive" } },
         { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
-    }
-
-    if (degreeLevel) {
-      where.degreeLevel = degreeLevel as Prisma.EnumDegreeLevelFilter["equals"];
-    }
-
-    if (initialYearFrom || initialYearTo) {
-      where.initialYear = {
-        ...(initialYearFrom && { gte: parseInt(initialYearFrom, 10) }),
-        ...(initialYearTo && { lte: parseInt(initialYearTo, 10) }),
-      };
-    }
-
-    if (graduationYearFrom || graduationYearTo) {
-      where.graduationYear = {
-        ...(graduationYearFrom && { gte: parseInt(graduationYearFrom, 10) }),
-        ...(graduationYearTo && { lte: parseInt(graduationYearTo, 10) }),
-      };
     }
 
     const [data, total] = await Promise.all([
@@ -64,6 +41,11 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           awards: true,
+          associations: true,
+          graduateCommittees: true,
+          potentials: true,
+          modelRepresentatives: true,
+          abroadAlumni: true,
         },
         orderBy: { [validSortField]: validSortOrder },
         skip: (page - 1) * pageSize,
@@ -87,23 +69,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       studentId,
+      prefix,
       firstName,
-      lastName,
-      degreeLevel,
-      initialYear,
-      graduationYear,
+      maidenLastName,
+      cohort,
+      newLastName,
+      province,
       email,
       phone,
       currentWorkplace,
       country,
       isPotential,
       isModelRepresentative,
-      expertise,
-      achievementSummary,
       photoUrl,
     } = body;
 
-    if (!studentId || !firstName || !lastName || !degreeLevel || !initialYear || !graduationYear) {
+    if (!studentId || !prefix || !firstName || !maidenLastName) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" },
         { status: 400 }
@@ -121,23 +102,27 @@ export async function POST(request: NextRequest) {
     const alumni = await prisma.alumni.create({
       data: {
         studentId,
+        prefix,
         firstName,
-        lastName,
-        degreeLevel,
-        initialYear: parseInt(String(initialYear), 10),
-        graduationYear: parseInt(String(graduationYear), 10),
+        maidenLastName,
+        cohort: cohort || null,
+        newLastName: newLastName || null,
+        province: province || null,
         email: email || null,
         phone: phone || null,
         currentWorkplace: currentWorkplace || null,
         country: country || null,
         isPotential: isPotential ?? false,
         isModelRepresentative: isModelRepresentative ?? false,
-        expertise: expertise || null,
-        achievementSummary: achievementSummary || null,
         photoUrl: photoUrl || null,
       },
       include: {
         awards: true,
+        associations: true,
+        graduateCommittees: true,
+        potentials: true,
+        modelRepresentatives: true,
+        abroadAlumni: true,
       },
     });
 

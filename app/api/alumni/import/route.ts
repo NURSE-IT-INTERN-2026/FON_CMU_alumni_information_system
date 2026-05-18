@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { DEGREE_LABELS } from "@/lib/constants";
-import { DegreeLevel } from "@/app/generated/prisma/client";
 import * as XLSX from "xlsx";
-
-const DEGREE_THAI_TO_ENUM: Record<string, string> = Object.fromEntries(
-  Object.entries(DEGREE_LABELS).map(([key, value]) => [value, key])
-);
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,45 +37,30 @@ export async function POST(request: NextRequest) {
       const rowNumber = i + 2;
 
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
+      const prefix = row["คำนำหน้า"]?.toString().trim();
       const firstName = row["ชื่อ"]?.toString().trim();
-      const lastName = row["นามสกุล"]?.toString().trim();
-      const degreeThai = row["ระดับปริญญา"]?.toString().trim();
-      const initialYearStr = row["ปีที่เข้าศึกษา"]?.toString().trim();
-      const graduationYearStr = row["ปีที่จบ"]?.toString().trim();
+      const maidenLastName = row["นามสกุลเดิม"]?.toString().trim();
+      const cohort = row["รุ่น/สาขา"]?.toString().trim() || null;
+      const newLastName = row["นามสกุลใหม่"]?.toString().trim() || null;
+      const province = row["จังหวัด"]?.toString().trim() || null;
       const email = row["อีเมล"]?.toString().trim() || null;
       const phone = row["เบอร์โทร"]?.toString().trim() || null;
       const currentWorkplace = row["สถานที่ทำงาน"]?.toString().trim() || null;
       const country = row["ประเทศ"]?.toString().trim() || null;
 
-      if (!studentId || !firstName || !lastName || !degreeThai || !initialYearStr || !graduationYearStr) {
+      if (!studentId || !prefix || !firstName || !maidenLastName) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
-        continue;
-      }
-
-      const degreeLevel = DEGREE_THAI_TO_ENUM[degreeThai];
-      if (!degreeLevel) {
-        errors.push({
-          row: rowNumber,
-          message: `ระดับปริญญา "${degreeThai}" ไม่ถูกต้อง`,
-        });
-        continue;
-      }
-
-      const initialYear = parseInt(initialYearStr, 10);
-      const graduationYear = parseInt(graduationYearStr, 10);
-
-      if (isNaN(initialYear) || isNaN(graduationYear)) {
-        errors.push({ row: rowNumber, message: "ปีที่เข้าศึกษาหรือปีที่จบไม่ถูกต้อง" });
         continue;
       }
 
       records.push({
         studentId,
+        prefix,
         firstName,
-        lastName,
-        degreeLevel: degreeLevel as DegreeLevel,
-        initialYear,
-        graduationYear,
+        maidenLastName,
+        cohort,
+        newLastName,
+        province,
         email,
         phone,
         currentWorkplace,

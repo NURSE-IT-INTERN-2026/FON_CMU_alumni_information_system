@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
 
 export async function POST(request: NextRequest) {
@@ -24,17 +25,18 @@ export async function POST(request: NextRequest) {
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
 
     const errors: { row: number; message: string }[] = [];
-    const records: { name: string; cohort: string; generation: number }[] = [];
+    const records: { studentId: string; name: string; cohort: string; generation: number }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNumber = i + 2;
 
+      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
       const name = row["ชื่อ-นามสกุล"]?.toString().trim();
       const cohort = row["รุ่น"]?.toString().trim();
       const generationStr = row["ลำดับรุ่น"]?.toString().trim();
 
-      if (!name || !cohort || !generationStr) {
+      if (!studentId || !name || !cohort || !generationStr) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -45,13 +47,19 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      records.push({ name, cohort, generation });
+      records.push({ studentId, name, cohort, generation });
     }
 
     let imported = 0;
-    if (records.length > 0) {
-      const result = await prisma.modelRepresentative.createMany({ data: records });
-      imported = result.count;
+    for (const record of records) {
+      try {
+        await ensureAlumni(record.studentId, record.name);
+        await prisma.modelRepresentative.create({ data: record });
+        imported++;
+      } catch (err) {
+        console.error("Import row error:", err);
+        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.name}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
+      }
     }
 
     return NextResponse.json({ imported, skipped: 0, errors });

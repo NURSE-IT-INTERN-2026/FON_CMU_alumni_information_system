@@ -12,6 +12,11 @@ export async function GET(
       where: { id },
       include: {
         awards: true,
+        associations: true,
+        graduateCommittees: true,
+        potentials: true,
+        modelRepresentatives: true,
+        abroadAlumni: true,
       },
     });
 
@@ -63,17 +68,18 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
     const allowedFields = [
       "studentId",
+      "prefix",
       "firstName",
-      "lastName",
-      "degreeLevel",
+      "maidenLastName",
+      "cohort",
+      "newLastName",
+      "province",
       "email",
       "phone",
       "currentWorkplace",
       "country",
       "isPotential",
       "isModelRepresentative",
-      "expertise",
-      "achievementSummary",
       "photoUrl",
     ];
 
@@ -83,18 +89,16 @@ export async function PUT(
       }
     }
 
-    if (body.initialYear !== undefined) {
-      updateData.initialYear = parseInt(String(body.initialYear), 10);
-    }
-    if (body.graduationYear !== undefined) {
-      updateData.graduationYear = parseInt(String(body.graduationYear), 10);
-    }
-
     const alumni = await prisma.alumni.update({
       where: { id },
       data: updateData,
       include: {
         awards: true,
+        associations: true,
+        graduateCommittees: true,
+        potentials: true,
+        modelRepresentatives: true,
+        abroadAlumni: true,
       },
     });
 

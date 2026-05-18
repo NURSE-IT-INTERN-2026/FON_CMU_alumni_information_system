@@ -1,25 +1,21 @@
-export const DEGREE_LABELS: Record<string, string> = {
-  DOCTORAL: "ปริญญาเอก",
-  MASTER: "ปริญญาโท",
-  BACHELOR: "ปริญญาตรี",
-  NURSING_CERTIFICATE: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
-};
-
 export const AWARD_TYPE_LABELS: Record<string, string> = {
   INTERNATIONAL: "รางวัลระดับนานาชาติ",
   NATIONAL: "รางวัลระดับชาติ",
   LOCAL: "รางวัลระดับท้องถิ่น",
 };
 
-export const DEGREE_OPTIONS = Object.entries(DEGREE_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export const AWARD_TYPE_OPTIONS = Object.entries(AWARD_TYPE_LABELS).map(([value, label]) => ({
   value,
   label,
 }));
+
+export const PREFIX_OPTIONS = [
+  { value: "นางสาว", label: "นางสาว" },
+  { value: "นาง", label: "นาง" },
+  { value: "นาย", label: "นาย" },
+  { value: "ดร.", label: "ดร." },
+  { value: "อื่นๆ", label: "อื่นๆ" },
+];
 
 export const NAV_ITEMS = [
   { href: "/", label: "หน้าหลัก" },

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
             { awardName: { contains: search, mode: "insensitive" } },
             { description: { contains: search, mode: "insensitive" } },
             { alumni: { firstName: { contains: search, mode: "insensitive" } } },
-            { alumni: { lastName: { contains: search, mode: "insensitive" } } },
+            { alumni: { maidenLastName: { contains: search, mode: "insensitive" } } },
           ],
         });
       }
@@ -29,13 +29,15 @@ export async function GET(request: NextRequest) {
 
     const items = await prisma.award.findMany({
       where,
-      include: { alumni: { select: { firstName: true, lastName: true } } },
+      include: { alumni: { select: { studentId: true, prefix: true, firstName: true, maidenLastName: true } } },
       orderBy: { createdAt: "desc" },
     });
 
     const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.alumni.studentId,
+      "คำนำหน้า": a.alumni.prefix,
       "ชื่อ": a.alumni.firstName,
-      "นามสกุล": a.alumni.lastName,
+      "นามสกุลเดิม": a.alumni.maidenLastName,
       "ชื่อรางวัล": a.awardName,
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,

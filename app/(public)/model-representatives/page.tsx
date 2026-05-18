@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface ModelRepresentative {
   id: string;
+  studentId: string;
   name: string;
   cohort: string;
   generation: number;
@@ -22,9 +24,10 @@ const COHORT_ORDER = [
   "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก (รุ่น  1 – 6)",
 ];
 
-const EMPTY_FORM = { name: "", cohort: "", generation: "" };
+const EMPTY_FORM = { studentId: "", name: "", cohort: "", generation: "" };
 
 export default function ModelRepresentativesPage() {
+  const router = useRouter();
   const [alumni, setAlumni] = useState<ModelRepresentative[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -99,14 +102,12 @@ export default function ModelRepresentativesPage() {
   }, [alumni]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
+    router.push("/new-alumni");
   };
 
   const openEdit = (item: ModelRepresentative) => {
     setForm({
+      studentId: item.studentId,
       name: item.name,
       cohort: item.cohort,
       generation: String(item.generation),
@@ -125,6 +126,7 @@ export default function ModelRepresentativesPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
+    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
     if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
     if (!form.cohort.trim()) errors.cohort = "กรุณากรอกรุ่น";
     if (!form.generation) errors.generation = "กรุณากรอกลำดับรุ่น";
@@ -140,6 +142,7 @@ export default function ModelRepresentativesPage() {
     setErrorMsg("");
     try {
       const payload = {
+        studentId: form.studentId.trim(),
         name: form.name.trim(),
         cohort: form.cohort.trim(),
         generation: Number(form.generation),
@@ -297,7 +300,23 @@ export default function ModelRepresentativesPage() {
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                รหัสนักศึกษา *
+              </label>
+              <input
+                type="text"
+                value={form.studentId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, studentId: e.target.value }))
+                }
+                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+              />
+              {formErrors.studentId && (
+                <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>
+              )}
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 ชื่อ-นามสกุล *
@@ -434,6 +453,9 @@ export default function ModelRepresentativesPage() {
                     ลำดับ
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                    รหัสนักศึกษา
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                     รุ่นที่
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
@@ -453,6 +475,7 @@ export default function ModelRepresentativesPage() {
                     <td className="px-4 py-3 text-center text-gray-500">
                       {manageStart + i + 1}
                     </td>
+                    <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3">{a.cohort}</td>
                     <td className="px-4 py-3">{a.name}</td>
                     <td className="px-4 py-3 text-center">
@@ -614,6 +637,9 @@ export default function ModelRepresentativesPage() {
                               รุ่นที่ {sortDir === "asc" ? "▲" : "▼"}
                             </th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                              รหัสนักศึกษา
+                            </th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                               ชื่อ - นามสกุล
                             </th>
                           </tr>
@@ -627,6 +653,7 @@ export default function ModelRepresentativesPage() {
                               <td className="px-4 py-3 text-center">
                                 {a.generation}
                               </td>
+                              <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                               <td className="px-4 py-3">{a.name}</td>
                             </tr>
                           ))}

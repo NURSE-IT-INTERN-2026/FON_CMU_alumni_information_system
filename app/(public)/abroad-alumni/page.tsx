@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface AbroadAlumni {
   id: string;
+  studentId: string;
   name: string;
   address: string | null;
   country: string;
@@ -17,9 +19,10 @@ interface ApiResponse {
   countries: string[];
 }
 
-const EMPTY_FORM = { name: "", address: "", country: "", university: "", order: "0" };
+const EMPTY_FORM = { studentId: "", name: "", address: "", country: "", university: "", order: "0" };
 
 export default function AbroadAlumniPage() {
+  const router = useRouter();
   const [alumni, setAlumni] = useState<AbroadAlumni[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -106,14 +109,12 @@ export default function AbroadAlumniPage() {
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
+    router.push("/new-alumni");
   };
 
   const openEdit = (a: AbroadAlumni) => {
     setForm({
+      studentId: a.studentId,
       name: a.name,
       address: a.address || "",
       country: a.country,
@@ -134,6 +135,7 @@ export default function AbroadAlumniPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
+    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
     if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ";
     if (!form.country.trim()) errors.country = "กรุณากรอกประเทศ";
     setFormErrors(errors);
@@ -146,6 +148,7 @@ export default function AbroadAlumniPage() {
     setErrorMsg("");
     try {
       const payload = {
+        studentId: form.studentId.trim(),
         name: form.name.trim(),
         address: form.address.trim() || null,
         country: form.country.trim(),
@@ -265,6 +268,11 @@ export default function AbroadAlumniPage() {
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
+              <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
               <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`} />
               {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
@@ -349,6 +357,7 @@ export default function AbroadAlumniPage() {
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
                   <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ-นามสกุล</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ประเทศ</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">มหาวิทยาลัย</th>
@@ -360,6 +369,7 @@ export default function AbroadAlumniPage() {
                 {pagedAlumni.map((a, idx) => (
                   <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3">{a.name}</td>
                     <td className="px-4 py-3">{a.country}</td>
                     <td className="px-4 py-3">{a.university || "-"}</td>
@@ -417,6 +427,7 @@ export default function AbroadAlumniPage() {
                         <thead>
                           <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
                             <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่</th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ - นามสกุล</th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่อยู่</th>
                           </tr>
@@ -425,6 +436,7 @@ export default function AbroadAlumniPage() {
                           {paged.map((a, idx) => (
                             <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                               <td className="px-4 py-3 text-center">{(page - 1) * perGroupPage + idx + 1}</td>
+                              <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                               <td className="px-4 py-3">{a.name}</td>
                               <td className="px-4 py-3 text-[var(--muted)]">{a.address || "-"}</td>
                             </tr>

@@ -8,9 +8,9 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { alumniId, awardName, awardType, year, description } = body;
+    const { studentId, awardName, awardType, year, description } = body;
 
-    if (!alumniId || !awardName || !awardType || !year) {
+    if (!studentId || !awardName || !awardType || !year) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -20,14 +20,14 @@ export async function PUT(
     const award = await prisma.award.update({
       where: { id },
       data: {
-        alumniId,
+        studentId,
         awardName: awardName.trim(),
         awardType,
         year: Number(year),
         description: description?.trim() || null,
       },
       include: {
-        alumni: { select: { firstName: true, lastName: true } },
+        alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
       },
     });
 

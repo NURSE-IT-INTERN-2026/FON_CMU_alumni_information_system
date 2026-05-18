@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface Committee {
@@ -37,6 +38,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 const EMPTY_FORM = { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" };
 
 export default function GraduateCommitteePage() {
+  const router = useRouter();
   const [committees, setCommittees] = useState<Committee[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -117,10 +119,7 @@ export default function GraduateCommitteePage() {
   useEffect(() => { fetchCommittees(); }, [fetchCommittees]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
+    router.push("/new-alumni");
   };
 
   const openEdit = (c: Committee) => {

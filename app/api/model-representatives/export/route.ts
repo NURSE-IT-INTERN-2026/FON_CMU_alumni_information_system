@@ -9,6 +9,7 @@ export async function GET() {
     });
 
     const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.studentId,
       "ชื่อ-นามสกุล": a.name,
       "รุ่น": a.cohort,
       "ลำดับรุ่น": a.generation,

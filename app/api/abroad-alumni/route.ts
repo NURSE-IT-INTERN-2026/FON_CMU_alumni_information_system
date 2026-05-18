@@ -4,9 +4,9 @@ import prisma from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, address, country, university, order } = body;
+    const { studentId, name, address, country, university, order } = body;
 
-    if (!name || !country) {
+    if (!studentId || !name || !country) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
 
     const item = await prisma.abroadAlumni.create({
       data: {
+        studentId: studentId.trim(),
         name: name.trim(),
         address: address?.trim() || null,
         country: country.trim(),
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
+        { studentId: { contains: search, mode: "insensitive" } },
         { name: { contains: search, mode: "insensitive" } },
         { address: { contains: search, mode: "insensitive" } },
         { university: { contains: search, mode: "insensitive" } },

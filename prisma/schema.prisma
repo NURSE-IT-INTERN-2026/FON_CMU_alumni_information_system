@@ -7,13 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum DegreeLevel {
-  DOCTORAL
-  MASTER
-  BACHELOR
-  NURSING_CERTIFICATE
-}
-
 enum AwardType {
   INTERNATIONAL
   NATIONAL
@@ -28,31 +21,35 @@ enum NewsStatus {
 model Alumni {
   id                    String    @id @default(uuid())
   studentId             String    @unique
+  prefix                String
   firstName             String
-  lastName              String
-  degreeLevel           DegreeLevel
-  initialYear           Int
-  graduationYear        Int
+  maidenLastName        String
+  cohort                String?
+  newLastName           String?
+  province              String?
   email                 String?
   phone                 String?
   currentWorkplace      String?
   country               String?
   isPotential           Boolean   @default(false)
   isModelRepresentative Boolean   @default(false)
-  expertise             String?
-  achievementSummary    String?
   photoUrl              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   awards               Award[]
+  associations          Association[]
+  graduateCommittees    GraduateCommittee[]
+  potentials            Potential[]
+  modelRepresentatives  ModelRepresentative[]
+  abroadAlumni          AbroadAlumni[]
 
   @@map("alumni")
 }
 
 model Award {
   id          String    @id @default(uuid())
-  alumniId    String
+  studentId   String
   awardName   String
   awardType   AwardType
   year        Int
@@ -60,7 +57,7 @@ model Award {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@map("awards")
 }
@@ -75,6 +72,8 @@ model Association {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
   @@map("associations")
 }
 
@@ -88,6 +87,8 @@ model GraduateCommittee {
   remarks   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@map("graduate_committees")
 }
@@ -115,22 +116,28 @@ model Potential {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
   @@map("potentials")
 }
 
 model ModelRepresentative {
   id         String   @id @default(uuid())
+  studentId  String
   name       String
   cohort     String
   generation Int
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
   @@map("model_representatives")
 }
 
 model AbroadAlumni {
   id         String   @id @default(uuid())
+  studentId  String
   name       String
   address    String?
   country    String
@@ -138,6 +145,8 @@ model AbroadAlumni {
   order      Int
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@map("abroad_alumni")
 }

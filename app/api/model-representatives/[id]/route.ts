@@ -8,9 +8,9 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, cohort, generation } = body;
+    const { studentId, name, cohort, generation } = body;
 
-    if (!name || !cohort || generation === undefined) {
+    if (!studentId || !name || !cohort || generation === undefined) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -20,6 +20,7 @@ export async function PUT(
     const item = await prisma.modelRepresentative.update({
       where: { id },
       data: {
+        studentId: studentId.trim(),
         name: name.trim(),
         cohort: cohort.trim(),
         generation: Number(generation),

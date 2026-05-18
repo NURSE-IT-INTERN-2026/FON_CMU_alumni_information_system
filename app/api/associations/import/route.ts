@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
 
 export async function POST(request: NextRequest) {
@@ -51,9 +52,15 @@ export async function POST(request: NextRequest) {
     }
 
     let imported = 0;
-    if (records.length > 0) {
-      const result = await prisma.association.createMany({ data: records });
-      imported = result.count;
+    for (const record of records) {
+      try {
+        await ensureAlumni(record.studentId, record.fullName);
+        await prisma.association.create({ data: record });
+        imported++;
+      } catch (err) {
+        console.error("Import row error:", err);
+        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.fullName}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
+      }
     }
 
     return NextResponse.json({ imported, skipped: 0, errors });

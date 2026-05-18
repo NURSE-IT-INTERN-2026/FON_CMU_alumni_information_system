@@ -8,9 +8,9 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, address, country, university, order } = body;
+    const { studentId, name, address, country, university, order } = body;
 
-    if (!name || !country) {
+    if (!studentId || !name || !country) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -20,6 +20,7 @@ export async function PUT(
     const item = await prisma.abroadAlumni.update({
       where: { id },
       data: {
+        studentId: studentId.trim(),
         name: name.trim(),
         address: address?.trim() || null,
         country: country.trim(),

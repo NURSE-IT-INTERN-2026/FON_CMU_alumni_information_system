@@ -5,9 +5,9 @@ import { PAGE_SIZE } from "@/lib/constants";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { alumniId, awardName, awardType, year, description } = body;
+    const { studentId, awardName, awardType, year, description } = body;
 
-    if (!alumniId || !awardName || !awardType || !year) {
+    if (!studentId || !awardName || !awardType || !year) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -16,14 +16,14 @@ export async function POST(request: NextRequest) {
 
     const award = await prisma.award.create({
       data: {
-        alumniId,
+        studentId,
         awardName: awardName.trim(),
         awardType,
         year: Number(year),
         description: description?.trim() || null,
       },
       include: {
-        alumni: { select: { firstName: true, lastName: true } },
+        alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
       },
     });
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           alumni: {
             OR: [
               { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
+              { maidenLastName: { contains: search, mode: "insensitive" } },
             ],
           },
         },
@@ -72,8 +72,9 @@ export async function GET(request: NextRequest) {
         include: {
           alumni: {
             select: {
+              prefix: true,
               firstName: true,
-              lastName: true,
+              maidenLastName: true,
             },
           },
         },

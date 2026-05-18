@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import { AwardType } from "@/app/generated/prisma/client";
+import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
 
 const AWARD_TYPE_THAI_TO_ENUM: Record<string, string> = Object.fromEntries(
@@ -30,20 +31,19 @@ export async function POST(request: NextRequest) {
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
 
     const errors: { row: number; message: string }[] = [];
-    const records: { alumniId: string; awardName: string; awardType: AwardType; year: number; description?: string | null }[] = [];
+    let imported = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNumber = i + 2;
 
-      const firstName = row["ชื่อ"]?.toString().trim();
-      const lastName = row["นามสกุล"]?.toString().trim();
+      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
       const awardName = row["ชื่อรางวัล"]?.toString().trim();
       const awardTypeThai = row["ประเภทรางวัล"]?.toString().trim();
       const yearStr = row["ปี (พ.ศ.)"]?.toString().trim();
       const description = row["รายละเอียด"]?.toString().trim() || null;
 
-      if (!firstName || !lastName || !awardName || !awardTypeThai || !yearStr) {
+      if (!studentId || !awardName || !awardTypeThai || !yearStr) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -63,35 +63,25 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const alumni = await prisma.alumni.findFirst({
-        where: {
-          firstName: { equals: firstName, mode: "insensitive" },
-          lastName: { equals: lastName, mode: "insensitive" },
-        },
-        select: { id: true },
-      });
+      try {
+        await ensureAlumni(studentId, studentId);
 
-      if (!alumni) {
+        await prisma.award.create({
+          data: {
+            studentId,
+            awardName,
+            awardType: awardType as AwardType,
+            year,
+            description,
+          },
+        });
+        imported++;
+      } catch {
         errors.push({
           row: rowNumber,
-          message: `ไม่พบข้อมูลศิษย์เก่าชื่อ "${firstName} ${lastName}"`,
+          message: `ไม่สามารถนำเข้าข้อมูลแถวนี้ได้`,
         });
-        continue;
       }
-
-      records.push({
-        alumniId: alumni.id,
-        awardName,
-        awardType: awardType as AwardType,
-        year,
-        description,
-      });
-    }
-
-    let imported = 0;
-    if (records.length > 0) {
-      const result = await prisma.award.createMany({ data: records });
-      imported = result.count;
     }
 
     return NextResponse.json({ imported, skipped: 0, errors });

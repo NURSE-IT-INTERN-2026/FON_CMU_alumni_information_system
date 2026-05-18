@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface Potential {
@@ -35,6 +36,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 const EMPTY_FORM = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
 
 export default function PotentialsPage() {
+  const router = useRouter();
   const [potentials, setPotentials] = useState<Potential[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -103,10 +105,7 @@ export default function PotentialsPage() {
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
+    router.push("/new-alumni");
   };
 
   const openEdit = (p: Potential) => {

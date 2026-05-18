@@ -4,9 +4,9 @@ import prisma from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, cohort, generation } = body;
+    const { studentId, name, cohort, generation } = body;
 
-    if (!name || !cohort || generation === undefined) {
+    if (!studentId || !name || !cohort || generation === undefined) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
 
     const item = await prisma.modelRepresentative.create({
       data: {
+        studentId: studentId.trim(),
         name: name.trim(),
         cohort: cohort.trim(),
         generation: Number(generation),
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
+        { studentId: { contains: search, mode: "insensitive" } },
         { name: { contains: search, mode: "insensitive" } },
         { cohort: { contains: search, mode: "insensitive" } },
       ];

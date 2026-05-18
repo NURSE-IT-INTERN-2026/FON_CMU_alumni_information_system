@@ -1,27 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Doughnut } from "react-chartjs-2";
+import { useRouter } from "next/navigation";
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE } from "@/lib/constants";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
 
 interface Award {
   id: string;
-  alumniId: string;
+  studentId: string;
   awardName: string;
   awardType: string;
   year: number;
   description: string | null;
   alumni: {
+    prefix: string;
     firstName: string;
-    lastName: string;
+    maidenLastName: string;
   };
 }
 
@@ -42,9 +36,13 @@ const AWARD_COLORS: Record<string, string> = {
 type SortField = "name" | "award" | "type" | "year";
 type SortDir = "asc" | "desc";
 
-const EMPTY_FORM = { alumniId: "", awardName: "", awardType: "INTERNATIONAL", year: "", description: "" };
+const EMPTY_FORM = { studentId: "", awardName: "", awardType: "INTERNATIONAL", year: "", description: "" };
+
+const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
+  `${a.prefix}${a.firstName} ${a.maidenLastName}`;
 
 export default function AwardsPage() {
+  const router = useRouter();
   const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -57,7 +55,6 @@ export default function AwardsPage() {
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
 
   const [manageMode, setManageMode] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -70,7 +67,7 @@ export default function AwardsPage() {
 
   // Alumni search for form
   const [alumniSearch, setAlumniSearch] = useState("");
-  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; firstName: string; lastName: string }[]>([]);
+  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
   const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
   const fetchAwards = useCallback(async () => {
@@ -122,7 +119,7 @@ export default function AwardsPage() {
   const sortedAwards = [...awards].sort((a, b) => {
     let cmp = 0;
     switch (sortField) {
-      case "name": cmp = `${a.alumni.firstName} ${a.alumni.lastName}`.localeCompare(`${b.alumni.firstName} ${b.alumni.lastName}`); break;
+      case "name": cmp = alumniDisplayName(a.alumni).localeCompare(alumniDisplayName(b.alumni)); break;
       case "award": cmp = a.awardName.localeCompare(b.awardName); break;
       case "type": cmp = a.awardType.localeCompare(b.awardType); break;
       case "year": cmp = a.year - b.year; break;
@@ -134,15 +131,11 @@ export default function AwardsPage() {
     <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
   );
 
-  const chartData = {
-    labels: Object.keys(typeCounts).map((k) => AWARD_TYPE_LABELS[k] || k),
-    datasets: [{
-      data: Object.values(typeCounts),
-      backgroundColor: Object.keys(typeCounts).map((k) => AWARD_COLORS[k] || "#999"),
-      borderWidth: 2,
-      borderColor: "#ffffff",
-    }],
-  };
+  const chartData = Object.entries(typeCounts).map(([key, value]) => ({
+    name: AWARD_TYPE_LABELS[key] || key,
+    value,
+    color: AWARD_COLORS[key] || "#999",
+  }));
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
@@ -175,37 +168,27 @@ export default function AwardsPage() {
     } catch {}
   }, []);
 
-  const selectAlumni = (a: { id: string; studentId: string; firstName: string; lastName: string }) => {
-    setForm((f) => ({ ...f, alumniId: a.id }));
-    setAlumniSearch(`${a.studentId} - ${a.firstName} ${a.lastName}`);
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+    setForm((f) => ({ ...f, studentId: a.studentId }));
+    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a)}`);
     setShowAlumniDropdown(false);
     setAlumniResults([]);
   };
 
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setAlumniSearch("");
-    setFormErrors({});
-    setEditingId(null);
-    setShowForm(true);
-  };
-
   const openEdit = (a: Award) => {
     setForm({
-      alumniId: a.alumniId,
+      studentId: a.studentId,
       awardName: a.awardName,
       awardType: a.awardType,
       year: String(a.year),
       description: a.description || "",
     });
-    setAlumniSearch(`${a.alumni.firstName} ${a.alumni.lastName}`);
+    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a.alumni)}`);
     setFormErrors({});
     setEditingId(a.id);
-    setShowForm(true);
   };
 
   const closeForm = () => {
-    setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setAlumniSearch("");
@@ -214,7 +197,7 @@ export default function AwardsPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.alumniId) errors.alumniId = "กรุณาเลือกศิษย์เก่า";
+    if (!form.studentId) errors.studentId = "กรุณาเลือกศิษย์เก่า";
     if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
     if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
     if (!form.year) errors.year = "กรุณากรอกปี";
@@ -229,23 +212,17 @@ export default function AwardsPage() {
     setErrorMsg("");
     try {
       const payload = {
-        alumniId: form.alumniId,
+        studentId: form.studentId,
         awardName: form.awardName.trim(),
         awardType: form.awardType,
         year: Number(form.year),
         description: form.description.trim() || null,
       };
-      const res = editingId
-        ? await fetch(`/api/awards/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch("/api/awards", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+      const res = await fetch(`/api/awards/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -308,7 +285,7 @@ export default function AwardsPage() {
             จัดการข้อมูล
           </button>
         ) : (
-          <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+          <button onClick={() => { setManageMode(false); closeForm(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม
           </button>
         )}
@@ -341,21 +318,21 @@ export default function AwardsPage() {
         </div>
       )}
 
-      {manageMode && showForm && (
+      {manageMode && editingId && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
-            {editingId ? "แก้ไขข้อมูลรางวัล" : "เพิ่มข้อมูลรางวัล"}
+            แก้ไขข้อมูลรางวัล
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="relative">
               <label className="mb-1 block text-sm font-medium text-gray-700">ศิษย์เก่า *</label>
-              <input type="text" value={alumniSearch} onChange={(e) => { setAlumniSearch(e.target.value); searchAlumni(e.target.value); }} placeholder="ค้นหารหัสนักศึกษาหรือชื่อ..." className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.alumniId ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.alumniId && <p className="mt-1 text-xs text-red-500">{formErrors.alumniId}</p>}
+              <input type="text" value={alumniSearch} onChange={(e) => { setAlumniSearch(e.target.value); searchAlumni(e.target.value); }} placeholder="ค้นหารหัสนักศึกษาหรือชื่อ..." className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
               {showAlumniDropdown && alumniResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
-                      {a.studentId} - {a.firstName} {a.lastName}
+                      {a.studentId} - {alumniDisplayName(a)}
                     </button>
                   ))}
                 </div>
@@ -397,15 +374,27 @@ export default function AwardsPage() {
       {!manageMode && Object.keys(typeCounts).length > 0 && (
         <div className="mb-8 flex justify-center">
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
-            <Doughnut
-              data={chartData}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: { position: "bottom", labels: { padding: 16, font: { size: 13 } } },
-                },
-              }}
-            />
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  dataKey="value"
+                  paddingAngle={2}
+                  stroke="#ffffff"
+                  strokeWidth={2}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -433,7 +422,7 @@ export default function AwardsPage() {
 
       {manageMode && (
         <div className="mb-4 flex flex-wrap gap-2">
-          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+          <button onClick={() => router.push("/new-alumni")} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             เพิ่มข้อมูล
           </button>
@@ -491,7 +480,7 @@ export default function AwardsPage() {
               ) : (
                 sortedAwards.map((award) => (
                   <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    <td className="px-4 py-3">{award.alumni.firstName} {award.alumni.lastName}</td>
+                    <td className="px-4 py-3">{alumniDisplayName(award.alumni)}</td>
                     <td className="px-4 py-3">{award.awardName}</td>
                     <td className="px-4 py-3">
                       <span className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: AWARD_COLORS[award.awardType] || "#999" }}>

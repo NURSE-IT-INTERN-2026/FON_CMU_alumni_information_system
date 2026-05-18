@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.studentId,
       "ชื่อ-นามสกุล": a.name,
       "ที่อยู่": a.address || "",
       "ประเทศ": a.country,

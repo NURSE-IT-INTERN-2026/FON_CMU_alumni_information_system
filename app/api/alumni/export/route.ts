@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { DEGREE_LABELS } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import * as XLSX from "xlsx";
 
@@ -8,39 +7,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
-    const degreeLevel = searchParams.get("degreeLevel") || "";
-    const initialYearFrom = searchParams.get("initialYearFrom");
-    const initialYearTo = searchParams.get("initialYearTo");
-    const graduationYearFrom = searchParams.get("graduationYearFrom");
-    const graduationYearTo = searchParams.get("graduationYearTo");
 
     const where: Prisma.AlumniWhereInput = {};
 
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
+        { maidenLastName: { contains: search, mode: "insensitive" } },
+        { newLastName: { contains: search, mode: "insensitive" } },
         { studentId: { contains: search, mode: "insensitive" } },
         { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
-    }
-
-    if (degreeLevel) {
-      where.degreeLevel = degreeLevel as Prisma.EnumDegreeLevelFilter["equals"];
-    }
-
-    if (initialYearFrom || initialYearTo) {
-      where.initialYear = {
-        ...(initialYearFrom && { gte: parseInt(initialYearFrom, 10) }),
-        ...(initialYearTo && { lte: parseInt(initialYearTo, 10) }),
-      };
-    }
-
-    if (graduationYearFrom || graduationYearTo) {
-      where.graduationYear = {
-        ...(graduationYearFrom && { gte: parseInt(graduationYearFrom, 10) }),
-        ...(graduationYearTo && { lte: parseInt(graduationYearTo, 10) }),
-      };
     }
 
     const alumni = await prisma.alumni.findMany({
@@ -50,19 +27,18 @@ export async function GET(request: NextRequest) {
 
     const rows = alumni.map((a) => ({
       "รหัสนักศึกษา": a.studentId,
+      "คำนำหน้า": a.prefix,
       "ชื่อ": a.firstName,
-      "นามสกุล": a.lastName,
-      "ระดับปริญญา": DEGREE_LABELS[a.degreeLevel] || a.degreeLevel,
-      "ปีที่เข้าศึกษา": a.initialYear,
-      "ปีที่จบ": a.graduationYear,
+      "นามสกุลเดิม": a.maidenLastName,
+      "รุ่น/สาขา": a.cohort || "",
+      "นามสกุลใหม่": a.newLastName || "",
+      "จังหวัด": a.province || "",
       "อีเมล": a.email || "",
       "เบอร์โทร": a.phone || "",
       "สถานที่ทำงาน": a.currentWorkplace || "",
       "ประเทศ": a.country || "",
       "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
       "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
-      "ความเชี่ยวชาญ": a.expertise || "",
-      "สรุปผลงาน": a.achievementSummary || "",
     }));
 
     const workbook = XLSX.utils.book_new();
