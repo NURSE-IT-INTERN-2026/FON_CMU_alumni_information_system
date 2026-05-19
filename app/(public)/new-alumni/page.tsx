@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PREFIX_OPTIONS, AWARD_TYPE_OPTIONS } from "@/lib/constants";
+import { PREFIX_OPTIONS, AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
 interface AwardRow {
   awardName: string;
@@ -50,6 +50,7 @@ const EMPTY_ALUMNI = {
   cohort: "",
   newLastName: "",
   province: "",
+  degreeLevel: "",
 };
 
 export default function NewAlumniPage() {
@@ -103,6 +104,7 @@ export default function NewAlumniPage() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!alumni.studentId.trim()) e.studentId = "กรุณากรอกรหัสนักศึกษา";
+    else if (!/^\d+$/.test(alumni.studentId.trim())) e.studentId = "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น";
     if (!alumni.prefix) e.prefix = "กรุณาเลือกคำนำหน้า";
     if (!alumni.firstName.trim()) e.firstName = "กรุณากรอกชื่อ";
     if (!alumni.maidenLastName.trim())
@@ -125,6 +127,7 @@ export default function NewAlumniPage() {
       cohort: alumni.cohort.trim() || undefined,
       newLastName: alumni.newLastName.trim() || undefined,
       province: alumni.province.trim() || undefined,
+      degreeLevel: alumni.degreeLevel || undefined,
     };
 
     if (awardRows.length > 0) {
@@ -318,6 +321,21 @@ export default function NewAlumniPage() {
                 onChange={(e) => updateAlumni("cohort", e.target.value)}
                 placeholder="รุ่น/สาขา"
               />
+            </div>
+            <div>
+              <label className={labelClass}>ระดับการศึกษา</label>
+              <select
+                className={inputClass}
+                value={alumni.degreeLevel}
+                onChange={(e) => updateAlumni("degreeLevel", e.target.value)}
+              >
+                <option value="">-- เลือกระดับการศึกษา --</option>
+                {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>นามสกุล (ใหม่)</label>

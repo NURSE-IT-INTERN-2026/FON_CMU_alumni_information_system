@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       firstName,
       maidenLastName,
       cohort,
+      degreeLevel,
       newLastName,
       province,
       email,
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest) {
     if (!studentId || !prefix || !firstName || !maidenLastName) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d+$/.test(studentId)) {
+      return NextResponse.json(
+        { error: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น" },
         { status: 400 }
       );
     }
@@ -53,6 +61,7 @@ export async function POST(request: NextRequest) {
           firstName,
           maidenLastName,
           cohort: cohort || null,
+          degreeLevel: degreeLevel || null,
           newLastName: newLastName || null,
           province: province || null,
           email: email || null,

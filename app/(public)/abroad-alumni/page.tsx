@@ -390,12 +390,15 @@ export default function AbroadAlumniPage() {
             </table>
           </div>
           {mgmtTotalPages > 1 && (
-            <div className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-4 py-3">
-              <button onClick={() => setMgmtPage(Math.max(1, mgmtPage - 1))} disabled={mgmtPage === 1} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ก่อนหน้า</button>
-              {Array.from({ length: mgmtTotalPages }, (_, i) => i + 1).map((p) => (
-                <button key={p} onClick={() => setMgmtPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${mgmtPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] hover:bg-gray-50"}`}>{p}</button>
-              ))}
-              <button onClick={() => setMgmtPage(Math.min(mgmtTotalPages, mgmtPage + 1))} disabled={mgmtPage === mgmtTotalPages} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ถัดไป</button>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+              <span className="text-sm text-gray-500">แสดง {sortedAlumni.length === 0 ? 0 : (mgmtPage - 1) * PAGE_SIZE + 1}-{Math.min(mgmtPage * PAGE_SIZE, sortedAlumni.length)} จาก {sortedAlumni.length} รายการ</span>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setMgmtPage(Math.max(1, mgmtPage - 1))} disabled={mgmtPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                {Array.from({ length: mgmtTotalPages }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setMgmtPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${mgmtPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                ))}
+                <button onClick={() => setMgmtPage(Math.min(mgmtTotalPages, mgmtPage + 1))} disabled={mgmtPage === mgmtTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+              </div>
             </div>
           )}
         </div>
@@ -445,12 +448,15 @@ export default function AbroadAlumniPage() {
                       </table>
                     </div>
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-4 py-3">
-                        <button onClick={() => setPageFor(group.label, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ก่อนหน้า</button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                          <button key={p} onClick={() => setPageFor(group.label, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] hover:bg-gray-50"}`}>{p}</button>
-                        ))}
-                        <button onClick={() => setPageFor(group.label, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50">ถัดไป</button>
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+                        <span className="text-sm text-gray-500">แสดง {(page - 1) * perGroupPage + 1}-{Math.min(page * perGroupPage, group.items.length)} จาก {group.items.length} รายการ</span>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setPageFor(group.label, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                            <button key={p} onClick={() => setPageFor(group.label, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                          ))}
+                          <button onClick={() => setPageFor(group.label, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                        </div>
                       </div>
                     )}
                   </>

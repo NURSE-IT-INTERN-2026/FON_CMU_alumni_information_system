@@ -3,6 +3,13 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import * as XLSX from "xlsx";
 
+const DEGREE_LEVEL_LABELS: Record<string, string> = {
+  DOCTORAL: "ปริญญาเอก",
+  MASTER: "ปริญญาโท",
+  BACHELOR: "ปริญญาตรี",
+  NURSING_ASSISTANT: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -31,6 +38,7 @@ export async function GET(request: NextRequest) {
       "ชื่อ": a.firstName,
       "นามสกุลเดิม": a.maidenLastName,
       "รุ่น/สาขา": a.cohort || "",
+      "ระดับการศึกษา": a.degreeLevel ? DEGREE_LEVEL_LABELS[a.degreeLevel] || a.degreeLevel : "",
       "นามสกุลใหม่": a.newLastName || "",
       "จังหวัด": a.province || "",
       "อีเมล": a.email || "",

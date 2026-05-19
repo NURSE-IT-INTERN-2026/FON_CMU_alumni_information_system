@@ -72,6 +72,7 @@ export async function PUT(
       "firstName",
       "maidenLastName",
       "cohort",
+      "degreeLevel",
       "newLastName",
       "province",
       "email",

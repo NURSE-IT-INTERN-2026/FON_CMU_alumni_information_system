@@ -30,3 +30,10 @@ export const NAV_ITEMS = [
 ];
 
 export const PAGE_SIZE = 10;
+
+export const DEGREE_LEVEL_OPTIONS = [
+  { value: "BACHELOR", label: "ปริญญาตรี" },
+  { value: "MASTER", label: "ปริญญาโท" },
+  { value: "DOCTORAL", label: "ปริญญาเอก" },
+  { value: "NURSING_ASSISTANT", label: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล" },
+];

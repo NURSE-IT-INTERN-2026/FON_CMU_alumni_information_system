@@ -3,20 +3,37 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
-import { PAGE_SIZE, PREFIX_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
-interface ChartData {
-  labels: string[];
+interface ChartSeries {
+  key: string;
+  label: string;
   data: number[];
 }
+
+interface ChartCard {
+  key: string;
+  label: string;
+  count: number;
+}
+
+interface ChartData {
+  generations: string[];
+  series: ChartSeries[];
+  cards: ChartCard[];
+  totalCount: number;
+}
+
+const SERIES_COLORS = ["#1e3a5f", "#2e7d32", "#c62828", "#f57f17"];
 
 interface Alumni {
   id: string;
@@ -26,6 +43,7 @@ interface Alumni {
   maidenLastName: string;
   newLastName: string | null;
   cohort: string | null;
+  degreeLevel: string | null;
   province: string | null;
   email: string | null;
   phone: string | null;
@@ -47,6 +65,7 @@ const EMPTY_EDIT_FORM = {
   firstName: "",
   maidenLastName: "",
   cohort: "",
+  degreeLevel: "",
   newLastName: "",
   province: "",
   email: "",
@@ -92,8 +111,7 @@ export default function AlumniCountPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ChartData = await res.json();
       setChartData(data);
-      const total = data.data.reduce((sum, v) => sum + v, 0);
-      setTotalCount(total);
+      setTotalCount(data.totalCount);
     } catch (err) {
       console.error(err);
     } finally {
@@ -134,6 +152,26 @@ export default function AlumniCountPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalAlumni / PAGE_SIZE));
 
+  const paginationNumbers = (() => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push("...");
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (page < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  })();
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
+
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
@@ -146,6 +184,7 @@ export default function AlumniCountPage() {
       firstName: a.firstName,
       maidenLastName: a.maidenLastName,
       cohort: a.cohort || "",
+      degreeLevel: a.degreeLevel || "",
       newLastName: a.newLastName || "",
       province: a.province || "",
       email: a.email || "",
@@ -166,6 +205,7 @@ export default function AlumniCountPage() {
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+    else if (!/^\d+$/.test(form.studentId.trim())) errors.studentId = "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น";
     if (!form.prefix) errors.prefix = "กรุณาเลือกคำนำหน้า";
     if (!form.firstName.trim()) errors.firstName = "กรุณากรอกชื่อ";
     if (!form.maidenLastName.trim())
@@ -185,6 +225,7 @@ export default function AlumniCountPage() {
         firstName: form.firstName.trim(),
         maidenLastName: form.maidenLastName.trim(),
         cohort: form.cohort.trim() || null,
+        degreeLevel: form.degreeLevel || null,
         newLastName: form.newLastName.trim() || null,
         province: form.province.trim() || null,
         email: form.email.trim() || null,
@@ -270,12 +311,15 @@ export default function AlumniCountPage() {
     }
   };
 
-  // Prepare recharts data from API response
+  // Prepare recharts data: one object per generation with counts per degree level
   const rechartsData =
-    chartData?.labels.map((label, i) => ({
-      name: label,
-      count: chartData.data[i],
-    })) ?? [];
+    chartData?.generations.map((gen, gi) => {
+      const point: Record<string, string | number> = { generation: gen };
+      for (const s of chartData.series) {
+        point[s.key] = s.data[gi] || 0;
+      }
+      return point;
+    }) ?? [];
 
   // View mode loading
   if (!manageMode && chartLoading) {
@@ -300,7 +344,7 @@ export default function AlumniCountPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          จำนวนนักศึกษาเก่าตามรุ่น
+          จำนวนนักศึกษาเก่าตามระดับการศึกษา
         </h1>
         {!manageMode ? (
           <button
@@ -493,6 +537,25 @@ export default function AlumniCountPage() {
                     }
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    ระดับการศึกษา
+                  </label>
+                  <select
+                    value={form.degreeLevel}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, degreeLevel: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                  >
+                    <option value="">-- เลือกระดับการศึกษา --</option>
+                    {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -791,25 +854,29 @@ export default function AlumniCountPage() {
             </div>
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-4 py-3">
-                <button
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-                >
-                  ก่อนหน้า
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`rounded-md px-3 py-1.5 text-sm ${
-                        page === p
-                          ? "bg-[var(--primary)] text-white"
-                          : "border border-[var(--border)] hover:bg-gray-50"
-                      }`}
-                    >
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+                <span className="text-sm text-gray-500">แสดง {totalAlumni === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalAlumni)} จาก {totalAlumni} รายการ</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
+                  >
+                    ก่อนหน้า
+                  </button>
+                  {paginationNumbers.map((p, i) =>
+                    p === "..." ? (
+                      <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`rounded-md px-3 py-1.5 text-sm ${
+                          page === p
+                            ? "bg-[var(--primary)] text-white"
+                            : "border border-[var(--border)] bg-white hover:bg-gray-100"
+                        }`}
+                      >
                       {p}
                     </button>
                   )
@@ -817,67 +884,112 @@ export default function AlumniCountPage() {
                 <button
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
+                  className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
                 >
                   ถัดไป
                 </button>
+              </div>
               </div>
             )}
           </div>
         </>
       ) : (
-        /* View mode: bar chart and total count */
-        <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
-          <div className="h-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={rechartsData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="name"
-                  angle={-45}
-                  textAnchor="end"
-                  interval={0}
-                  tick={{ fontSize: 12 }}
-                  label={{
-                    value: "รุ่น/สาขา",
-                    position: "insideBottom",
-                    offset: -20,
-                    style: { fontSize: 14, fontWeight: 600 },
-                  }}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  label={{
-                    value: "จำนวน (คน)",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { fontSize: 14, fontWeight: 600 },
-                  }}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    `${value} คน`,
-                    "จำนวน",
-                  ]}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="#1e3a5f"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+        /* View mode: multi-line chart and count cards */
+        <>
+          {/* Line chart */}
+          <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
+            <div className="h-[450px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={rechartsData}
+                  margin={{ top: 10, right: 20, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="generation"
+                    tick={{ fontSize: 13 }}
+                    label={{
+                      value: "รุ่น (จากเลข 2 หลักแรกของรหัสนักศึกษา)",
+                      position: "insideBottom",
+                      offset: -5,
+                      style: { fontSize: 12, fill: "#666" },
+                    }}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    label={{
+                      value: "จำนวน (คน)",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 14, fontWeight: 600 },
+                    }}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      const series = chartData?.series.find((s) => s.key === name);
+                      return [`${value} คน`, series?.label ?? String(name)];
+                    }}
+                  />
+                  {chartData?.series.map((s, i) => (
+                    <Line
+                      key={s.key}
+                      type="monotone"
+                      dataKey={s.key}
+                      stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Custom legend */}
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              {chartData?.series.map((s, i) => (
+                <span key={s.key} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span
+                    className="inline-block h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }}
+                  />
+                  {s.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-3 border-t border-[var(--border)] pt-3">
+              <p className="text-center text-lg font-semibold text-[var(--primary)]">
+                จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
+              </p>
+            </div>
           </div>
 
-          <div className="mt-6 border-t border-[var(--border)] pt-4">
-            <p className="mb-4 text-center text-lg font-semibold text-[var(--primary)]">
-              จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
-            </p>
+          {/* Group count cards */}
+          <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {chartData?.cards.map((card, i) => {
+              const color = SERIES_COLORS[i % SERIES_COLORS.length];
+              return (
+                <div
+                  key={card.key}
+                  className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm"
+                >
+                  <div
+                    className="absolute inset-y-0 left-0 w-1.5"
+                    style={{ backgroundColor: color }}
+                  />
+                  <p className="pl-3 text-xs font-medium tracking-wide text-gray-400 uppercase">
+                    {card.label}
+                  </p>
+                  <p className="mt-1 pl-3 text-3xl font-bold" style={{ color }}>
+                    {card.count.toLocaleString()}
+                  </p>
+                  <p className="pl-3 text-xs text-gray-400">คน</p>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
 
       {/* Delete confirmation dialog */}

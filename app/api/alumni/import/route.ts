@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { DegreeLevel } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import * as XLSX from "xlsx";
+
+const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
+  "ปริญญาเอก": "DOCTORAL",
+  "ปริญญาโท": "MASTER",
+  "ปริญญาตรี": "BACHELOR",
+  "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล": "NURSING_ASSISTANT",
+  "DOCTORAL": "DOCTORAL",
+  "MASTER": "MASTER",
+  "BACHELOR": "BACHELOR",
+  "NURSING_ASSISTANT": "NURSING_ASSISTANT",
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +53,8 @@ export async function POST(request: NextRequest) {
       const firstName = row["ชื่อ"]?.toString().trim();
       const maidenLastName = row["นามสกุลเดิม"]?.toString().trim();
       const cohort = row["รุ่น/สาขา"]?.toString().trim() || null;
+      const degreeLevelRaw = row["ระดับการศึกษา"]?.toString().trim();
+      const degreeLevel = degreeLevelRaw ? (DEGREE_LEVEL_MAP[degreeLevelRaw] || null) : null;
       const newLastName = row["นามสกุลใหม่"]?.toString().trim() || null;
       const province = row["จังหวัด"]?.toString().trim() || null;
       const email = row["อีเมล"]?.toString().trim() || null;
@@ -53,12 +67,18 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      if (!/^\d+$/.test(studentId)) {
+        errors.push({ row: rowNumber, message: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น" });
+        continue;
+      }
+
       records.push({
         studentId,
         prefix,
         firstName,
         maidenLastName,
         cohort,
+        degreeLevel,
         newLastName,
         province,
         email,

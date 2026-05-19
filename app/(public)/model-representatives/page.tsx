@@ -533,7 +533,7 @@ export default function ModelRepresentativesPage() {
                 <button
                   onClick={() => setManagePage(Math.max(1, currentManagePage - 1))}
                   disabled={currentManagePage === 1}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
                 >
                   ก่อนหน้า
                 </button>
@@ -552,7 +552,7 @@ export default function ModelRepresentativesPage() {
                       className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                         currentManagePage === p
                           ? "bg-[var(--primary)] text-white"
-                          : "text-gray-600 hover:bg-gray-50"
+                          : "text-gray-600 bg-white hover:bg-gray-100"
                       }`}
                     >
                       {p}
@@ -564,7 +564,7 @@ export default function ModelRepresentativesPage() {
                     setManagePage(Math.min(manageTotalPages, currentManagePage + 1))
                   }
                   disabled={currentManagePage === manageTotalPages}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
                 >
                   ถัดไป
                 </button>
@@ -662,44 +662,47 @@ export default function ModelRepresentativesPage() {
                     </div>
 
                     {totalPages > 1 && (
-                      <div className="flex justify-center gap-2 border-t border-[var(--border)] px-4 py-3">
-                        <button
-                          onClick={() =>
-                            setPage(group.label, Math.max(1, currentPage - 1))
-                          }
-                          disabled={currentPage === 1}
-                          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          ก่อนหน้า
-                        </button>
-                        {Array.from(
-                          { length: totalPages },
-                          (_, i) => i + 1
-                        ).map((p) => (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+                        <span className="text-sm text-gray-500">แสดง {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, sortedItems.length)} จาก {sortedItems.length} รายการ</span>
+                        <div className="flex items-center gap-1.5">
                           <button
-                            key={p}
-                            onClick={() => setPage(group.label, p)}
-                            className={`rounded-md px-3 py-1.5 text-sm ${
-                              p === currentPage
-                                ? "bg-[var(--primary)] text-white"
-                                : "border border-[var(--border)] hover:bg-gray-50"
-                            }`}
+                            onClick={() =>
+                              setPage(group.label, Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50"
                           >
-                            {p}
+                            ก่อนหน้า
                           </button>
-                        ))}
-                        <button
-                          onClick={() =>
-                            setPage(
-                              group.label,
-                              Math.min(totalPages, currentPage + 1)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          ถัดไป
-                        </button>
+                          {Array.from(
+                            { length: totalPages },
+                            (_, i) => i + 1
+                          ).map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => setPage(group.label, p)}
+                              className={`rounded-md px-3 py-1.5 text-sm ${
+                                p === currentPage
+                                  ? "bg-[var(--primary)] text-white"
+                                  : "border border-[var(--border)] bg-white hover:bg-gray-100"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() =>
+                              setPage(
+                                group.label,
+                                Math.min(totalPages, currentPage + 1)
+                              )
+                            }
+                            disabled={currentPage === totalPages}
+                            className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            ถัดไป
+                          </button>
+                        </div>
                       </div>
                     )}
                   </>

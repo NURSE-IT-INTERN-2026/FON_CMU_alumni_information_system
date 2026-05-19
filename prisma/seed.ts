@@ -116,6 +116,33 @@ async function main() {
     "เยอรมนี", "แคนาดา", "สหรัฐอเมริกา",
   ];
 
+  const degreeLevels: ("BACHELOR" | "MASTER" | "DOCTORAL" | "NURSING_ASSISTANT")[] = [
+    "BACHELOR", "BACHELOR", "BACHELOR", "BACHELOR", "MASTER",
+    "BACHELOR", "BACHELOR", "BACHELOR", "MASTER", "BACHELOR",
+    "BACHELOR", "BACHELOR", "MASTER", "DOCTORAL", "BACHELOR",
+    "BACHELOR", "BACHELOR", "MASTER", "BACHELOR", "MASTER",
+    "BACHELOR", "MASTER", "BACHELOR", "BACHELOR", "DOCTORAL",
+    "MASTER", "BACHELOR", "BACHELOR", "BACHELOR", "MASTER",
+    "BACHELOR", "MASTER", "BACHELOR", "DOCTORAL", "BACHELOR",
+    "MASTER", "BACHELOR", "BACHELOR", "BACHELOR", "MASTER",
+    "DOCTORAL", "BACHELOR", "MASTER", "BACHELOR", "NURSING_ASSISTANT",
+    "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT",
+  ];
+
+  // Generation prefixes (first 2 digits of studentId) — varies per record
+  const genPrefixes = [
+    "51", "51", "52", "52", "53",
+    "53", "54", "54", "55", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "55",
+    "51", "52", "53", "54", "51",
+    "52", "53", "54", "55", "51",
+  ];
+
   const alumniData = [];
 
   for (let i = 0; i < 50; i++) {
@@ -130,10 +157,11 @@ async function main() {
     const isAbroad = i < 15;
 
     alumniData.push({
-      studentId: `5143${String(i + 1).padStart(4, "0")}`,
+      studentId: `${genPrefixes[i]}43${String(i + 1).padStart(4, "0")}`,
       prefix: prefixes[i],
       firstName,
       maidenLastName,
+      degreeLevel: degreeLevels[i],
       cohort: `รุ่น ${(i % 38) + 1}`,
       newLastName: i % 7 === 0 ? "วงศ์สวัสดิ์ใหม่" : null,
       province: i % 3 === 0 ? provinces[i % provinces.length] : null,
@@ -240,18 +268,18 @@ async function main() {
   ];
 
   const associationSeedData = [
-    { studentId: "51430001", fullName: "สมชาย สุขใจ", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ประธาน", recordedYear: 2568 },
-    { studentId: "51430002", fullName: "สมหญิง บุญมี", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "รองประธาน", recordedYear: 2568 },
-    { studentId: "51430003", fullName: "วิชัย ศรีสวัสดิ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "เลขานุการ", recordedYear: 2568 },
-    { studentId: "51430004", fullName: "นภา วงศ์สวัสดิ์", associationName: "ชมรมพยาบาลภาคเหนือ", position: "ประธาน", recordedYear: 2569 },
-    { studentId: "51430005", fullName: "พรรณี แก้วมณี", associationName: "ชมรมพยาบาลภาคเหนือ", position: "รองประธาน", recordedYear: 2569 },
-    { studentId: "51430006", fullName: "ธนา ธนาพร", associationName: "ชมรมพยาบาลภาคเหนือ", position: "กรรมการ", recordedYear: 2569 },
-    { studentId: "51430007", fullName: "ประภาส รัตนชัย", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ประธาน", recordedYear: 2567 },
-    { studentId: "51430008", fullName: "จิตรา พงษ์ประเสริฐ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ที่ปรึกษา", recordedYear: 2567 },
-    { studentId: "51430009", fullName: "สุภาพ สิทธิโชค", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "กรรมการ", recordedYear: 2569 },
-    { studentId: "51430010", fullName: "วันดี เจริญสุข", associationName: "ชมรมพยาบาลภาคเหนือ", position: "เลขานุการ", recordedYear: 2568 },
-    { studentId: "51430011", fullName: "อรุณ วิเชียรเจริญ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "กรรมการ", recordedYear: 2568 },
-    { studentId: "51430012", fullName: "ปิยะ สมบูรณ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ที่ปรึกษา", recordedYear: 2567 },
+    { studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ประธาน", recordedYear: 2568 },
+    { studentId: alumni[1].studentId, fullName: "สมหญิง บุญมี", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "รองประธาน", recordedYear: 2568 },
+    { studentId: alumni[2].studentId, fullName: "วิชัย ศรีสวัสดิ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "เลขานุการ", recordedYear: 2568 },
+    { studentId: alumni[3].studentId, fullName: "นภา วงศ์สวัสดิ์", associationName: "ชมรมพยาบาลภาคเหนือ", position: "ประธาน", recordedYear: 2569 },
+    { studentId: alumni[4].studentId, fullName: "พรรณี แก้วมณี", associationName: "ชมรมพยาบาลภาคเหนือ", position: "รองประธาน", recordedYear: 2569 },
+    { studentId: alumni[5].studentId, fullName: "ธนา ธนาพร", associationName: "ชมรมพยาบาลภาคเหนือ", position: "กรรมการ", recordedYear: 2569 },
+    { studentId: alumni[6].studentId, fullName: "ประภาส รัตนชัย", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ประธาน", recordedYear: 2567 },
+    { studentId: alumni[7].studentId, fullName: "จิตรา พงษ์ประเสริฐ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "ที่ปรึกษา", recordedYear: 2567 },
+    { studentId: alumni[8].studentId, fullName: "สุภาพ สิทธิโชค", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "กรรมการ", recordedYear: 2569 },
+    { studentId: alumni[9].studentId, fullName: "วันดี เจริญสุข", associationName: "ชมรมพยาบาลภาคเหนือ", position: "เลขานุการ", recordedYear: 2568 },
+    { studentId: alumni[10].studentId, fullName: "อรุณ วิเชียรเจริญ", associationName: "สมาคมพยาบาลแห่งประเทศไทย", position: "กรรมการ", recordedYear: 2568 },
+    { studentId: alumni[11].studentId, fullName: "ปิยะ สมบูรณ์", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ที่ปรึกษา", recordedYear: 2567 },
   ];
 
   const associations = [];
@@ -272,21 +300,21 @@ async function main() {
   ];
 
   const committeeData = [
-    { termYear: 2568, studentId: "51430001", fullName: "สมชาย สุขใจ", cohort: "1", position: "ประธานกรรมการ", remarks: null },
-    { termYear: 2568, studentId: "51430002", fullName: "สมหญิง บุญมี", cohort: "1", position: "กรรมการ", remarks: null },
-    { termYear: 2568, studentId: "51430003", fullName: "วิชัย ศรีสวัสดิ์", cohort: "2", position: "เลขานุการกรรมการ", remarks: null },
-    { termYear: 2569, studentId: "51430004", fullName: "นภา วงศ์สวัสดิ์", cohort: "2", position: "ที่ปรึกษา", remarks: null },
-    { termYear: 2569, studentId: "51430005", fullName: "พรรณี แก้วมณี", cohort: "3", position: "ประธานกรรมการ", remarks: null },
-    { termYear: 2569, studentId: "51430006", fullName: "ธนา ธนาพร", cohort: "3", position: "กรรมการ", remarks: "ด้านวิชาการ" },
-    { termYear: 2567, studentId: "51430007", fullName: "ประภาส รัตนชัย", cohort: "4", position: "กรรมการ", remarks: null },
-    { termYear: 2567, studentId: "51430008", fullName: "จิตรา พงษ์ประเสริฐ", cohort: "4", position: "เลขานุการกรรมการ", remarks: null },
-    { termYear: 2567, studentId: "51430009", fullName: "สุภาพ สิทธิโชค", cohort: "5", position: "ประธานกรรมการ", remarks: null },
-    { termYear: 2568, studentId: "51430010", fullName: "วันดี เจริญสุข", cohort: "5", position: "ที่ปรึกษา", remarks: null },
-    { termYear: 2568, studentId: "51430011", fullName: "อรุณ วิเชียรเจริญ", cohort: "6", position: "กรรมการ", remarks: null },
-    { termYear: 2569, studentId: "51430012", fullName: "ปิยะ สมบูรณ์", cohort: "6", position: "กรรมการ", remarks: null },
-    { termYear: 2569, studentId: "51430013", fullName: "มนัส กิจเจริญ", cohort: "7", position: "ประธานกรรมการ", remarks: null },
-    { termYear: 2568, studentId: "51430014", fullName: "กานดา ภูมิพัฒน์", cohort: "7", position: "เลขานุการกรรมการ", remarks: null },
-    { termYear: 2567, studentId: "51430015", fullName: "ธีรพงษ์ มณีรัตน์", cohort: "8", position: "ที่ปรึกษา", remarks: "ด้านบริหาร" },
+    { termYear: 2568, studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", cohort: "1", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: alumni[1].studentId, fullName: "สมหญิง บุญมี", cohort: "1", position: "กรรมการ", remarks: null },
+    { termYear: 2568, studentId: alumni[2].studentId, fullName: "วิชัย ศรีสวัสดิ์", cohort: "2", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2569, studentId: alumni[3].studentId, fullName: "นภา วงศ์สวัสดิ์", cohort: "2", position: "ที่ปรึกษา", remarks: null },
+    { termYear: 2569, studentId: alumni[4].studentId, fullName: "พรรณี แก้วมณี", cohort: "3", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2569, studentId: alumni[5].studentId, fullName: "ธนา ธนาพร", cohort: "3", position: "กรรมการ", remarks: "ด้านวิชาการ" },
+    { termYear: 2567, studentId: alumni[6].studentId, fullName: "ประภาส รัตนชัย", cohort: "4", position: "กรรมการ", remarks: null },
+    { termYear: 2567, studentId: alumni[7].studentId, fullName: "จิตรา พงษ์ประเสริฐ", cohort: "4", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2567, studentId: alumni[8].studentId, fullName: "สุภาพ สิทธิโชค", cohort: "5", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: alumni[9].studentId, fullName: "วันดี เจริญสุข", cohort: "5", position: "ที่ปรึกษา", remarks: null },
+    { termYear: 2568, studentId: alumni[10].studentId, fullName: "อรุณ วิเชียรเจริญ", cohort: "6", position: "กรรมการ", remarks: null },
+    { termYear: 2569, studentId: alumni[11].studentId, fullName: "ปิยะ สมบูรณ์", cohort: "6", position: "กรรมการ", remarks: null },
+    { termYear: 2569, studentId: alumni[12].studentId, fullName: "มนัส กิจเจริญ", cohort: "7", position: "ประธานกรรมการ", remarks: null },
+    { termYear: 2568, studentId: alumni[13].studentId, fullName: "กานดา ภูมิพัฒน์", cohort: "7", position: "เลขานุการกรรมการ", remarks: null },
+    { termYear: 2567, studentId: alumni[14].studentId, fullName: "ธีรพงษ์ มณีรัตน์", cohort: "8", position: "ที่ปรึกษา", remarks: "ด้านบริหาร" },
   ];
 
   const committees = [];
@@ -381,21 +409,21 @@ async function main() {
   console.log("Creating potentials...");
 
   const potentialData = [
-    { studentId: "51430001", fullName: "สมชาย สุขใจ", career: "พยาบาลวิชาชีพ", position: "ผู้จัดการแผนกผู้ป่วยใน", recordedYear: 2568 },
-    { studentId: "51430002", fullName: "สมหญิง บุญมี", career: "อาจารย์พยาบาล", position: "รองศาสตราจารย์", recordedYear: 2568 },
-    { studentId: "51430003", fullName: "วิชัย ศรีสวัสดิ์", career: "ผู้บริหารโรงพยาบาล", position: "ผู้อำนวยการโรงพยาบาล", recordedYear: 2568 },
-    { studentId: "51430004", fullName: "นภา วงศ์สวัสดิ์", career: "นักวิจัยทางการพยาบาล", position: "หัวหน้าทีมวิจัย", recordedYear: 2569 },
-    { studentId: "51430005", fullName: "พรรณี แก้วมณี", career: "พยาบาลผู้ป่วยวิกฤต", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
-    { studentId: "51430006", fullName: "ธนา ธนาพร", career: "ที่ปรึกษาด้านสาธารณสุข", position: "ที่ปรึกษาองค์การอนามัยโลก", recordedYear: 2569 },
-    { studentId: "51430007", fullName: "ประภาส รัตนชัย", career: "พยาบาลสูติกรรม", position: "หัวหน้าหอผู้ป่วย", recordedYear: 2567 },
-    { studentId: "51430008", fullName: "จิตรา พงษ์ประเสริฐ", career: "นักวิชาการสาธารณสุข", position: "ผู้เชี่ยวชาญด้านนโยบายสาธารณสุข", recordedYear: 2567 },
-    { studentId: "51430009", fullName: "สุภาพ สิทธิโชค", career: "พยาบาลจิตเวช", position: "พยาบาลวิชาชีพชำนาญการ", recordedYear: 2567 },
-    { studentId: "51430010", fullName: "วันดี เจริญสุข", career: "ผู้จัดการโครงการสุขภาพ", position: "ผู้จัดการโครงการ", recordedYear: 2568 },
-    { studentId: "51430011", fullName: "อรุณ วิเชียรเจริญ", career: "อาจารย์คลินิก", position: "อาจารย์ ระดับ 9", recordedYear: 2569 },
-    { studentId: "51430012", fullName: "ปิยะ สมบูรณ์", career: "พยาบาลเด็กแรกเกิด", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
-    { studentId: "51430013", fullName: "มนัส กิจเจริญ", career: "ผู้บริหารการพยาบาล", position: "ผู้อำนวยการกองการพยาบาล", recordedYear: 2568 },
-    { studentId: "51430014", fullName: "กานดา ภูมิพัฒน์", career: "นักวิจัยด้านมะเร็งวิทยา", position: "นักวิจัยหลังปริญญาเอก", recordedYear: 2567 },
-    { studentId: "51430015", fullName: "ธีรพงษ์ มณีรัตน์", career: "พยาบาลชุมชน", position: "หัวหน้าสถานีอนามัย", recordedYear: 2568 },
+    { studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", career: "พยาบาลวิชาชีพ", position: "ผู้จัดการแผนกผู้ป่วยใน", recordedYear: 2568 },
+    { studentId: alumni[1].studentId, fullName: "สมหญิง บุญมี", career: "อาจารย์พยาบาล", position: "รองศาสตราจารย์", recordedYear: 2568 },
+    { studentId: alumni[2].studentId, fullName: "วิชัย ศรีสวัสดิ์", career: "ผู้บริหารโรงพยาบาล", position: "ผู้อำนวยการโรงพยาบาล", recordedYear: 2568 },
+    { studentId: alumni[3].studentId, fullName: "นภา วงศ์สวัสดิ์", career: "นักวิจัยทางการพยาบาล", position: "หัวหน้าทีมวิจัย", recordedYear: 2569 },
+    { studentId: alumni[4].studentId, fullName: "พรรณี แก้วมณี", career: "พยาบาลผู้ป่วยวิกฤต", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
+    { studentId: alumni[5].studentId, fullName: "ธนา ธนาพร", career: "ที่ปรึกษาด้านสาธารณสุข", position: "ที่ปรึกษาองค์การอนามัยโลก", recordedYear: 2569 },
+    { studentId: alumni[6].studentId, fullName: "ประภาส รัตนชัย", career: "พยาบาลสูติกรรม", position: "หัวหน้าหอผู้ป่วย", recordedYear: 2567 },
+    { studentId: alumni[7].studentId, fullName: "จิตรา พงษ์ประเสริฐ", career: "นักวิชาการสาธารณสุข", position: "ผู้เชี่ยวชาญด้านนโยบายสาธารณสุข", recordedYear: 2567 },
+    { studentId: alumni[8].studentId, fullName: "สุภาพ สิทธิโชค", career: "พยาบาลจิตเวช", position: "พยาบาลวิชาชีพชำนาญการ", recordedYear: 2567 },
+    { studentId: alumni[9].studentId, fullName: "วันดี เจริญสุข", career: "ผู้จัดการโครงการสุขภาพ", position: "ผู้จัดการโครงการ", recordedYear: 2568 },
+    { studentId: alumni[10].studentId, fullName: "อรุณ วิเชียรเจริญ", career: "อาจารย์คลินิก", position: "อาจารย์ ระดับ 9", recordedYear: 2569 },
+    { studentId: alumni[11].studentId, fullName: "ปิยะ สมบูรณ์", career: "พยาบาลเด็กแรกเกิด", position: "พยาบาลวิชาชีพชำนาญการพิเศษ", recordedYear: 2569 },
+    { studentId: alumni[12].studentId, fullName: "มนัส กิจเจริญ", career: "ผู้บริหารการพยาบาล", position: "ผู้อำนวยการกองการพยาบาล", recordedYear: 2568 },
+    { studentId: alumni[13].studentId, fullName: "กานดา ภูมิพัฒน์", career: "นักวิจัยด้านมะเร็งวิทยา", position: "นักวิจัยหลังปริญญาเอก", recordedYear: 2567 },
+    { studentId: alumni[14].studentId, fullName: "ธีรพงษ์ มณีรัตน์", career: "พยาบาลชุมชน", position: "หัวหน้าสถานีอนามัย", recordedYear: 2568 },
   ];
 
   const potentials = [];
