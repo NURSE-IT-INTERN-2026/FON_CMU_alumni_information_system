@@ -67,7 +67,8 @@ export default function AwardsPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Alumni search for form
-  const [alumniSearch, setAlumniSearch] = useState("");
+  const [nameSearch, setNameSearch] = useState("");
+  const [searchField, setSearchField] = useState<"studentId" | "name" | null>(null);
   const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
   const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
@@ -171,14 +172,16 @@ export default function AwardsPage() {
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setForm((f) => ({ ...f, studentId: a.studentId }));
-    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a)}`);
+    setNameSearch(alumniDisplayName(a));
     setShowAlumniDropdown(false);
     setAlumniResults([]);
+    setSearchField(null);
   };
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
-    setAlumniSearch("");
+    setNameSearch("");
+    setSearchField(null);
     setFormErrors({});
     setEditingId(null);
     setShowForm(true);
@@ -192,7 +195,7 @@ export default function AwardsPage() {
       year: String(a.year),
       description: a.description || "",
     });
-    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a.alumni)}`);
+    setNameSearch(alumniDisplayName(a.alumni));
     setFormErrors({});
     setEditingId(a.id);
     setShowForm(true);
@@ -202,17 +205,15 @@ export default function AwardsPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setAlumniSearch("");
+    setNameSearch("");
+    setSearchField(null);
+    setAlumniResults([]);
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (editingId) {
-      if (!form.studentId) errors.studentId = "กรุณาเลือกศิษย์เก่า";
-    } else {
-      if (!alumniSearch.trim()) errors.studentId = "กรุณาค้นหาชื่อศิษย์เก่า";
-    }
+    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
     if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
     if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
     if (!form.year) errors.year = "กรุณากรอกปี";
@@ -268,7 +269,7 @@ export default function AwardsPage() {
           // Alumni not found - redirect to /new-alumni with pre-filled data
           const params = new URLSearchParams({
             section: "awards",
-            nameSearch: alumniSearch,
+            nameSearch: nameSearch,
           });
           if (form.awardName) params.set("awardName", form.awardName);
           if (form.awardType) params.set("awardType", form.awardType);
@@ -376,10 +377,35 @@ export default function AwardsPage() {
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="relative">
-              <label className="mb-1 block text-sm font-medium text-gray-700">ศิษย์เก่า *</label>
-              <input type="text" value={alumniSearch} onChange={(e) => { setAlumniSearch(e.target.value); searchAlumni(e.target.value); }} placeholder="ค้นหารหัสนักศึกษาหรือชื่อ..." className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
+              <input
+                type="text"
+                value={form.studentId}
+                onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value })); searchAlumni(e.target.value); setSearchField("studentId"); setNameSearch(""); }}
+                placeholder="พิมพ์รหัสนักศึกษา..."
+                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+              />
               {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-              {showAlumniDropdown && alumniResults.length > 0 && (
+              {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {alumniResults.map((a) => (
+                    <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                      {a.studentId} - {alumniDisplayName(a)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล</label>
+              <input
+                type="text"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setSearchField("name"); setForm((f) => ({ ...f, studentId: "" })); }}
+                placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] border-gray-300"
+              />
+              {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">

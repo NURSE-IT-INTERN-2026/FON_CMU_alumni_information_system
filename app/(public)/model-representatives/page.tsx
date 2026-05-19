@@ -48,9 +48,11 @@ export default function ModelRepresentativesPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  const [alumniSearch, setAlumniSearch] = useState("");
   const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
   const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
+  const [searchField, setSearchField] = useState<"studentId" | "name" | null>(null);
+  const [showCohortDropdown, setShowCohortDropdown] = useState(false);
+  const cohortDropdownRef = useRef<HTMLDivElement>(null);
 
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
@@ -68,9 +70,9 @@ export default function ModelRepresentativesPage() {
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setForm((f) => ({ ...f, studentId: a.studentId, name: alumniDisplayName(a) }));
-    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a)}`);
     setShowAlumniDropdown(false);
     setAlumniResults([]);
+    setSearchField(null);
   };
 
   const toggle = (label: string) =>
@@ -106,6 +108,16 @@ export default function ModelRepresentativesPage() {
     fetchAlumni();
   }, [fetchAlumni]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cohortDropdownRef.current && !cohortDropdownRef.current.contains(e.target as Node)) {
+        setShowCohortDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const grouped = useMemo(() => {
     const byCohort = new Map<string, ModelRepresentative[]>();
     for (const a of alumni) {
@@ -126,9 +138,26 @@ export default function ModelRepresentativesPage() {
     }));
   }, [alumni]);
 
+  const allCohorts = useMemo(() => {
+    const seen = new Set(COHORT_ORDER);
+    const result = [...COHORT_ORDER];
+    for (const a of alumni) {
+      if (!seen.has(a.cohort)) {
+        seen.add(a.cohort);
+        result.push(a.cohort);
+      }
+    }
+    return result;
+  }, [alumni]);
+
+  const cohortOptions = useMemo(() => {
+    if (!form.cohort.trim()) return allCohorts;
+    const term = form.cohort.toLowerCase();
+    return allCohorts.filter((c) => c.toLowerCase().includes(term));
+  }, [allCohorts, form.cohort]);
+
   const openCreate = () => {
     setForm(EMPTY_FORM);
-    setAlumniSearch("");
     setFormErrors({});
     setEditingId(null);
     setShowForm(true);
@@ -141,7 +170,6 @@ export default function ModelRepresentativesPage() {
       cohort: item.cohort,
       generation: String(item.generation),
     });
-    setAlumniSearch(`${item.studentId} - ${item.name}`);
     setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
@@ -151,22 +179,20 @@ export default function ModelRepresentativesPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setAlumniSearch("");
     setFormErrors({});
+    setShowCohortDropdown(false);
+    setSearchField(null);
+    setAlumniResults([]);
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (editingId) {
-      if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-      if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
-    } else {
-      if (!alumniSearch.trim()) errors.studentId = "กรุณาค้นหาชื่อศิษย์เก่า";
-    }
-    if (!form.cohort.trim()) errors.cohort = "กรุณากรอกรุ่น";
-    if (!form.generation) errors.generation = "กรุณากรอกลำดับรุ่น";
+    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+    if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
+    if (!form.cohort.trim()) errors.cohort = "กรุณากรอกชื่อเครือข่าย";
+    if (!form.generation) errors.generation = "กรุณากรอกรุ่นที่";
     if (form.generation && isNaN(Number(form.generation)))
-      errors.generation = "ลำดับรุ่นต้องเป็นตัวเลข";
+      errors.generation = "รุ่นที่ต้องเป็นตัวเลข";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -204,7 +230,7 @@ export default function ModelRepresentativesPage() {
             throw new Error(data.error || "เกิดข้อผิดพลาด");
           }
         } else {
-          const params = new URLSearchParams({ section: "modelReps", nameSearch: alumniSearch });
+          const params = new URLSearchParams({ section: "modelReps", nameSearch: form.name });
           if (form.cohort) params.set("cohort", form.cohort);
           if (form.generation) params.set("generation", form.generation);
           router.push(`/new-alumni?${params.toString()}`);
@@ -386,32 +412,56 @@ export default function ModelRepresentativesPage() {
                 </div>
               </>
             ) : (
-              <div className="relative sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  ชื่อ-สกุลศิษย์เก่า *
-                </label>
-                <input
-                  type="text"
-                  value={alumniSearch}
-                  onChange={(e) => { setAlumniSearch(e.target.value); setForm((f) => ({ ...f, studentId: "", name: "" })); searchAlumni(e.target.value); }}
-                  placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-                />
-                {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                {showAlumniDropdown && alumniResults.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                    {alumniResults.map((a) => (
-                      <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
-                        {a.studentId} - {alumniDisplayName(a)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <>
+                <div className="relative">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    รหัสนักศึกษา *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.studentId}
+                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, name: "" })); searchAlumni(e.target.value); setSearchField("studentId"); }}
+                    placeholder="พิมพ์รหัสนักศึกษา..."
+                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+                  />
+                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+                  {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      {alumniResults.map((a) => (
+                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                          {a.studentId} - {alumniDisplayName(a)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    ชื่อ-นามสกุล *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value, studentId: "" })); searchAlumni(e.target.value); setSearchField("name"); }}
+                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
+                  />
+                  {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
+                  {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      {alumniResults.map((a) => (
+                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                          {a.studentId} - {alumniDisplayName(a)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
-            <div>
+            <div className="relative" ref={cohortDropdownRef}>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                รุ่น (cohort) *
+                ชื่อเครือข่าย *
               </label>
               <input
                 type="text"
@@ -419,15 +469,33 @@ export default function ModelRepresentativesPage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, cohort: e.target.value }))
                 }
+                onFocus={() => setShowCohortDropdown(true)}
                 className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.cohort ? "border-red-400" : "border-gray-300"}`}
               />
               {formErrors.cohort && (
                 <p className="mt-1 text-xs text-red-500">{formErrors.cohort}</p>
               )}
+              {showCohortDropdown && cohortOptions.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {cohortOptions.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, cohort: c }));
+                        setShowCohortDropdown(false);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                ลำดับรุ่น (ตัวเลข) *
+                รุ่นที่ *
               </label>
               <input
                 type="number"
@@ -526,13 +594,13 @@ export default function ModelRepresentativesPage() {
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                    ลำดับ
+                    รุ่นที่
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                     รหัสนักศึกษา
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    รุ่นที่
+                    ชื่อเครือข่าย
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                     ชื่อ-นามสกุล
@@ -549,7 +617,7 @@ export default function ModelRepresentativesPage() {
                     className="transition-colors hover:bg-gray-50"
                   >
                     <td className="px-4 py-3 text-center text-gray-500">
-                      {manageStart + i + 1}
+                      {a.generation}
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3">{a.cohort}</td>
