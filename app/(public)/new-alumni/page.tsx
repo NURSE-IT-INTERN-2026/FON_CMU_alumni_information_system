@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PREFIX_OPTIONS, AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
 interface AwardRow {
   awardName: string;
@@ -11,40 +11,34 @@ interface AwardRow {
   description: string;
 }
 interface AssociationRow {
-  fullName: string;
   associationName: string;
   position: string;
   recordedYear: string;
 }
 interface CommitteeRow {
   termYear: string;
-  fullName: string;
   cohort: string;
   position: string;
   remarks: string;
 }
 interface PotentialRow {
-  fullName: string;
   career: string;
   position: string;
   recordedYear: string;
 }
 interface ModelRepRow {
-  name: string;
   cohort: string;
   generation: string;
 }
 interface AbroadRow {
-  name: string;
   address: string;
   country: string;
   university: string;
-  order: string;
 }
 
 const EMPTY_ALUMNI = {
   studentId: "",
-  prefix: "นางสาว",
+  prefix: "",
   firstName: "",
   maidenLastName: "",
   cohort: "",
@@ -83,15 +77,15 @@ export default function NewAlumniPage() {
       const next = !prev[key];
       if (next) {
         if (key === "associations" && associationRows.length === 0)
-          setAssociationRows([{ fullName: "", associationName: "", position: "", recordedYear: "" }]);
+          setAssociationRows([{ associationName: "", position: "", recordedYear: "" }]);
         if (key === "committees" && committeeRows.length === 0)
-          setCommitteeRows([{ termYear: "", fullName: "", cohort: "", position: "", remarks: "" }]);
+          setCommitteeRows([{ termYear: "", cohort: "", position: "", remarks: "" }]);
         if (key === "potentials" && potentialRows.length === 0)
-          setPotentialRows([{ fullName: "", career: "", position: "", recordedYear: "" }]);
+          setPotentialRows([{ career: "", position: "", recordedYear: "" }]);
         if (key === "modelReps" && modelRepRows.length === 0)
-          setModelRepRows([{ name: "", cohort: "", generation: "" }]);
+          setModelRepRows([{ cohort: "", generation: "" }]);
         if (key === "abroad" && abroadRows.length === 0)
-          setAbroadRows([{ name: "", address: "", country: "", university: "", order: "" }]);
+          setAbroadRows([{ address: "", country: "", university: "" }]);
       }
       return { ...prev, [key]: next };
     });
@@ -105,10 +99,63 @@ export default function NewAlumniPage() {
     const e: Record<string, string> = {};
     if (!alumni.studentId.trim()) e.studentId = "กรุณากรอกรหัสนักศึกษา";
     else if (!/^\d+$/.test(alumni.studentId.trim())) e.studentId = "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น";
-    if (!alumni.prefix) e.prefix = "กรุณาเลือกคำนำหน้า";
+    if (!alumni.prefix.trim()) e.prefix = "กรุณากรอกคำนำหน้า";
     if (!alumni.firstName.trim()) e.firstName = "กรุณากรอกชื่อ";
     if (!alumni.maidenLastName.trim())
       e.maidenLastName = "กรุณากรอกนามสกุลเดิม";
+    if (!alumni.degreeLevel) e.degreeLevel = "กรุณาเลือกระดับการศึกษา";
+
+    // Validate expanded sections — all fields required when section is open
+    if (sections.awards) {
+      awardRows.forEach((r, i) => {
+        const prefix = `awards_${i}_`;
+        if (!r.awardName.trim()) e[prefix + "awardName"] = "กรุณากรอกชื่อรางวัล";
+        if (!r.awardType) e[prefix + "awardType"] = "กรุณาเลือกประเภทรางวัล";
+        if (!r.year.trim()) e[prefix + "year"] = "กรุณากรอกปี";
+        if (!r.description.trim()) e[prefix + "description"] = "กรุณากรอกรายละเอียด";
+      });
+    }
+    if (sections.potentials) {
+      potentialRows.forEach((r, i) => {
+        const prefix = `potentials_${i}_`;
+        if (!r.career.trim()) e[prefix + "career"] = "กรุณากรอกอาชีพ";
+        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
+        if (!r.recordedYear.trim()) e[prefix + "recordedYear"] = "กรุณากรอกปีที่บันทึก";
+      });
+    }
+    if (sections.associations) {
+      associationRows.forEach((r, i) => {
+        const prefix = `associations_${i}_`;
+        if (!r.associationName.trim()) e[prefix + "associationName"] = "กรุณากรอกชื่อสมาคม/ชมรม";
+        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
+        if (!r.recordedYear.trim()) e[prefix + "recordedYear"] = "กรุณากรอกปีที่บันทึก";
+      });
+    }
+    if (sections.committees) {
+      committeeRows.forEach((r, i) => {
+        const prefix = `committees_${i}_`;
+        if (!r.termYear.trim()) e[prefix + "termYear"] = "กรุณากรอกปี พ.ศ.";
+        if (!r.cohort.trim()) e[prefix + "cohort"] = "กรุณากรอกรุ่นที่";
+        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
+        if (!r.remarks.trim()) e[prefix + "remarks"] = "กรุณากรอกหมายเหตุ";
+      });
+    }
+    if (sections.modelReps) {
+      modelRepRows.forEach((r, i) => {
+        const prefix = `modelReps_${i}_`;
+        if (!r.cohort.trim()) e[prefix + "cohort"] = "กรุณากรอกรุ่น";
+        if (!r.generation.trim()) e[prefix + "generation"] = "กรุณากรอกลำดับรุ่น";
+      });
+    }
+    if (sections.abroad) {
+      abroadRows.forEach((r, i) => {
+        const prefix = `abroad_${i}_`;
+        if (!r.address.trim()) e[prefix + "address"] = "กรุณากรอกที่อยู่";
+        if (!r.country.trim()) e[prefix + "country"] = "กรุณากรอกประเทศ";
+        if (!r.university.trim()) e[prefix + "university"] = "กรุณากรอกมหาวิทยาลัย";
+      });
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -127,7 +174,7 @@ export default function NewAlumniPage() {
       cohort: alumni.cohort.trim() || undefined,
       newLastName: alumni.newLastName.trim() || undefined,
       province: alumni.province.trim() || undefined,
-      degreeLevel: alumni.degreeLevel || undefined,
+      degreeLevel: alumni.degreeLevel,
     };
 
     if (awardRows.length > 0) {
@@ -135,12 +182,12 @@ export default function NewAlumniPage() {
         awardName: r.awardName,
         awardType: r.awardType,
         year: Number(r.year),
-        description: r.description || undefined,
+        description: r.description,
       }));
     }
     if (associationRows.length > 0) {
       payload.associations = associationRows.map((r) => ({
-        fullName: r.fullName || `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
         associationName: r.associationName,
         position: r.position,
         recordedYear: Number(r.recordedYear),
@@ -149,15 +196,15 @@ export default function NewAlumniPage() {
     if (committeeRows.length > 0) {
       payload.graduateCommittees = committeeRows.map((r) => ({
         termYear: Number(r.termYear),
-        fullName: r.fullName || `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
         cohort: r.cohort,
         position: r.position,
-        remarks: r.remarks || undefined,
+        remarks: r.remarks,
       }));
     }
     if (potentialRows.length > 0) {
       payload.potentials = potentialRows.map((r) => ({
-        fullName: r.fullName || `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
         career: r.career,
         position: r.position,
         recordedYear: Number(r.recordedYear),
@@ -165,18 +212,17 @@ export default function NewAlumniPage() {
     }
     if (modelRepRows.length > 0) {
       payload.modelRepresentatives = modelRepRows.map((r) => ({
-        name: r.name || `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
         cohort: r.cohort,
         generation: Number(r.generation),
       }));
     }
     if (abroadRows.length > 0) {
       payload.abroadAlumni = abroadRows.map((r) => ({
-        name: r.name || `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
-        address: r.address || undefined,
+        name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        address: r.address,
         country: r.country,
-        university: r.university || undefined,
-        order: Number(r.order) || 0,
+        university: r.university,
       }));
     }
 
@@ -266,17 +312,12 @@ export default function NewAlumniPage() {
               <label className={labelClass}>
                 คำนำหน้า <span className="text-red-500">*</span>
               </label>
-              <select
+              <input
                 className={inputClass}
                 value={alumni.prefix}
                 onChange={(e) => updateAlumni("prefix", e.target.value)}
-              >
-                {PREFIX_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                placeholder="คำนำหน้า"
+              />
               {errors.prefix && (
                 <p className="text-red-500 text-xs mt-1">{errors.prefix}</p>
               )}
@@ -323,7 +364,7 @@ export default function NewAlumniPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>ระดับการศึกษา</label>
+              <label className={labelClass}>ระดับการศึกษา <span className="text-red-500">*</span></label>
               <select
                 className={inputClass}
                 value={alumni.degreeLevel}
@@ -336,6 +377,9 @@ export default function NewAlumniPage() {
                   </option>
                 ))}
               </select>
+              {errors.degreeLevel && (
+                <p className="text-red-500 text-xs mt-1">{errors.degreeLevel}</p>
+              )}
             </div>
             <div>
               <label className={labelClass}>นามสกุล (ใหม่)</label>
@@ -368,16 +412,19 @@ export default function NewAlumniPage() {
             rows={awardRows}
             setRows={setAwardRows}
             emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }}
+            errors={errors}
+            sectionKey="awards"
             fields={[
               { key: "awardName", label: "ชื่อรางวัล", required: true },
               {
                 key: "awardType",
                 label: "ประเภทรางวัล",
                 type: "select",
+                required: true,
                 options: AWARD_TYPE_OPTIONS,
               },
-              { key: "year", label: "ปี (พ.ศ.)", type: "number" },
-              { key: "description", label: "รายละเอียด" },
+              { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
+              { key: "description", label: "รายละเอียด", type: "textarea", required: true },
             ]}
           />
         </SectionToggle>
@@ -390,13 +437,14 @@ export default function NewAlumniPage() {
           <RepeatableForm<AssociationRow>
             rows={associationRows}
             setRows={setAssociationRows}
-            emptyRow={{ fullName: "", associationName: "", position: "", recordedYear: "" }}
+            emptyRow={{ associationName: "", position: "", recordedYear: "" }}
+            errors={errors}
+            sectionKey="associations"
             singleRow
             fields={[
-              { key: "fullName", label: "ชื่อ-สกุล" },
               { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
               { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number" },
+              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
             ]}
           />
         </SectionToggle>
@@ -409,14 +457,15 @@ export default function NewAlumniPage() {
           <RepeatableForm<CommitteeRow>
             rows={committeeRows}
             setRows={setCommitteeRows}
-            emptyRow={{ termYear: "", fullName: "", cohort: "", position: "", remarks: "" }}
+            emptyRow={{ termYear: "", cohort: "", position: "", remarks: "" }}
+            errors={errors}
+            sectionKey="committees"
             singleRow
             fields={[
-              { key: "termYear", label: "ปี พ.ศ.", type: "number" },
-              { key: "fullName", label: "ชื่อ-สกุล" },
+              { key: "termYear", label: "ปี พ.ศ.", type: "number", required: true },
               { key: "cohort", label: "รุ่นที่", required: true },
               { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "remarks", label: "หมายเหตุ" },
+              { key: "remarks", label: "หมายเหตุ", type: "textarea", required: true },
             ]}
           />
         </SectionToggle>
@@ -429,13 +478,14 @@ export default function NewAlumniPage() {
           <RepeatableForm<PotentialRow>
             rows={potentialRows}
             setRows={setPotentialRows}
-            emptyRow={{ fullName: "", career: "", position: "", recordedYear: "" }}
+            emptyRow={{ career: "", position: "", recordedYear: "" }}
+            errors={errors}
+            sectionKey="potentials"
             singleRow
             fields={[
-              { key: "fullName", label: "ชื่อ-สกุล" },
               { key: "career", label: "อาชีพ", required: true },
               { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number" },
+              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
             ]}
           />
         </SectionToggle>
@@ -448,12 +498,13 @@ export default function NewAlumniPage() {
           <RepeatableForm<ModelRepRow>
             rows={modelRepRows}
             setRows={setModelRepRows}
-            emptyRow={{ name: "", cohort: "", generation: "" }}
+            emptyRow={{ cohort: "", generation: "" }}
+            errors={errors}
+            sectionKey="modelReps"
             singleRow
             fields={[
-              { key: "name", label: "ชื่อ-สกุล" },
               { key: "cohort", label: "รุ่น", required: true },
-              { key: "generation", label: "ลำดับรุ่น", type: "number" },
+              { key: "generation", label: "ลำดับรุ่น", type: "number", required: true },
             ]}
           />
         </SectionToggle>
@@ -466,14 +517,14 @@ export default function NewAlumniPage() {
           <RepeatableForm<AbroadRow>
             rows={abroadRows}
             setRows={setAbroadRows}
-            emptyRow={{ name: "", address: "", country: "", university: "", order: "" }}
+            emptyRow={{ address: "", country: "", university: "" }}
+            errors={errors}
+            sectionKey="abroad"
             singleRow
             fields={[
-              { key: "name", label: "ชื่อ-สกุล" },
-              { key: "address", label: "ที่อยู่" },
+              { key: "address", label: "ที่อยู่", required: true },
               { key: "country", label: "ประเทศ", required: true },
-              { key: "university", label: "มหาวิทยาลัย" },
-              { key: "order", label: "ลำดับ", type: "number" },
+              { key: "university", label: "มหาวิทยาลัย", required: true },
             ]}
           />
         </SectionToggle>
@@ -531,7 +582,7 @@ function SectionToggle({
 interface FieldDef {
   key: string;
   label: string;
-  type?: "text" | "number" | "select";
+  type?: "text" | "number" | "select" | "textarea";
   required?: boolean;
   options?: { value: string; label: string }[];
 }
@@ -542,15 +593,24 @@ function RepeatableForm<T>({
   emptyRow,
   fields,
   singleRow,
+  errors,
+  sectionKey,
 }: {
   rows: T[];
   setRows: React.Dispatch<React.SetStateAction<T[]>>;
   emptyRow: T;
   fields: FieldDef[];
   singleRow?: boolean;
+  errors?: Record<string, string>;
+  sectionKey?: string;
 }) {
   const inputClass =
     "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
+  const errorInputClass =
+    "w-full border border-red-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent";
+
+  const getFieldError = (idx: number, key: string) =>
+    errors?.[`${sectionKey}_${idx}_${key}`];
 
   const addRow = () => setRows((prev) => [...prev, { ...emptyRow }]);
   const removeRow = (idx: number) =>
@@ -572,11 +632,11 @@ function RepeatableForm<T>({
           {fields.map((f) => (
             <div key={f.key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {f.label}
+                {f.label} {f.required && <span className="text-red-500">*</span>}
               </label>
               {f.type === "select" ? (
                 <select
-                  className={inputClass}
+                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
                   value={(row as Record<string, string>)[f.key]}
                   onChange={(e) => updateRow(idx, f.key, e.target.value)}
                 >
@@ -586,14 +646,25 @@ function RepeatableForm<T>({
                     </option>
                   ))}
                 </select>
+              ) : f.type === "textarea" ? (
+                <textarea
+                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
+                  rows={3}
+                  value={(row as Record<string, string>)[f.key]}
+                  onChange={(e) => updateRow(idx, f.key, e.target.value)}
+                  placeholder={f.label}
+                />
               ) : (
                 <input
-                  className={inputClass}
+                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
                   type={f.type || "text"}
                   value={(row as Record<string, string>)[f.key]}
                   onChange={(e) => updateRow(idx, f.key, e.target.value)}
                   placeholder={f.label}
                 />
+              )}
+              {getFieldError(idx, f.key) && (
+                <p className="text-red-500 text-xs mt-1">{getFieldError(idx, f.key)}</p>
               )}
             </div>
           ))}

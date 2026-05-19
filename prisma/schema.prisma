@@ -33,7 +33,7 @@ model Alumni {
   maidenLastName        String
   cohort                String?
   newLastName           String?
-  degreeLevel           DegreeLevel?
+  degreeLevel           DegreeLevel
   province              String?
   email                 String?
   phone                 String?
