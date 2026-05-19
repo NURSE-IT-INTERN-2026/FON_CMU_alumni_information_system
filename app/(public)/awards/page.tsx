@@ -55,6 +55,7 @@ export default function AwardsPage() {
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
 
   const [manageMode, setManageMode] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -175,6 +176,14 @@ export default function AwardsPage() {
     setAlumniResults([]);
   };
 
+  const openCreate = () => {
+    setForm(EMPTY_FORM);
+    setAlumniSearch("");
+    setFormErrors({});
+    setEditingId(null);
+    setShowForm(true);
+  };
+
   const openEdit = (a: Award) => {
     setForm({
       studentId: a.studentId,
@@ -186,9 +195,11 @@ export default function AwardsPage() {
     setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a.alumni)}`);
     setFormErrors({});
     setEditingId(a.id);
+    setShowForm(true);
   };
 
   const closeForm = () => {
+    setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setAlumniSearch("");
@@ -197,7 +208,11 @@ export default function AwardsPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.studentId) errors.studentId = "กรุณาเลือกศิษย์เก่า";
+    if (editingId) {
+      if (!form.studentId) errors.studentId = "กรุณาเลือกศิษย์เก่า";
+    } else {
+      if (!alumniSearch.trim()) errors.studentId = "กรุณาค้นหาชื่อศิษย์เก่า";
+    }
     if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
     if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
     if (!form.year) errors.year = "กรุณากรอกปี";
@@ -211,21 +226,57 @@ export default function AwardsPage() {
     setSaving(true);
     setErrorMsg("");
     try {
-      const payload = {
-        studentId: form.studentId,
-        awardName: form.awardName.trim(),
-        awardType: form.awardType,
-        year: Number(form.year),
-        description: form.description.trim() || null,
-      };
-      const res = await fetch(`/api/awards/${editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      if (editingId) {
+        // Edit mode
+        const payload = {
+          studentId: form.studentId,
+          awardName: form.awardName.trim(),
+          awardType: form.awardType,
+          year: Number(form.year),
+          description: form.description.trim() || null,
+        };
+        const res = await fetch(`/api/awards/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+      } else {
+        // Create mode
+        if (form.studentId) {
+          // Alumni found - POST directly
+          const payload = {
+            studentId: form.studentId,
+            awardName: form.awardName.trim(),
+            awardType: form.awardType,
+            year: Number(form.year),
+            description: form.description.trim() || null,
+          };
+          const res = await fetch("/api/awards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "เกิดข้อผิดพลาด");
+          }
+        } else {
+          // Alumni not found - redirect to /new-alumni with pre-filled data
+          const params = new URLSearchParams({
+            section: "awards",
+            nameSearch: alumniSearch,
+          });
+          if (form.awardName) params.set("awardName", form.awardName);
+          if (form.awardType) params.set("awardType", form.awardType);
+          if (form.year) params.set("year", form.year);
+          if (form.description) params.set("description", form.description);
+          router.push(`/new-alumni?${params.toString()}`);
+          return;
+        }
       }
       closeForm();
       fetchAwards();
@@ -318,10 +369,10 @@ export default function AwardsPage() {
         </div>
       )}
 
-      {manageMode && editingId && (
+      {manageMode && showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
-            แก้ไขข้อมูลรางวัล
+            {editingId ? "แก้ไขข้อมูลรางวัล" : "เพิ่มข้อมูลรางวัล"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="relative">
@@ -420,9 +471,9 @@ export default function AwardsPage() {
         </select>
       </div>
 
-      {manageMode && (
+      {manageMode && !showForm && (
         <div className="mb-4 flex flex-wrap gap-2">
-          <button onClick={() => router.push("/new-alumni")} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             เพิ่มข้อมูล
           </button>

@@ -58,6 +58,30 @@ export default function AssociationsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const [alumniSearch, setAlumniSearch] = useState("");
+  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
+  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
+
+  const searchAlumni = useCallback(async (term: string) => {
+    if (term.length < 2) { setAlumniResults([]); return; }
+    try {
+      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setAlumniResults(data.data || []);
+      setShowAlumniDropdown(true);
+    } catch {}
+  }, []);
+
+  const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
+    `${a.prefix}${a.firstName} ${a.maidenLastName}`;
+
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+    setForm((f) => ({ ...f, studentId: a.studentId, fullName: alumniDisplayName(a) }));
+    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a)}`);
+    setShowAlumniDropdown(false);
+    setAlumniResults([]);
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -112,7 +136,11 @@ export default function AssociationsPage() {
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const openCreate = () => {
-    router.push("/new-alumni");
+    setForm(EMPTY_FORM);
+    setAlumniSearch("");
+    setFormErrors({});
+    setEditingId(null);
+    setShowForm(true);
   };
 
   const openEdit = (item: Association) => {
@@ -123,6 +151,7 @@ export default function AssociationsPage() {
       position: item.position,
       recordedYear: String(item.recordedYear),
     });
+    setAlumniSearch(`${item.studentId} - ${item.fullName}`);
     setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
@@ -132,13 +161,18 @@ export default function AssociationsPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setAlumniSearch("");
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.fullName.trim()) errors.fullName = "กรุณากรอกชื่อ-สกุล";
+    if (editingId) {
+      if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+      if (!form.fullName.trim()) errors.fullName = "กรุณากรอกชื่อ-สกุล";
+    } else {
+      if (!alumniSearch.trim()) errors.studentId = "กรุณาค้นหาชื่อศิษย์เก่า";
+    }
     if (!form.associationName.trim()) errors.associationName = "กรุณากรอกชื่อสมาคม/ชมรม";
     if (!form.position.trim()) errors.position = "กรุณากรอกตำแหน่ง";
     if (!form.recordedYear) errors.recordedYear = "กรุณากรอกปีที่บันทึก";
@@ -153,21 +187,37 @@ export default function AssociationsPage() {
     setSaving(true);
     setErrorMsg("");
     try {
-      const payload = { ...form, recordedYear: Number(form.recordedYear) };
-      const res = editingId
-        ? await fetch(`/api/associations/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch("/api/associations", {
+      if (editingId) {
+        const payload = { ...form, recordedYear: Number(form.recordedYear) };
+        const res = await fetch(`/api/associations/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+      } else {
+        if (form.studentId) {
+          const payload = { ...form, recordedYear: Number(form.recordedYear) };
+          const res = await fetch("/api/associations", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "เกิดข้อผิดพลาด");
+          }
+        } else {
+          const params = new URLSearchParams({ section: "associations", nameSearch: alumniSearch });
+          if (form.associationName) params.set("associationName", form.associationName);
+          if (form.position) params.set("position", form.position);
+          if (form.recordedYear) params.set("recordedYear", form.recordedYear);
+          router.push(`/new-alumni?${params.toString()}`);
+          return;
+        }
       }
       closeForm();
       fetchItems();
@@ -294,16 +344,35 @@ export default function AssociationsPage() {
             {editingId ? "แก้ไขข้อมูลสมาคม/ชมรมศิษย์เก่า" : "เพิ่มข้อมูลสมาคม/ชมรมศิษย์เก่า"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-              <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุล *</label>
-              <input type="text" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
-            </div>
+            {editingId ? (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
+                  <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุล *</label>
+                  <input type="text" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`} />
+                  {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
+                </div>
+              </>
+            ) : (
+              <div className="relative sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุลศิษย์เก่า *</label>
+                <input type="text" value={alumniSearch} onChange={(e) => { setAlumniSearch(e.target.value); setForm((f) => ({ ...f, studentId: "", fullName: "" })); searchAlumni(e.target.value); }} placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..." className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
+                {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+                {showAlumniDropdown && alumniResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                    {alumniResults.map((a) => (
+                      <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                        {a.studentId} - {alumniDisplayName(a)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อสมาคม/ชมรม *</label>
               <input type="text" value={form.associationName} onChange={(e) => setForm((f) => ({ ...f, associationName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.associationName ? "border-red-400" : "border-gray-300"}`} />

@@ -7,8 +7,79 @@ function randomDegreeLevel() {
   return ALL_DEGREE_LEVELS[Math.floor(Math.random() * ALL_DEGREE_LEVELS.length)];
 }
 
+function parseThaiName(raw: string): { prefix: string; firstName: string; maidenLastName: string; newLastName: string | null } {
+  let name = raw.replace(/\s+/g, " ").trim();
+
+  // Extract maiden name from parentheses: "ลดารักษณ์ (เกียรติพลพจน์) ตั้งชีวินศิริกุล"
+  // → maidenLastName = "เกียรติพลพจน์", newLastName = "ตั้งชีวินศิริกุล"
+  // But English parentheticals like (Dean), (President) are titles, not names
+  let maidenLastName = "";
+  let newLastName: string | null = null;
+  const parenMatch = name.match(/^(.+?)\s*\(([^)]+)\)\s*(.*)$/);
+  if (parenMatch) {
+    const parenContent = parenMatch[2].trim();
+    const isThaiName = /[฀-๿]/.test(parenContent);
+    const isEnglishTitle = /^(Dean|President|Director|Former|Prof|Dr|Mr|Mrs|Ms)/i.test(parenContent);
+    if (isThaiName && !isEnglishTitle) {
+      name = parenMatch[1].trim();
+      maidenLastName = parenContent;
+      const after = parenMatch[3].trim();
+      if (after) newLastName = after.replace(/\s*[\[(].*?[\])]/g, "").trim() || null;
+    }
+  }
+
+  // Remove non-name parenthetical like [G 1], (Dean), (President)
+  name = name.replace(/\s*[\[(].*?[\])]/g, "").trim();
+  if (newLastName) newLastName = newLastName.replace(/\s*[\[(].*?[\])]/g, "").trim() || null;
+
+  const thaiPrefixes = ["รศ.ดร.", "รศ ดร.", "ผศ.ดร.", "ผศ ดร.", "รศ.", "รศ ", "ผศ.", "ผศ ", "อ.ดร.", "ดร.", "อ.", "คุณ", "มล."];
+  const engPrefixes = ["Prof.", "Assoc.Prof.", "Dr."];
+
+  let prefix = "นางสาว";
+  for (const p of thaiPrefixes) {
+    if (name.startsWith(p)) {
+      prefix = p.replace(/\s+/g, ".");
+      name = name.slice(p.length).trim();
+      break;
+    }
+  }
+  if (prefix === "นางสาว") {
+    for (const p of engPrefixes) {
+      if (name.startsWith(p)) {
+        prefix = p;
+        name = name.slice(p.length).trim();
+        break;
+      }
+    }
+  }
+
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (!maidenLastName) {
+    maidenLastName = parts.slice(1).join(" ") || "ไม่ทราบ";
+  }
+
+  return {
+    prefix,
+    firstName: parts[0] || "ไม่ทราบ",
+    maidenLastName,
+    newLastName,
+  };
+}
+
 async function main() {
   console.log("Seeding database...\n");
+
+  // ── 0. Clean up existing data ──
+  console.log("Cleaning up existing data...");
+  await prisma.abroadAlumni.deleteMany();
+  await prisma.modelRepresentative.deleteMany();
+  await prisma.potential.deleteMany();
+  await prisma.graduateCommittee.deleteMany();
+  await prisma.association.deleteMany();
+  await prisma.award.deleteMany();
+  await prisma.news.deleteMany();
+  await prisma.alumni.deleteMany();
+  console.log("  All existing data cleared\n");
 
   // ── 1. Upsert admin users ──
   console.log("Upserting admin users...");
@@ -592,32 +663,39 @@ async function main() {
     let studentId = data.studentId;
     if (!studentId) {
       studentId = `6043${String(idx + 1).padStart(4, "0")}`;
-      const parts = data.name.trim().split(/\s+/);
+      const parsed = parseThaiName(data.name);
       await prisma.alumni.upsert({
         where: { studentId },
         update: {
-          prefix: "นางสาว",
-          firstName: parts[0] || "ไม่ทราบ",
-          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          prefix: parsed.prefix,
+          firstName: parsed.firstName,
+          maidenLastName: parsed.maidenLastName,
+          newLastName: parsed.newLastName,
           country: data.country,
           degreeLevel: randomDegreeLevel(),
         },
         create: {
           studentId,
-          prefix: "นางสาว",
-          firstName: parts[0] || "ไม่ทราบ",
-          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          prefix: parsed.prefix,
+          firstName: parsed.firstName,
+          maidenLastName: parsed.maidenLastName,
+          newLastName: parsed.newLastName,
           country: data.country,
           degreeLevel: randomDegreeLevel(),
         },
       });
     }
+    // Build display name: prefix + firstName + (maidenLastName) + newLastName
+    const displayParsed = parseThaiName(data.name);
+    const displayName = displayParsed.newLastName
+      ? `${displayParsed.prefix}${displayParsed.firstName} (${displayParsed.maidenLastName}) ${displayParsed.newLastName}`
+      : `${displayParsed.prefix}${displayParsed.firstName} ${displayParsed.maidenLastName}`;
     const record = await prisma.abroadAlumni.upsert({
       where: {
         studentId_order: { studentId, order: data.order },
       },
-      update: { ...data, studentId },
-      create: { ...data, studentId },
+      update: { ...data, studentId, name: displayName },
+      create: { ...data, studentId, name: displayName },
     });
     abroadAlumni.push(record);
   }
@@ -762,24 +840,30 @@ async function main() {
     let studentId = data.studentId;
     if (!studentId) {
       studentId = `7043${String(idx + 1).padStart(4, "0")}`;
-      const parts = data.name.trim().split(/\s+/);
+      const parsed = parseThaiName(data.name);
       await prisma.alumni.upsert({
         where: { studentId },
         update: {
-          prefix: "นางสาว",
-          firstName: parts[0] || "ไม่ทราบ",
-          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          prefix: parsed.prefix,
+          firstName: parsed.firstName,
+          maidenLastName: parsed.maidenLastName,
+          newLastName: parsed.newLastName,
           degreeLevel: randomDegreeLevel(),
         },
         create: {
           studentId,
-          prefix: "นางสาว",
-          firstName: parts[0] || "ไม่ทราบ",
-          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          prefix: parsed.prefix,
+          firstName: parsed.firstName,
+          maidenLastName: parsed.maidenLastName,
+          newLastName: parsed.newLastName,
           degreeLevel: randomDegreeLevel(),
         },
       });
     }
+    const modelDisplayName = parseThaiName(data.name);
+    const displayName = modelDisplayName.newLastName
+      ? `${modelDisplayName.prefix}${modelDisplayName.firstName} (${modelDisplayName.maidenLastName}) ${modelDisplayName.newLastName}`
+      : `${modelDisplayName.prefix}${modelDisplayName.firstName} ${modelDisplayName.maidenLastName}`;
     const record = await prisma.modelRepresentative.upsert({
       where: {
         studentId_cohort_generation: {
@@ -788,8 +872,8 @@ async function main() {
           generation: data.generation,
         },
       },
-      update: { ...data, studentId },
-      create: { ...data, studentId },
+      update: { ...data, studentId, name: displayName },
+      create: { ...data, studentId, name: displayName },
     });
     modelReps.push(record);
   }

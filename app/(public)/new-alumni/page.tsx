@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
 interface AwardRow {
@@ -49,6 +49,8 @@ const EMPTY_ALUMNI = {
 
 export default function NewAlumniPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialLoadDone = useRef(false);
   const [alumni, setAlumni] = useState(EMPTY_ALUMNI);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -71,6 +73,89 @@ export default function NewAlumniPage() {
   const [potentialRows, setPotentialRows] = useState<PotentialRow[]>([]);
   const [modelRepRows, setModelRepRows] = useState<ModelRepRow[]>([]);
   const [abroadRows, setAbroadRows] = useState<AbroadRow[]>([]);
+
+  // Pre-fill from query params (redirected from entity pages)
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+
+    const section = searchParams.get("section");
+    const nameSearch = searchParams.get("nameSearch");
+    const firstName = searchParams.get("firstName");
+    const maidenLastName = searchParams.get("maidenLastName");
+    const prefix = searchParams.get("prefix");
+
+    if (!section && !nameSearch && !firstName && !maidenLastName) return;
+
+    initialLoadDone.current = true;
+
+    if (nameSearch) setAlumni((prev) => ({ ...prev, firstName: nameSearch }));
+    if (firstName) setAlumni((prev) => ({ ...prev, firstName }));
+    if (maidenLastName) setAlumni((prev) => ({ ...prev, maidenLastName }));
+    if (prefix) setAlumni((prev) => ({ ...prev, prefix }));
+
+    const validSections = ["awards", "associations", "committees", "potentials", "modelReps", "abroad"];
+    if (section && validSections.includes(section)) {
+      setSections((prev) => ({ ...prev, [section]: true }));
+
+      switch (section) {
+        case "awards": {
+          const row: AwardRow = {
+            awardName: searchParams.get("awardName") || "",
+            awardType: searchParams.get("awardType") || "INTERNATIONAL",
+            year: searchParams.get("year") || "",
+            description: searchParams.get("description") || "",
+          };
+          if (row.awardName || row.year) setAwardRows([row]);
+          break;
+        }
+        case "associations": {
+          const row: AssociationRow = {
+            associationName: searchParams.get("associationName") || "",
+            position: searchParams.get("position") || "",
+            recordedYear: searchParams.get("recordedYear") || "",
+          };
+          if (row.associationName) setAssociationRows([row]);
+          break;
+        }
+        case "committees": {
+          const row: CommitteeRow = {
+            termYear: searchParams.get("termYear") || "",
+            cohort: searchParams.get("cohort") || "",
+            position: searchParams.get("position") || "",
+            remarks: searchParams.get("remarks") || "",
+          };
+          if (row.termYear || row.cohort) setCommitteeRows([row]);
+          break;
+        }
+        case "potentials": {
+          const row: PotentialRow = {
+            career: searchParams.get("career") || "",
+            position: searchParams.get("position") || "",
+            recordedYear: searchParams.get("recordedYear") || "",
+          };
+          if (row.career) setPotentialRows([row]);
+          break;
+        }
+        case "modelReps": {
+          const row: ModelRepRow = {
+            cohort: searchParams.get("cohort") || "",
+            generation: searchParams.get("generation") || "",
+          };
+          if (row.cohort) setModelRepRows([row]);
+          break;
+        }
+        case "abroad": {
+          const row: AbroadRow = {
+            address: searchParams.get("address") || "",
+            country: searchParams.get("country") || "",
+            university: searchParams.get("university") || "",
+          };
+          if (row.address || row.country) setAbroadRows([row]);
+          break;
+        }
+      }
+    }
+  }, [searchParams]);
 
   const toggleSection = (key: keyof typeof sections) =>
     setSections((prev) => {

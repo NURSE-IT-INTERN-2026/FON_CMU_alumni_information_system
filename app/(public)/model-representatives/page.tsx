@@ -48,6 +48,31 @@ export default function ModelRepresentativesPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
+  const [alumniSearch, setAlumniSearch] = useState("");
+  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
+  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
+
+  const searchAlumni = useCallback(async (term: string) => {
+    if (term.length < 2) { setAlumniResults([]); return; }
+    try {
+      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setAlumniResults(data.data || []);
+      setShowAlumniDropdown(true);
+    } catch {}
+  }, []);
+
+  const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
+    `${a.prefix}${a.firstName} ${a.maidenLastName}`;
+
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+    setForm((f) => ({ ...f, studentId: a.studentId, name: alumniDisplayName(a) }));
+    setAlumniSearch(`${a.studentId} - ${alumniDisplayName(a)}`);
+    setShowAlumniDropdown(false);
+    setAlumniResults([]);
+  };
+
   const toggle = (label: string) =>
     setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
 
@@ -102,7 +127,11 @@ export default function ModelRepresentativesPage() {
   }, [alumni]);
 
   const openCreate = () => {
-    router.push("/new-alumni");
+    setForm(EMPTY_FORM);
+    setAlumniSearch("");
+    setFormErrors({});
+    setEditingId(null);
+    setShowForm(true);
   };
 
   const openEdit = (item: ModelRepresentative) => {
@@ -112,6 +141,7 @@ export default function ModelRepresentativesPage() {
       cohort: item.cohort,
       generation: String(item.generation),
     });
+    setAlumniSearch(`${item.studentId} - ${item.name}`);
     setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
@@ -121,13 +151,18 @@ export default function ModelRepresentativesPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setAlumniSearch("");
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
+    if (editingId) {
+      if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
+      if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
+    } else {
+      if (!alumniSearch.trim()) errors.studentId = "กรุณาค้นหาชื่อศิษย์เก่า";
+    }
     if (!form.cohort.trim()) errors.cohort = "กรุณากรอกรุ่น";
     if (!form.generation) errors.generation = "กรุณากรอกลำดับรุ่น";
     if (form.generation && isNaN(Number(form.generation)))
@@ -147,20 +182,34 @@ export default function ModelRepresentativesPage() {
         cohort: form.cohort.trim(),
         generation: Number(form.generation),
       };
-      const res = editingId
-        ? await fetch(`/api/model-representatives/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch("/api/model-representatives", {
+      if (editingId) {
+        const res = await fetch(`/api/model-representatives/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+      } else {
+        if (form.studentId) {
+          const res = await fetch("/api/model-representatives", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "เกิดข้อผิดพลาด");
+          }
+        } else {
+          const params = new URLSearchParams({ section: "modelReps", nameSearch: alumniSearch });
+          if (form.cohort) params.set("cohort", form.cohort);
+          if (form.generation) params.set("generation", form.generation);
+          router.push(`/new-alumni?${params.toString()}`);
+          return;
+        }
       }
       closeForm();
       fetchAlumni();
@@ -301,38 +350,65 @@ export default function ModelRepresentativesPage() {
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                รหัสนักศึกษา *
-              </label>
-              <input
-                type="text"
-                value={form.studentId}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, studentId: e.target.value }))
-                }
-                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-              />
-              {formErrors.studentId && (
-                <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                ชื่อ-นามสกุล *
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
-              />
-              {formErrors.name && (
-                <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
-              )}
-            </div>
+            {editingId ? (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    รหัสนักศึกษา *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.studentId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, studentId: e.target.value }))
+                    }
+                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+                  />
+                  {formErrors.studentId && (
+                    <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    ชื่อ-นามสกุล *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
+                  />
+                  {formErrors.name && (
+                    <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="relative sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  ชื่อ-สกุลศิษย์เก่า *
+                </label>
+                <input
+                  type="text"
+                  value={alumniSearch}
+                  onChange={(e) => { setAlumniSearch(e.target.value); setForm((f) => ({ ...f, studentId: "", name: "" })); searchAlumni(e.target.value); }}
+                  placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+                />
+                {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+                {showAlumniDropdown && alumniResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                    {alumniResults.map((a) => (
+                      <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                        {a.studentId} - {alumniDisplayName(a)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 รุ่น (cohort) *
