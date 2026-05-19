@@ -67,6 +67,7 @@ model Award {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, awardName, year])
   @@map("awards")
 }
 
@@ -82,6 +83,7 @@ model Association {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, associationName, position, recordedYear])
   @@map("associations")
 }
 
@@ -98,6 +100,7 @@ model GraduateCommittee {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, termYear, position])
   @@map("graduate_committees")
 }
 
@@ -111,6 +114,7 @@ model News {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  @@unique([title])
   @@map("news")
 }
 
@@ -126,6 +130,7 @@ model Potential {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, recordedYear])
   @@map("potentials")
 }
 
@@ -140,6 +145,7 @@ model ModelRepresentative {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, cohort, generation])
   @@map("model_representatives")
 }
 
@@ -156,6 +162,7 @@ model AbroadAlumni {
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@unique([studentId, order])
   @@map("abroad_alumni")
 }
 

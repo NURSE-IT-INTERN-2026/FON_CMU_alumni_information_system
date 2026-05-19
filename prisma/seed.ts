@@ -2,32 +2,23 @@ import "dotenv/config";
 import prisma from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
 
+const ALL_DEGREE_LEVELS = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"] as const;
+function randomDegreeLevel() {
+  return ALL_DEGREE_LEVELS[Math.floor(Math.random() * ALL_DEGREE_LEVELS.length)];
+}
+
 async function main() {
   console.log("Seeding database...\n");
 
-  // ── 1. Clean existing data (reverse dependency order) ──
-  console.log("Cleaning existing data...");
-  await prisma.session.deleteMany();
-  await prisma.award.deleteMany();
-  await prisma.association.deleteMany();
-  await prisma.graduateCommittee.deleteMany();
-  await prisma.news.deleteMany();
-  await prisma.potential.deleteMany();
-  await prisma.abroadAlumni.deleteMany();
-  await prisma.modelRepresentative.deleteMany();
-  await prisma.alumni.deleteMany();
-  await prisma.adminUser.deleteMany();
-  console.log("All existing data cleared.\n");
-
-  // ── 2. Create admin users ──
-  console.log("Creating admin users...");
+  // ── 1. Upsert admin users ──
+  console.log("Upserting admin users...");
   const adminHash = await hashPassword("password123");
   const superadminHash = await hashPassword("password123");
 
   const [admin, superadmin] = await Promise.all([
     prisma.adminUser.upsert({
       where: { email: "admin@fon.cmu.ac.th" },
-      update: {},
+      update: { name: "ผู้ดูแลระบบ", passwordHash: adminHash, role: "admin" },
       create: {
         name: "ผู้ดูแลระบบ",
         email: "admin@fon.cmu.ac.th",
@@ -37,7 +28,7 @@ async function main() {
     }),
     prisma.adminUser.upsert({
       where: { email: "superadmin@fon.cmu.ac.th" },
-      update: {},
+      update: { name: "ผู้ดูแลระบบสูงสุด", passwordHash: superadminHash, role: "superadmin" },
       create: {
         name: "ผู้ดูแลระบบสูงสุด",
         email: "superadmin@fon.cmu.ac.th",
@@ -46,11 +37,11 @@ async function main() {
       },
     }),
   ]);
-  console.log(`  Created admin: ${admin.email}`);
-  console.log(`  Created superadmin: ${superadmin.email}\n`);
+  console.log(`  Upserted admin: ${admin.email}`);
+  console.log(`  Upserted superadmin: ${superadmin.email}\n`);
 
-  // ── 3. Create alumni records ──
-  console.log("Creating alumni...");
+  // ── 2. Upsert alumni records ──
+  console.log("Upserting alumni...");
 
   const firstNames = [
     "สมชาย", "สมหญิง", "วิชัย", "นภา", "พรรณี",
@@ -179,15 +170,15 @@ async function main() {
   for (const data of alumniData) {
     const record = await prisma.alumni.upsert({
       where: { studentId: data.studentId },
-      update: {},
+      update: data,
       create: data,
     });
     alumni.push(record);
   }
-  console.log(`  Created ${alumni.length} alumni records\n`);
+  console.log(`  Upserted ${alumni.length} alumni records\n`);
 
-  // ── 4. Create awards ──
-  console.log("Creating awards...");
+  // ── 3. Upsert awards ──
+  console.log("Upserting awards...");
 
   const awardNames = [
     "รางวัลพยาบาลดีเด่น",
@@ -245,27 +236,23 @@ async function main() {
 
   const awards = [];
   for (const data of awardData) {
-    const record = await prisma.award.create({ data });
+    const record = await prisma.award.upsert({
+      where: {
+        studentId_awardName_year: {
+          studentId: data.studentId,
+          awardName: data.awardName,
+          year: data.year,
+        },
+      },
+      update: data,
+      create: data,
+    });
     awards.push(record);
   }
-  console.log(`  Created ${awards.length} award records\n`);
+  console.log(`  Upserted ${awards.length} award records\n`);
 
-  // ── 5. Create associations ──
-  console.log("Creating associations...");
-
-  const associationNames = [
-    "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.",
-    "ชมรมพยาบาลภาคเหนือ",
-    "สมาคมพยาบาลแห่งประเทศไทย",
-  ];
-
-  const positions = [
-    "ประธาน",
-    "รองประธาน",
-    "เลขานุการ",
-    "กรรมการ",
-    "ที่ปรึกษา",
-  ];
+  // ── 4. Upsert associations ──
+  console.log("Upserting associations...");
 
   const associationSeedData = [
     { studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", associationName: "สมาคมศิษย์เก่าคณะพยาบาลศาสตร์ มช.", position: "ประธาน", recordedYear: 2568 },
@@ -284,20 +271,24 @@ async function main() {
 
   const associations = [];
   for (const data of associationSeedData) {
-    const record = await prisma.association.create({ data });
+    const record = await prisma.association.upsert({
+      where: {
+        studentId_associationName_position_recordedYear: {
+          studentId: data.studentId,
+          associationName: data.associationName,
+          position: data.position,
+          recordedYear: data.recordedYear,
+        },
+      },
+      update: data,
+      create: data,
+    });
     associations.push(record);
   }
-  console.log(`  Created ${associations.length} association records\n`);
+  console.log(`  Upserted ${associations.length} association records\n`);
 
-  // ── 6. Create graduate committee members ──
-  console.log("Creating graduate committee members...");
-
-  const committeePositions = [
-    "ประธานกรรมการ",
-    "กรรมการ",
-    "เลขานุการกรรมการ",
-    "ที่ปรึกษา",
-  ];
+  // ── 5. Upsert graduate committee members ──
+  console.log("Upserting graduate committee members...");
 
   const committeeData = [
     { termYear: 2568, studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", cohort: "1", position: "ประธานกรรมการ", remarks: null },
@@ -319,13 +310,23 @@ async function main() {
 
   const committees = [];
   for (const data of committeeData) {
-    const record = await prisma.graduateCommittee.create({ data });
+    const record = await prisma.graduateCommittee.upsert({
+      where: {
+        studentId_termYear_position: {
+          studentId: data.studentId,
+          termYear: data.termYear,
+          position: data.position,
+        },
+      },
+      update: data,
+      create: data,
+    });
     committees.push(record);
   }
-  console.log(`  Created ${committees.length} graduate committee records\n`);
+  console.log(`  Upserted ${committees.length} graduate committee records\n`);
 
-  // ── 7. Create news articles ──
-  console.log("Creating news articles...");
+  // ── 6. Upsert news articles ──
+  console.log("Upserting news articles...");
 
   const newsArticles = [
     {
@@ -392,21 +393,24 @@ async function main() {
 
   const newsRecords = [];
   for (const article of newsArticles) {
-    const record = await prisma.news.create({
-      data: {
-        title: article.title,
-        body: article.body,
-        coverImageUrl: null,
-        status: article.status,
-        publishedAt: article.publishedAt,
-      },
+    const data = {
+      title: article.title,
+      body: article.body,
+      coverImageUrl: null,
+      status: article.status,
+      publishedAt: article.publishedAt,
+    };
+    const record = await prisma.news.upsert({
+      where: { title: article.title },
+      update: data,
+      create: data,
     });
     newsRecords.push(record);
   }
-  console.log(`  Created ${newsRecords.length} news articles\n`);
+  console.log(`  Upserted ${newsRecords.length} news articles\n`);
 
-  // ── 8. Create potentials ──
-  console.log("Creating potentials...");
+  // ── 7. Upsert potentials ──
+  console.log("Upserting potentials...");
 
   const potentialData = [
     { studentId: alumni[0].studentId, fullName: "สมชาย สุขใจ", career: "พยาบาลวิชาชีพ", position: "ผู้จัดการแผนกผู้ป่วยใน", recordedYear: 2568 },
@@ -428,13 +432,22 @@ async function main() {
 
   const potentials = [];
   for (const data of potentialData) {
-    const record = await prisma.potential.create({ data });
+    const record = await prisma.potential.upsert({
+      where: {
+        studentId_recordedYear: {
+          studentId: data.studentId,
+          recordedYear: data.recordedYear,
+        },
+      },
+      update: data,
+      create: data,
+    });
     potentials.push(record);
   }
-  console.log(`  Created ${potentials.length} potential records\n`);
+  console.log(`  Upserted ${potentials.length} potential records\n`);
 
-  // ── 9. Create abroad alumni (scraped from reference site) ──
-  console.log("Creating abroad alumni...");
+  // ── 8. Upsert abroad alumni (scraped from reference site) ──
+  console.log("Upserting abroad alumni...");
 
   const abroadAlumniData = [
     // USA alumni (1-45)
@@ -578,29 +591,40 @@ async function main() {
     const data = abroadAlumniData[idx];
     let studentId = data.studentId;
     if (!studentId) {
-      studentId = `AB${String(idx + 1).padStart(4, "0")}`;
+      studentId = `6043${String(idx + 1).padStart(4, "0")}`;
       const parts = data.name.trim().split(/\s+/);
       await prisma.alumni.upsert({
         where: { studentId },
-        update: {},
+        update: {
+          prefix: "นางสาว",
+          firstName: parts[0] || "ไม่ทราบ",
+          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          country: data.country,
+          degreeLevel: randomDegreeLevel(),
+        },
         create: {
           studentId,
           prefix: "นางสาว",
           firstName: parts[0] || "ไม่ทราบ",
           maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
           country: data.country,
+          degreeLevel: randomDegreeLevel(),
         },
       });
     }
-    const record = await prisma.abroadAlumni.create({
-      data: { ...data, studentId },
+    const record = await prisma.abroadAlumni.upsert({
+      where: {
+        studentId_order: { studentId, order: data.order },
+      },
+      update: { ...data, studentId },
+      create: { ...data, studentId },
     });
     abroadAlumni.push(record);
   }
-  console.log(`  Created ${abroadAlumni.length} abroad alumni records\n`);
+  console.log(`  Upserted ${abroadAlumni.length} abroad alumni records\n`);
 
-  // ── 10. Create model representatives (from reference site) ──
-  console.log("Creating model representatives...");
+  // ── 9. Upsert model representatives (from reference site) ──
+  console.log("Upserting model representatives...");
 
   const ASSIST = "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล (รุ่น  1 – 38)";
   const MASTER = "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท (รุ่น  1 – 20)";
@@ -737,25 +761,39 @@ async function main() {
     const data = modelRepData[idx];
     let studentId = data.studentId;
     if (!studentId) {
-      studentId = `MR${String(idx + 1).padStart(4, "0")}`;
+      studentId = `7043${String(idx + 1).padStart(4, "0")}`;
       const parts = data.name.trim().split(/\s+/);
       await prisma.alumni.upsert({
         where: { studentId },
-        update: {},
+        update: {
+          prefix: "นางสาว",
+          firstName: parts[0] || "ไม่ทราบ",
+          maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          degreeLevel: randomDegreeLevel(),
+        },
         create: {
           studentId,
           prefix: "นางสาว",
           firstName: parts[0] || "ไม่ทราบ",
           maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+          degreeLevel: randomDegreeLevel(),
         },
       });
     }
-    const record = await prisma.modelRepresentative.create({
-      data: { ...data, studentId },
+    const record = await prisma.modelRepresentative.upsert({
+      where: {
+        studentId_cohort_generation: {
+          studentId,
+          cohort: data.cohort,
+          generation: data.generation,
+        },
+      },
+      update: { ...data, studentId },
+      create: { ...data, studentId },
     });
     modelReps.push(record);
   }
-  console.log(`  Created ${modelReps.length} model representative records\n`);
+  console.log(`  Upserted ${modelReps.length} model representative records\n`);
 
   // ── Summary ──
   console.log("=".repeat(50));
