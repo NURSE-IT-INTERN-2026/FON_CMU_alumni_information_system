@@ -1,15 +1,29 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 
+const OAUTH_ERRORS: Record<string, string> = {
+  oauth_denied: "การเข้าสู่ระบบด้วยบัญชี CMU ถูกปฏิเสธ",
+  oauth_invalid_state: "เกิดข้อผิดพลาดด้านความปิดกั้น กรุณาลองใหม่",
+  oauth_expired: "การขออนุญาตหมดอายุ กรุณาลองใหม่",
+  oauth_token_failed: "ไม่สามารถรับโทเคนจาก CMU ได้ กรุณาลองใหม่",
+  oauth_profile_failed: "ไม่สามารถดึงข้อมูลจาก CMU ได้ กรุณาลองใหม่",
+  oauth_user_not_found: "บัญชี CMU นี้ยังไม่ได้ลงทะเบียนในระบบ",
+  oauth_error: "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย CMU กรุณาลองใหม่",
+};
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    oauthError ? (OAUTH_ERRORS[oauthError] || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ") : ""
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -102,6 +116,19 @@ export default function LoginPage() {
                 {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
               </button>
             </form>
+
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[var(--border)]" />
+              <span className="text-sm text-[var(--muted)]">หรือ</span>
+              <div className="h-px flex-1 bg-[var(--border)]" />
+            </div>
+
+            <a
+              href="/api/auth/cmu-login"
+              className="mt-4 block w-full rounded-lg border-2 border-[var(--primary)] px-4 py-2.5 text-center text-sm font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary)]/5"
+            >
+              เข้าสู่ระบบด้วยบัญชี CMU
+            </a>
 
             <div className="mt-6 text-center">
               <Link
