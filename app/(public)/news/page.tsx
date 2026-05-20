@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -70,6 +70,89 @@ export default function NewsListPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverDragOver, setCoverDragOver] = useState(false);
+  const coverFileRef = useRef<HTMLInputElement>(null);
+  const inlineImageRef = useRef<HTMLInputElement>(null);
+
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
+  const [showTablePicker, setShowTablePicker] = useState(false);
+  const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
+  const tablePickerRef = useRef<HTMLDivElement>(null);
+
+  const TOOLBAR_COMMANDS = [
+    "bold", "italic", "underline", "strikeThrough",
+    "insertUnorderedList", "insertOrderedList",
+    "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
+    "createLink",
+  ];
+
+  const updateToolbarState = useCallback(() => {
+    const states: Record<string, boolean> = {};
+    for (const cmd of TOOLBAR_COMMANDS) {
+      try { states[cmd] = document.queryCommandState(cmd); } catch { states[cmd] = false; }
+    }
+    setActiveStates(states);
+  }, []);
+
+  const execFormat = useCallback((command: string, value?: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    // If no selection in editor, place cursor at end
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    document.execCommand(command, false, value);
+    setForm((f) => ({ ...f, body: editor.innerHTML }));
+    updateToolbarState();
+  }, [updateToolbarState]);
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      setErrorMsg("อนุญาตเฉพาะไฟล์ JPG และ PNG เท่านั้น");
+      return null;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("ขนาดไฟล์ต้องไม่เกิน 5MB");
+      return null;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      const { url } = await res.json();
+      return url;
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการอัปโหลด");
+      return null;
+    }
+  };
+
+  const uploadCoverImage = async (file: File) => {
+    setCoverUploading(true);
+    const url = await uploadImage(file);
+    if (url) setForm((f) => ({ ...f, coverImageUrl: url }));
+    setCoverUploading(false);
+  };
+
+  const bodyStats = useMemo(() => {
+    const text = stripHtml(form.body);
+    return {
+      chars: text.length,
+      words: text.trim() ? text.trim().split(/\s+/).length : 0,
+    };
+  }, [form.body]);
 
   const fetchNews = useCallback(async () => {
     setLoading(true);
@@ -98,6 +181,24 @@ export default function NewsListPage() {
   useEffect(() => {
     fetchNews();
   }, [fetchNews]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (tablePickerRef.current && !tablePickerRef.current.contains(e.target as Node)) {
+        setShowTablePicker(false);
+        setTableHover({ rows: 0, cols: 0 });
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (showForm && editorRef.current) {
+      editorRef.current.innerHTML = form.body || "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, editingId]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -225,40 +326,327 @@ export default function NewsListPage() {
       )}
 
       {manageMode && showForm && (
-        <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
-          <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
-            {editingId ? "แก้ไขข่าวสาร" : "สร้างข่าวใหม่"}
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อเรื่อง *</label>
-              <input type="text" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.title ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.title && <p className="mt-1 text-xs text-red-500">{formErrors.title}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">เนื้อหา *</label>
-              <textarea value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} rows={8} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.body ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.body && <p className="mt-1 text-xs text-red-500">{formErrors.body}</p>}
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">URL รูปปก</label>
-                <input type="text" value={form.coverImageUrl} onChange={(e) => setForm((f) => ({ ...f, coverImageUrl: e.target.value }))} placeholder="https://..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">สถานะ</label>
-                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "DRAFT" | "PUBLISHED" }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
-                  <option value="DRAFT">ฉบับร่าง</option>
-                  <option value="PUBLISHED">เผยแพร่</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end gap-3">
-            <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+        <div className="mb-6 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+          {/* Header bar */}
+          <div className="flex items-center justify-between bg-[var(--primary)] px-6 py-3">
+            <h2 className="text-base font-semibold text-white">
+              {editingId ? "แก้ไขข่าวสาร" : "สร้างข่าวใหม่"}
+            </h2>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-[var(--primary)] transition-colors hover:bg-gray-100 disabled:opacity-50"
+            >
               {saving ? "กำลังบันทึก..." : "บันทึก"}
             </button>
+          </div>
+
+          {/* Form body */}
+          <div className="space-y-4 p-6 sm:p-8">
+            {(formErrors.title || formErrors.body) && (
+              <p className="text-xs text-red-500">* กรุณากรอกข้อมูลให้ครบ</p>
+            )}
+
+            {/* Title */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                หัวข้อ <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.title ? "border-red-400" : "border-gray-300"}`}
+              />
+            </div>
+
+            {/* Cover Image Upload */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">รูปปก</label>
+              {form.coverImageUrl ? (
+                <div className="relative inline-block w-full">
+                  <img src={form.coverImageUrl} alt="preview" className="w-full rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, coverImageUrl: "" }))}
+                    className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true); }}
+                  onDragLeave={() => setCoverDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setCoverDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) uploadCoverImage(file);
+                  }}
+                  onClick={() => coverFileRef.current?.click()}
+                  tabIndex={0}
+                  onPaste={(e) => {
+                    const items = e.clipboardData.items;
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].type.match(/^image\/(jpeg|png)$/)) {
+                        e.preventDefault();
+                        const file = items[i].getAsFile();
+                        if (file) uploadCoverImage(file);
+                        return;
+                      }
+                    }
+                  }}
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors outline-none focus:ring-2 focus:ring-[var(--primary)] ${
+                    coverDragOver ? "border-[var(--primary)] bg-[var(--primary)]/5" : "border-gray-300 bg-gray-50 hover:border-gray-400"
+                  }`}
+                >
+                  {coverUploading ? (
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+                  ) : (
+                    <>
+                      <svg className="mb-2 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                      </svg>
+                      <p className="text-sm text-gray-600">คลิก ลากไฟล์มาวาง หรือวางรูปจากคลิปบอร์ด</p>
+                      <p className="mt-1 text-xs text-gray-400">อนุญาตเฉพาะ JPG, PNG (ไม่เกิน 5MB)</p>
+                    </>
+                  )}
+                  <input
+                    ref={coverFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadCoverImage(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Body with toolbar */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                เนื้อหา <span className="text-red-500">*</span>
+              </label>
+              {/* Formatting toolbar */}
+              <div className="flex flex-wrap items-center gap-px rounded-t-lg border border-b-0 border-gray-300 bg-gray-50 px-1.5 py-1">
+                {/* Bold */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("bold")} title="ตัวหนา" className={`rounded p-1.5 ${activeStates.bold ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                </button>
+                {/* Italic */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("italic")} title="ตัวเอียง" className={`rounded p-1.5 ${activeStates.italic ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                </button>
+                {/* Underline */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("underline")} title="ขีดเส้นใต้" className={`rounded p-1.5 ${activeStates.underline ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                </button>
+                {/* Link */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = prompt("URL:"); if (url) execFormat("createLink", url); }} title="แทรกลิงก์" className={`rounded p-1.5 ${activeStates.createLink ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </button>
+                {/* Insert image */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => inlineImageRef.current?.click()} title="แทรกรูปภาพ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </button>
+                <input ref={inlineImageRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImage(file).then((url) => { if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`); }); e.target.value = ""; }} />
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Bulleted list */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertUnorderedList")} title="รายการแบบ bullet" className={`rounded p-1.5 ${activeStates.insertUnorderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+                </button>
+                {/* Numbered list */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertOrderedList")} title="รายการแบบลำดับเลข" className={`rounded p-1.5 ${activeStates.insertOrderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="3" y="8" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="3" y="14" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="3" y="20" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
+                </button>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Decrease indent */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("outdent")} title="ลดการเยื้อง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="11 17 6 12 11 7"/><line x1="6" y1="12" x2="20" y2="12"/><line x1="3" y1="6" x2="3" y2="18"/></svg>
+                </button>
+                {/* Increase indent */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("indent")} title="เพิ่มการเยื้อง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="21" y1="6" x2="21" y2="18"/></svg>
+                </button>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Font color */}
+                <label title="สีตัวอักษร" className="relative flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <span className="text-xs font-bold">A</span>
+                  <input type="color" defaultValue="#000000" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => execFormat("foreColor", e.target.value)} />
+                </label>
+                {/* Highlight color */}
+                <label title="สีพื้นหลังข้อความ" className="relative flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                  <input type="color" defaultValue="#FFFF00" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => execFormat("hiliteColor", e.target.value)} />
+                </label>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Insert table */}
+                <div className="relative" ref={tablePickerRef}>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowTablePicker((v) => !v)} title="แทรกตาราง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                  </button>
+                  {showTablePicker && (
+                    <div className="absolute left-0 top-full z-20 mt-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                      <div className="mb-1 text-center text-xs text-gray-500">
+                        {tableHover.rows > 0 ? `${tableHover.rows}×${tableHover.cols} ตาราง` : "เลือกขนาดตาราง"}
+                      </div>
+                      <div className="grid" style={{ gridTemplateColumns: `repeat(8, 1fr)` }}>
+                        {Array.from({ length: 64 }, (_, i) => {
+                          const r = Math.floor(i / 8) + 1;
+                          const c = (i % 8) + 1;
+                          const hovered = r <= tableHover.rows && c <= tableHover.cols;
+                          return (
+                            <div
+                              key={i}
+                              className={`h-4 w-4 border ${hovered ? "border-[var(--primary)] bg-[var(--primary)]/20" : "border-gray-200"}`}
+                              onMouseEnter={() => setTableHover({ rows: r, cols: c })}
+                              onClick={() => {
+                                let html = '<table style="border-collapse:collapse;width:100%"><tbody>';
+                                for (let ri = 0; ri < r; ri++) {
+                                  html += '<tr>';
+                                  for (let ci = 0; ci < c; ci++) html += '<td style="border:1px solid #ccc;padding:6px">&nbsp;</td>';
+                                  html += '</tr>';
+                                }
+                                html += '</tbody></table><br/>';
+                                execFormat("insertHTML", html);
+                                setShowTablePicker(false);
+                                setTableHover({ rows: 0, cols: 0 });
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Undo */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("undo")} title="เลิกทำ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                </button>
+                {/* Clear formatting */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("removeFormat")} title="ล้างรูปแบบ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16l9-9 8 8-4 4"/><path d="M6 11l4 4"/><line x1="17" y1="4" x2="21" y2="8"/></svg>
+                </button>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Strikethrough */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("strikeThrough")} title="ขีดทับ" className={`rounded p-1.5 ${activeStates.strikeThrough ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H9a3 3 0 0 0-3 3 3 3 0 0 0 3 3h6"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M15 12a3 3 0 1 1 0 6H8"/></svg>
+                </button>
+                {/* Font size */}
+                <label title="ขนาดตัวอักษร" className="flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                  <select
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onChange={(e) => execFormat("fontSize", e.target.value)}
+                    className="ml-0.5 h-5 cursor-pointer border-none bg-transparent text-xs text-gray-600 outline-none"
+                    defaultValue="3"
+                  >
+                    <option value="1">เล็กมาก</option>
+                    <option value="2">เล็ก</option>
+                    <option value="3">ปกติ</option>
+                    <option value="4">ใหญ่</option>
+                    <option value="5">ใหญ่มาก</option>
+                    <option value="6">ใหญ่พิเศษ</option>
+                    <option value="7">ใหญ่สุด</option>
+                  </select>
+                </label>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Align left */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyLeft")} title="ชิดซ้าย" className={`rounded p-1.5 ${activeStates.justifyLeft ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+                </button>
+                {/* Align center */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyCenter")} title="กึ่งกลาง" className={`rounded p-1.5 ${activeStates.justifyCenter ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                </button>
+                {/* Align right */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyRight")} title="ชิดขวา" className={`rounded p-1.5 ${activeStates.justifyRight ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                {/* Align justify */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyFull")} title="เต็มแนว" className={`rounded p-1.5 ${activeStates.justifyFull ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <span className="mx-1 h-5 w-px bg-gray-300" />
+                {/* Code block */}
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("formatBlock", "pre")} title="บล็อกโค้ด" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </button>
+              </div>
+              {/* Editor area */}
+              <div
+                ref={editorRef}
+                contentEditable
+                onInput={() => {
+                  if (editorRef.current) {
+                    setForm((f) => ({ ...f, body: editorRef.current!.innerHTML }));
+                  }
+                  updateToolbarState();
+                }}
+                onKeyUp={updateToolbarState}
+                onMouseUp={updateToolbarState}
+                onPaste={(e) => {
+                  const items = e.clipboardData.items;
+                  for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.match(/^image\/(jpeg|png)$/)) {
+                      e.preventDefault();
+                      const file = items[i].getAsFile();
+                      if (file) {
+                        uploadImage(file).then((url) => {
+                          if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`);
+                        });
+                      }
+                      return;
+                    }
+                  }
+                }}
+                className={`min-h-[240px] rounded-b-lg border p-6 sm:p-8 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] prose prose-sm sm:prose !max-w-none ${formErrors.body ? "border-red-400" : "border-gray-300"}`}
+                suppressContentEditableWarning
+              />
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">สถานะ</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "DRAFT" | "PUBLISHED" }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              >
+                <option value="DRAFT">ฉบับร่าง</option>
+                <option value="PUBLISHED">เผยแพร่</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3">
+            <span className="text-xs text-gray-400">
+              ตัวอักษร: {bodyStats.chars} &nbsp;|&nbsp; คำ: {bodyStats.words}
+            </span>
+            <div className="flex gap-3">
+              <button
+                onClick={closeForm}
+                className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-lg bg-[var(--primary)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? "กำลังบันทึก..." : "บันทึก"}
+              </button>
+            </div>
           </div>
         </div>
       )}

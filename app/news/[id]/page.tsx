@@ -71,7 +71,7 @@ export default async function NewsDetailPage({
         )}
 
         <div
-          className="prose prose-sm sm:prose max-w-none px-6 py-6 sm:px-8 sm:py-8"
+          className="prose prose-sm sm:prose !max-w-none px-6 py-6 sm:px-8 sm:py-8"
           dangerouslySetInnerHTML={{ __html: news.body }}
         />
       </article>
