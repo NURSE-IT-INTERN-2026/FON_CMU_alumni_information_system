@@ -303,7 +303,7 @@ export default function NewsListPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           ข่าวสารและกิจกรรม
         </h1>
@@ -574,11 +574,6 @@ export default function NewsListPage() {
                 {/* Align justify */}
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyFull")} title="เต็มแนว" className={`rounded p-1.5 ${activeStates.justifyFull ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </button>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Code block */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("formatBlock", "pre")} title="บล็อกโค้ด" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                 </button>
               </div>
               {/* Editor area */}

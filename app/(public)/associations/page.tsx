@@ -271,7 +271,7 @@ export default function AssociationsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           สมาคม/ชมรมศิษย์เก่า
         </h1>
@@ -430,7 +430,7 @@ export default function AssociationsPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
         <select
           value={searchField}
           onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}

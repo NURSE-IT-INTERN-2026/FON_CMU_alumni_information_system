@@ -350,7 +350,7 @@ export default function NewAlumniPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">
             เพิ่มข้อมูลศิษย์เก่า
           </h1>
@@ -712,7 +712,7 @@ function RepeatableForm<T>({
       {rows.map((row, idx) => (
         <div
           key={idx}
-          className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-3 p-3 bg-gray-50 rounded-lg"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end mb-3 p-3 bg-gray-50 rounded-lg"
         >
           {fields.map((f) => (
             <div key={f.key}>

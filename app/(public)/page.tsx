@@ -41,7 +41,7 @@ export default async function HomePage() {
 
       {/* News Section */}
       <section>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-2xl font-semibold text-[var(--primary)]">
             ข่าวสารและกิจกรรม
           </h2>
