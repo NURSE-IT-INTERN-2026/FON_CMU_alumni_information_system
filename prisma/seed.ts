@@ -89,9 +89,10 @@ async function main() {
   const [admin, superadmin] = await Promise.all([
     prisma.adminUser.upsert({
       where: { email: "admin@fon.cmu.ac.th" },
-      update: { name: "ผู้ดูแลระบบ", passwordHash: adminHash, role: "admin" },
+      update: { firstName: "ผู้ดูแล", lastName: "ระบบ", passwordHash: adminHash, role: "admin" },
       create: {
-        name: "ผู้ดูแลระบบ",
+        firstName: "ผู้ดูแล",
+        lastName: "ระบบ",
         email: "admin@fon.cmu.ac.th",
         passwordHash: adminHash,
         role: "admin",
@@ -99,9 +100,10 @@ async function main() {
     }),
     prisma.adminUser.upsert({
       where: { email: "superadmin@fon.cmu.ac.th" },
-      update: { name: "ผู้ดูแลระบบสูงสุด", passwordHash: superadminHash, role: "superadmin" },
+      update: { firstName: "ผู้ดูแลระบบ", lastName: "สูงสุด", passwordHash: superadminHash, role: "superadmin" },
       create: {
-        name: "ผู้ดูแลระบบสูงสุด",
+        firstName: "ผู้ดูแลระบบ",
+        lastName: "สูงสุด",
         email: "superadmin@fon.cmu.ac.th",
         passwordHash: superadminHash,
         role: "superadmin",

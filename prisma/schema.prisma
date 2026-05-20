@@ -168,9 +168,10 @@ model AbroadAlumni {
 
 model AdminUser {
   id           String    @id @default(uuid())
-  name         String
+  firstName    String
+  lastName     String
   email        String    @unique
-  passwordHash String
+  passwordHash String    @default("")
   role         String    @default("admin")
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?

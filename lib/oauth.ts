@@ -50,7 +50,7 @@ export async function exchangeCodeForToken(
 
 export async function fetchCmuProfile(
   accessToken: string
-): Promise<{ email: string; name: string }> {
+): Promise<{ email: string; firstName: string; lastName: string }> {
   const res = await fetch(process.env.BASICINFO_URL!, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -61,24 +61,20 @@ export async function fetchCmuProfile(
 
   const json = await res.json();
 
-  // CMU API returns { data: { cmuAccount, firstName, lastName, ... } }
   const profile = json.data ?? json;
   const email =
     profile.cmuAccount ??
     profile.email ??
     profile.mail ??
     profile.preferred_username;
-  const name =
-    [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
-    profile.displayName ||
-    profile.name ||
-    email;
+  const firstName = profile.firstName ?? profile.given_name ?? "";
+  const lastName = profile.lastName ?? profile.family_name ?? "";
 
   if (!email) {
     throw new Error("No email found in CMU profile response");
   }
 
-  return { email, name };
+  return { email, firstName, lastName };
 }
 
 export function setOAuthCookies(state: string, verifier: string) {

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch CMU user profile
-    let profile: { email: string; name: string };
+    let profile: { email: string; firstName: string; lastName: string };
     try {
       profile = await fetchCmuProfile(accessToken);
     } catch {
@@ -67,7 +67,11 @@ export async function GET(request: NextRequest) {
 
     await prisma.adminUser.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        lastLoginAt: new Date(),
+      },
     });
 
     // Set session cookie and clean up OAuth cookies

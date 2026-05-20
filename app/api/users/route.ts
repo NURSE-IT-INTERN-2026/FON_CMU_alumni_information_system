@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession, hashPassword } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const users = await prisma.adminUser.findMany({
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true,
         isActive: true,
@@ -41,11 +42,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password, role, isActive } = body;
+    const { firstName, lastName, email, role } = body;
 
-    if (!name || !email || !password) {
+    if (!firstName || !lastName || !email) {
       return NextResponse.json(
-        { error: "กรุณากรอกชื่อ อีเมล และรหัสผ่าน" },
+        { error: "กรุณากรอกชื่อ นามสกุล และอีเมล" },
         { status: 400 }
       );
     }
@@ -58,19 +59,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const passwordHash = await hashPassword(password);
-
     const user = await prisma.adminUser.create({
       data: {
-        name,
+        firstName,
+        lastName,
         email,
-        passwordHash,
         role: role || "admin",
-        isActive: isActive ?? true,
       },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true,
         isActive: true,

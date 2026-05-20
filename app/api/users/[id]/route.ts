@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession, hashPassword } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +18,8 @@ export async function GET(
       where: { id },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true,
         isActive: true,
@@ -67,21 +68,19 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
+    if (body.firstName !== undefined) updateData.firstName = body.firstName;
+    if (body.lastName !== undefined) updateData.lastName = body.lastName;
     if (body.email !== undefined) updateData.email = body.email;
     if (body.role !== undefined) updateData.role = body.role;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
-
-    if (body.password) {
-      updateData.passwordHash = await hashPassword(body.password);
-    }
 
     const user = await prisma.adminUser.update({
       where: { id },
       data: updateData,
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true,
         isActive: true,

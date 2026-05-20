@@ -17,9 +17,6 @@ export async function GET() {
         studentId: true,
         degreeLevel: true,
       },
-      where: {
-        degreeLevel: { not: null },
-      },
     });
 
     // Group by generation (first 2 digits of studentId) x degreeLevel

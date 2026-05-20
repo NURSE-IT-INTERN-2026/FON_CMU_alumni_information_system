@@ -29,6 +29,11 @@ export const NAV_ITEMS = [
   { href: "/news", label: "ข่าวสาร" },
 ];
 
+export const SETTINGS_NAV_ITEMS = [
+  { href: "/settings/profile", label: "ข้อมูลส่วนตัว" },
+  { href: "/settings/members", label: "สมาชิกทั้งหมด" },
+];
+
 export const PAGE_SIZE = 10;
 
 export const DEGREE_LEVEL_OPTIONS = [
