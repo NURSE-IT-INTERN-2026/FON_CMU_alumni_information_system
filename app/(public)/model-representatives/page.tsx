@@ -17,11 +17,11 @@ interface ApiResponse {
 }
 
 const COHORT_ORDER = [
-  "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล (รุ่น  1 – 38)",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท (รุ่น  1 – 20)",
-  "รายชื่อเครือข่ายศิษย์เก่าอนุปริญญาพยาบาล (รุ่น  1 – 13)",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาพยาบาล (รุ่น  1 – 38)",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก (รุ่น  1 – 6)",
+  "รายชื่อเครือข่ายศิษย์เก่าอนุปริญญาพยาบาล",
+  "รายชื่อเครือข่ายศิษย์เก่าปริญญาพยาบาล",
+  "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท",
+  "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก",
+  "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล",
 ];
 
 const EMPTY_FORM = { studentId: "", name: "", cohort: "", generation: "" };
@@ -31,6 +31,7 @@ export default function ModelRepresentativesPage() {
   const [alumni, setAlumni] = useState<ModelRepresentative[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [sortDirs, setSortDirs] = useState<Record<string, "asc" | "desc">>({});
@@ -91,8 +92,7 @@ export default function ModelRepresentativesPage() {
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ search });
-      const res = await fetch(`/api/model-representatives?${params}`);
+      const res = await fetch(`/api/model-representatives`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
@@ -102,7 +102,7 @@ export default function ModelRepresentativesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, []);
 
   useEffect(() => {
     fetchAlumni();
@@ -118,9 +118,35 @@ export default function ModelRepresentativesPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const matchesSearch = useCallback((a: ModelRepresentative, term: string) => {
+    if (!term) return true;
+    const t = term.toLowerCase();
+    switch (filterField) {
+      case "name":
+        return a.name.toLowerCase().includes(t);
+      case "studentId":
+        return a.studentId.toLowerCase().includes(t);
+      case "generation":
+        return String(a.generation).includes(t);
+      case "cohort":
+        return a.cohort.toLowerCase().includes(t);
+      default:
+        return (
+          a.name.toLowerCase().includes(t) ||
+          a.studentId.toLowerCase().includes(t) ||
+          String(a.generation).includes(t) ||
+          a.cohort.toLowerCase().includes(t)
+        );
+    }
+  }, [filterField]);
+
   const grouped = useMemo(() => {
+    const filtered = search
+      ? alumni.filter((a) => matchesSearch(a, search))
+      : alumni;
+
     const byCohort = new Map<string, ModelRepresentative[]>();
-    for (const a of alumni) {
+    for (const a of filtered) {
       const list = byCohort.get(a.cohort) || [];
       list.push(a);
       byCohort.set(a.cohort, list);
@@ -136,7 +162,7 @@ export default function ModelRepresentativesPage() {
       label: cohort,
       items: [...items].sort((a, b) => a.generation - b.generation),
     }));
-  }, [alumni]);
+  }, [alumni, search, matchesSearch]);
 
   const allCohorts = useMemo(() => {
     const seen = new Set(COHORT_ORDER);
@@ -260,12 +286,17 @@ export default function ModelRepresentativesPage() {
     }
   };
 
-  const manageTotalPages = Math.max(1, Math.ceil(alumni.length / PAGE_SIZE));
+  const filteredAlumni = useMemo(
+    () => search ? alumni.filter((a) => matchesSearch(a, search)) : alumni,
+    [alumni, search, matchesSearch]
+  );
+
+  const manageTotalPages = Math.max(1, Math.ceil(filteredAlumni.length / PAGE_SIZE));
   const currentManagePage = Math.min(managePage, manageTotalPages);
   const manageStart = (currentManagePage - 1) * PAGE_SIZE;
-  const managePageItems = alumni.slice(manageStart, manageStart + PAGE_SIZE);
-  const managePageStart = alumni.length === 0 ? 0 : manageStart + 1;
-  const managePageEnd = Math.min(manageStart + PAGE_SIZE, alumni.length);
+  const managePageItems = filteredAlumni.slice(manageStart, manageStart + PAGE_SIZE);
+  const managePageStart = filteredAlumni.length === 0 ? 0 : manageStart + 1;
+  const managePageEnd = Math.min(manageStart + PAGE_SIZE, filteredAlumni.length);
 
   const handleExport = () => {
     window.location.href = "/api/model-representatives/export";
@@ -565,10 +596,21 @@ export default function ModelRepresentativesPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-6 flex gap-2">
+        <select
+          value={filterField}
+          onChange={(e) => setFilterField(e.target.value as typeof filterField)}
+          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          <option value="all">ทั้งหมด</option>
+          <option value="name">ชื่อ-นามสกุล</option>
+          <option value="studentId">รหัสนักศึกษา</option>
+          <option value="generation">รุ่นที่</option>
+          <option value="cohort">ชื่อเครือข่าย</option>
+        </select>
         <input
           type="text"
-          placeholder="ค้นหาชื่อหรือรุ่น..."
+          placeholder="ค้นหา..."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -584,7 +626,7 @@ export default function ModelRepresentativesPage() {
         </div>
       ) : manageMode ? (
         /* ===== MANAGE MODE: flat table ===== */
-        alumni.length === 0 ? (
+        filteredAlumni.length === 0 ? (
           <div className="rounded-lg bg-white py-16 text-center shadow-sm">
             <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
           </div>
@@ -670,7 +712,7 @@ export default function ModelRepresentativesPage() {
             </table>
             <div className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3 sm:flex-row">
               <span className="text-sm text-gray-500">
-                แสดง {managePageStart}-{managePageEnd} จาก {alumni.length}{" "}
+                แสดง {managePageStart}-{managePageEnd} จาก {filteredAlumni.length}{" "}
                 รายการ
               </span>
               <div className="flex items-center gap-1">
@@ -717,7 +759,7 @@ export default function ModelRepresentativesPage() {
           </div>
         )
       ) : /* ===== VIEW MODE: sectioned tables by cohort ===== */
-      alumni.length === 0 ? (
+      grouped.length === 0 ? (
         <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
       ) : (
         <div className="space-y-8">
