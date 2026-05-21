@@ -273,6 +273,7 @@ export default function GraduateCommitteePage() {
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
+  const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -477,6 +478,9 @@ export default function GraduateCommitteePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    ลำดับ
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
                     ปี พ.ศ. {sortField === "termYear" && (sortDir === "asc" ? "▲" : "▼")}
                   </th>
@@ -503,6 +507,7 @@ export default function GraduateCommitteePage() {
               <tbody>
                 {committees.map((c, i) => (
                   <tr key={c.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="px-4 py-3 text-center">{c.termYear}</td>
                     <td className="px-4 py-3 font-mono">{c.studentId}</td>
                     <td className="px-4 py-3">{c.fullName}</td>

@@ -305,6 +305,9 @@ export default function MembersPage() {
                 className="text-white text-left"
                 style={{ backgroundColor: "#1e3a5f" }}
               >
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                  ลำดับ
+                </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                   ชื่อ-นามสกุล
                 </th>
@@ -322,7 +325,7 @@ export default function MembersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center">
+                  <td colSpan={5} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -331,18 +334,21 @@ export default function MembersPage() {
               ) : members.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-12 text-center text-[var(--muted)]"
                   >
                     ไม่พบข้อมูล
                   </td>
                 </tr>
               ) : (
-                members.map((m) => (
+                members.map((m, i) => (
                   <tr
                     key={m.id}
                     className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                   >
+                    <td className="px-4 py-3 text-center text-gray-500">
+                      {i + 1}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {m.firstName} {m.lastName}
                     </td>

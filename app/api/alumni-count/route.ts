@@ -24,7 +24,7 @@ export async function GET() {
     const degreeTotals: Record<string, number> = {};
 
     for (const a of alumni) {
-      const gen = a.studentId.slice(0, 2);
+      const gen = a.studentId.length === 5 ? a.studentId.slice(0, 1) : a.studentId.slice(0, 2);
       const degree = a.degreeLevel!;
       if (!grouped[gen]) grouped[gen] = {};
       grouped[gen][degree] = (grouped[gen][degree] || 0) + 1;

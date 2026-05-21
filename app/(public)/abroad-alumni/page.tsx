@@ -541,7 +541,7 @@ export default function AbroadAlumniPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
-                            <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่</th>
+                            <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลำดับ</th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ - นามสกุล</th>
                             <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่อยู่</th>

@@ -4,6 +4,17 @@ import { hashPassword } from "../lib/auth";
 import * as XLSX from "xlsx";
 
 const ALL_DEGREE_LEVELS = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"] as const;
+
+function cohortFromStudentId(sid: string): string | undefined {
+  if (/^\d{5}$/.test(sid)) return `รุ่น ${sid[0]}`;
+  return undefined;
+}
+
+function spreadPrefix(index: number, total: number): string {
+  const prefixes = Array.from({ length: 15 }, (_, i) => String(51 + i));
+  return prefixes[index % prefixes.length];
+}
+
 function randomDegreeLevel() {
   return ALL_DEGREE_LEVELS[Math.floor(Math.random() * ALL_DEGREE_LEVELS.length)];
 }
@@ -194,18 +205,18 @@ async function main() {
     "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT", "NURSING_ASSISTANT",
   ];
 
-  // Generation prefixes (first 2 digits of studentId) — varies per record
+  // Generation prefixes (first 2 digits of studentId) — ranges 51–65
   const genPrefixes = [
-    "51", "51", "52", "52", "53",
-    "53", "54", "54", "55", "55",
     "51", "52", "53", "54", "55",
+    "56", "57", "58", "59", "60",
+    "61", "62", "63", "64", "65",
     "51", "52", "53", "54", "55",
+    "56", "57", "58", "59", "60",
+    "61", "62", "63", "64", "65",
     "51", "52", "53", "54", "55",
+    "56", "57", "58", "59", "60",
+    "61", "62", "63", "64", "65",
     "51", "52", "53", "54", "55",
-    "51", "52", "53", "54", "55",
-    "51", "52", "53", "54", "55",
-    "51", "52", "53", "54", "51",
-    "52", "53", "54", "55", "51",
   ];
 
   const alumniData = [];
@@ -305,8 +316,8 @@ async function main() {
       const parsed = parseThaiName(fullName);
       await prisma.alumni.upsert({
         where: { studentId },
-        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName },
-        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR" },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
       });
       alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
     }
@@ -333,8 +344,8 @@ async function main() {
       const parsed = parseThaiName(fullName);
       await prisma.alumni.upsert({
         where: { studentId },
-        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName },
-        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR" },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
       });
       alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
     }
@@ -755,7 +766,7 @@ async function main() {
     const data = abroadAlumniData[idx];
     let studentId = data.studentId;
     if (!studentId) {
-      studentId = `6043${String(idx + 1).padStart(4, "0")}`;
+      studentId = `${spreadPrefix(idx, abroadAlumniData.length)}43${String(idx + 1).padStart(4, "0")}`;
       const parsed = parseThaiName(data.name);
       await prisma.alumni.upsert({
         where: { studentId },
@@ -932,7 +943,7 @@ async function main() {
     const data = modelRepData[idx];
     let studentId = data.studentId;
     if (!studentId) {
-      studentId = `7043${String(idx + 1).padStart(4, "0")}`;
+      studentId = `${spreadPrefix(idx, modelRepData.length)}43${String(idx + 1).padStart(4, "0")}`;
       const parsed = parseThaiName(data.name);
       await prisma.alumni.upsert({
         where: { studentId },

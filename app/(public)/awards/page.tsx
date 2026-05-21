@@ -144,6 +144,7 @@ export default function AwardsPage() {
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
+  const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -518,6 +519,9 @@ export default function AwardsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                  ลำดับ
+                </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                   ชื่อ-นามสกุล <SortIcon field="name" />
                 </th>
@@ -528,7 +532,7 @@ export default function AwardsPage() {
                   ประเภท <SortIcon field="type" />
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
-                  ปี <SortIcon field="year" />
+                  ปีที่ได้รับ <SortIcon field="year" />
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                   รายละเอียด
@@ -541,7 +545,7 @@ export default function AwardsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={manageMode ? 6 : 5} className="px-4 py-12 text-center">
+                  <td colSpan={manageMode ? 7 : 6} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -549,11 +553,12 @@ export default function AwardsPage() {
                 </tr>
               ) : awards.length === 0 ? (
                 <tr>
-                  <td colSpan={manageMode ? 6 : 5} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
+                  <td colSpan={manageMode ? 7 : 6} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
-                awards.map((award) => (
+                awards.map((award, i) => (
                   <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="px-4 py-3">{alumniDisplayName(award.alumni, award.recipientName)}</td>
                     <td className="px-4 py-3">{award.awardName}</td>
                     <td className="px-4 py-3">
