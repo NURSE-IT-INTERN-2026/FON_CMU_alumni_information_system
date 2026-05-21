@@ -23,14 +23,15 @@ interface ApiResponse {
 
 type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
 type SortDir = "asc" | "desc";
-type SearchField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
+type SearchField = "all" | "studentId" | "fullName" | "career" | "position" | "recordedYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
   { value: "fullName", label: "ชื่อ-สกุล" },
   { value: "career", label: "อาชีพ" },
   { value: "position", label: "ตำแหน่ง" },
-  { value: "recordedYear", label: "ปีที่บันทึก" },
+  { value: "recordedYear", label: "ปีที่บันตึก" },
 ];
 
 const EMPTY_FORM = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
@@ -43,7 +44,7 @@ export default function PotentialsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("studentId");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("recordedYear");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 

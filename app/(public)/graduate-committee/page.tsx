@@ -24,9 +24,10 @@ interface ApiResponse {
 
 type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "remarks";
 type SortDir = "asc" | "desc";
-type SearchField = "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
+type SearchField = "all" | "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
   { value: "fullName", label: "ชื่อ-สกุล" },
   { value: "cohort", label: "รุ่นที่" },
@@ -45,7 +46,7 @@ export default function GraduateCommitteePage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("studentId");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [filterCohort, setFilterCohort] = useState("");
   const [filterPosition, setFilterPosition] = useState("");
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);

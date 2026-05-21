@@ -56,18 +56,18 @@ model Alumni {
 }
 
 model Award {
-  id          String    @id @default(uuid())
-  studentId   String
-  awardName   String
-  awardType   AwardType
-  year        Int
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  studentId     String?
+  recipientName String?
+  awardName     String
+  awardType     AwardType
+  year          Int
+  description   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
-  @@unique([studentId, awardName, year])
   @@map("awards")
 }
 

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import prisma from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
+import * as XLSX from "xlsx";
 
 const ALL_DEGREE_LEVELS = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"] as const;
 function randomDegreeLevel() {
@@ -250,79 +251,169 @@ async function main() {
   }
   console.log(`  Upserted ${alumni.length} alumni records\n`);
 
-  // ── 3. Upsert awards ──
-  console.log("Upserting awards...");
+  // ── 3. Upsert awards from real xlsx data ──
+  console.log("Upserting awards from xlsx files...");
 
-  const awardNames = [
-    "รางวัลพยาบาลดีเด่น",
-    "รางวัลผู้ทำคุณประโยชน์",
-    "รางวัลนักวิจัยยอดเยี่ยม",
-    "รางวัลพยาบาลสังคม",
-    "รางวัลศิษย์เก่าดีเด่น",
-    "รางวัลผู้นำทางการพยาบาล",
-    "รางวัลวิชาชีพพยาบาล",
-    "รางวัลนวัตกรรมการพยาบาล",
-    "รางวัลจิตอาสา",
-    "รางวัลพยาบาลผู้อุทิศตน",
-    "รางวัลการบริการวิชาชีพดีเด่น",
-    "รางวัลอาจารย์พยาบาลดีเด่น",
-    "รางวัลผู้บริหารการพยาบาลดีเด่น",
-    "รางวัลนักวิชาการดีเด่น",
-    "รางวัลผู้พัฒนาวิชาชีพพยาบาล",
-  ];
-
-  const awardTypes: ("INTERNATIONAL" | "NATIONAL" | "LOCAL")[] = [
-    "INTERNATIONAL", "NATIONAL", "LOCAL", "NATIONAL", "INTERNATIONAL",
-    "NATIONAL", "LOCAL", "NATIONAL", "LOCAL", "INTERNATIONAL",
-    "NATIONAL", "LOCAL", "NATIONAL", "INTERNATIONAL", "NATIONAL",
-    "INTERNATIONAL", "LOCAL", "NATIONAL", "LOCAL", "NATIONAL",
-    "INTERNATIONAL", "NATIONAL", "LOCAL", "NATIONAL", "INTERNATIONAL",
-    "NATIONAL", "LOCAL", "NATIONAL", "LOCAL", "NATIONAL",
-  ];
-
-  const awardDescriptions = [
-    "ได้รับการคัดเลือกจากสมาคมพยาบาลแห่งประเทศไทย ให้เป็นพยาบาลดีเด่นประจำปี",
-    "อุทิศตนเพื่อสังคมและสาธารณสุขมาอย่างยาวนาน",
-    "มีผลงานวิจัยที่ได้รับการตีพิมพ์ในวารสารระดับนานาชาติ",
-    "ทำงานเพื่อสังคมและชุมชนอย่างต่อเนื่อง",
-    "เป็นศิษย์เก่าที่ประสบความสำเร็จและเป็นแบบอย่างที่ดี",
-    "เป็นผู้นำในการพัฒนาวิชาชีพพยาบาล",
-    "ปฏิบัติงานวิชาชีพพยาบาลด้วยความเสียสละ",
-    "คิดค้นนวัตกรรมที่เป็นประโยชน์ต่อวงการพยาบาล",
-    "อาสาทำงานเพื่อสาธารณประโยชน์อย่างต่อเนื่อง",
-    "อุทิศชีวิตให้กับวิชาชีพพยาบาลอย่างแท้จริง",
-    null, null, null, null, null,
-  ];
-
-  const awardData = [];
-  for (let i = 0; i < 30; i++) {
-    const alumniIdx = (i * 7 + 3) % alumni.length;
-    const year = Math.min(2550 + Math.floor(i * 18 / 30), 2569);
-    awardData.push({
-      studentId: alumni[alumniIdx].studentId,
-      awardName: awardNames[i % awardNames.length],
-      awardType: awardTypes[i % awardTypes.length],
-      year,
-      description: awardDescriptions[i % awardDescriptions.length],
-    });
+  function classifyAwardTier(awardName: string): "INTERNATIONAL" | "NATIONAL" | "LOCAL" {
+    const upper = awardName.toUpperCase();
+    const internationalKeywords = [
+      "นานาชาติ", "INTERNATIONAL", "โลก", "USA", "AMERICAN", "FAAN",
+      "STANFORD", "UAB", "HALL OF FAME", "PHI KAPPA", "PHI BETA",
+      "TARA", "EACC", "UNIVERSITY OF WASHINGTON", "UNIVERSITY OF ALABAMA",
+      "DISTINGUISHED ALUMNI AWARD",
+    ];
+    const nationalKeywords = [
+      "ประเทศไทย", "แห่งชาติ", "ระดับประเทศ", "กระทรวง",
+      "สภาการพยาบาล", "มหิดล", "เลิศรัฐ", "ข้าราชการพลเรือนดีเด่น",
+      "สตรีตัวอย่างแห่งชาติ", "สมาคมพยาบาลแห่งประเทศไทย",
+      "อาจารย์ดีเด่นแห่งชาติ",
+    ];
+    if (internationalKeywords.some((kw) => upper.includes(kw.toUpperCase()))) return "INTERNATIONAL";
+    if (nationalKeywords.some((kw) => upper.includes(kw))) return "NATIONAL";
+    return "LOCAL";
   }
 
-  const awards = [];
-  for (const data of awardData) {
-    const record = await prisma.award.upsert({
-      where: {
-        studentId_awardName_year: {
-          studentId: data.studentId,
-          awardName: data.awardName,
-          year: data.year,
-        },
-      },
-      update: data,
-      create: data,
-    });
+  // Build alumni name lookup: "firstname lastname" -> studentId
+  const allAlumni = await prisma.alumni.findMany({ select: { studentId: true, firstName: true, maidenLastName: true } });
+  const alumniByName = new Map<string, string>();
+  for (const a of allAlumni) {
+    alumniByName.set(`${a.firstName.trim()} ${a.maidenLastName.trim()}`.toLowerCase(), a.studentId);
+  }
+
+  interface AwardRow { studentId: string | null; recipientName: string | null; awardName: string; awardType: "INTERNATIONAL" | "NATIONAL" | "LOCAL"; year: number; description: string | null; }
+
+  const awardRows: AwardRow[] = [];
+  const seenAwards = new Set<string>();
+
+  function dedupKey(sid: string | null, name: string, yr: number) {
+    return sid ? `${sid}::${name}::${yr}` : `NULL::${name}::${yr}`;
+  }
+
+  // --- File 1: back up รางวัลศิษย์เก่า.xlsx ---
+  const wb1 = XLSX.readFile("imports/award/back up รางวัลศิษย์เก่า.xlsx");
+  const d1 = XLSX.utils.sheet_to_json(wb1.Sheets["Sheet1"], { header: 1, defval: "" }) as (string | number)[][];
+  for (let i = 2; i < d1.length; i++) {
+    const row = d1[i];
+    const studentId = String(row[1] || "").trim();
+    const fullName = String(row[2] || "").trim();
+    const awardName = String(row[5] || "").trim();
+    const year = Number(row[6]);
+    if (!awardName || !year) continue;
+
+    // Create alumni stub if needed
+    if (studentId) {
+      const parsed = parseThaiName(fullName);
+      await prisma.alumni.upsert({
+        where: { studentId },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR" },
+      });
+      alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
+    }
+
+    const key = dedupKey(studentId, awardName, year);
+    if (seenAwards.has(key)) continue;
+    seenAwards.add(key);
+
+    awardRows.push({ studentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+  }
+
+  // --- File 2: ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx ---
+  const wb2 = XLSX.readFile("imports/award/ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx");
+  const d2 = XLSX.utils.sheet_to_json(wb2.Sheets["Sheet1"], { header: 1, defval: "" }) as (string | number)[][];
+  for (let i = 1; i < d2.length; i++) {
+    const row = d2[i];
+    const studentId = String(row[1] || "").trim();
+    const fullName = String(row[2] || "").trim();
+    const awardName = String(row[4] || "").trim();
+    const year = Number(row[5]);
+    if (!awardName || !year) continue;
+
+    if (studentId) {
+      const parsed = parseThaiName(fullName);
+      await prisma.alumni.upsert({
+        where: { studentId },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR" },
+      });
+      alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
+    }
+
+    const key = dedupKey(studentId, awardName, year);
+    if (seenAwards.has(key)) continue;
+    seenAwards.add(key);
+
+    awardRows.push({ studentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+  }
+
+  // --- File 3: รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx — ศิษย์เก่า sheet ---
+  const wb3 = XLSX.readFile("imports/award/รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx");
+  const d3a = XLSX.utils.sheet_to_json(wb3.Sheets["ศิษย์เก่า"], { header: 1, defval: "" }) as (string | number)[][];
+  let currentYear3a = 0;
+  for (let i = 2; i < d3a.length; i++) {
+    const row = d3a[i];
+    if (row[0] && typeof row[0] === "number") currentYear3a = row[0];
+    // Skip header rows repeated in the sheet
+    if (String(row[0]) === "ปีที่รับ") { currentYear3a = 0; continue; }
+
+    const prefix = String(row[1] || "").trim();
+    const fullName = String(row[2] || "").trim();
+    const awardName = String(row[3] || "").trim();
+    const year = currentYear3a;
+    if (!fullName || !awardName || !year) continue;
+
+    // Try to match by name
+    const parsed = parseThaiName(fullName);
+    const nameKey = `${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase();
+    const matchedStudentId = alumniByName.get(nameKey) || null;
+
+    const key = dedupKey(matchedStudentId, awardName, year);
+    if (seenAwards.has(key)) continue;
+    seenAwards.add(key);
+
+    if (matchedStudentId) {
+      awardRows.push({ studentId: matchedStudentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    } else {
+      console.log(`  ⚠ No alumni match for: ${fullName} — storing with recipientName`);
+      awardRows.push({ studentId: null, recipientName: `${prefix}${fullName}`.trim(), awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    }
+  }
+
+  // --- File 3: นักศึกษา sheet ---
+  const d3b = XLSX.utils.sheet_to_json(wb3.Sheets["นักศึกษา"], { header: 1, defval: "" }) as (string | number)[][];
+  let currentYear3b = 0;
+  for (let i = 2; i < d3b.length; i++) {
+    const row = d3b[i];
+    if (row[0] && typeof row[0] === "number") currentYear3b = row[0];
+
+    const fullName = String(row[1] || "").trim();
+    const awardName = String(row[2] || "").trim();
+    const year = currentYear3b;
+    if (!fullName || !awardName || !year) continue;
+
+    const parsed = parseThaiName(fullName);
+    const nameKey = `${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase();
+    const matchedStudentId = alumniByName.get(nameKey) || null;
+
+    const key = dedupKey(matchedStudentId, awardName, year);
+    if (seenAwards.has(key)) continue;
+    seenAwards.add(key);
+
+    if (matchedStudentId) {
+      awardRows.push({ studentId: matchedStudentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    } else {
+      console.log(`  ⚠ No alumni match for: ${fullName} — storing with recipientName`);
+      awardRows.push({ studentId: null, recipientName: fullName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    }
+  }
+
+  // Create all awards
+  const awards: { id: string }[] = [];
+  for (const data of awardRows) {
+    const record = await prisma.award.create({ data });
     awards.push(record);
   }
-  console.log(`  Upserted ${awards.length} award records\n`);
+  console.log(`  Created ${awards.length} award records\n`);
 
   // ── 4. Upsert associations ──
   console.log("Upserting associations...");

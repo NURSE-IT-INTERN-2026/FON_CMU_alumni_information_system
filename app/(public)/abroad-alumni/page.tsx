@@ -21,11 +21,23 @@ interface ApiResponse {
 
 const EMPTY_FORM = { studentId: "", name: "", address: "", country: "", university: "", order: "0" };
 
+type SearchField = "all" | "studentId" | "name" | "university" | "country" | "address";
+
+const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "studentId", label: "รหัสนักศึกษา" },
+  { value: "name", label: "ชื่อ-นามสกุล" },
+  { value: "university", label: "สถาบัน" },
+  { value: "country", label: "ประเทศ" },
+  { value: "address", label: "ที่อยู่" },
+];
+
 export default function AbroadAlumniPage() {
   const router = useRouter();
   const [alumni, setAlumni] = useState<AbroadAlumni[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState("");
   const [countries, setCountries] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -44,7 +56,7 @@ export default function AbroadAlumniPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const [searchField, setSearchField] = useState<"studentId" | "name" | null>(null);
+  const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
   const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
@@ -64,7 +76,7 @@ export default function AbroadAlumniPage() {
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setForm((f) => ({ ...f, studentId: a.studentId, name: alumniDisplayName(a) }));
-    setSearchField(null);
+    setFormSearchField(null);
     setShowAlumniDropdown(false);
     setAlumniResults([]);
   };
@@ -78,7 +90,7 @@ export default function AbroadAlumniPage() {
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ search, country: countryFilter });
+      const params = new URLSearchParams({ search, country: countryFilter, searchField });
       const res = await fetch(`/api/abroad-alumni?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
@@ -91,7 +103,7 @@ export default function AbroadAlumniPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, countryFilter, countries.length]);
+  }, [search, searchField, countryFilter, countries.length]);
 
   useEffect(() => {
     fetchAlumni();
@@ -157,7 +169,7 @@ export default function AbroadAlumniPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setSearchField(null);
+    setFormSearchField(null);
     setAlumniResults([]);
     setFormErrors({});
   };
@@ -331,12 +343,12 @@ export default function AbroadAlumniPage() {
                   <input
                     type="text"
                     value={form.studentId}
-                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, name: "" })); searchAlumni(e.target.value); setSearchField("studentId"); }}
+                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, name: "" })); searchAlumni(e.target.value); setFormSearchField("studentId"); }}
                     placeholder="พิมพ์รหัสนักศึกษา..."
                     className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
                   />
                   {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                  {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
+                  {showAlumniDropdown && formSearchField === "studentId" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
                         <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
@@ -351,12 +363,12 @@ export default function AbroadAlumniPage() {
                   <input
                     type="text"
                     value={form.name}
-                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value, studentId: "" })); searchAlumni(e.target.value); setSearchField("name"); }}
+                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value, studentId: "" })); searchAlumni(e.target.value); setFormSearchField("name"); }}
                     placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
                     className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
                   />
                   {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-                  {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
+                  {showAlumniDropdown && formSearchField === "name" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
                         <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
@@ -397,9 +409,18 @@ export default function AbroadAlumniPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <select
+          value={searchField}
+          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); }}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          {SEARCH_FIELDS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="ค้นหาชื่อ สถาบัน หรือประเทศ..."
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"

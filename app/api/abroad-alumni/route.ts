@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const country = searchParams.get("country") || "";
+    const searchFieldParam = searchParams.get("searchField") || "all";
+
+    const validSearchFields = ["studentId", "name", "university", "country", "address"];
 
     const where: Record<string, unknown> = {};
 
@@ -47,13 +50,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { name: { contains: search, mode: "insensitive" } },
-        { address: { contains: search, mode: "insensitive" } },
-        { university: { contains: search, mode: "insensitive" } },
-        { country: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
+        where[searchFieldParam] = { contains: search, mode: "insensitive" };
+      } else {
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { name: { contains: search, mode: "insensitive" } },
+          { address: { contains: search, mode: "insensitive" } },
+          { university: { contains: search, mode: "insensitive" } },
+          { country: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const [alumni, countries] = await Promise.all([

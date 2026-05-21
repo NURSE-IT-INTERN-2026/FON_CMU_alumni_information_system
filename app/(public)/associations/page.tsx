@@ -22,9 +22,10 @@ interface ApiResponse {
 
 type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
 type SortDir = "asc" | "desc";
-type SearchField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
+type SearchField = "all" | "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
   { value: "fullName", label: "ชื่อ-สกุล" },
   { value: "associationName", label: "สมาคม/ชมรม" },
@@ -41,7 +42,7 @@ export default function AssociationsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("studentId");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("associationName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 

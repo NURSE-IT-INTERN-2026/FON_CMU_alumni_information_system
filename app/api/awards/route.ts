@@ -5,9 +5,9 @@ import { PAGE_SIZE } from "@/lib/constants";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, awardName, awardType, year, description } = body;
+    const { studentId, recipientName, awardName, awardType, year, description } = body;
 
-    if (!studentId || !awardName || !awardType || !year) {
+    if (!awardName || !awardType || !year) {
       return NextResponse.json(
         { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
         { status: 400 }
@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
 
     const award = await prisma.award.create({
       data: {
-        studentId,
+        studentId: studentId || null,
+        recipientName: recipientName?.trim() || null,
         awardName: awardName.trim(),
         awardType,
         year: Number(year),
@@ -44,6 +45,11 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const awardType = searchParams.get("awardType") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    const sortField = searchParams.get("sortField") || "year";
+    const sortDir = searchParams.get("sortDir") || "desc";
+    const searchFieldParam = searchParams.get("searchField") || "all";
+
+    const validSearchFields = ["awardName", "recipientName", "description", "name", "year"];
 
     const where: Record<string, unknown> = {};
 
@@ -52,19 +58,37 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { awardName: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-        {
-          alumni: {
-            OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { maidenLastName: { contains: search, mode: "insensitive" } },
-            ],
+      if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
+        if (searchFieldParam === "year") {
+          where.year = Number(search) || undefined;
+        } else if (searchFieldParam === "name") {
+          where.OR = [
+            { recipientName: { contains: search, mode: "insensitive" } },
+            { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { maidenLastName: { contains: search, mode: "insensitive" } }] } },
+          ];
+        } else {
+          where[searchFieldParam] = { contains: search, mode: "insensitive" };
+        }
+      } else {
+        where.OR = [
+          { awardName: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { recipientName: { contains: search, mode: "insensitive" } },
+          {
+            alumni: {
+              OR: [
+                { firstName: { contains: search, mode: "insensitive" } },
+                { maidenLastName: { contains: search, mode: "insensitive" } },
+              ],
+            },
           },
-        },
-      ];
+        ];
+      }
     }
+
+    const sortFieldMap: Record<string, string> = { name: "recipientName", award: "awardName", type: "awardType", year: "year" };
+    const orderKey = sortFieldMap[sortField] || "year";
+    const dir = sortDir === "asc" ? "asc" : "desc";
 
     const [awards, total] = await Promise.all([
       prisma.award.findMany({
@@ -78,7 +102,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: { year: "desc" },
+        orderBy: { [orderKey]: dir },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

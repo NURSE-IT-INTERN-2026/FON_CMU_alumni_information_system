@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE } from "@/lib/constants";
 
 interface Award {
   id: string;
-  studentId: string;
+  studentId: string | null;
+  recipientName: string | null;
   awardName: string;
   awardType: string;
   year: number;
@@ -16,7 +16,7 @@ interface Award {
     prefix: string;
     firstName: string;
     maidenLastName: string;
-  };
+  } | null;
 }
 
 interface ApiResponse {
@@ -38,17 +38,27 @@ type SortDir = "asc" | "desc";
 
 const EMPTY_FORM = { studentId: "", awardName: "", awardType: "INTERNATIONAL", year: "", description: "" };
 
-const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
-  `${a.prefix}${a.firstName} ${a.maidenLastName}`;
+type SearchField = "all" | "awardName" | "recipientName" | "description" | "name" | "year";
+
+const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "name", label: "ชื่อ-นามสกุล" },
+  { value: "awardName", label: "ชื่อรางวัล" },
+  { value: "description", label: "รายละเอียด" },
+  { value: "year", label: "ปี พ.ศ." },
+];
+
+const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string } | null, fallback?: string | null) =>
+  a ? `${a.prefix}${a.firstName} ${a.maidenLastName}` : (fallback || "ไม่ระบุชื่อ");
 
 export default function AwardsPage() {
-  const router = useRouter();
   const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [awardTypeFilter, setAwardTypeFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("year");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -68,7 +78,7 @@ export default function AwardsPage() {
 
   // Alumni search for form
   const [nameSearch, setNameSearch] = useState("");
-  const [searchField, setSearchField] = useState<"studentId" | "name" | null>(null);
+  const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
   const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
@@ -80,6 +90,9 @@ export default function AwardsPage() {
         pageSize: String(PAGE_SIZE),
         search,
         awardType: awardTypeFilter,
+        sortField,
+        sortDir,
+        searchField,
       });
       const res = await fetch(`/api/awards?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -92,7 +105,7 @@ export default function AwardsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, awardTypeFilter]);
+  }, [page, search, searchField, awardTypeFilter, sortField, sortDir]);
 
   const fetchTypeCounts = useCallback(async () => {
     try {
@@ -116,18 +129,8 @@ export default function AwardsPage() {
   const handleSort = (field: SortField) => {
     if (sortField === field) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
     else { setSortField(field); setSortDir("asc"); }
+    setPage(1);
   };
-
-  const sortedAwards = [...awards].sort((a, b) => {
-    let cmp = 0;
-    switch (sortField) {
-      case "name": cmp = alumniDisplayName(a.alumni).localeCompare(alumniDisplayName(b.alumni)); break;
-      case "award": cmp = a.awardName.localeCompare(b.awardName); break;
-      case "type": cmp = a.awardType.localeCompare(b.awardType); break;
-      case "year": cmp = a.year - b.year; break;
-    }
-    return sortDir === "asc" ? cmp : -cmp;
-  });
 
   const SortIcon = ({ field }: { field: SortField }) => (
     <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
@@ -172,16 +175,16 @@ export default function AwardsPage() {
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setForm((f) => ({ ...f, studentId: a.studentId }));
-    setNameSearch(alumniDisplayName(a));
+    setNameSearch(`${a.prefix}${a.firstName} ${a.maidenLastName}`);
     setShowAlumniDropdown(false);
     setAlumniResults([]);
-    setSearchField(null);
+    setFormSearchField(null);
   };
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setNameSearch("");
-    setSearchField(null);
+    setFormSearchField(null);
     setFormErrors({});
     setEditingId(null);
     setShowForm(true);
@@ -189,13 +192,13 @@ export default function AwardsPage() {
 
   const openEdit = (a: Award) => {
     setForm({
-      studentId: a.studentId,
+      studentId: a.studentId || "",
       awardName: a.awardName,
       awardType: a.awardType,
       year: String(a.year),
       description: a.description || "",
     });
-    setNameSearch(alumniDisplayName(a.alumni));
+    setNameSearch(alumniDisplayName(a.alumni, a.recipientName));
     setFormErrors({});
     setEditingId(a.id);
     setShowForm(true);
@@ -206,14 +209,13 @@ export default function AwardsPage() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setNameSearch("");
-    setSearchField(null);
+    setFormSearchField(null);
     setAlumniResults([]);
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
     if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
     if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
     if (!form.year) errors.year = "กรุณากรอกปี";
@@ -230,7 +232,8 @@ export default function AwardsPage() {
       if (editingId) {
         // Edit mode
         const payload = {
-          studentId: form.studentId,
+          studentId: form.studentId || null,
+          recipientName: form.studentId ? null : (nameSearch.trim() || null),
           awardName: form.awardName.trim(),
           awardType: form.awardType,
           year: Number(form.year),
@@ -247,36 +250,22 @@ export default function AwardsPage() {
         }
       } else {
         // Create mode
-        if (form.studentId) {
-          // Alumni found - POST directly
-          const payload = {
-            studentId: form.studentId,
-            awardName: form.awardName.trim(),
-            awardType: form.awardType,
-            year: Number(form.year),
-            description: form.description.trim() || null,
-          };
-          const res = await fetch("/api/awards", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || "เกิดข้อผิดพลาด");
-          }
-        } else {
-          // Alumni not found - redirect to /new-alumni with pre-filled data
-          const params = new URLSearchParams({
-            section: "awards",
-            nameSearch: nameSearch,
-          });
-          if (form.awardName) params.set("awardName", form.awardName);
-          if (form.awardType) params.set("awardType", form.awardType);
-          if (form.year) params.set("year", form.year);
-          if (form.description) params.set("description", form.description);
-          router.push(`/new-alumni?${params.toString()}`);
-          return;
+        const payload = {
+          studentId: form.studentId || null,
+          recipientName: form.studentId ? null : (nameSearch.trim() || null),
+          awardName: form.awardName.trim(),
+          awardType: form.awardType,
+          year: Number(form.year),
+          description: form.description.trim() || null,
+        };
+        const res = await fetch("/api/awards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
       }
       closeForm();
@@ -377,16 +366,15 @@ export default function AwardsPage() {
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="relative">
-              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา</label>
               <input
                 type="text"
                 value={form.studentId}
-                onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value })); searchAlumni(e.target.value); setSearchField("studentId"); setNameSearch(""); }}
+                onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value })); searchAlumni(e.target.value); setFormSearchField("studentId"); setNameSearch(""); }}
                 placeholder="พิมพ์รหัสนักศึกษา..."
                 className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
               />
-              {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-              {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
+              {showAlumniDropdown && formSearchField === "studentId" && alumniResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
@@ -401,11 +389,11 @@ export default function AwardsPage() {
               <input
                 type="text"
                 value={nameSearch}
-                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setSearchField("name"); setForm((f) => ({ ...f, studentId: "" })); }}
+                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setFormSearchField("name"); setForm((f) => ({ ...f, studentId: "" })); }}
                 placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
                 className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] border-gray-300"
               />
-              {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
+              {showAlumniDropdown && formSearchField === "name" && alumniResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
@@ -478,9 +466,18 @@ export default function AwardsPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <select
+          value={searchField}
+          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          {SEARCH_FIELDS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="ค้นหาชื่อหรือรางวัล..."
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
@@ -550,14 +547,14 @@ export default function AwardsPage() {
                     </div>
                   </td>
                 </tr>
-              ) : sortedAwards.length === 0 ? (
+              ) : awards.length === 0 ? (
                 <tr>
                   <td colSpan={manageMode ? 6 : 5} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
-                sortedAwards.map((award) => (
+                awards.map((award) => (
                   <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    <td className="px-4 py-3">{alumniDisplayName(award.alumni)}</td>
+                    <td className="px-4 py-3">{alumniDisplayName(award.alumni, award.recipientName)}</td>
                     <td className="px-4 py-3">{award.awardName}</td>
                     <td className="px-4 py-3">
                       <span className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: AWARD_COLORS[award.awardType] || "#999" }}>
@@ -587,7 +584,7 @@ export default function AwardsPage() {
         {manageMode && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
             <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap justify-center">
               <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
               {paginationNumbers.map((p, i) =>
                 p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
@@ -603,11 +600,13 @@ export default function AwardsPage() {
       {!manageMode && totalPages > 1 && (
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 flex-wrap justify-center">
             <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-            ))}
+            {paginationNumbers.map((p, i) =>
+              p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
+                <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+              )
+            )}
             <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
           </div>
         </div>

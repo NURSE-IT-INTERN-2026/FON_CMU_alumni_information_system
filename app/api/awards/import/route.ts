@@ -38,12 +38,13 @@ export async function POST(request: NextRequest) {
       const rowNumber = i + 2;
 
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
+      const recipientName = row["ชื่อ-นามสกุล"]?.toString().trim();
       const awardName = row["ชื่อรางวัล"]?.toString().trim();
       const awardTypeThai = row["ประเภทรางวัล"]?.toString().trim();
       const yearStr = row["ปี (พ.ศ.)"]?.toString().trim();
       const description = row["รายละเอียด"]?.toString().trim() || null;
 
-      if (!studentId || !awardName || !awardTypeThai || !yearStr) {
+      if (!awardName || !awardTypeThai || !yearStr) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -64,11 +65,14 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await ensureAlumni(studentId, studentId);
+        if (studentId) {
+          await ensureAlumni(studentId, studentId);
+        }
 
         await prisma.award.create({
           data: {
-            studentId,
+            studentId: studentId || null,
+            recipientName: recipientName || null,
             awardName,
             awardType: awardType as AwardType,
             year,

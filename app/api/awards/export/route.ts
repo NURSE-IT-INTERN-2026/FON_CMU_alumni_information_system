@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { awardName: { contains: search, mode: "insensitive" } },
             { description: { contains: search, mode: "insensitive" } },
+            { recipientName: { contains: search, mode: "insensitive" } },
             { alumni: { firstName: { contains: search, mode: "insensitive" } } },
             { alumni: { maidenLastName: { contains: search, mode: "insensitive" } } },
           ],
@@ -34,10 +35,10 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.alumni.studentId,
-      "คำนำหน้า": a.alumni.prefix,
-      "ชื่อ": a.alumni.firstName,
-      "นามสกุลเดิม": a.alumni.maidenLastName,
+      "รหัสนักศึกษา": a.alumni?.studentId ?? "",
+      "คำนำหน้า": a.alumni?.prefix ?? "",
+      "ชื่อ": a.alumni?.firstName ?? a.recipientName ?? "",
+      "นามสกุลเดิม": a.alumni?.maidenLastName ?? "",
       "ชื่อรางวัล": a.awardName,
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,
