@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface Association {
@@ -36,6 +37,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 const EMPTY_FORM = { studentId: "", fullName: "", associationName: "", position: "", recordedYear: "" };
 
 export default function AssociationsPage() {
+  const canWrite = useCanWrite();
   const [items, setItems] = useState<Association[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -277,12 +279,12 @@ export default function AssociationsPage() {
           สมาคม/ชมรมศิษย์เก่า
         </h1>
         {!manageMode ? (
-          <button
+          canWrite && (<button
             onClick={() => setManageMode(true)}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
           >
             จัดการข้อมูล
-          </button>
+          </button>)
         ) : (
           <button
             onClick={() => { setManageMode(false); setShowForm(false); }}

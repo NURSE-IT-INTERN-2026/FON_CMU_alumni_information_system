@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function GET(
   request: NextRequest,
@@ -32,6 +33,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {
@@ -79,6 +82,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {

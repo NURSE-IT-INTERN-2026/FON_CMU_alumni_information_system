@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -39,6 +40,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 const EMPTY_FORM = { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" };
 
 export default function GraduateCommitteePage() {
+  const canWrite = useCanWrite();
   const router = useRouter();
   const [committees, setCommittees] = useState<Committee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,9 +298,11 @@ export default function GraduateCommitteePage() {
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กรรมการบัณฑิต</h1>
         {!manageMode ? (
+          canWrite && (
           <button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
           </button>
+          )
         ) : (
           <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม

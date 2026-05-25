@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +52,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {

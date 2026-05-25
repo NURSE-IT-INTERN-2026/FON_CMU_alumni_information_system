@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -37,6 +38,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 const EMPTY_FORM = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
 
 export default function PotentialsPage() {
+  const canWrite = useCanWrite();
   const router = useRouter();
   const [potentials, setPotentials] = useState<Potential[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,12 +275,12 @@ export default function PotentialsPage() {
           ศักยภาพ
         </h1>
         {!manageMode ? (
-          <button
+          canWrite && (<button
             onClick={() => setManageMode(true)}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
           >
             จัดการข้อมูล
-          </button>
+          </button>)
         ) : (
           <button
             onClick={() => { setManageMode(false); setShowForm(false); }}

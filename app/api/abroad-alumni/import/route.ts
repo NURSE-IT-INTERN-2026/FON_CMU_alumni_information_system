@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import * as XLSX from "xlsx";
+import { checkWritePermission } from "@/lib/permissions";
 
 function inferCountry(wp: string): string {
   const w = wp.toLowerCase();
@@ -101,6 +102,8 @@ function isOriginalFormat(rawRows: (string | number)[][]): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {

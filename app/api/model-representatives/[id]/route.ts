@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -41,6 +44,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const { id } = await params;
     await prisma.modelRepresentative.delete({ where: { id } });

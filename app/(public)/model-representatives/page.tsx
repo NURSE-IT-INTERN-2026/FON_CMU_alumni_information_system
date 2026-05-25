@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -52,6 +53,7 @@ function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; c
 }
 
 export default function ModelRepresentativesPage() {
+  const canWrite = useCanWrite();
   const router = useRouter();
   const [alumni, setAlumni] = useState<ModelRepresentative[]>([]);
   const [loading, setLoading] = useState(true);
@@ -404,12 +406,14 @@ export default function ModelRepresentativesPage() {
           รายชื่อเครือข่ายศิษย์เก่าทุกรุ่นทุกหลักสูตร
         </h1>
         {!manageMode ? (
+          canWrite && (
           <button
             onClick={() => setManageMode(true)}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
           >
             จัดการข้อมูล
           </button>
+          )
         ) : (
           <button
             onClick={() => {

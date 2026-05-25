@@ -15,6 +15,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!email.endsWith("@cmu.ac.th")) {
+      return NextResponse.json(
+        { error: "กรุณาใช้อีเมล @cmu.ac.th" },
+        { status: 400 }
+      );
+    }
+
     const user = await prisma.adminUser.findUnique({
       where: { email },
     });

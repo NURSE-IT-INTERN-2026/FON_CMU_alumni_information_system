@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
@@ -48,6 +49,7 @@ const EMPTY_ALUMNI = {
 };
 
 export default function NewAlumniPage() {
+  const canWrite = useCanWrite();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialLoadDone = useRef(false);
@@ -622,13 +624,13 @@ export default function NewAlumniPage() {
           >
             ยกเลิก
           </button>
-          <button
+          {canWrite && (<button
             onClick={handleSubmit}
             disabled={saving}
             className={btnPrimary}
           >
             {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-          </button>
+          </button>)}
         </div>
       </div>
     </div>

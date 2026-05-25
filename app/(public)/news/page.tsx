@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import Link from "next/link";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -54,6 +55,7 @@ const EMPTY_FORM: {
 };
 
 export default function NewsListPage() {
+  const canWrite = useCanWrite();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -308,9 +310,9 @@ export default function NewsListPage() {
           ข่าวสารและกิจกรรม
         </h1>
         {!manageMode ? (
-          <button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+          canWrite && (<button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
-          </button>
+          </button>)
         ) : (
           <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม

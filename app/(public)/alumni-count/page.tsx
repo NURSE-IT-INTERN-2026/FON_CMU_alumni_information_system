@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import {
   LineChart,
@@ -75,6 +76,7 @@ const EMPTY_EDIT_FORM = {
 };
 
 export default function AlumniCountPage() {
+  const canWrite = useCanWrite();
   const router = useRouter();
 
   // View mode state
@@ -347,12 +349,14 @@ export default function AlumniCountPage() {
           จำนวนนักศึกษาเก่าตามระดับการศึกษา
         </h1>
         {!manageMode ? (
+          canWrite && (
           <button
             onClick={enterManageMode}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
           >
             จัดการข้อมูล
           </button>
+          )
         ) : (
           <button
             onClick={exitManageMode}

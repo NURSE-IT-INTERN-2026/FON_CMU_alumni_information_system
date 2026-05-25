@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface AbroadAlumni {
@@ -99,6 +100,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 }
 
 export default function AbroadAlumniPage() {
+  const canWrite = useCanWrite();
   const [alumni, setAlumni] = useState<AbroadAlumni[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -317,9 +319,9 @@ export default function AbroadAlumniPage() {
           ข้อมูลการทำงานต่างประเทศ
         </h1>
         {!manageMode ? (
-          <button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+          canWrite && (<button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
-          </button>
+          </button>)
         ) : (
           <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม

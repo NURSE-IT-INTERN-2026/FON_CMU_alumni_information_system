@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,6 +60,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const body = await request.json();
     const { studentId, fullName, career, position, recordedYear } = body;

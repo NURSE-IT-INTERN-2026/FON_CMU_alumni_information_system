@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS } from "@/lib/constants";
+import { useCanWrite } from "@/lib/role-context";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const canWrite = useCanWrite();
   const showSettings = pathname.startsWith("/settings");
 
-  const items = showSettings ? SETTINGS_NAV_ITEMS : NAV_ITEMS;
+  const items = showSettings
+    ? SETTINGS_NAV_ITEMS.filter((item) => canWrite || item.href === "/settings/profile")
+    : NAV_ITEMS;
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--card-bg)] lg:block">

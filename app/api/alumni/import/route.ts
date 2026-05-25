@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { DegreeLevel } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import * as XLSX from "xlsx";
+import { checkWritePermission } from "@/lib/permissions";
 
 const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
   "ปริญญาเอก": "DOCTORAL",
@@ -16,6 +17,8 @@ const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
 };
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {

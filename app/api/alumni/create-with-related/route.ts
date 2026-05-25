@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { AwardType } from "@/app/generated/prisma/client";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const body = await request.json();
     const {

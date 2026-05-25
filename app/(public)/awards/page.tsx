@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useCanWrite } from "@/lib/role-context";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE } from "@/lib/constants";
 
@@ -52,6 +53,7 @@ const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastNam
   a ? `${a.prefix}${a.firstName} ${a.maidenLastName}` : (fallback || "ไม่ระบุชื่อ");
 
 export default function AwardsPage() {
+  const canWrite = useCanWrite();
   const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -323,9 +325,9 @@ export default function AwardsPage() {
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รางวัลที่ได้รับ</h1>
         {!manageMode ? (
-          <button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+          canWrite && (<button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
-          </button>
+          </button>)
         ) : (
           <button onClick={() => { setManageMode(false); closeForm(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม

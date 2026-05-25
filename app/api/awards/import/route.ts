@@ -5,12 +5,15 @@ import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import { AwardType } from "@/app/generated/prisma/client";
 import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
+import { checkWritePermission } from "@/lib/permissions";
 
 const AWARD_TYPE_THAI_TO_ENUM: Record<string, string> = Object.fromEntries(
   Object.entries(AWARD_TYPE_LABELS).map(([key, value]) => [value, key])
 );
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {

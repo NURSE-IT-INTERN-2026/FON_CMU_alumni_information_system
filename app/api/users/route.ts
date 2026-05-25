@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkWritePermission } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   try {
     const session = await getSession();
     if (!session) {
@@ -47,6 +50,13 @@ export async function POST(request: NextRequest) {
     if (!firstName || !lastName || !email) {
       return NextResponse.json(
         { error: "กรุณากรอกชื่อ นามสกุล และอีเมล" },
+        { status: 400 }
+      );
+    }
+
+    if (!email.endsWith("@cmu.ac.th")) {
+      return NextResponse.json(
+        { error: "กรุณาใช้อีเมล @cmu.ac.th" },
         { status: 400 }
       );
     }

@@ -18,8 +18,12 @@ export default async function ProfilePage() {
 
   const user = session.user;
 
-  const roleLabel =
-    user.role === "superadmin" ? "ผู้ดูแลระบบสูงสุด" : "ผู้ดูแลระบบ";
+  const roleLabels: Record<string, string> = {
+    superadmin: "ผู้ดูแลระบบสูงสุด",
+    executive: "ผู้บริหาร",
+    admin: "ผู้ดูแลระบบ",
+  };
+  const roleLabel = roleLabels[user.role] || user.role;
 
   const fields = [
     { label: "ชื่อ", value: user.firstName },
