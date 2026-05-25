@@ -8,11 +8,18 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { studentId, name, address, country, university, order } = body;
+    const { cohort, prefix, thaiName, englishName, workplace, country, notes, order } = body;
 
-    if (!studentId || !name || !country) {
+    if (!country) {
       return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
+        { error: "กรุณากรอกประเทศ" },
+        { status: 400 }
+      );
+    }
+
+    if (!thaiName && !englishName) {
+      return NextResponse.json(
+        { error: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ" },
         { status: 400 }
       );
     }
@@ -20,11 +27,13 @@ export async function PUT(
     const item = await prisma.abroadAlumni.update({
       where: { id },
       data: {
-        studentId: studentId.trim(),
-        name: name.trim(),
-        address: address?.trim() || null,
+        cohort: cohort?.trim() || null,
+        prefix: prefix?.trim() || null,
+        thaiName: thaiName?.trim() || null,
+        englishName: englishName?.trim() || null,
+        workplace: workplace?.trim() || null,
         country: country.trim(),
-        university: university?.trim() || null,
+        notes: notes?.trim() || null,
         order: order !== undefined ? Number(order) : 0,
       },
     });

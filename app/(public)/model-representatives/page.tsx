@@ -24,7 +24,32 @@ const COHORT_ORDER = [
   "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล",
 ];
 
+type ViewSortField = "generation" | "studentId" | "name";
+type MgmtSortField = "generation" | "studentId" | "cohort" | "name";
+type SortDir = "asc" | "desc";
+
 const EMPTY_FORM = { studentId: "", name: "", cohort: "", generation: "" };
+
+function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; className?: string }) {
+  const color = className ?? "text-white";
+  if (!active) {
+    return (
+      <svg className={`ml-1 inline h-3.5 w-3.5 ${color} opacity-30`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10l4-4 4 4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 14l4 4 4-4" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={`ml-1 inline h-3.5 w-3.5 ${color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      {dir === "asc" ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      )}
+    </svg>
+  );
+}
 
 export default function ModelRepresentativesPage() {
   const router = useRouter();
@@ -34,7 +59,11 @@ export default function ModelRepresentativesPage() {
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
-  const [sortDirs, setSortDirs] = useState<Record<string, "asc" | "desc">>({});
+  const [viewSortFields, setViewSortFields] = useState<Record<string, ViewSortField>>({});
+  const [viewSortDirs, setViewSortDirs] = useState<Record<string, SortDir>>({});
+
+  const [mgmtSortField, setMgmtSortField] = useState<MgmtSortField>("generation");
+  const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("asc");
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -82,12 +111,28 @@ export default function ModelRepresentativesPage() {
   const getPage = (label: string) => pages[label] ?? 1;
   const setPage = (label: string, p: number) =>
     setPages((prev) => ({ ...prev, [label]: p }));
-  const getSortDir = (label: string) => sortDirs[label] ?? "asc";
-  const toggleSort = (label: string) =>
-    setSortDirs((prev) => ({
-      ...prev,
-      [label]: prev[label] === "asc" ? "desc" : "asc",
-    }));
+
+  const getViewSortField = (label: string) => viewSortFields[label] ?? "generation";
+  const getViewSortDir = (label: string) => viewSortDirs[label] ?? "asc";
+  const handleViewSort = (label: string, field: ViewSortField) => {
+    const currentField = viewSortFields[label] ?? "generation";
+    const currentDir = viewSortDirs[label] ?? "asc";
+    if (currentField === field) {
+      setViewSortDirs((prev) => ({ ...prev, [label]: currentDir === "asc" ? "desc" : "asc" }));
+    } else {
+      setViewSortFields((prev) => ({ ...prev, [label]: field }));
+      setViewSortDirs((prev) => ({ ...prev, [label]: "asc" }));
+    }
+  };
+
+  const handleMgmtSort = (field: MgmtSortField) => {
+    if (mgmtSortField === field) {
+      setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
+    } else {
+      setMgmtSortField(field);
+      setMgmtSortDir("asc");
+    }
+  };
 
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
@@ -286,10 +331,22 @@ export default function ModelRepresentativesPage() {
     }
   };
 
-  const filteredAlumni = useMemo(
-    () => search ? alumni.filter((a) => matchesSearch(a, search)) : alumni,
-    [alumni, search, matchesSearch]
-  );
+  const filteredAlumni = useMemo(() => {
+    const filtered = search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
+    return [...filtered].sort((a, b) => {
+      let va: string | number, vb: string | number;
+      switch (mgmtSortField) {
+        case "generation": va = a.generation; vb = b.generation; break;
+        case "studentId": va = a.studentId; vb = b.studentId; break;
+        case "cohort": va = a.cohort; vb = b.cohort; break;
+        case "name": va = a.name; vb = b.name; break;
+      }
+      const cmp = typeof va === "number"
+        ? (va as number) - (vb as number)
+        : String(va).localeCompare(String(vb), "th");
+      return mgmtSortDir === "asc" ? cmp : -cmp;
+    });
+  }, [alumni, search, matchesSearch, mgmtSortField, mgmtSortDir]);
 
   const manageTotalPages = Math.max(1, Math.ceil(filteredAlumni.length / PAGE_SIZE));
   const currentManagePage = Math.min(managePage, manageTotalPages);
@@ -635,17 +692,17 @@ export default function ModelRepresentativesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                    รุ่นที่
+                  <th onClick={() => handleMgmtSort("generation")} className="cursor-pointer select-none px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
+                    รุ่นที่ <SortIcon active={mgmtSortField === "generation"} dir={mgmtSortDir} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    รหัสนักศึกษา
+                  <th onClick={() => handleMgmtSort("studentId")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
+                    รหัสนักศึกษา <SortIcon active={mgmtSortField === "studentId"} dir={mgmtSortDir} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ชื่อเครือข่าย
+                  <th onClick={() => handleMgmtSort("cohort")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
+                    ชื่อเครือข่าย <SortIcon active={mgmtSortField === "cohort"} dir={mgmtSortDir} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    ชื่อ-นามสกุล
+                  <th onClick={() => handleMgmtSort("name")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
+                    ชื่อ-นามสกุล <SortIcon active={mgmtSortField === "name"} dir={mgmtSortDir} />
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
@@ -765,12 +822,20 @@ export default function ModelRepresentativesPage() {
         <div className="space-y-8">
           {grouped.map((group) => {
             const isCollapsed = collapsed[group.label] ?? true;
-            const sortDir = getSortDir(group.label);
-            const sortedItems = [...group.items].sort((a, b) =>
-              sortDir === "asc"
-                ? a.generation - b.generation
-                : b.generation - a.generation
-            );
+            const sortField = getViewSortField(group.label);
+            const sortDir = getViewSortDir(group.label);
+            const sortedItems = [...group.items].sort((a, b) => {
+              let va: string | number, vb: string | number;
+              switch (sortField) {
+                case "generation": va = a.generation; vb = b.generation; break;
+                case "studentId": va = a.studentId; vb = b.studentId; break;
+                case "name": va = a.name; vb = b.name; break;
+              }
+              const cmp = typeof va === "number"
+                ? (va as number) - (vb as number)
+                : String(va).localeCompare(String(vb), "th");
+              return sortDir === "asc" ? cmp : -cmp;
+            });
             const totalPages = Math.max(
               1,
               Math.ceil(sortedItems.length / PAGE_SIZE)
@@ -818,15 +883,21 @@ export default function ModelRepresentativesPage() {
                           >
                             <th
                               className="w-20 cursor-pointer px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
-                              onClick={() => toggleSort(group.label)}
+                              onClick={() => handleViewSort(group.label, "generation")}
                             >
-                              รุ่นที่ {sortDir === "asc" ? "▲" : "▼"}
+                              รุ่นที่ <SortIcon active={sortField === "generation"} dir={sortDir} />
                             </th>
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                              รหัสนักศึกษา
+                            <th
+                              className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
+                              onClick={() => handleViewSort(group.label, "studentId")}
+                            >
+                              รหัสนักศึกษา <SortIcon active={sortField === "studentId"} dir={sortDir} />
                             </th>
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                              ชื่อ - นามสกุล
+                            <th
+                              className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
+                              onClick={() => handleViewSort(group.label, "name")}
+                            >
+                              ชื่อ - นามสกุล <SortIcon active={sortField === "name"} dir={sortDir} />
                             </th>
                           </tr>
                         </thead>

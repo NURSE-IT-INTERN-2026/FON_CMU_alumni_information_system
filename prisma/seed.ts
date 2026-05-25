@@ -621,189 +621,44 @@ async function main() {
   }
   console.log(`  Upserted ${potentials.length} potential records\n`);
 
-  // ── 8. Upsert abroad alumni (scraped from reference site) ──
-  console.log("Upserting abroad alumni...");
+  // ── 8. Upsert abroad alumni (from Excel import) ──
+  console.log("Upserting abroad alumni from xlsx file...");
 
-  const abroadAlumniData = [
-    // USA alumni (1-45)
-    { studentId: "", name: "สุดฤทัย ศรีกำพล", address: "14300 Terra Bella #29 Panorama City CA.91402", country: "สหรัฐอเมริกา", university: null, order: 1 },
-    { studentId: "", name: "Vachareeratang Sererut", address: "5545 N.California Chicago IL.60625", country: "สหรัฐอเมริกา", university: null, order: 2 },
-    { studentId: "", name: "กาญจนา แต่งสอน", address: "81-60 247 th St.Bellerose, N.Y. 11426", country: "สหรัฐอเมริกา", university: null, order: 3 },
-    { studentId: "", name: "วไลลักษณ์ ภัณธนเกษม", address: "373 ถ.วานิช 1 ต.จักรวรรดิ สัมพันธวงศ์ กทม. 10100", country: "สหรัฐอเมริกา", university: null, order: 4 },
-    { studentId: "", name: "อรพรรณ พันธาภิรัตน์", address: "624 LongHilll RN River Valr N.S. 07672", country: "สหรัฐอเมริกา", university: null, order: 5 },
-    { studentId: "", name: "Thida Petchor", address: "965 Ramsden Run, Alpharetta, CA. 30022-4702", country: "สหรัฐอเมริกา", university: null, order: 6 },
-    { studentId: "", name: "พิศมัย ตันพัฒนาเจริญ", address: "500 Ackly St.Monterey Park CA. 91755 USA.", country: "สหรัฐอเมริกา", university: null, order: 7 },
-    { studentId: "", name: "Orapin Chullasavock", address: "4035 N.Sawyer Chicago Illinois 60618", country: "สหรัฐอเมริกา", university: null, order: 8 },
-    { studentId: "", name: "จินตนา ไกรลาศ (กูรมะโรหิต)", address: "1461 LA Lome Drive, Santa ANA, CA. 92705", country: "สหรัฐอเมริกา", university: null, order: 9 },
-    { studentId: "", name: "ฉวีวรรณ สีละวิทย์", address: "3308, W. 189 th St.Torrance, CA. 90504", country: "สหรัฐอเมริกา", university: null, order: 10 },
-    { studentId: "", name: "กัลยาณี นาคประดิษฐ์ (เนตรอัคคี)", address: "33-12 86 Street Jackson Heights, N.Y. 11372-1536", country: "สหรัฐอเมริกา", university: null, order: 11 },
-    { studentId: "", name: "Pimpaka Suriyong", address: "4035 N.Sawyer Chicago IL. 60618", country: "สหรัฐอเมริกา", university: null, order: 12 },
-    { studentId: "", name: "ผกาวรรณ อุณหะสูต", address: "711 Prospect Ave Mamaroneck N.Y. 10543", country: "สหรัฐอเมริกา", university: null, order: 13 },
-    { studentId: "", name: "พวงทรัพย์ เปรื่องการ สูณัฐตระกูล", address: "7338 Wolfreen Trail Fairview Heights, IL. 62208", country: "สหรัฐอเมริกา", university: null, order: 14 },
-    { studentId: "", name: "ประจง (วิญิบุตร) พิทยาธิคุณ", address: "705 Campbell Drive Sparta IL.62286", country: "สหรัฐอเมริกา", university: null, order: 15 },
-    { studentId: "", name: "ลดารัตน์ (เกียรติพลพจน์) ตั้งชีวินศิริกุล", address: "7346 Wolfreen Trail, Fairview Heights, IL.62208.", country: "สหรัฐอเมริกา", university: null, order: 16 },
-    { studentId: "", name: "เจือจันทร์ จัยสิน", address: "1165 Cruknit Lane Coring CA.92880", country: "สหรัฐอเมริกา", university: null, order: 17 },
-    { studentId: "", name: "เครือวัลย์ ศรีวภา (Kruewan Srivapa)", address: "1 EI Vaquero, Rnch Snta Margar, CA 92688", country: "สหรัฐอเมริกา", university: null, order: 18 },
-    { studentId: "", name: "จำนง นิ่มตระกูล (C. Nimtragool)", address: "13130 Caravel St., Cerritos, CA 90703", country: "สหรัฐอเมริกา", university: null, order: 19 },
-    { studentId: "", name: "ชวนพิศ (เกิดเนียม) สังขกิจกรณีย์ (C.Sungkakitkoranee)", address: "5896 Sycamore Ave., Rialto, CA 92377-3910", country: "สหรัฐอเมริกา", university: null, order: 20 },
-    { studentId: "", name: "ทัสนีย์ (ธนานุรักษ์) (Thasani Chandra)", address: "1168 Barbara Dr., Cherry Hill, NJ. 08003", country: "สหรัฐอเมริกา", university: null, order: 21 },
-    { studentId: "", name: "พัฒนา บุญมี (P.Boonmee)", address: "19625 Sabrina Ct. Cerritos, CA 90701", country: "สหรัฐอเมริกา", university: null, order: 22 },
-    { studentId: "", name: "เพ็ญศรี (กุยยกานนท์) อติภัทธะ (Pensri Athipatha)", address: "7852 West Park Ave., Niles, IL 60714", country: "สหรัฐอเมริกา", university: null, order: 23 },
-    { studentId: "", name: "วรรธนา (การุณยุญญานันท์) ชุณห์ถนอม (Wadhana Choontanom)", address: "1825 Jacaranda Place, Fullerton, CA 92833", country: "สหรัฐอเมริกา", university: null, order: 24 },
-    { studentId: "", name: "วัลลภา (ศุภศิริรัตน์) รักสกุลไทย (V.Rukskulthai)", address: "201 Williams, Fredericktown, MO 63645", country: "สหรัฐอเมริกา", university: null, order: 25 },
-    { studentId: "", name: "สมสุข (เครือวรรณ) สาระชัย (S.K. Sarachai)", address: "3318 76th St., Flushing, NY. 11372-1152", country: "สหรัฐอเมริกา", university: null, order: 26 },
-    { studentId: "", name: "เสาวนีย์ (สุทธพินธุ) จุฬามรกต (S.Chulamorakodt)", address: "R.R. #3 Box 94, Vandalia, IL 62471 E-mail: Chulamorkodt@yahoo.com.", country: "สหรัฐอเมริกา", university: null, order: 27 },
-    { studentId: "", name: "โสมนัส (ไชยเพ็ชร) เสริมชีพ (S.Sermchief)", address: "1222 Stonewolf Tr., Fairveiw Height, IL. 62208", country: "สหรัฐอเมริกา", university: null, order: 28 },
-    { studentId: "", name: "อารียา (จินตธรรม) Adams", address: "8634 Forsythe St., Sunland, CA 91041", country: "สหรัฐอเมริกา", university: null, order: 29 },
-    { studentId: "", name: "พริ้มเพรา สุชาตานนท์ (P. SUTATANOND)", address: "1209 E. CLARK TRAIL HERRIN IL 62948 U.S.A. H: 618-942-2807", country: "สหรัฐอเมริกา", university: null, order: 30 },
-    { studentId: "", name: "ประคองศรี ศักดิ์ศรี (P. SAKDISRI)", address: "121 CRESTMOOR St COLLINSVILLE IL 62234 U.S.A. H: 618-346-2549 C: 618-210-7679", country: "สหรัฐอเมริกา", university: null, order: 31 },
-    { studentId: "", name: "พวงทรัพย์ สุณัฐตระกูล (P. SOONATTRAKUL)", address: "7338 WOLF RUN TRAIL FAIRVIEW HEIGHTS IL 62208 U.S.A. H: 618-628-7262 C: 573-888-2128", country: "สหรัฐอเมริกา", university: null, order: 32 },
-    { studentId: "", name: "พิจิตร พฤติธรรม (P. PHRUTTITUM)", address: "3 FLAG STICK COURT St. LOUIS MO 63127 U.S.A. H: 641-228-6084 C: 641-330-5736", country: "สหรัฐอเมริกา", university: null, order: 33 },
-    { studentId: "", name: "ละเอียด ฉัตรคุปต์", address: "1213 JILL LANE EXELSIOR SPRING, MO 64024 U.S.A. H: 816-630-5269 C: 816-686-5069", country: "สหรัฐอเมริกา", university: null, order: 34 },
-    { studentId: "", name: "ลิบดา ติวรศักดิ์ (L. TIVORSAK)", address: "1716 COUNTRY LANE AT CHINSON KA 66002 U.S.A. H: 913-367-0089", country: "สหรัฐอเมริกา", university: null, order: 35 },
-    { studentId: "", name: "อัมพร ศุภวนิช (A. SUPAWANICH)", address: "9841 CANNON GATE PKWY VILLA RICA, GA 30180 U.S.A. H: 770-456-0666 C: 678-371-8006", country: "สหรัฐอเมริกา", university: null, order: 36 },
-    { studentId: "", name: "แสงดาว ตุลยเสถียร (S. TULYASATHIEN)", address: "4306 156Th AVE NE APT PP 147 REDMOND, WA 98052 U.S.A. C: 425-885-2636", country: "สหรัฐอเมริกา", university: null, order: 37 },
-    { studentId: "", name: "จุไร ไกรสร (J. KRAISORN)", address: "1104 S. CALIFORNIA AVE W. COVINA, CA 91790 U.S.A. H: 626-960-7134 C: 626-806-2133", country: "สหรัฐอเมริกา", university: null, order: 38 },
-    { studentId: "", name: "จิตราภรณ์ Kanares", address: "840 E LIVE OAK St. APT. B GABRIEL, CA 91776 U.S.A. 626-291-2594", country: "สหรัฐอเมริกา", university: null, order: 39 },
-    { studentId: "", name: "พรรณี CLARK", address: "2175 DE COTO APT # 192 UNION CITY CA 94587 U.S.A.", country: "สหรัฐอเมริกา", university: null, order: 40 },
-    { studentId: "", name: "ขวัญใจ Narangajavana (K. NARANGAJAVANA)", address: "2804 A WELSH ROAD PHILADELPHIA. PA 19152 U.S.A. 215-969-4872", country: "สหรัฐอเมริกา", university: null, order: 41 },
-    { studentId: "", name: "สุทธิลักษณ์ BRENT", address: "6441 lock LOCK LOMMOND DR. KEYSTONE HEIGHTS FL 32656 U.S.A. H: 352-473-2350", country: "สหรัฐอเมริกา", university: null, order: 42 },
-    { studentId: "", name: "ปานจิต ฮันตระกูล (P. HUNTRAKUL)", address: "1501 METROPOLITAN AVE #8 D BRONX, NY 10462 U.S.A. 718-863-0800", country: "สหรัฐอเมริกา", university: null, order: 43 },
-    { studentId: "", name: "ศุภนิตย์ Sethakorn", address: "541 Meadow Dr. Gibson city, IL 60931 U.S.A. H. 217-784-4104", country: "สหรัฐอเมริกา", university: null, order: 44 },
-    { studentId: "", name: "เกสร จันทร์ประภาพ", address: "S. 308 Birnam Trail Willow Brook, IL 60527 U.S.A. / 6 ถ. สันติรักษ์ ต. ช้างเผือก อ. เมือง จ. เชียงใหม่ 50300 H: 053-219-831", country: "สหรัฐอเมริกา", university: null, order: 45 },
-    // Central South University Xiang-Ya School of Nursing — Changsha, Hunan
-    { studentId: "", name: "Prof. He Guoping (Dean)", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 1 },
-    { studentId: "", name: "Cai Yimin [G 5]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 2 },
-    { studentId: "", name: "Huang Jin [G 1]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 3 },
-    { studentId: "", name: "Li Lezhi [G 2]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 4 },
-    { studentId: "", name: "Wang Honghong [G 1]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 5 },
-    { studentId: "", name: "Yan Jin [G 2]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 6 },
-    { studentId: "", name: "Zeng Hui [G 5]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 7 },
-    { studentId: "", name: "Zhang Jingping [G 3]", address: "Xiangya School of Nursing, 172 Tongzipo Rd, Changsha, Hunan 410013", country: "ประเทศจีน", university: "Central South University Xiang-Ya School of Nursing", order: 8 },
-    // China Medical University — Shenyang, Liaoning
-    { studentId: "", name: "Prof. Qiao Min (Dean)", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 1 },
-    { studentId: "", name: "Prof. Yu Yan Gin (Director of Nursing College)", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 2 },
-    { studentId: "", name: "Cao Ying [G 3]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 3 },
-    { studentId: "", name: "Fan Ling [G 5]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 4 },
-    { studentId: "", name: "Guo Hong [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 5 },
-    { studentId: "", name: "Li Xiaohan [G 1]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 6 },
-    { studentId: "", name: "Sun Tianjie [G 5]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 7 },
-    { studentId: "", name: "Wang Jian [G 1]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 8 },
-    { studentId: "", name: "Zhang Bo [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 9 },
-    { studentId: "", name: "Zhang Xiuyue [G 4]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 10 },
-    { studentId: "", name: "Zhao Haping [G 2]", address: "School of Nursing, 77 Puhe Rd, Shenbei New Area, Shenyang, Liaoning 110122", country: "ประเทศจีน", university: "China Medical University", order: 11 },
-    // Fudan University — Shanghai
-    { studentId: "", name: "Dr. Jai Hongli (Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 1 },
-    { studentId: "", name: "Prof. Dai Baozhen (Former Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 2 },
-    { studentId: "", name: "Prof. Yang Yinghua (Former Dean)", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 3 },
-    { studentId: "", name: "Cheng Yun [G 3]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 4 },
-    { studentId: "", name: "Hu Yan [G 1]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 5 },
-    { studentId: "", name: "Li Xiaoying [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 6 },
-    { studentId: "", name: "Shao Wenli [G 1]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 7 },
-    { studentId: "", name: "Xi Shuxin [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 8 },
-    { studentId: "", name: "Xia Haiou [G 4]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 9 },
-    { studentId: "", name: "Xu Hong [G 3]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 10 },
-    { studentId: "", name: "Yan Meiqiong [G 2]", address: "School of Nursing, 138 Yixueyuan Rd, Xuhui District, Shanghai 200032", country: "ประเทศจีน", university: "Fudan University", order: 11 },
-    // Peking Union Medical College — Beijing
-    { studentId: "", name: "Dr. Huaping Liu (Dean)", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 1 },
-    { studentId: "", name: "Chen Jingli [G 2]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 2 },
-    { studentId: "", name: "Li Zheng [G 1]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 3 },
-    { studentId: "", name: "Liang Xiaokun [G 3]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 4 },
-    { studentId: "", name: "Liu Jianfen [G 2]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 5 },
-    { studentId: "", name: "Sheng Yu [G 5]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 6 },
-    { studentId: "", name: "Zhao Yan [G 4]", address: "School of Nursing, 9 Dongdan 3rd Alley, Dongcheng District, Beijing 100730", country: "ประเทศจีน", university: "Peking Union Medical College", order: 7 },
-    // Peking University Health Science Center — Beijing
-    { studentId: "", name: "Prof. Zheng Xiuxia (Dean)", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 1 },
-    { studentId: "", name: "Prof. Yao Jingpeng (Former Dean)", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 2 },
-    { studentId: "", name: "Liu Jun-e [G 3]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 3 },
-    { studentId: "", name: "Liu Yu [G 4]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 4 },
-    { studentId: "", name: "Wang Chenguang [G 5]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 5 },
-    { studentId: "", name: "Wang Qun [G 3]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 6 },
-    { studentId: "", name: "Zhang Haiyan [G 2]", address: "School of Nursing, 38 Xueyuan Rd, Haidian District, Beijing 100191", country: "ประเทศจีน", university: "Peking University Health Science Center", order: 7 },
-    // Sichuan University — Chengdu, Sichuan
-    { studentId: "", name: "Prof. Jiang Xiaolian (Dean)", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 1 },
-    { studentId: "", name: "Prof. Yin Kei (Former Dean)", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 2 },
-    { studentId: "", name: "Feng Xiangqiong [G 5]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 3 },
-    { studentId: "", name: "Li Xiao lin [G 3]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 4 },
-    { studentId: "", name: "Li Xiaoling [G 1]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 5 },
-    { studentId: "", name: "Liu Suzhen [G 3]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 6 },
-    { studentId: "", name: "Song Jingping [G 5]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 7 },
-    { studentId: "", name: "Wang Shiping [G 1]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 8 },
-    { studentId: "", name: "Wang Yuqiong [G 2]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 9 },
-    { studentId: "", name: "Zhao Xiufang [G 4]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 10 },
-    { studentId: "", name: "Zhu Mingxia [G 2]", address: "West China School of Nursing, 37 Guoxue Rd, Wuhou District, Chengdu, Sichuan 610041", country: "ประเทศจีน", university: "Sichuan University", order: 11 },
-    // Sun Yat-Sen University, Guangzhou — Guangdong
-    { studentId: "", name: "Assoc.Prof. You Liming (Dean)", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 1 },
-    { studentId: "", name: "Chen Xhi Qun [G 4]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 2 },
-    { studentId: "", name: "Gao Lingling [G 5]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 3 },
-    { studentId: "", name: "Liu Ke [G 3]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 4 },
-    { studentId: "", name: "Lin Xiyin [G 1]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 5 },
-    { studentId: "", name: "Luo Xhimin [G 3]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 6 },
-    { studentId: "", name: "Yan Jun [G 4]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 7 },
-    { studentId: "", name: "Zeng Wen [G 1]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 8 },
-    { studentId: "", name: "Zhang Meifen [G 2]", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 9 },
-    { studentId: "", name: "Zhu Yanli", address: "School of Nursing, 74 Zhongshan 2nd Rd, Yuexiu District, Guangzhou, Guangdong 510080", country: "ประเทศจีน", university: "Sun Yat-Sen University, Guangzhou", order: 10 },
-    // Xi'an Jiaotong University — Xi'an, Shaanxi
-    { studentId: "", name: "Prof. Zheng Nanning (President)", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 1 },
-    { studentId: "", name: "Prof. Ren Huimin", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 2 },
-    { studentId: "", name: "Dr. Yan Jianqun", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 3 },
-    { studentId: "", name: "Dr. Yan Hong", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 4 },
-    { studentId: "", name: "Dr. Li Wei", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 5 },
-    { studentId: "", name: "Dr. Zhu Hongliang", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 6 },
-    { studentId: "", name: "Assoc.Prof. Li Xiaomei (Dean) [G 1]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 7 },
-    { studentId: "", name: "Gao Rui [G 4]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 8 },
-    { studentId: "", name: "Gu Wei [G 3]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 9 },
-    { studentId: "", name: "Jiang Wenhui [G 2]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 10 },
-    { studentId: "", name: "Li Jing [G 2]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 11 },
-    { studentId: "", name: "Liu Ming [G 4]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 12 },
-    { studentId: "", name: "Lu Aili [G 5]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 13 },
-    { studentId: "", name: "Wang Wenru [G 1]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 14 },
-    { studentId: "", name: "Wang Xiaoquin [G 5]", address: "School of Nursing, 28 Xianning West Rd, Beilin District, Xi'an, Shaanxi 710049", country: "ประเทศจีน", university: "Xi'an Jiaotong University", order: 15 },
-  ];
+  const abroadWb = XLSX.readFile("imports/abroad-alumni/ศิษย์เก่าที่ทำงานในต่างประเทศ.xlsx");
+  const abroadRows = XLSX.utils.sheet_to_json(abroadWb.Sheets[abroadWb.SheetNames[0]], { header: 1, defval: "" }) as (string | number)[][];
+
+  function inferCountry(wp: string): string {
+    const w = wp.toLowerCase();
+    if (w.includes("australia") || w.includes("brisbane") || w.includes("perth")) return "ออสเตรเลีย";
+    if (w.includes("canada")) return "แคนาดา";
+    if (w.includes("denmark")) return "เดนมาร์ก";
+    if (w.includes("new zealand")) return "นิวซีแลนด์";
+    if (w.includes("france") || w.includes("paris")) return "ฝรั่งเศส";
+    if (w.includes("usa") || w.includes("u.s.a") || w.includes("california") || w.includes("chicago") || w.includes("texas") || w.includes("new york") || w.includes("illinois") || w.includes("florida") || w.includes("pennsylvania") || w.includes("georgia") || w.includes("missouri") || w.includes("connecticut") || w.includes("maryland") || w.includes("washington") || w.includes("nevada") || w.includes("indiana") || w.includes("kansas")) return "สหรัฐอเมริกา";
+    return "สหรัฐอเมริกา";
+  }
+
+  const abroadAlumniData: { cohort: string | null; prefix: string; thaiName: string | null; englishName: string | null; workplace: string | null; country: string; notes: string | null; order: number }[] = [];
+
+  for (let i = 1; i < abroadRows.length; i++) {
+    const r = abroadRows[i];
+    const cohort = String(r[0] || "").trim() || null;
+    const prefix = String(r[1] || "").trim() || "คุณ";
+    const thaiName = String(r[2] || "").trim() || null;
+    const englishName = String(r[3] || "").trim() || null;
+    const workplace = String(r[4] || "").trim() || null;
+    const notes = String(r[5] || "").trim() || null;
+    const country = inferCountry(workplace || "");
+
+    abroadAlumniData.push({ cohort, prefix, thaiName, englishName, workplace, country, notes, order: i });
+  }
 
   const abroadAlumni = [];
-  for (let idx = 0; idx < abroadAlumniData.length; idx++) {
-    const data = abroadAlumniData[idx];
-    let studentId = data.studentId;
-    if (!studentId) {
-      studentId = `${spreadPrefix(idx, abroadAlumniData.length)}43${String(idx + 1).padStart(4, "0")}`;
-      const parsed = parseThaiName(data.name);
-      await prisma.alumni.upsert({
-        where: { studentId },
-        update: {
-          prefix: parsed.prefix,
-          firstName: parsed.firstName,
-          maidenLastName: parsed.maidenLastName,
-          newLastName: parsed.newLastName,
-          country: data.country,
-          degreeLevel: randomDegreeLevel(),
-        },
-        create: {
-          studentId,
-          prefix: parsed.prefix,
-          firstName: parsed.firstName,
-          maidenLastName: parsed.maidenLastName,
-          newLastName: parsed.newLastName,
-          country: data.country,
-          degreeLevel: randomDegreeLevel(),
-        },
-      });
-    }
-    // Build display name: prefix + firstName + (maidenLastName) + newLastName
-    const displayParsed = parseThaiName(data.name);
-    const displayName = displayParsed.newLastName
-      ? `${displayParsed.prefix}${displayParsed.firstName} (${displayParsed.maidenLastName}) ${displayParsed.newLastName}`
-      : `${displayParsed.prefix}${displayParsed.firstName} ${displayParsed.maidenLastName}`;
-    const record = await prisma.abroadAlumni.upsert({
-      where: {
-        studentId_order: { studentId, order: data.order },
-      },
-      update: { ...data, studentId, name: displayName },
-      create: { ...data, studentId, name: displayName },
-    });
+  for (const data of abroadAlumniData) {
+    const record = await prisma.abroadAlumni.create({ data });
     abroadAlumni.push(record);
   }
-  console.log(`  Upserted ${abroadAlumni.length} abroad alumni records\n`);
+  console.log(`  Created ${abroadAlumni.length} abroad alumni records\n`);
 
   // ── 9. Upsert model representatives (from reference site) ──
   console.log("Upserting model representatives...");

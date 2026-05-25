@@ -14,6 +14,7 @@ export async function ensureAlumni(studentId: string, fullName: string) {
       prefix: "นางสาว",
       firstName,
       maidenLastName,
+      degreeLevel: "BACHELOR",
     },
   });
 }

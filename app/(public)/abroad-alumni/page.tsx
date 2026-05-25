@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { PAGE_SIZE } from "@/lib/constants";
 
 interface AbroadAlumni {
   id: string;
-  studentId: string;
-  name: string;
-  address: string | null;
+  cohort: string | null;
+  prefix: string | null;
+  thaiName: string | null;
+  englishName: string | null;
+  workplace: string | null;
   country: string;
-  university: string | null;
+  notes: string | null;
   order: number;
 }
 
@@ -19,21 +20,85 @@ interface ApiResponse {
   countries: string[];
 }
 
-const EMPTY_FORM = { studentId: "", name: "", address: "", country: "", university: "", order: "0" };
+const EMPTY_FORM = {
+  cohort: "",
+  prefix: "คุณ",
+  thaiName: "",
+  englishName: "",
+  workplace: "",
+  country: "",
+  notes: "",
+  order: "0",
+};
 
-type SearchField = "all" | "studentId" | "name" | "university" | "country" | "address";
+type SearchField = "all" | "thaiName" | "englishName" | "country" | "workplace" | "cohort";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
-  { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "name", label: "ชื่อ-นามสกุล" },
-  { value: "university", label: "สถาบัน" },
+  { value: "thaiName", label: "ชื่อไทย" },
+  { value: "englishName", label: "ชื่ออังกฤษ" },
   { value: "country", label: "ประเทศ" },
-  { value: "address", label: "ที่อยู่" },
+  { value: "workplace", label: "สถานที่ทำงาน" },
+  { value: "cohort", label: "รุ่น" },
 ];
 
+function displayName(a: AbroadAlumni): string {
+  if (a.thaiName && a.englishName) return `${a.thaiName} (${a.englishName})`;
+  return a.thaiName || a.englishName || "-";
+}
+
+type SortField = "cohort" | "thaiName" | "englishName" | "country" | "workplace" | "notes" | "order";
+type SortDir = "asc" | "desc";
+
+const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: "cohort", label: "รุ่น" },
+  { field: "thaiName", label: "ชื่อ-นามสกุล" },
+  { field: "country", label: "ประเทศ" },
+  { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "notes", label: "หมายเหตุ" },
+];
+
+const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: "cohort", label: "รุ่น" },
+  { field: "thaiName", label: "ชื่อ - นามสกุล" },
+  { field: "englishName", label: "ชื่ออังกฤษ" },
+  { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "notes", label: "หมายเหตุ" },
+];
+
+function getFieldValue(a: AbroadAlumni, field: SortField): string {
+  switch (field) {
+    case "cohort": return a.cohort || "";
+    case "thaiName": return a.thaiName || "";
+    case "englishName": return a.englishName || "";
+    case "country": return a.country;
+    case "workplace": return a.workplace || "";
+    case "notes": return a.notes || "";
+    case "order": return String(a.order);
+  }
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) {
+    return (
+      <svg className="ml-1 inline h-3.5 w-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10l4-4 4 4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 14l4 4 4-4" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="ml-1 inline h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      {dir === "asc" ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      )}
+    </svg>
+  );
+}
+
 export default function AbroadAlumniPage() {
-  const router = useRouter();
   const [alumni, setAlumni] = useState<AbroadAlumni[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -56,30 +121,11 @@ export default function AbroadAlumniPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
-  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
-  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
 
-  const searchAlumni = useCallback(async (term: string) => {
-    if (term.length < 2) { setAlumniResults([]); return; }
-    try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setAlumniResults(data.data || []);
-      setShowAlumniDropdown(true);
-    } catch {}
-  }, []);
-
-  const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
-    `${a.prefix}${a.firstName} ${a.maidenLastName}`;
-
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId, name: alumniDisplayName(a) }));
-    setFormSearchField(null);
-    setShowAlumniDropdown(false);
-    setAlumniResults([]);
-  };
+  const [mgmtSortField, setMgmtSortField] = useState<SortField>("country");
+  const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("desc");
+  const [viewSortField, setViewSortField] = useState<SortField>("cohort");
+  const [viewSortDir, setViewSortDir] = useState<SortDir>("desc");
 
   const toggle = (label: string) =>
     setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
@@ -109,8 +155,9 @@ export default function AbroadAlumniPage() {
     fetchAlumni();
   }, [fetchAlumni]);
 
+  // Group by country
   const grouped = useMemo(() => {
-    const groups: { label: string; isUniversity: boolean; items: AbroadAlumni[] }[] = [];
+    const groups: { country: string; items: AbroadAlumni[] }[] = [];
     const byCountry = new Map<string, AbroadAlumni[]>();
     for (const a of alumni) {
       const list = byCountry.get(a.country) || [];
@@ -118,28 +165,26 @@ export default function AbroadAlumniPage() {
       byCountry.set(a.country, list);
     }
     for (const [country, items] of byCountry) {
-      const withUni = items.filter((a) => a.university);
-      const withoutUni = items.filter((a) => !a.university);
-      if (withoutUni.length > 0) groups.push({ label: country, isUniversity: false, items: withoutUni });
-      if (withUni.length > 0) {
-        const byUni = new Map<string, AbroadAlumni[]>();
-        for (const a of withUni) {
-          const list = byUni.get(a.university!) || [];
-          list.push(a);
-          byUni.set(a.university!, list);
-        }
-        for (const [uni, uniItems] of byUni) {
-          groups.push({ label: uni, isUniversity: true, items: uniItems });
-        }
-      }
+      const sorted = [...items].sort((a, b) => {
+        const va = getFieldValue(a, viewSortField);
+        const vb = getFieldValue(b, viewSortField);
+        const cmp = va.localeCompare(vb, "th");
+        return viewSortDir === "asc" ? cmp : -cmp;
+      });
+      groups.push({ country, items: sorted });
     }
     return groups;
-  }, [alumni]);
+  }, [alumni, viewSortField, viewSortDir]);
 
   // Management mode: flat sorted list
   const sortedAlumni = useMemo(() =>
-    [...alumni].sort((a, b) => a.country.localeCompare(b.country) || (a.university || "").localeCompare(b.university || "") || a.order - b.order),
-    [alumni]
+    [...alumni].sort((a, b) => {
+      const va = getFieldValue(a, mgmtSortField);
+      const vb = getFieldValue(b, mgmtSortField);
+      const cmp = va.localeCompare(vb, "th");
+      return mgmtSortDir === "asc" ? cmp : -cmp;
+    }),
+    [alumni, mgmtSortField, mgmtSortDir]
   );
   const mgmtTotalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
@@ -153,11 +198,13 @@ export default function AbroadAlumniPage() {
 
   const openEdit = (a: AbroadAlumni) => {
     setForm({
-      studentId: a.studentId,
-      name: a.name,
-      address: a.address || "",
+      cohort: a.cohort || "",
+      prefix: a.prefix || "",
+      thaiName: a.thaiName || "",
+      englishName: a.englishName || "",
+      workplace: a.workplace || "",
       country: a.country,
-      university: a.university || "",
+      notes: a.notes || "",
       order: String(a.order),
     });
     setFormErrors({});
@@ -169,15 +216,12 @@ export default function AbroadAlumniPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setFormSearchField(null);
-    setAlumniResults([]);
     setFormErrors({});
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
+    if (!form.thaiName.trim() && !form.englishName.trim()) errors.thaiName = "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ";
     if (!form.country.trim()) errors.country = "กรุณากรอกประเทศ";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -189,11 +233,13 @@ export default function AbroadAlumniPage() {
     setErrorMsg("");
     try {
       const payload = {
-        studentId: form.studentId.trim(),
-        name: form.name.trim(),
-        address: form.address.trim() || null,
+        cohort: form.cohort.trim() || null,
+        prefix: form.prefix.trim() || null,
+        thaiName: form.thaiName.trim() || null,
+        englishName: form.englishName.trim() || null,
+        workplace: form.workplace.trim() || null,
         country: form.country.trim(),
-        university: form.university.trim() || null,
+        notes: form.notes.trim() || null,
         order: Number(form.order) || 0,
       };
       if (editingId) {
@@ -207,23 +253,14 @@ export default function AbroadAlumniPage() {
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        if (form.studentId) {
-          const res = await fetch("/api/abroad-alumni", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || "เกิดข้อผิดพลาด");
-          }
-        } else {
-          const params = new URLSearchParams({ section: "abroad", nameSearch: form.name });
-          if (form.address) params.set("address", form.address);
-          if (form.country) params.set("country", form.country);
-          if (form.university) params.set("university", form.university);
-          router.push(`/new-alumni?${params.toString()}`);
-          return;
+        const res = await fetch("/api/abroad-alumni", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
       }
       closeForm();
@@ -323,75 +360,38 @@ export default function AbroadAlumniPage() {
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {editingId ? (
-              <>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-                  <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-                  <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="relative">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, name: "" })); searchAlumni(e.target.value); setFormSearchField("studentId"); }}
-                    placeholder="พิมพ์รหัสนักศึกษา..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-                  />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                  {showAlumniDropdown && formSearchField === "studentId" && alumniResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                      {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
-                          {a.studentId} - {alumniDisplayName(a)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="relative">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value, studentId: "" })); searchAlumni(e.target.value); setFormSearchField("name"); }}
-                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
-                  />
-                  {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-                  {showAlumniDropdown && formSearchField === "name" && alumniResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                      {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
-                          {a.studentId} - {alumniDisplayName(a)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">รุ่น</label>
+              <input type="text" value={form.cohort} onChange={(e) => setForm((f) => ({ ...f, cohort: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">คำนำหน้า</label>
+              <input type="text" value={form.prefix} onChange={(e) => setForm((f) => ({ ...f, prefix: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อไทย *</label>
+              <input type="text" value={form.thaiName} onChange={(e) => setForm((f) => ({ ...f, thaiName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.thaiName ? "border-red-400" : "border-gray-300"}`} />
+              {formErrors.thaiName && <p className="mt-1 text-xs text-red-500">{formErrors.thaiName}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่ออังกฤษ</label>
+              <input type="text" value={form.englishName} onChange={(e) => setForm((f) => ({ ...f, englishName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">สถานที่ทำงาน</label>
+              <textarea value={form.workplace} onChange={(e) => setForm((f) => ({ ...f, workplace: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">ประเทศ *</label>
-              <input type="text" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.country ? "border-red-400" : "border-gray-300"}`} />
+              <input type="text" list="country-list" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.country ? "border-red-400" : "border-gray-300"}`} />
+              <datalist id="country-list">
+                {countries.map((c) => <option key={c} value={c} />)}
+              </datalist>
               {formErrors.country && <p className="mt-1 text-xs text-red-500">{formErrors.country}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">มหาวิทยาลัย</label>
-              <input type="text" value={form.university} onChange={(e) => setForm((f) => ({ ...f, university: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ที่อยู่</label>
-              <input type="text" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+              <label className="mb-1 block text-sm font-medium text-gray-700">หมายเหตุ</label>
+              <input type="text" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">ลำดับ</label>
@@ -468,12 +468,20 @@ export default function AbroadAlumniPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ-นามสกุล</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ประเทศ</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">มหาวิทยาลัย</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่อยู่</th>
+                  <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                  {MGMT_SORT_FIELDS.map(({ field, label }) => (
+                    <th
+                      key={field}
+                      onClick={() => {
+                        if (mgmtSortField === field) setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
+                        else { setMgmtSortField(field); setMgmtSortDir("asc"); }
+                      }}
+                      className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                    >
+                      {label}
+                      <SortIcon active={mgmtSortField === field} dir={mgmtSortField === field ? mgmtSortDir : "asc"} />
+                    </th>
+                  ))}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                 </tr>
               </thead>
@@ -481,11 +489,11 @@ export default function AbroadAlumniPage() {
                 {pagedAlumni.map((a, idx) => (
                   <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
-                    <td className="px-4 py-3">{a.name}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
+                    <td className="px-4 py-3">{displayName(a)}</td>
                     <td className="px-4 py-3">{a.country}</td>
-                    <td className="px-4 py-3">{a.university || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.address || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.workplace || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.notes || "-"}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEdit(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100" title="แก้ไข">
@@ -515,22 +523,25 @@ export default function AbroadAlumniPage() {
           )}
         </div>
       ) : (
-        /* View mode: grouped tables */
+        /* View mode: grouped by country */
         <div className="space-y-8">
           {grouped.map((group) => {
-            const isCollapsed = collapsed[group.label] ?? true;
-            const page = pageFor(group.label);
+            const isCollapsed = collapsed[group.country] ?? true;
+            const page = pageFor(group.country);
             const totalPages = Math.ceil(group.items.length / perGroupPage);
             const paged = group.items.slice((page - 1) * perGroupPage, page * perGroupPage);
 
             return (
-              <div key={group.label} className="overflow-hidden rounded-lg bg-white shadow-sm">
+              <div key={group.country} className="overflow-hidden rounded-lg bg-white shadow-sm">
                 <button
                   type="button"
-                  onClick={() => toggle(group.label)}
+                  onClick={() => toggle(group.country)}
                   className="flex w-full items-center justify-between bg-[var(--primary)] px-4 py-3 text-left"
                 >
-                  <h2 className="text-sm font-semibold text-white sm:text-base">{group.label}</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-sm font-semibold text-white sm:text-base">{group.country}</h2>
+                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs text-white">{group.items.length} คน</span>
+                  </div>
                   <svg className={`h-5 w-5 shrink-0 text-white transition-transform ${isCollapsed ? "" : "rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -541,19 +552,35 @@ export default function AbroadAlumniPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
-                            <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลำดับ</th>
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ - นามสกุล</th>
-                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ที่อยู่</th>
+                            <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                            {VIEW_SORT_FIELDS.map(({ field, label }) => (
+                              <th
+                                key={field}
+                                onClick={() => {
+                                  if (viewSortField === field) setViewSortDir((d) => d === "asc" ? "desc" : "asc");
+                                  else { setViewSortField(field); setViewSortDir("asc"); }
+                                }}
+                                className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                              >
+                                {label}
+                                <SortIcon active={viewSortField === field} dir={viewSortField === field ? viewSortDir : "asc"} />
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
                           {paged.map((a, idx) => (
                             <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                               <td className="px-4 py-3 text-center">{(page - 1) * perGroupPage + idx + 1}</td>
-                              <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
-                              <td className="px-4 py-3">{a.name}</td>
-                              <td className="px-4 py-3 text-[var(--muted)]">{a.address || "-"}</td>
+                              <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
+                              <td className="px-4 py-3">{a.thaiName || a.englishName || "-"}</td>
+                              <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
+                              <td className="px-4 py-3 text-[var(--muted)]">{a.workplace || "-"}</td>
+                              <td className="px-4 py-3">
+                                {a.notes ? (
+                                  <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
+                                ) : "-"}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -563,11 +590,11 @@ export default function AbroadAlumniPage() {
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
                         <span className="text-sm text-gray-500">แสดง {(page - 1) * perGroupPage + 1}-{Math.min(page * perGroupPage, group.items.length)} จาก {group.items.length} รายการ</span>
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => setPageFor(group.label, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                          <button onClick={() => setPageFor(group.country, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
                           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                            <button key={p} onClick={() => setPageFor(group.label, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                            <button key={p} onClick={() => setPageFor(group.country, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
                           ))}
-                          <button onClick={() => setPageFor(group.label, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                          <button onClick={() => setPageFor(group.country, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
                         </div>
                       </div>
                     )}

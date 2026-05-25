@@ -51,8 +51,8 @@ export default function GraduateCommitteePage() {
   const [filterPosition, setFilterPosition] = useState("");
   const [cohortOptions, setCohortOptions] = useState<string[]>([]);
   const [positionOptions, setPositionOptions] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<SortField>("termYear");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortField, setSortField] = useState<SortField>("cohort");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -482,19 +482,19 @@ export default function GraduateCommitteePage() {
                     ลำดับ
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
-                    ปี พ.ศ. {sortField === "termYear" && (sortDir === "asc" ? "▲" : "▼")}
+                    ปี พ.ศ. {sortField === "termYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                    รหัสนักศึกษา {sortField === "studentId" && (sortDir === "asc" ? "▲" : "▼")}
+                    รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
-                    ชื่อ-สกุล {sortField === "fullName" && (sortDir === "asc" ? "▲" : "▼")}
+                    ชื่อ-สกุล {sortField === "fullName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                    รุ่นที่ {sortField === "cohort" && (sortDir === "asc" ? "▲" : "▼")}
+                    รุ่นที่ {sortField === "cohort" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
-                    ตำแหน่ง {sortField === "position" && (sortDir === "asc" ? "▲" : "▼")}
+                    ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                     หมายเหตุ

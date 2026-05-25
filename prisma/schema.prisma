@@ -50,7 +50,6 @@ model Alumni {
   graduateCommittees    GraduateCommittee[]
   potentials            Potential[]
   modelRepresentatives  ModelRepresentative[]
-  abroadAlumni          AbroadAlumni[]
 
   @@map("alumni")
 }
@@ -150,19 +149,18 @@ model ModelRepresentative {
 }
 
 model AbroadAlumni {
-  id         String   @id @default(uuid())
-  studentId  String
-  name       String
-  address    String?
-  country    String
-  university String?
-  order      Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  cohort      String?
+  prefix      String?
+  thaiName    String?
+  englishName String?
+  workplace   String?
+  country     String
+  notes       String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
-
-  @@unique([studentId, order])
   @@map("abroad_alumni")
 }
 

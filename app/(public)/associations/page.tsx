@@ -469,19 +469,19 @@ export default function AssociationsPage() {
                   ลำดับ
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                  รหัสนักศึกษา {sortField === "studentId" && (sortDir === "asc" ? "▲" : "▼")}
+                  รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
-                  ชื่อ-สกุล {sortField === "fullName" && (sortDir === "asc" ? "▲" : "▼")}
+                  ชื่อ-สกุล {sortField === "fullName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("associationName")}>
-                  ชื่อสมาคม/ชมรม {sortField === "associationName" && (sortDir === "asc" ? "▲" : "▼")}
+                  ชื่อสมาคม/ชมรม {sortField === "associationName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
-                  ตำแหน่ง {sortField === "position" && (sortDir === "asc" ? "▲" : "▼")}
+                  ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
-                  ปีที่บันทึก {sortField === "recordedYear" && (sortDir === "asc" ? "▲" : "▼")}
+                  ปีที่บันทึก {sortField === "recordedYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 {manageMode && (
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>

@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
           graduateCommittees: true,
           potentials: true,
           modelRepresentatives: true,
-          abroadAlumni: true,
         },
         orderBy: { [validSortField]: validSortOrder },
         skip: (page - 1) * pageSize,
@@ -73,6 +72,7 @@ export async function POST(request: NextRequest) {
       firstName,
       maidenLastName,
       cohort,
+      degreeLevel,
       newLastName,
       province,
       email,
@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
         firstName,
         maidenLastName,
         cohort: cohort || null,
+        degreeLevel: degreeLevel || "BACHELOR",
         newLastName: newLastName || null,
         province: province || null,
         email: email || null,
@@ -122,7 +123,6 @@ export async function POST(request: NextRequest) {
         graduateCommittees: true,
         potentials: true,
         modelRepresentatives: true,
-        abroadAlumni: true,
       },
     });
 

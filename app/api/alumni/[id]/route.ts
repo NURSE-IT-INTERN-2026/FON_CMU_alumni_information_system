@@ -16,7 +16,6 @@ export async function GET(
         graduateCommittees: true,
         potentials: true,
         modelRepresentatives: true,
-        abroadAlumni: true,
       },
     });
 
@@ -99,7 +98,6 @@ export async function PUT(
         graduateCommittees: true,
         potentials: true,
         modelRepresentatives: true,
-        abroadAlumni: true,
       },
     });
 

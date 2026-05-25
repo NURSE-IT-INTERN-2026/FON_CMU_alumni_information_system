@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       const maidenLastName = row["นามสกุลเดิม"]?.toString().trim();
       const cohort = row["รุ่น/สาขา"]?.toString().trim() || null;
       const degreeLevelRaw = row["ระดับการศึกษา"]?.toString().trim();
-      const degreeLevel = degreeLevelRaw ? (DEGREE_LEVEL_MAP[degreeLevelRaw] || null) : null;
+      const degreeLevel = degreeLevelRaw ? (DEGREE_LEVEL_MAP[degreeLevelRaw] || "BACHELOR") : "BACHELOR";
       const newLastName = row["นามสกุลใหม่"]?.toString().trim() || null;
       const province = row["จังหวัด"]?.toString().trim() || null;
       const email = row["อีเมล"]?.toString().trim() || null;

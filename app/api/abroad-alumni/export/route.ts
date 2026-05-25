@@ -10,9 +10,11 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {};
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
+        { thaiName: { contains: search, mode: "insensitive" } },
+        { englishName: { contains: search, mode: "insensitive" } },
         { country: { contains: search, mode: "insensitive" } },
-        { university: { contains: search, mode: "insensitive" } },
+        { workplace: { contains: search, mode: "insensitive" } },
+        { cohort: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -22,11 +24,13 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId,
-      "ชื่อ-นามสกุล": a.name,
-      "ที่อยู่": a.address || "",
+      "รุ่น": a.cohort || "",
+      "คำนำหน้า": a.prefix || "",
+      "ชื่อไทย": a.thaiName || "",
+      "ชื่ออังกฤษ": a.englishName || "",
+      "สถานที่ทำงาน": a.workplace || "",
       "ประเทศ": a.country,
-      "มหาวิทยาลัย": a.university || "",
+      "หมายเหตุ": a.notes || "",
       "ลำดับ": a.order,
     }));
 

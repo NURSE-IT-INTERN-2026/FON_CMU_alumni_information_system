@@ -4,22 +4,31 @@ import prisma from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, name, address, country, university, order } = body;
+    const { cohort, prefix, thaiName, englishName, workplace, country, notes, order } = body;
 
-    if (!studentId || !name || !country) {
+    if (!country) {
       return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
+        { error: "กรุณากรอกประเทศ" },
+        { status: 400 }
+      );
+    }
+
+    if (!thaiName && !englishName) {
+      return NextResponse.json(
+        { error: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ" },
         { status: 400 }
       );
     }
 
     const item = await prisma.abroadAlumni.create({
       data: {
-        studentId: studentId.trim(),
-        name: name.trim(),
-        address: address?.trim() || null,
+        cohort: cohort?.trim() || null,
+        prefix: prefix?.trim() || null,
+        thaiName: thaiName?.trim() || null,
+        englishName: englishName?.trim() || null,
+        workplace: workplace?.trim() || null,
         country: country.trim(),
-        university: university?.trim() || null,
+        notes: notes?.trim() || null,
         order: order !== undefined ? Number(order) : 0,
       },
     });
@@ -41,7 +50,7 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["studentId", "name", "university", "country", "address"];
+    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "cohort"];
 
     const where: Record<string, unknown> = {};
 
@@ -54,11 +63,11 @@ export async function GET(request: NextRequest) {
         where[searchFieldParam] = { contains: search, mode: "insensitive" };
       } else {
         where.OR = [
-          { studentId: { contains: search, mode: "insensitive" } },
-          { name: { contains: search, mode: "insensitive" } },
-          { address: { contains: search, mode: "insensitive" } },
-          { university: { contains: search, mode: "insensitive" } },
+          { thaiName: { contains: search, mode: "insensitive" } },
+          { englishName: { contains: search, mode: "insensitive" } },
+          { workplace: { contains: search, mode: "insensitive" } },
           { country: { contains: search, mode: "insensitive" } },
+          { cohort: { contains: search, mode: "insensitive" } },
         ];
       }
     }
@@ -66,7 +75,7 @@ export async function GET(request: NextRequest) {
     const [alumni, countries] = await Promise.all([
       prisma.abroadAlumni.findMany({
         where,
-        orderBy: [{ country: "asc" }, { university: "asc" }, { order: "asc" }],
+        orderBy: [{ country: "asc" }, { order: "asc" }],
       }),
       prisma.abroadAlumni.findMany({
         select: { country: true },

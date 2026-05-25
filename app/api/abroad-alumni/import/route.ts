@@ -1,8 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
+
+function inferCountry(wp: string): string {
+  const w = wp.toLowerCase();
+  if (w.includes("australia") || w.includes("brisbane") || w.includes("perth")) return "ออสเตรเลีย";
+  if (w.includes("canada")) return "แคนาดา";
+  if (w.includes("denmark")) return "เดนมาร์ก";
+  if (w.includes("new zealand")) return "นิวซีแลนด์";
+  if (w.includes("france") || w.includes("paris")) return "ฝรั่งเศส";
+  if (w.includes("japan")) return "ญี่ปุ่น";
+  if (
+    w.includes("usa") ||
+    w.includes("u.s.a") ||
+    w.includes("california") ||
+    w.includes("chicago") ||
+    w.includes("texas") ||
+    w.includes("new york") ||
+    w.includes("illinois") ||
+    w.includes("florida") ||
+    w.includes("pennsylvania") ||
+    w.includes("georgia") ||
+    w.includes("missouri") ||
+    w.includes("connecticut") ||
+    w.includes("maryland") ||
+    w.includes("washington") ||
+    w.includes("nevada") ||
+    w.includes("indiana") ||
+    w.includes("kansas")
+  )
+    return "สหรัฐอเมริกา";
+  return "สหรัฐอเมริกา";
+}
+
+interface ParsedRow {
+  cohort: string | null;
+  prefix: string | null;
+  thaiName: string | null;
+  englishName: string | null;
+  workplace: string | null;
+  country: string;
+  notes: string | null;
+  order: number;
+}
+
+function parseOriginalFormat(rows: (string | number)[][]): { data: ParsedRow; rowNumber: number }[] {
+  const result: { data: ParsedRow; rowNumber: number }[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const cohort = String(r[0] || "").trim() || null;
+    const prefix = String(r[1] || "").trim() || null;
+    const thaiName = String(r[2] || "").trim() || null;
+    const englishName = String(r[3] || "").trim() || null;
+    const workplace = String(r[4] || "").trim() || null;
+    const notes = String(r[5] || "").trim() || null;
+    const country = inferCountry(workplace || "");
+    result.push({ data: { cohort, prefix, thaiName, englishName, workplace, country, notes, order: i }, rowNumber: i + 1 });
+  }
+  return result;
+}
+
+function parseExportFormat(rows: Record<string, string>[]): { data: ParsedRow; rowNumber: number }[] {
+  const result: { data: ParsedRow; rowNumber: number }[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const country = row["ประเทศ"]?.toString().trim();
+    const thaiName = row["ชื่อไทย"]?.toString().trim();
+    const englishName = row["ชื่ออังกฤษ"]?.toString().trim();
+
+    if (!country) continue;
+    if (!thaiName && !englishName) continue;
+
+    const orderStr = row["ลำดับ"]?.toString().trim();
+    const order = orderStr ? parseInt(orderStr, 10) : 0;
+
+    result.push({
+      data: {
+        cohort: row["รุ่น"]?.toString().trim() || null,
+        prefix: row["คำนำหน้า"]?.toString().trim() || null,
+        thaiName: thaiName || null,
+        englishName: englishName || null,
+        workplace: row["สถานที่ทำงาน"]?.toString().trim() || null,
+        country,
+        notes: row["หมายเหตุ"]?.toString().trim() || null,
+        order: isNaN(order) ? 0 : order,
+      },
+      rowNumber: i + 2,
+    });
+  }
+  return result;
+}
+
+function isOriginalFormat(rawRows: (string | number)[][]): boolean {
+  const header = rawRows[0] || [];
+  const h = header.map((v) => String(v || "").trim());
+  // Original file: รุ่น, ชื่อไทย, (empty), ชื่ออังกฤษ, ที่ทำงาน, หมายเหตุ
+  // No คำนำหน้า or ประเทศ columns
+  return !h.includes("คำนำหน้า") && !h.includes("ประเทศ");
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,45 +118,37 @@ export async function POST(request: NextRequest) {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
 
     const errors: { row: number; message: string }[] = [];
-    const records: { studentId: string; name: string; address: string | null; country: string; university: string | null; order: number }[] = [];
+    let imported = 0;
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNumber = i + 2;
+    // Read raw rows to detect format
+    const rawRows = XLSX.utils.sheet_to_json<(string | number)[]>(worksheet, { header: 1, defval: "" });
 
-      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
-      const name = row["ชื่อ-นามสกุล"]?.toString().trim();
-      const address = row["ที่อยู่"]?.toString().trim() || null;
-      const country = row["ประเทศ"]?.toString().trim();
-      const university = row["มหาวิทยาลัย"]?.toString().trim() || null;
-      const orderStr = row["ลำดับ"]?.toString().trim();
+    let parsed: { data: ParsedRow; rowNumber: number }[];
 
-      if (!studentId || !name || !country) {
-        errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน (รหัสนักศึกษา, ชื่อ-นามสกุล, ประเทศ)" });
-        continue;
-      }
-
-      const order = orderStr ? parseInt(orderStr, 10) : 0;
-      if (orderStr && isNaN(order)) {
-        errors.push({ row: rowNumber, message: "ลำดับไม่ถูกต้อง" });
-        continue;
-      }
-
-      records.push({ studentId, name, address, country, university, order });
+    if (isOriginalFormat(rawRows)) {
+      parsed = parseOriginalFormat(rawRows);
+    } else {
+      const objectRows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
+      parsed = parseExportFormat(objectRows);
     }
 
-    let imported = 0;
-    for (const record of records) {
+    for (const { data, rowNumber } of parsed) {
+      if (!data.thaiName && !data.englishName) {
+        errors.push({ row: rowNumber, message: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ" });
+        continue;
+      }
+
       try {
-        await ensureAlumni(record.studentId, record.name);
-        await prisma.abroadAlumni.create({ data: record });
+        await prisma.abroadAlumni.create({ data });
         imported++;
       } catch (err) {
         console.error("Import row error:", err);
-        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.name}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
+        errors.push({
+          row: rowNumber,
+          message: `ไม่สามารถนำเข้าข้อมูล: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}`,
+        });
       }
     }
 

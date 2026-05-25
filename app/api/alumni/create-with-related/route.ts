@@ -169,17 +169,22 @@ export async function POST(request: NextRequest) {
         await tx.abroadAlumni.createMany({
           data: abroadAlumni.map(
             (a: {
-              name: string;
-              address?: string;
+              cohort?: string;
+              prefix?: string;
+              thaiName?: string;
+              englishName?: string;
+              workplace?: string;
               country: string;
-              university?: string;
+              notes?: string;
               order: number;
             }) => ({
-              studentId,
-              name: a.name || `${prefix}${firstName} ${maidenLastName}`,
-              address: a.address || null,
+              cohort: a.cohort || null,
+              prefix: a.prefix || null,
+              thaiName: a.thaiName || null,
+              englishName: a.englishName || null,
+              workplace: a.workplace || null,
               country: a.country,
-              university: a.university || null,
+              notes: a.notes || null,
               order: Number(a.order),
             })
           ),
