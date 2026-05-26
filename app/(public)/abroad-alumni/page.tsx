@@ -175,6 +175,7 @@ export default function AbroadAlumniPage() {
       });
       groups.push({ country, items: sorted });
     }
+    groups.sort((a, b) => b.items.length - a.items.length);
     return groups;
   }, [alumni, viewSortField, viewSortDir]);
 

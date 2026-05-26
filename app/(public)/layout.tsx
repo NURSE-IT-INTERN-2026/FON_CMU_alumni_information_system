@@ -22,8 +22,8 @@ export default async function PublicLayout({
         <Header />
         <div className="flex flex-1">
           <Sidebar />
-          <div className="flex flex-1 flex-col">
-            <main className="flex-1">{children}</main>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <main className="min-w-0 flex-1">{children}</main>
             <Footer />
           </div>
         </div>
