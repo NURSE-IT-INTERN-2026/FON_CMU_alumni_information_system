@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
+import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
 import {
   LineChart,
@@ -104,6 +105,18 @@ export default function AlumniCountPage() {
     errors: { row: number; message: string }[];
   } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const {
+    selectedIds,
+    selectedCount,
+    toggleSelect,
+    selectAll,
+    deselectAll,
+    isSelected,
+    isAllSelected,
+    getSelectedArray,
+  } = useBulkSelection();
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Fetch chart data
   const fetchChartData = useCallback(async () => {
@@ -269,17 +282,68 @@ export default function AlumniCountPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const ids = getSelectedArray();
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/alumni/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      deselectAll();
+      setShowBulkDeleteDialog(false);
+      fetchAlumni();
+      fetchChartData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkExport = async () => {
+    const ids = getSelectedArray();
+    if (ids.length === 0) return;
+    try {
+      const res = await fetch("/api/alumni/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error("เกิดข้อผิดพลาด");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "alumni_export.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+      deselectAll();
+    } catch {
+      setErrorMsg("เกิดข้อผิดพลาดในการส่งออกข้อมูล");
+    }
+  };
+
   const enterManageMode = () => {
     setManageMode(true);
     setPage(1);
     setSearch("");
     setEditingId(null);
+    deselectAll();
   };
 
   const exitManageMode = () => {
     setManageMode(false);
     setEditingId(null);
     setErrorMsg("");
+    deselectAll();
   };
 
   const handleExport = () => {
@@ -716,6 +780,24 @@ export default function AlumniCountPage() {
                 </svg>
                 {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
               </button>
+              {selectedCount > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowBulkDeleteDialog(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                    ลบที่เลือก ({selectedCount})
+                  </button>
+                  <button
+                    onClick={handleBulkExport}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500 px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-500 hover:text-white transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                    ส่งออกที่เลือก ({selectedCount})
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -739,6 +821,17 @@ export default function AlumniCountPage() {
                     className="text-white text-left"
                     style={{ backgroundColor: "#1e3a5f" }}
                   >
+                    <th className="px-4 py-3 w-12">
+                      <input
+                        type="checkbox"
+                        checked={alumni.length > 0 && isAllSelected(alumni.map((a) => a.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) selectAll(alumni.map((a) => a.id));
+                          else deselectAll();
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </th>
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
@@ -771,7 +864,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center">
+                      <td colSpan={10} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -780,7 +873,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -792,6 +885,14 @@ export default function AlumniCountPage() {
                         key={a.id}
                         className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                       >
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected(a.id)}
+                            onChange={() => toggleSelect(a.id)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </td>
                         <td className="px-4 py-3 text-center">
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
@@ -862,7 +963,7 @@ export default function AlumniCountPage() {
                 <span className="text-sm text-gray-500">แสดง {totalAlumni === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalAlumni)} จาก {totalAlumni} รายการ</span>
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
+                    onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }}
                     disabled={page === 1}
                     className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
                   >
@@ -874,7 +975,7 @@ export default function AlumniCountPage() {
                     ) : (
                       <button
                         key={p}
-                        onClick={() => setPage(p)}
+                        onClick={() => { setPage(p); deselectAll(); }}
                         className={`rounded-md px-3 py-1.5 text-sm ${
                           page === p
                             ? "bg-[var(--primary)] text-white"
@@ -1018,6 +1119,23 @@ export default function AlumniCountPage() {
                 className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
                 ยืนยัน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
+            <p className="mb-6 text-sm text-gray-600">
+              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
               </button>
             </div>
           </div>

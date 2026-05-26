@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useCanWrite } from "@/lib/role-context";
+import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -72,6 +73,18 @@ export default function NewsListPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const {
+    selectedIds,
+    selectedCount,
+    toggleSelect,
+    selectAll,
+    deselectAll,
+    isSelected,
+    isAllSelected,
+    getSelectedArray,
+  } = useBulkSelection();
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverDragOver, setCoverDragOver] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
@@ -283,6 +296,31 @@ export default function NewsListPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const ids = getSelectedArray();
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/news/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      deselectAll();
+      setShowBulkDeleteDialog(false);
+      fetchNews();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
@@ -310,11 +348,11 @@ export default function NewsListPage() {
           ข่าวสารและกิจกรรม
         </h1>
         {!manageMode ? (
-          canWrite && (<button onClick={() => setManageMode(true)} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+          canWrite && (<button onClick={() => { setManageMode(true); deselectAll(); }} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
           </button>)
         ) : (
-          <button onClick={() => { setManageMode(false); setShowForm(false); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+          <button onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม
           </button>
         )}
@@ -671,11 +709,20 @@ export default function NewsListPage() {
       </div>
 
       {manageMode && (
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             สร้างข่าวใหม่
           </button>
+          {selectedCount > 0 && (
+            <button
+              onClick={() => setShowBulkDeleteDialog(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+              ลบที่เลือก ({selectedCount})
+            </button>
+          )}
         </div>
       )}
 
@@ -697,6 +744,19 @@ export default function NewsListPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
+                  {manageMode && (
+                    <th className="px-4 py-3 w-12">
+                      <input
+                        type="checkbox"
+                        checked={news.length > 0 && isAllSelected(news.map((n) => n.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) selectAll(news.map((n) => n.id));
+                          else deselectAll();
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-16">ลำดับ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">ชื่อเรื่อง</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-32">สถานะ</th>
@@ -707,6 +767,16 @@ export default function NewsListPage() {
               <tbody className="divide-y divide-gray-100">
                 {news.map((item, i) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    {manageMode && (
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-gray-500">{(page - 1) * PAGE_SIZE + i + 1}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{item.title}</td>
                     <td className="px-4 py-3">
@@ -733,7 +803,7 @@ export default function NewsListPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
             <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
             <div className="flex items-center gap-1">
-              <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
+              <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
               {paginationNumbers.map((p, i) =>
                 p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
                   <button key={p} onClick={() => setPage(p)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${page === p ? "bg-[var(--primary)] text-white" : "text-gray-600 bg-white hover:bg-gray-100"}`}>{p}</button>
@@ -788,7 +858,7 @@ export default function NewsListPage() {
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+            <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
             ))}
@@ -805,6 +875,23 @@ export default function NewsListPage() {
             <div className="flex justify-end gap-3">
               <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
               <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
+            <p className="mb-6 text-sm text-gray-600">
+              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
+              </button>
             </div>
           </div>
         </div>

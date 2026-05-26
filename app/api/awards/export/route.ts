@@ -3,6 +3,25 @@ import prisma from "@/lib/prisma";
 import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import * as XLSX from "xlsx";
 
+function buildResponse(rows: Record<string, unknown>[], filename: string) {
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, "รางวัล");
+
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  return new NextResponse(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}_${dateStr}.xlsx"`,
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -45,24 +64,45 @@ export async function GET(request: NextRequest) {
       "รายละเอียด": a.description || "",
     }));
 
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "รางวัล");
-
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="awards_export_${dateStr}.xlsx"`,
-      },
-    });
+    return buildResponse(rows, "awards_export");
   } catch (error) {
     console.error("GET /api/awards/export error:", error);
+    return NextResponse.json(
+      { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูล" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { ids } = await request.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: "กรุณาเลือกรายการที่ต้องการส่งออก" },
+        { status: 400 }
+      );
+    }
+
+    const items = await prisma.award.findMany({
+      where: { id: { in: ids } },
+      include: { alumni: { select: { studentId: true, prefix: true, firstName: true, maidenLastName: true } } },
+    });
+
+    const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.alumni?.studentId ?? "",
+      "คำนำหน้า": a.alumni?.prefix ?? "",
+      "ชื่อ": a.alumni?.firstName ?? a.recipientName ?? "",
+      "นามสกุลเดิม": a.alumni?.maidenLastName ?? "",
+      "ชื่อรางวัล": a.awardName,
+      "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
+      "ปี (พ.ศ.)": a.year,
+      "รายละเอียด": a.description || "",
+    }));
+
+    return buildResponse(rows, "awards_export");
+  } catch (error) {
+    console.error("POST /api/awards/export error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูล" },
       { status: 500 }

@@ -10,6 +10,44 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = {
   NURSING_ASSISTANT: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
 };
 
+function mapRows(alumni: Awaited<ReturnType<typeof prisma.alumni.findMany>>) {
+  return alumni.map((a) => ({
+    "รหัสนักศึกษา": a.studentId,
+    "คำนำหน้า": a.prefix,
+    "ชื่อ": a.firstName,
+    "นามสกุลเดิม": a.maidenLastName,
+    "รุ่น/สาขา": a.cohort || "",
+    "ระดับการศึกษา": a.degreeLevel ? DEGREE_LEVEL_LABELS[a.degreeLevel] || a.degreeLevel : "",
+    "นามสกุลใหม่": a.newLastName || "",
+    "จังหวัด": a.province || "",
+    "อีเมล": a.email || "",
+    "เบอร์โทร": a.phone || "",
+    "สถานที่ทำงาน": a.currentWorkplace || "",
+    "ประเทศ": a.country || "",
+    "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
+    "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
+  }));
+}
+
+function buildResponse(rows: Record<string, unknown>[], filename: string) {
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, "ศิษย์เก่า");
+
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  return new NextResponse(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}_${dateStr}.xlsx"`,
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -32,41 +70,33 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    const rows = alumni.map((a) => ({
-      "รหัสนักศึกษา": a.studentId,
-      "คำนำหน้า": a.prefix,
-      "ชื่อ": a.firstName,
-      "นามสกุลเดิม": a.maidenLastName,
-      "รุ่น/สาขา": a.cohort || "",
-      "ระดับการศึกษา": a.degreeLevel ? DEGREE_LEVEL_LABELS[a.degreeLevel] || a.degreeLevel : "",
-      "นามสกุลใหม่": a.newLastName || "",
-      "จังหวัด": a.province || "",
-      "อีเมล": a.email || "",
-      "เบอร์โทร": a.phone || "",
-      "สถานที่ทำงาน": a.currentWorkplace || "",
-      "ประเทศ": a.country || "",
-      "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
-      "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
-    }));
-
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "ศิษย์เก่า");
-
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="alumni_export_${dateStr}.xlsx"`,
-      },
-    });
+    return buildResponse(mapRows(alumni), "alumni_export");
   } catch (error) {
     console.error("GET /api/alumni/export error:", error);
+    return NextResponse.json(
+      { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูลศิษย์เก่า" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { ids } = await request.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: "กรุณาเลือกรายการที่ต้องการส่งออก" },
+        { status: 400 }
+      );
+    }
+
+    const alumni = await prisma.alumni.findMany({
+      where: { id: { in: ids } },
+    });
+
+    return buildResponse(mapRows(alumni), "alumni_export");
+  } catch (error) {
+    console.error("POST /api/alumni/export error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูลศิษย์เก่า" },
       { status: 500 }
