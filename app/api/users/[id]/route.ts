@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(
   request: NextRequest,
@@ -93,6 +94,15 @@ export async function PUT(
       },
     });
 
+    await logActivity(
+      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "UPDATE",
+      "user",
+      id,
+      { email: user.email, role: user.role },
+      getIp(request)
+    );
+
     return NextResponse.json(user);
   } catch (error) {
     console.error("PUT /api/users/[id] error:", error);
@@ -126,6 +136,15 @@ export async function DELETE(
     }
 
     await prisma.adminUser.delete({ where: { id } });
+
+    await logActivity(
+      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "DELETE",
+      "user",
+      id,
+      { email: existing.email, role: existing.role },
+      getIp(request)
+    );
 
     return NextResponse.json({ message: "ลบผู้ใช้งานสำเร็จ" });
   } catch (error) {

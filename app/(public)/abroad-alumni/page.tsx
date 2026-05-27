@@ -54,7 +54,8 @@ type SortDir = "asc" | "desc";
 
 const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
-  { field: "thaiName", label: "ชื่อ-นามสกุล" },
+  { field: "thaiName", label: "ชื่อ - นามสกุล" },
+  { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
   { field: "notes", label: "หมายเหตุ" },
@@ -78,6 +79,18 @@ function getFieldValue(a: AbroadAlumni, field: SortField): string {
     case "notes": return a.notes || "";
     case "order": return String(a.order);
   }
+}
+
+function getPageNumbers(current: number, total: number): (number | "dots")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "dots")[] = [1];
+  if (current > 3) pages.push("dots");
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) pages.push("dots");
+  if (pages[pages.length - 1] !== total) pages.push(total);
+  return pages;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -595,7 +608,8 @@ export default function AbroadAlumniPage() {
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
-                    <td className="px-4 py-3">{displayName(a)}</td>
+                    <td className="px-4 py-3">{a.thaiName || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
                     <td className="px-4 py-3">{a.country}</td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.workplace || "-"}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{a.notes || "-"}</td>
@@ -619,7 +633,8 @@ export default function AbroadAlumniPage() {
               <span className="text-sm text-gray-500">แสดง {sortedAlumni.length === 0 ? 0 : (mgmtPage - 1) * PAGE_SIZE + 1}-{Math.min(mgmtPage * PAGE_SIZE, sortedAlumni.length)} จาก {sortedAlumni.length} รายการ</span>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => { setMgmtPage(Math.max(1, mgmtPage - 1)); deselectAll(); }} disabled={mgmtPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                {Array.from({ length: mgmtTotalPages }, (_, i) => i + 1).map((p) => (
+                {getPageNumbers(mgmtPage, mgmtTotalPages).map((p, i) => (
+                  p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
                   <button key={p} onClick={() => { setMgmtPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${mgmtPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
                 ))}
                 <button onClick={() => { setMgmtPage(Math.min(mgmtTotalPages, mgmtPage + 1)); deselectAll(); }} disabled={mgmtPage === mgmtTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
@@ -696,7 +711,8 @@ export default function AbroadAlumniPage() {
                         <span className="text-sm text-gray-500">แสดง {(page - 1) * perGroupPage + 1}-{Math.min(page * perGroupPage, group.items.length)} จาก {group.items.length} รายการ</span>
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => setPageFor(group.country, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                          {getPageNumbers(page, totalPages).map((p, i) => (
+                            p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
                             <button key={p} onClick={() => setPageFor(group.country, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
                           ))}
                           <button onClick={() => setPageFor(group.country, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>

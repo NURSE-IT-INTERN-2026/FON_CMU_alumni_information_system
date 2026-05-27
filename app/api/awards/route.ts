@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -30,6 +32,18 @@ export async function POST(request: NextRequest) {
         alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
       },
     });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "CREATE",
+        "award",
+        award.id,
+        { awardName: award.awardName, awardType: award.awardType, year: award.year },
+        getIp(request)
+      );
+    }
 
     return NextResponse.json(award, { status: 201 });
   } catch (error) {

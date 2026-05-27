@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,6 +89,17 @@ export async function POST(request: NextRequest) {
         updatedAt: true,
       },
     });
+
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "CREATE",
+        "user",
+        user.id,
+        { email: user.email, role: user.role },
+        getIp(request)
+      );
+    }
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

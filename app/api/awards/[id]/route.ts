@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function PUT(
   request: NextRequest,
@@ -35,6 +37,18 @@ export async function PUT(
       },
     });
 
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "UPDATE",
+        "award",
+        id,
+        { awardName: award.awardName, awardType: award.awardType, year: award.year },
+        getIp(request)
+      );
+    }
+
     return NextResponse.json(award);
   } catch (error) {
     console.error("Failed to update award:", error);
@@ -54,6 +68,19 @@ export async function DELETE(
   try {
     const { id } = await params;
     await prisma.award.delete({ where: { id } });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "award",
+        id,
+        null,
+        getIp(request)
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete award:", error);

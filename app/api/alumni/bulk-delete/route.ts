@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -16,6 +18,19 @@ export async function POST(request: NextRequest) {
     const result = await prisma.alumni.deleteMany({
       where: { id: { in: ids } },
     });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "BULK_DELETE",
+        "alumni",
+        null,
+        { count: result.count, ids },
+        getIp(request)
+      );
+    }
+
     return NextResponse.json({ deleted: result.count });
   } catch (error) {
     console.error("Bulk delete error:", error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(
   request: NextRequest,
@@ -68,6 +69,15 @@ export async function PUT(
       data: updateData,
     });
 
+    await logActivity(
+      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "UPDATE",
+      "news",
+      id,
+      { title: news.title, status: news.status },
+      getIp(request)
+    );
+
     return NextResponse.json(news);
   } catch (error) {
     console.error("PUT /api/news/[id] error:", error);
@@ -101,6 +111,15 @@ export async function DELETE(
     }
 
     await prisma.news.delete({ where: { id } });
+
+    await logActivity(
+      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "DELETE",
+      "news",
+      id,
+      { title: existing.title },
+      getIp(request)
+    );
 
     return NextResponse.json({ message: "ลบข่าวสารสำเร็จ" });
   } catch (error) {

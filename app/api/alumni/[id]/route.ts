@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(
   request: NextRequest,
@@ -104,6 +106,18 @@ export async function PUT(
       },
     });
 
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "UPDATE",
+        "alumni",
+        id,
+        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}` },
+        getIp(request)
+      );
+    }
+
     return NextResponse.json(alumni);
   } catch (error) {
     console.error("PUT /api/alumni/[id] error:", error);
@@ -132,6 +146,18 @@ export async function DELETE(
     }
 
     await prisma.alumni.delete({ where: { id } });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "alumni",
+        id,
+        { studentId: existing.studentId, name: `${existing.prefix}${existing.firstName} ${existing.maidenLastName}` },
+        getIp(request)
+      );
+    }
 
     return NextResponse.json({ message: "ลบข้อมูลศิษย์เก่าสำเร็จ" });
   } catch (error) {

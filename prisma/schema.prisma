@@ -176,9 +176,30 @@ model AdminUser {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sessions Session[]
+  sessions     Session[]
+  activityLogs ActivityLog[]
 
   @@map("admin_users")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  userEmail  String
+  userRole   String
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([resource])
+  @@map("activity_logs")
 }
 
 model Session {

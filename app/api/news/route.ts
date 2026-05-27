@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
+import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,6 +80,15 @@ export async function POST(request: NextRequest) {
         publishedAt: status === "PUBLISHED" ? new Date() : null,
       },
     });
+
+    await logActivity(
+      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "CREATE",
+      "news",
+      news.id,
+      { title: news.title, status: news.status },
+      getIp(request)
+    );
 
     return NextResponse.json(news, { status: 201 });
   } catch (error) {

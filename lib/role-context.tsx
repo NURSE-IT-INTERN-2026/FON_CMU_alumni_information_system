@@ -21,3 +21,8 @@ export function useRole() {
 export function useCanWrite() {
   return useRole() !== "executive";
 }
+
+export function useIsAdmin() {
+  const role = useRole();
+  return role === "admin" || role === "superadmin";
+}

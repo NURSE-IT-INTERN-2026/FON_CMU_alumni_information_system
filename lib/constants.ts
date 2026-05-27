@@ -32,6 +32,7 @@ export const NAV_ITEMS = [
 export const SETTINGS_NAV_ITEMS = [
   { href: "/settings/profile", label: "ข้อมูลส่วนตัว" },
   { href: "/settings/members", label: "สมาชิกทั้งหมด" },
+  { href: "/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
 ];
 
 export const PAGE_SIZE = 10;
