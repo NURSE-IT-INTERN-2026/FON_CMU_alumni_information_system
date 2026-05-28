@@ -49,6 +49,7 @@ export default function Header() {
           {/* Right side actions */}
           <div className="flex items-center gap-3">
             {/* Settings button (desktop) */}
+            {showLogout && (
             <button
               type="button"
               onClick={toggleSettings}
@@ -78,6 +79,7 @@ export default function Header() {
                 />
               </svg>
             </button>
+            )}
 
             {showLogout && (
               <form action="/api/auth/logout" method="POST">
@@ -91,6 +93,7 @@ export default function Header() {
             )}
 
             {/* Hamburger button (mobile only) */}
+            {showLogout && (
             <button
               type="button"
               className="inline-flex items-center justify-center rounded-md p-2 text-white hover:bg-white/10 lg:hidden"
@@ -128,6 +131,7 @@ export default function Header() {
                 </svg>
               )}
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -146,6 +150,7 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            {showLogout && (
             <button
               type="button"
               onClick={toggleSettings}
@@ -171,6 +176,7 @@ export default function Header() {
               </svg>
               {showSettings ? "กลับเมนูหลัก" : "ตั้งค่า"}
             </button>
+            )}
             {showLogout && (
               <form action="/api/auth/logout" method="POST">
                 <button
