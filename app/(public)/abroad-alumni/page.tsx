@@ -362,7 +362,8 @@ export default function AbroadAlumniPage() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/abroad-alumni/export";
+    const params = new URLSearchParams({ search, country: countryFilter, searchField });
+    window.location.href = `/api/abroad-alumni/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

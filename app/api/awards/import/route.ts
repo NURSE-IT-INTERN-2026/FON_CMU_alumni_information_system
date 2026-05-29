@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import { AwardType } from "@/app/generated/prisma/client";
 import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
 import { checkWritePermission } from "@/lib/permissions";
-
-const AWARD_TYPE_THAI_TO_ENUM: Record<string, string> = Object.fromEntries(
-  Object.entries(AWARD_TYPE_LABELS).map(([key, value]) => [value, key])
-);
+import { parseAwardRow } from "@/lib/award-import-parse";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -37,49 +33,27 @@ export async function POST(request: NextRequest) {
     let imported = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
       const rowNumber = i + 2;
+      const { data, error } = parseAwardRow(rows[i], rowNumber);
 
-      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
-      const recipientName = row["ชื่อ-นามสกุล"]?.toString().trim();
-      const awardName = row["ชื่อรางวัล"]?.toString().trim();
-      const awardTypeThai = row["ประเภทรางวัล"]?.toString().trim();
-      const yearStr = row["ปี (พ.ศ.)"]?.toString().trim();
-      const description = row["รายละเอียด"]?.toString().trim() || null;
-
-      if (!awardName || !awardTypeThai || !yearStr) {
-        errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
-        continue;
-      }
-
-      const awardType = AWARD_TYPE_THAI_TO_ENUM[awardTypeThai];
-      if (!awardType) {
-        errors.push({
-          row: rowNumber,
-          message: `ประเภทรางวัล "${awardTypeThai}" ไม่ถูกต้อง`,
-        });
-        continue;
-      }
-
-      const year = parseInt(yearStr, 10);
-      if (isNaN(year)) {
-        errors.push({ row: rowNumber, message: "ปี (พ.ศ.) ไม่ถูกต้อง" });
+      if (error) {
+        errors.push(error);
         continue;
       }
 
       try {
-        if (studentId) {
-          await ensureAlumni(studentId, studentId);
+        if (data!.studentId) {
+          await ensureAlumni(data!.studentId, data!.studentId);
         }
 
         await prisma.award.create({
           data: {
-            studentId: studentId || null,
-            recipientName: recipientName || null,
-            awardName,
-            awardType: awardType as AwardType,
-            year,
-            description,
+            studentId: data!.studentId,
+            recipientName: data!.recipientName,
+            awardName: data!.awardName,
+            awardType: data!.awardType as AwardType,
+            year: data!.year,
+            description: data!.description,
           },
         });
         imported++;
@@ -100,3 +74,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

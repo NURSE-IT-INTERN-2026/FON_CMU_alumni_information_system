@@ -27,21 +27,45 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const cohort = searchParams.get("cohort") || "";
     const position = searchParams.get("position") || "";
+    const searchField = searchParams.get("searchField") || "";
+    const sortBy = searchParams.get("sortBy") || "termYear";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
+    const validSortFields = ["termYear", "createdAt", "studentId", "fullName", "cohort", "position"];
+    const validSortField = validSortFields.includes(sortBy) ? sortBy : "termYear";
+
+    const validSearchFields = ["studentId", "fullName", "cohort", "position", "remarks", "termYear"];
     const where: Record<string, unknown> = {};
+    const andConditions: Record<string, unknown>[] = [];
+
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { fullName: { contains: search, mode: "insensitive" } },
-        { remarks: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "termYear") {
+          andConditions.push({ [searchField]: Number(search) || undefined });
+        } else {
+          andConditions.push({ [searchField]: { contains: search, mode: "insensitive" } });
+        }
+      } else {
+        andConditions.push({
+          OR: [
+            { studentId: { contains: search, mode: "insensitive" } },
+            { fullName: { contains: search, mode: "insensitive" } },
+            { remarks: { contains: search, mode: "insensitive" } },
+          ],
+        });
+      }
     }
-    if (cohort) where.cohort = cohort;
-    if (position) where.position = position;
+
+    if (cohort) andConditions.push({ cohort });
+    if (position) andConditions.push({ position });
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
 
     const items = await prisma.graduateCommittee.findMany({
       where,
-      orderBy: [{ termYear: "desc" }, { createdAt: "desc" }],
+      orderBy: { [validSortField]: sortOrder },
     });
 
     const rows = items.map((a) => ({

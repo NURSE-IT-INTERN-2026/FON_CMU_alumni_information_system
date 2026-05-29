@@ -21,9 +21,22 @@ function buildResponse(rows: Record<string, unknown>[], filename: string) {
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = request.nextUrl;
+    const search = searchParams.get("search") || "";
+
+    const where: Record<string, unknown> = {};
+    if (search) {
+      where.OR = [
+        { studentId: { contains: search, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { cohort: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
     const items = await prisma.modelRepresentative.findMany({
+      where,
       orderBy: [{ cohort: "asc" }, { generation: "asc" }],
     });
 

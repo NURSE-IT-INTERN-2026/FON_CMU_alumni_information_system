@@ -292,7 +292,12 @@ export default function AssociationsPage() {
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
   const handleExport = () => {
-    window.location.href = "/api/associations/export";
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (searchField !== "all") params.set("searchField", searchField);
+    params.set("sortField", sortField);
+    params.set("sortOrder", sortDir);
+    window.location.href = `/api/associations/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

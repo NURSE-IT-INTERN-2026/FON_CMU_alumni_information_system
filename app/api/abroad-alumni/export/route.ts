@@ -25,16 +25,28 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
+    const country = searchParams.get("country") || "";
+    const searchFieldParam = searchParams.get("searchField") || "all";
 
+    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "cohort"];
     const where: Record<string, unknown> = {};
+
+    if (country) {
+      where.country = country;
+    }
+
     if (search) {
-      where.OR = [
-        { thaiName: { contains: search, mode: "insensitive" } },
-        { englishName: { contains: search, mode: "insensitive" } },
-        { country: { contains: search, mode: "insensitive" } },
-        { workplace: { contains: search, mode: "insensitive" } },
-        { cohort: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
+        where[searchFieldParam] = { contains: search, mode: "insensitive" };
+      } else {
+        where.OR = [
+          { thaiName: { contains: search, mode: "insensitive" } },
+          { englishName: { contains: search, mode: "insensitive" } },
+          { country: { contains: search, mode: "insensitive" } },
+          { workplace: { contains: search, mode: "insensitive" } },
+          { cohort: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const items = await prisma.abroadAlumni.findMany({

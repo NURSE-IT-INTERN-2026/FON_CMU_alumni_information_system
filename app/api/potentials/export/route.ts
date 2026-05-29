@@ -25,20 +25,36 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
+    const searchField = searchParams.get("searchField") || "";
+    const sortBy = searchParams.get("sortBy") || "recordedYear";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
+    const validSortFields = ["createdAt", "studentId", "fullName", "career", "position", "recordedYear"];
+    const validSortField = validSortFields.includes(sortBy) ? sortBy : "recordedYear";
+
+    const validSearchFields = ["studentId", "fullName", "career", "position", "recordedYear"];
     const where: Record<string, unknown> = {};
+
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { fullName: { contains: search, mode: "insensitive" } },
-        { career: { contains: search, mode: "insensitive" } },
-        { position: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "recordedYear") {
+          where[searchField] = Number(search) || undefined;
+        } else {
+          where[searchField] = { contains: search, mode: "insensitive" };
+        }
+      } else {
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { career: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const items = await prisma.potential.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { [validSortField]: sortOrder },
     });
 
     const rows = items.map((a) => ({

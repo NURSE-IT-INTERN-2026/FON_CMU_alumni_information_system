@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 # Alumni Information System — Faculty of Nursing, Chiang Mai University (FON CMU)
 
-**Date:** 2026-05-20
+**Date:** 2026-05-29
 **Author:** Lead Supervisor, Faculty of Nursing CMU
 **Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS 4, Prisma 7, PostgreSQL
 
@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-A web-based alumni information system for the Faculty of Nursing, Chiang Mai University. The primary purpose is to let authorized administrators manage alumni records at scale — importing and exporting Excel spreadsheets, viewing/filtering/sorting alumni data in tables, and performing CRUD operations. The system also serves as a public-facing portal showcasing alumni news, statistics, awards, and other highlights.
+A web-based alumni information system for the Faculty of Nursing, Chiang Mai University. The primary purpose is for superadmin and admin roles to manage alumni data, and for executives to view that data.
 
 ---
 
@@ -17,150 +17,138 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 
 | Role | Description |
 |------|-------------|
-| **Admin** | Full CRUD on all data (alumni, news, awards, associations, committees, potentials, model representatives, abroad alumni, users). Can import/export Excel. Authorized personnel and faculty executives only. |
-| **Public (unauthenticated)** | Can view public pages: main page, alumni count graph, awards, potentials, association/club info, graduate committee, model representatives, abroad alumni listings, and individual news articles. Cannot create, edit, or delete any data. |
+| **Superadmin** | Full CRUD on all data and user account management. |
+| **Admin** | Full CRUD on all data. Can import/export Excel. |
+| **Executive** | Read-only access — can view and search data but cannot add, edit, or delete anything. |
+
+> Only CMU accounts that have been added to the system by a superadmin or admin may log in.
 
 ---
 
 ## 3. Functional Requirements
 
-### 3.1 Authentication & Login Page
+### 3.1 Authentication
 
-- Login page at `/login` restricted to authorized personnel and faculty executives.
-- Credentials validated against the `AdminUser` table in the database.
-- Session-based authentication using tokens stored in the `Session` table, with HTTP-only cookies.
-- Sessions expire after 7 days.
-- Passwords hashed with bcrypt.
-- Admin management (see 3.13) controls who has access.
-- Auth is enforced at the API level — write endpoints check for a valid session.
+- Login at `/login` using CMU account (OAuth/CMU SSO) only.
+- Access is granted only if the CMU account has been pre-registered by a superadmin or admin.
+- Session-based authentication with HTTP-only cookies; sessions expire after 7 days.
+- Auth enforced at the API level — write endpoints require a valid admin/superadmin session.
 
-### 3.2 Main Page (Public)
+### 3.2 Main Page
 
 - Route: `/`
-- Display featured news or activities about alumni.
-- Each news card shows: title, cover image, publish date.
-- Clicking a card navigates to the full news article page (`/news/[id]`).
-- Only news marked as "published" are shown.
+- Displays news cards about alumni.
+- Each card shows: title, cover image, publish date.
+- Clicking a card navigates to the full news article at `/news/[id]`.
+- Only published news is shown.
 
-### 3.3 News Page (Public + Admin)
-
-- Route: `/news`
-- Public: displays a searchable, paginated list of published news articles.
-- Admin (when logged in): can create, edit, and delete news articles directly on this page.
-- **WYSIWYG editor** built with native `contentEditable` (not a third-party library):
-  - Toolbar: bold, italic, underline, strikethrough, ordered/unordered lists, text alignment (left/center/right/justify), insert link.
-  - Image upload via paste or button: stored in `public/uploads/` with UUID filenames.
-  - Image constraints: **1 file per upload**, **5 MB max**, **PNG and JPG only**.
-- Fields: title, body (rich text HTML), cover image, publish status (draft/published), publish date.
-- Validation: reject files over 5 MB or with non-PNG/JPG extensions before upload.
-- Unique constraint on news title.
-
-### 3.4 News Detail Page (Public)
-
-- Route: `/news/[id]`
-- Displays the full news article: title, cover image, formatted body (HTML), and publish date.
-- Only accessible for published news — draft articles return 404.
-- Date displayed in Thai Buddhist calendar format (e.g., "20 พฤษภาคม 2569").
-
-### 3.5 Alumni Count Page (Public)
+### 3.3 Alumni Count Page
 
 - Route: `/alumni-count`
-- Bar chart displaying alumni counts.
-- **X-axis:** Cohort/generation (e.g., ปริญญาตรี รุ่นที่ 1, 2, 3…).
-- **Y-axis:** Number of alumni.
-- **Grouped by degree level:**
-  - ปริญญาเอก (Doctoral)
-  - ปริญญาโท (Master's)
-  - ปริญญาตรี (Bachelor's)
-  - หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล (Nursing Assistant Certificate)
-- Data sourced from the alumni database via API.
-- Responsive and readable on mobile.
+- **Line graph** with:
+  - X-axis: cohort (รุ่นที่)
+  - Y-axis: count of alumni
+  - Grouped by degree level
+- Below the graph: grouped count cards summarising totals per degree level.
+- Degree levels:
+  - ปริญญาเอก
+  - ปริญญาโท
+  - ปริญญาตรี
+  - หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล
+- Export to `.xlsx`.
+- Superadmin/Admin: can import `.xlsx` to update data.
 
-### 3.6 Awards Page (Public + Admin)
+### 3.4 Awards Page
 
 - Route: `/awards`
-- **Table list** with columns: recipient name, award name, award type, year, description.
-- **Searchable** by recipient name or award name.
-- **Filterable** by award type (dropdown: all / international / national / local).
-- **Sortable** by column headers (ascending/descending).
-- **Paginated.**
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- **Circle (pie/doughnut) graph** of award counts grouped by award type.
+- Below the graph: a table with columns:
+  - ลำดับ, ชื่อ-สกุล, ชื่อรางวัล, ประเภท, ปีที่ได้รับ, รายละเอียด
+- Searchable, sortable, paginated.
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
+- Award types: รางวัลระดับนานาชาติ, รางวัลระดับชาติ, รางวัลระดับท้องถิ่น
 
-### 3.7 Data Input & Alumni Management
-
-- Alumni CRUD is accessible from every public-facing entity page (awards, associations, etc.) via in-page forms.
-- Dedicated creation page at `/new-alumni` for adding a new alumni record along with all related records (awards, associations, committees, potentials, model representatives, abroad alumni) in a single form.
-- **Table view** displaying all alumni with columns: prefix, name, student ID, degree level, cohort, province, email, phone, current workplace, country, etc.
-- **Sorting:** click column headers to sort ascending/descending.
-- **Filtering:** filter by degree level, etc.
-- **Searching:** full-text search across name, student ID, workplace.
-- **Pagination:** server-side pagination for large datasets.
-- **Excel Import:**
-  - Upload an `.xlsx` file.
-  - System parses rows and bulk-inserts into the database.
-  - Show a summary: how many rows imported, how many skipped (with reasons).
-- **Excel Export:**
-  - Export the current filtered/sorted view to `.xlsx`.
-  - Column headers in Thai matching the display table.
-
-### 3.8 Potentials Page (Public + Admin)
+### 3.5 Potentials Page
 
 - Route: `/potentials`
-- Display a list of alumni identified as having notable potential.
-- Each entry shows: name, career, position, recorded year.
-- Searchable and paginated.
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- Table of potential alumni with columns:
+  - ลำดับ, รหัสนักศึกษา, ชื่อ-สกุล, อาชีพ, ตำแหน่ง, ปีที่บันทึก
+- Searchable, paginated.
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
 
-### 3.9 Association / Club Page (Public + Admin)
+### 3.6 Association / Club Page
 
 - Route: `/associations`
-- Display information about alumni associations and clubs.
-- Show: association/club name, member full name, position, recorded year.
-- Searchable and paginated.
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- Table of alumni in associations/clubs with columns:
+  - ลำดับ, รหัสนักศึกษา, ชื่อ-สกุล, ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก
+- Searchable, paginated.
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
 
-### 3.10 Graduate Committee Page (Public + Admin)
+### 3.7 Graduate Committee Page
 
 - Route: `/graduate-committee`
-- Display the list of graduate committee members.
-- Show: name, cohort, position, term year, remarks.
-- Searchable and paginated.
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- Table of graduate committee alumni with columns:
+  - ลำดับ, ปีพ.ศ., รหัสนักศึกษา, ชื่อ-สกุล, รุ่นที่, ตำแหน่ง, หมายเหตุ
+- Searchable, paginated.
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
 
-### 3.11 Model Representative Page (Public + Admin)
+### 3.8 Model Representatives Page
 
 - Route: `/model-representatives`
-- Display alumni selected as model representatives.
-- Show: name, cohort, generation.
-- Searchable and paginated.
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- Tables of model representative alumni **grouped by representative's name**.
+- Each group table contains columns:
+  - รุ่นที่, รหัสนักศึกษา, ชื่อ-สกุล
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
 
-### 3.12 Abroad Alumni Page (Public + Admin)
+### 3.9 Abroad Alumni Page
 
 - Route: `/abroad-alumni`
-- Display alumni currently residing or working abroad.
-- Show: name, address, country, university.
-- **Filterable** by country.
-- Searchable and paginated.
-- Admin: in-page creation form, inline editing, and deletion.
-- Excel import and export.
+- Tables of abroad alumni **grouped by country**.
+- Each group table contains columns:
+  - ลำดับ, รุ่น, ชื่อ-สกุล, ชื่ออังกฤษ, สถานที่ทำงาน, หมายเหตุ
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD records and import `.xlsx`.
 
-### 3.13 Admin User Management
+### 3.10 News Page
 
-- Admin user CRUD via `/api/users` endpoints (no dedicated UI page yet).
-- Fields: name, email, password (hashed), role (admin/superadmin), status (active/inactive).
-- Only authenticated admins can create new admin accounts.
-- Password change functionality via update endpoint.
-- Last login timestamp tracked.
+- Route: `/news`
+- Displays news cards; clicking a card shows full detail at `/news/[id]`.
+- **WYSIWYG editor** for creating and updating news (unlike all other pages which use normal forms).
+  - Toolbar: bold, italic, underline, strikethrough, ordered/unordered lists, text alignment, insert link.
+  - Image upload via paste or button; stored in `public/uploads/` with UUID filenames.
+  - Image constraints: 1 file per upload, 5 MB max, PNG and JPG only.
+- Fields: title, body (rich-text HTML), cover image, publish status (draft/published), publish date.
+- Export to `.xlsx`.
+- Superadmin/Admin: can CRUD news articles.
+
+### 3.11 User Account Management
+
+- Exclusive page for superadmin/admin to manage app user accounts.
+- Fields: name, CMU email, role (superadmin/admin/executive), status (active/inactive).
+- Only superadmin/admin can add, edit, or deactivate user accounts.
+- A CMU account must exist in this list to be granted login access.
 
 ---
 
-## 4. Data Model
+## 4. Access Control Summary
+
+| Feature | Superadmin | Admin | Executive |
+|---------|-----------|-------|-----------|
+| View all pages | ✓ | ✓ | ✓ |
+| Search data | ✓ | ✓ | ✓ |
+| Export `.xlsx` | ✓ | ✓ | ✓ |
+| Create / Edit / Delete records | ✓ | ✓ | ✗ |
+| Import `.xlsx` | ✓ | ✓ | ✗ |
+| Manage user accounts | ✓ | ✓ | ✗ |
+
+---
+
+## 5. Data Model
 
 ### Enums
 
@@ -169,26 +157,24 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 | **DegreeLevel** | DOCTORAL, MASTER, BACHELOR, NURSING_ASSISTANT |
 | **AwardType** | INTERNATIONAL, NATIONAL, LOCAL |
 | **NewsStatus** | DRAFT, PUBLISHED |
+| **UserRole** | SUPERADMIN, ADMIN, EXECUTIVE |
 
 ### Alumni
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | Unique, student ID |
-| prefix | String | Name prefix (นางสาว, นาง, นาย, ดร., อื่นๆ) |
-| firstName | String | First name |
-| maidenLastName | String | Maiden family name |
-| newLastName | String? | New family name after marriage |
-| cohort | String? | Graduation cohort/generation |
-| degreeLevel | DegreeLevel | Degree level |
-| province | String? | Home province |
+| studentId | String | Unique |
+| prefix | String | นางสาว, นาง, นาย, ดร., อื่นๆ |
+| firstName | String | |
+| maidenLastName | String | |
+| newLastName | String? | After marriage |
+| cohort | String? | รุ่นที่ |
+| degreeLevel | DegreeLevel | |
+| province | String? | |
 | email | String? | |
 | phone | String? | |
 | currentWorkplace | String? | |
-| country | String? | For abroad alumni |
-| isPotential | Boolean | Flag for potentials page |
-| isModelRepresentative | Boolean | Flag for model rep page |
-| photoUrl | String? | |
+| country | String? | |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
 
@@ -196,80 +182,77 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
+| studentId | String? | FK → Alumni.studentId |
+| recipientName | String | ชื่อ-สกุล |
 | awardName | String | |
 | awardType | AwardType | |
-| year | Int | |
+| year | Int | Buddhist year (พ.ศ.) |
 | description | String? | |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, awardName, year]` | |
 
 ### Association
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
+| studentId | String | FK → Alumni.studentId |
 | fullName | String | |
 | associationName | String | |
 | position | String | |
 | recordedYear | Int | |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, associationName, position, recordedYear]` | |
 
 ### GraduateCommittee
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| termYear | Int | |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
+| termYear | Int | ปีพ.ศ. |
+| studentId | String | FK → Alumni.studentId |
 | fullName | String | |
-| cohort | String | |
+| cohort | String | รุ่นที่ |
 | position | String | |
 | remarks | String? | |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, termYear, position]` | |
 
 ### Potential
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
+| studentId | String | FK → Alumni.studentId |
 | fullName | String | |
-| career | String | |
-| position | String | |
+| career | String | อาชีพ |
+| position | String | ตำแหน่ง |
 | recordedYear | Int | |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, recordedYear]` | |
 
 ### ModelRepresentative
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
-| name | String | |
-| cohort | String | |
-| generation | Int | |
+| studentId | String | FK → Alumni.studentId |
+| name | String | ชื่อตัวแทน (group key) |
+| fullName | String | ชื่อ-สกุลศิษย์เก่า |
+| cohort | String | รุ่นที่ |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, cohort, generation]` | |
 
 ### AbroadAlumni
 | Field | Type | Notes |
 |-------|------|-------|
 | id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId (cascade delete) |
-| name | String | |
-| address | String? | |
-| country | String | |
-| university | String? | |
-| order | Int | Display ordering |
+| studentId | String | FK → Alumni.studentId |
+| cohort | String | รุ่น |
+| fullName | String | ชื่อ-สกุล |
+| fullNameEn | String? | ชื่ออังกฤษ |
+| workplace | String? | สถานที่ทำงาน |
+| country | String | Group key |
+| remarks | String? | |
+| order | Int | Display ordering within group |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
-| Unique | `[studentId, order]` | |
 
 ### News
 | Field | Type | Notes |
@@ -288,9 +271,8 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 |-------|------|-------|
 | id | String (UUID) | Primary key |
 | name | String | |
-| email | String | Unique |
-| passwordHash | String | bcrypt |
-| role | String | admin, superadmin |
+| email | String | Unique (CMU email) |
+| role | UserRole | SUPERADMIN, ADMIN, EXECUTIVE |
 | isActive | Boolean | |
 | lastLoginAt | DateTime? | |
 | createdAt | DateTime | |
@@ -307,84 +289,86 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 
 ---
 
-## 5. Non-Functional Requirements
+## 6. Non-Functional Requirements
 
-- **Localization:** Thai language primary; all UI labels, column headers, and validation messages in Thai.
-- **Responsive:** Works on desktop, tablet, and mobile.
-- **Performance:** Alumni table with Excel import/export should handle up to 10,000 records without noticeable lag.
-- **Security:** Passwords hashed with bcrypt. HTTP-only session cookies. Input sanitization on all forms.
-- **File storage:** Uploaded images stored locally in `public/uploads/` with UUID filenames. File size (5 MB max) and type (PNG/JPG only) enforced at both client and server level.
+- **Language:** Thai primary — all UI labels, column headers, validation messages, and enum display values use Thai.
+- **Calendar:** Buddhist calendar years (e.g., 2568, not 2025).
+- **Responsive:** Desktop, tablet, and mobile.
+- **Performance:** Tables and Excel import/export should handle up to 10,000 records without noticeable lag.
+- **Security:** HTTP-only session cookies. Input sanitization on all forms. CMU OAuth for authentication.
+- **File storage:** Uploaded images stored locally in `public/uploads/` with UUID filenames. 5 MB max, PNG/JPG only, enforced at client and server.
 
 ---
 
-## 6. Out of Scope (Post-MVP)
+## 7. Out of Scope (Post-MVP)
 
-- Alumni self-service portal (alumni logging in to update their own info).
+- Alumni self-service portal.
 - Email notifications.
 - Multi-language support (English).
 - Advanced analytics dashboard.
 - API for external integrations.
-- Dedicated admin UI page for user management (currently API-only).
 
 ---
 
-## 7. Page Route Summary
+## 8. Page Route Summary
 
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/login` | Public | Login page |
-| `/` | Public | Main page with featured news cards |
-| `/news` | Public + Admin | News list; admin can create/edit/delete with WYSIWYG editor |
+| Route | Auth Required | Description |
+|-------|--------------|-------------|
+| `/login` | Public | CMU OAuth login |
+| `/` | Public | Main page with news cards |
+| `/news` | Public | News list |
 | `/news/[id]` | Public | Full news article (published only) |
-| `/new-alumni` | Public + Admin | Create alumni with all related records in one form |
-| `/alumni-count` | Public | Alumni count bar chart by degree level |
-| `/awards` | Public + Admin | Awards table with search, filter, sort, import/export |
-| `/potentials` | Public + Admin | Notable alumni list with search, import/export |
-| `/associations` | Public + Admin | Association/club positions with search, import/export |
-| `/graduate-committee` | Public + Admin | Graduate committee members with search, import/export |
-| `/model-representatives` | Public + Admin | Model representatives with search, import/export |
-| `/abroad-alumni` | Public + Admin | Alumni abroad with search, country filter, import/export |
+| `/alumni-count` | Public | Line graph + count cards by degree level |
+| `/awards` | Public | Circle graph + awards table |
+| `/potentials` | Public | Potentials table |
+| `/associations` | Public | Associations/clubs table |
+| `/graduate-committee` | Public | Graduate committee table |
+| `/model-representatives` | Public | Model reps tables grouped by name |
+| `/abroad-alumni` | Public | Abroad alumni tables grouped by country |
+| `/settings/users` | Superadmin/Admin | User account management |
 
-## 8. API Route Summary
+---
+
+## 9. API Route Summary
 
 All API routes are under `/api/`.
 
 | Endpoint | Methods | Auth | Description |
 |----------|---------|------|-------------|
-| `/api/auth/login` | POST | Public | Login |
-| `/api/auth/logout` | POST | Public | Logout |
+| `/api/auth/login` | POST | Public | Initiate CMU OAuth login |
+| `/api/auth/callback` | GET | Public | OAuth callback |
+| `/api/auth/logout` | POST | Authenticated | Logout |
 | `/api/alumni` | GET, POST | GET public, POST admin | List/create alumni |
 | `/api/alumni/[id]` | GET, PUT, DELETE | GET public, PUT/DELETE admin | Read/update/delete alumni |
-| `/api/alumni/create-with-related` | POST | Admin | Create alumni with all related records |
 | `/api/alumni/import` | POST | Admin | Import alumni from Excel |
 | `/api/alumni/export` | GET | Public | Export alumni to Excel |
-| `/api/alumni-count` | GET | Public | Alumni count stats grouped by degree level |
+| `/api/alumni-count` | GET | Public | Alumni count grouped by degree level |
 | `/api/news` | GET, POST | GET public, POST admin | List/create news |
 | `/api/news/[id]` | GET, PUT, DELETE | GET public, PUT/DELETE admin | Read/update/delete news |
 | `/api/awards` | GET, POST | GET public, POST admin | List/create awards |
-| `/api/awards/[id]` | PUT, DELETE | Admin | Update/delete awards |
+| `/api/awards/[id]` | PUT, DELETE | Admin | Update/delete award |
 | `/api/awards/import` | POST | Admin | Import awards from Excel |
 | `/api/awards/export` | GET | Public | Export awards to Excel |
+| `/api/potentials` | GET, POST | GET public, POST admin | List/create potentials |
+| `/api/potentials/[id]` | PUT, DELETE | Admin | Update/delete potential |
+| `/api/potentials/import` | POST | Admin | Import potentials from Excel |
+| `/api/potentials/export` | GET | Public | Export potentials to Excel |
 | `/api/associations` | GET, POST | GET public, POST admin | List/create associations |
-| `/api/associations/[id]` | PUT, DELETE | Admin | Update/delete associations |
+| `/api/associations/[id]` | PUT, DELETE | Admin | Update/delete association |
 | `/api/associations/import` | POST | Admin | Import associations from Excel |
 | `/api/associations/export` | GET | Public | Export associations to Excel |
 | `/api/graduate-committee` | GET, POST | GET public, POST admin | List/create committees |
-| `/api/graduate-committee/[id]` | PUT, DELETE | Admin | Update/delete committees |
+| `/api/graduate-committee/[id]` | PUT, DELETE | Admin | Update/delete committee |
 | `/api/graduate-committee/import` | POST | Admin | Import committees from Excel |
 | `/api/graduate-committee/export` | GET | Public | Export committees to Excel |
-| `/api/potentials` | GET, POST | GET public, POST admin | List/create potentials |
-| `/api/potentials/[id]` | PUT, DELETE | Admin | Update/delete potentials |
-| `/api/potentials/import` | POST | Admin | Import potentials from Excel |
-| `/api/potentials/export` | GET | Public | Export potentials to Excel |
 | `/api/model-representatives` | GET, POST | GET public, POST admin | List/create model reps |
-| `/api/model-representatives/[id]` | PUT, DELETE | Admin | Update/delete model reps |
+| `/api/model-representatives/[id]` | PUT, DELETE | Admin | Update/delete model rep |
 | `/api/model-representatives/import` | POST | Admin | Import model reps from Excel |
 | `/api/model-representatives/export` | GET | Public | Export model reps to Excel |
 | `/api/abroad-alumni` | GET, POST | GET public, POST admin | List/create abroad alumni |
 | `/api/abroad-alumni/[id]` | PUT, DELETE | Admin | Update/delete abroad alumni |
 | `/api/abroad-alumni/import` | POST | Admin | Import abroad alumni from Excel |
 | `/api/abroad-alumni/export` | GET | Public | Export abroad alumni to Excel |
-| `/api/users` | GET, POST | Admin | List/create admin users |
-| `/api/users/[id]` | GET, PUT, DELETE | Admin | Read/update/delete admin users |
+| `/api/users` | GET, POST | Admin | List/create user accounts |
+| `/api/users/[id]` | GET, PUT, DELETE | Admin | Read/update/delete user account |
 | `/api/upload` | POST | Admin | Upload image (PNG/JPG, max 5 MB) |

@@ -51,6 +51,8 @@ model Alumni {
   potentials            Potential[]
   modelRepresentatives  ModelRepresentative[]
 
+  @@index([degreeLevel])
+  @@index([cohort])
   @@map("alumni")
 }
 
@@ -67,6 +69,8 @@ model Award {
 
   alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
+  @@index([awardType])
+  @@index([year])
   @@map("awards")
 }
 

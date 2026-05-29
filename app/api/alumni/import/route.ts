@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
 
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
-    let skipped = 0;
 
     const records = [];
 
@@ -91,16 +90,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (records.length > 0) {
-      const result = await prisma.alumni.createMany({
-        data: records,
-        skipDuplicates: true,
+    for (const record of records) {
+      const result = await prisma.alumni.upsert({
+        where: { studentId: record.studentId },
+        update: {
+          prefix: record.prefix,
+          firstName: record.firstName,
+          maidenLastName: record.maidenLastName,
+          cohort: record.cohort,
+          degreeLevel: record.degreeLevel,
+          newLastName: record.newLastName,
+          province: record.province,
+          email: record.email,
+          phone: record.phone,
+          currentWorkplace: record.currentWorkplace,
+          country: record.country,
+        },
+        create: record,
       });
-      imported = result.count;
-      skipped = records.length - imported;
+      if (result) imported++;
     }
 
-    return NextResponse.json({ imported, skipped, errors });
+    return NextResponse.json({ imported, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/alumni/import error:", error);
     return NextResponse.json(

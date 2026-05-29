@@ -419,7 +419,9 @@ export default function ModelRepresentativesPage() {
   const managePageEnd = Math.min(manageStart + PAGE_SIZE, filteredAlumni.length);
 
   const handleExport = () => {
-    window.location.href = "/api/model-representatives/export";
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    window.location.href = `/api/model-representatives/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

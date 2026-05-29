@@ -357,7 +357,13 @@ export default function AwardsPage() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/awards/export";
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (searchField !== "all") params.set("searchField", searchField);
+    if (awardTypeFilter) params.set("awardType", awardTypeFilter);
+    params.set("sortField", sortField);
+    params.set("sortDir", sortDir);
+    window.location.href = `/api/awards/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

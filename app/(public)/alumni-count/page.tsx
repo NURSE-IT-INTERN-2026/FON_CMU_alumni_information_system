@@ -347,7 +347,9 @@ export default function AlumniCountPage() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/alumni/export";
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    window.location.href = `/api/alumni/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

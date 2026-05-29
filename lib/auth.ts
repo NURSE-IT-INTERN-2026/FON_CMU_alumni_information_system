@@ -25,11 +25,23 @@ export async function createSession(userId: string): Promise<string> {
   return token;
 }
 
+export async function cleanupExpiredSessions(): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: { expiresAt: { lt: new Date() } },
+  });
+  return result.count;
+}
+
 export async function getSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (!token) return null;
+
+  // Probabilistic cleanup: prune expired sessions ~1% of requests (fire-and-forget)
+  if (Math.random() < 0.01) {
+    cleanupExpiredSessions().catch(() => {});
+  }
 
   const session = await prisma.session.findUnique({
     where: { token },

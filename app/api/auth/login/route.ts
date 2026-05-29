@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import { verifyPassword, createSession, setSessionCookie } from "@/lib/auth";
+import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const headerStore = await headers();
+    const ip =
+      headerStore.get("x-forwarded-for")?.split(",")[0].trim() ??
+      headerStore.get("x-real-ip") ??
+      "unknown";
+
+    const rateLimit = checkRateLimit(`login:${ip}`);
+    if (!rateLimit.allowed) {
+      const retryAfterSec = Math.ceil(rateLimit.retryAfterMs / 1000);
+      return NextResponse.json(
+        { error: "ลองเข้าสู่ระบบมากเกินไป กรุณารอสักครู่แล้วลองใหม่" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfterSec) },
+        }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
@@ -42,6 +61,8 @@ export async function POST(request: Request) {
     }
 
     const token = await createSession(user.id);
+
+    resetRateLimit(`login:${ip}`);
 
     await prisma.adminUser.update({
       where: { id: user.id },

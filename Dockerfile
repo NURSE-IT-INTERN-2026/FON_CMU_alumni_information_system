@@ -24,7 +24,10 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/app/generated ./app/generated
 
+RUN mkdir -p /app/public/uploads && chown nextjs:nodejs /app/public/uploads
+
 USER nextjs
+VOLUME ["/app/public/uploads"]
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"

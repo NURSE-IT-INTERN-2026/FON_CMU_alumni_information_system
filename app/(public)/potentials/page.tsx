@@ -285,7 +285,12 @@ export default function PotentialsPage() {
   };
 
   const handleExport = () => {
-    window.location.href = "/api/potentials/export";
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (searchField !== "all") params.set("searchField", searchField);
+    params.set("sortBy", sortField);
+    params.set("sortOrder", sortDir);
+    window.location.href = `/api/potentials/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

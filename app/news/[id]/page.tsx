@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import sanitizeHtml from "sanitize-html";
 import prisma from "@/lib/prisma";
 
 function formatThaiDate(date: Date): string {
@@ -72,7 +73,20 @@ export default async function NewsDetailPage({
 
         <div
           className="prose prose-sm sm:prose !max-w-none px-6 py-6 sm:px-8 sm:py-8"
-          dangerouslySetInnerHTML={{ __html: news.body }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizeHtml(news.body, {
+              allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+                "img", "figure", "figcaption", "iframe",
+              ]),
+              allowedAttributes: {
+                ...sanitizeHtml.defaults.allowedAttributes,
+                img: ["src", "alt", "width", "height", "class", "style"],
+                iframe: ["src", "width", "height", "frameborder", "allowfullscreen"],
+                "*": ["class", "style"],
+              },
+              allowedIframeHostnames: ["www.youtube.com", "player.vimeo.com"],
+            }),
+          }}
         />
       </article>
     </div>
