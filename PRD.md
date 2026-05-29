@@ -61,7 +61,7 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 ### 3.4 Awards Page
 
 - Route: `/awards`
-- **Circle (pie/doughnut) graph** of award counts grouped by award type.
+- **Doughnut graph** of award counts grouped by award type.
 - Below the graph: a table with columns:
   - ลำดับ, ชื่อ-สกุล, ชื่อรางวัล, ประเภท, ปีที่ได้รับ, รายละเอียด
 - Searchable, sortable, paginated.

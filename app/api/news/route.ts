@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       prisma.news.count({ where }),
     ]);
 
-    return NextResponse.json({ data, total, page, pageSize });
+    return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
   } catch (error) {
     console.error("GET /api/news error:", error);
     return NextResponse.json(

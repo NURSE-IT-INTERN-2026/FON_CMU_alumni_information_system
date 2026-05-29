@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-const RoleContext = createContext<string>("admin");
+const RoleContext = createContext<string>("executive");
 
 export function RoleProvider({
   role,
