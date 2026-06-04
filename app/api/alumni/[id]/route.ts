@@ -8,6 +8,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+  }
   try {
     const { id } = await params;
 

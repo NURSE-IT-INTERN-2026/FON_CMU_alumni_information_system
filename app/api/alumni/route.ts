@@ -7,6 +7,10 @@ import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+  }
   try {
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1", 10);

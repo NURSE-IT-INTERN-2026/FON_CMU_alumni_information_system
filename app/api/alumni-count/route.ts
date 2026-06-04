@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 const DEGREE_LABELS: Record<string, string> = {
   DOCTORAL: "ปริญญาเอก",
@@ -11,6 +12,10 @@ const DEGREE_LABELS: Record<string, string> = {
 const DEGREE_ORDER = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"];
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+  }
   try {
     const alumni = await prisma.alumni.findMany({
       select: {
