@@ -5,6 +5,9 @@ import { AwardType } from "@/app/generated/prisma/client";
 import { ensureAlumni } from "@/lib/ensure-alumni";
 import * as XLSX from "xlsx";
 import { checkWritePermission } from "@/lib/permissions";
+
+const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 import { parseAwardRow } from "@/lib/award-import-parse";
 
 export async function POST(request: NextRequest) {
@@ -21,6 +24,13 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: "กรุณาเลือกไฟล์ Excel" }, { status: 400 });
+    }
+
+    if (file.size > MAX_IMPORT_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "ไฟล์มีขนาดเกิน 5MB" },
+        { status: 400 }
+      );
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
