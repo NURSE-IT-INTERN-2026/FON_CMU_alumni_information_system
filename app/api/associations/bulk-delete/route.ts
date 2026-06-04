@@ -13,6 +13,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (ids.length > 1000) {
+      return NextResponse.json(
+        { error: "ไม่สามารถลบเกิน 1000 รายการในครั้งเดียว" },
+        { status: 400 }
+      );
+    }
     const result = await prisma.association.deleteMany({
       where: { id: { in: ids } },
     });
