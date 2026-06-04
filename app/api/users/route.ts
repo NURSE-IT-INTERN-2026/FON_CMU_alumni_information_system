@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { checkWritePermission } from "@/lib/permissions";
+import { checkSuperAdminPermission } from "@/lib/permissions";
 import { logActivity, getIp } from "@/lib/activity-log";
 
 export async function GET(request: NextRequest) {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const permErr = await checkWritePermission();
+  const permErr = await checkSuperAdminPermission();
   if (permErr) return permErr;
   try {
     const session = await getSession();
