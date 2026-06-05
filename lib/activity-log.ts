@@ -18,13 +18,23 @@ export type LogResource =
   | "model_representative"
   | "abroad_alumni"
   | "news"
-  | "user";
+  | "user"
+  | "alumni_profile";
 
-interface LogContext {
+interface AdminLogContext {
+  actorType: "ADMIN";
   userId: string;
   userEmail: string;
   userRole: string;
 }
+
+interface AlumniLogContext {
+  actorType: "ALUMNI";
+  alumniId: string;
+  alumniName: string;
+}
+
+export type LogContext = AdminLogContext | AlumniLogContext;
 
 export async function logActivity(
   ctx: LogContext,
@@ -35,18 +45,34 @@ export async function logActivity(
   ipAddress?: string | null
 ): Promise<void> {
   try {
-    await prisma.activityLog.create({
-      data: {
-        userId: ctx.userId,
-        userEmail: ctx.userEmail,
-        userRole: ctx.userRole,
-        action,
-        resource,
-        resourceId: resourceId ?? null,
-        details: (details ?? undefined) as Prisma.InputJsonValue | undefined,
-        ipAddress: ipAddress ?? null,
-      },
-    });
+    if (ctx.actorType === "ADMIN") {
+      await prisma.activityLog.create({
+        data: {
+          actorType: "ADMIN",
+          userId: ctx.userId,
+          userEmail: ctx.userEmail,
+          userRole: ctx.userRole,
+          action,
+          resource,
+          resourceId: resourceId ?? null,
+          details: details ? (details as Prisma.InputJsonValue) : undefined,
+          ipAddress: ipAddress ?? null,
+        },
+      });
+    } else {
+      await prisma.activityLog.create({
+        data: {
+          actorType: "ALUMNI",
+          alumniId: ctx.alumniId,
+          alumniName: ctx.alumniName,
+          action,
+          resource,
+          resourceId: resourceId ?? null,
+          details: details ? (details as Prisma.InputJsonValue) : undefined,
+          ipAddress: ipAddress ?? null,
+        },
+      });
+    }
   } catch (err) {
     // Logging must never break the main request
     console.error("Failed to write activity log:", err);

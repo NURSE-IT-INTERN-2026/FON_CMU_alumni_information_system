@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const session = await getSession();
     if (session) {
       await logActivity(
-        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "BULK_DELETE",
         "alumni",
         null,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, getAlumniSession } from "@/lib/auth";
 
 export async function checkWritePermission(): Promise<NextResponse | null> {
   const session = await getSession();
@@ -33,4 +33,12 @@ export async function checkSuperAdminPermission(): Promise<NextResponse | null> 
     );
   }
   return null;
+}
+
+export async function checkAlumniSession(): Promise<{ alumni: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; newLastName: string | null } } | { error: NextResponse }> {
+  const session = await getAlumniSession();
+  if (!session || !session.alumni) {
+    return { error: NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 }) };
+  }
+  return { alumni: session.alumni };
 }

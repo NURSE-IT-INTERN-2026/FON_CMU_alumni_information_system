@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import { Session, AdminUser, Alumni } from "@/app/generated/prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomUUID } from "crypto";
+
+// Explicit types for narrowed session returns
+type AdminSession = Session & { user: AdminUser };
+type AlumniSession = Session & { alumni: Alumni };
 
 const SESSION_COOKIE = "fon-cmu-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -19,7 +24,18 @@ export async function createSession(userId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
 
   await prisma.session.create({
-    data: { userId, token, expiresAt },
+    data: { userId, token, expiresAt, sessionType: "ADMIN", alumniId: null },
+  });
+
+  return token;
+}
+
+export async function createAlumniSession(alumniId: string): Promise<string> {
+  const token = randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
+
+  await prisma.session.create({
+    data: { alumniId, token, expiresAt, sessionType: "ALUMNI", userId: null },
   });
 
   return token;
@@ -32,7 +48,7 @@ export async function cleanupExpiredSessions(): Promise<number> {
   return result.count;
 }
 
-export async function getSession() {
+export async function getSession(): Promise<AdminSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
@@ -48,11 +64,47 @@ export async function getSession() {
     include: { user: true },
   });
 
-  if (!session || session.expiresAt < new Date() || !session.user || !session.user.isActive) {
+  if (!session || session.expiresAt < new Date()) {
     return null;
   }
 
-  return session;
+  // Only return admin sessions from getSession()
+  if (session.sessionType !== "ADMIN") {
+    return null;
+  }
+
+  if (!session.user || !session.user.isActive) {
+    return null;
+  }
+
+  return session as AdminSession;
+}
+
+export async function getAlumniSession(): Promise<AlumniSession | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+
+  if (!token) return null;
+
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: { alumni: true },
+  });
+
+  if (!session || session.expiresAt < new Date()) {
+    return null;
+  }
+
+  // Only return alumni sessions
+  if (session.sessionType !== "ALUMNI") {
+    return null;
+  }
+
+  if (!session.alumni) {
+    return null;
+  }
+
+  return session as AlumniSession;
 }
 
 export function setSessionCookie(token: string) {

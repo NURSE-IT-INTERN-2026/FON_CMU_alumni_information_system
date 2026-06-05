@@ -25,9 +25,21 @@ enum NewsStatus {
   PUBLISHED
 }
 
+enum SessionType {
+  ADMIN
+  ALUMNI
+}
+
+enum ActorType {
+  ADMIN
+  ALUMNI
+}
+
 model Alumni {
   id                    String    @id @default(uuid())
   studentId             String    @unique
+  citizenId             String?
+  birthDate             String?
   prefix                String
   firstName             String
   maidenLastName        String
@@ -42,6 +54,9 @@ model Alumni {
   isPotential           Boolean   @default(false)
   isModelRepresentative Boolean   @default(false)
   photoUrl              String?
+  hasLoggedIn           Boolean   @default(false)
+  adminEditedAt         DateTime?
+  lastLoginAt           DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -50,7 +65,10 @@ model Alumni {
   graduateCommittees    GraduateCommittee[]
   potentials            Potential[]
   modelRepresentatives  ModelRepresentative[]
+  sessions             Session[]
+  activityLogs         ActivityLog[]
 
+  @@unique([citizenId])
   @@index([degreeLevel])
   @@index([cohort])
   @@map("alumni")
@@ -187,33 +205,43 @@ model AdminUser {
 }
 
 model ActivityLog {
-  id         String   @id @default(uuid())
-  userId     String
-  userEmail  String
-  userRole   String
+  id         String    @id @default(uuid())
+  actorType  ActorType @default(ADMIN)
+  userId     String?
+  userEmail  String?
+  userRole   String?
+  alumniId   String?
+  alumniName String?
   action     String
   resource   String
   resourceId String?
   details    Json?
   ipAddress  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
-  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   AdminUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alumni Alumni?    @relation(fields: [alumniId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([alumniId])
   @@index([createdAt])
   @@index([resource])
+  @@index([actorType])
   @@map("activity_logs")
 }
 
 model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id          String      @id @default(uuid())
+  userId      String?
+  alumniId    String?
+  token       String      @unique
+  sessionType SessionType @default(ADMIN)
+  expiresAt   DateTime
+  createdAt   DateTime    @default(now())
 
-  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   AdminUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alumni Alumni?    @relation(fields: [alumniId], references: [id], onDelete: Cascade)
 
+  @@index([alumniId])
   @@map("sessions")
 }

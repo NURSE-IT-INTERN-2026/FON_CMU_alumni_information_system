@@ -3,8 +3,7 @@ import {
   generateState,
   generateCodeVerifier,
   generateCodeChallenge,
-  setOAuthCookies,
-  setAdminFlowCookie,
+  setAlumniOAuthCookies,
 } from "@/lib/oauth";
 
 export async function GET() {
@@ -23,13 +22,12 @@ export async function GET() {
   });
 
   const authUrl = `${process.env.AUTH_URL}?${params.toString()}`;
+  console.log("[Alumni OAuth] Redirecting to CMU, flow cookie will be set to 'alumni'");
   const response = NextResponse.redirect(authUrl);
 
-  for (const cookie of setOAuthCookies(state, codeVerifier)) {
+  for (const cookie of setAlumniOAuthCookies(state, codeVerifier)) {
     response.cookies.set(cookie);
   }
-
-  response.cookies.set(setAdminFlowCookie());
 
   return response;
 }

@@ -12,7 +12,7 @@ export default async function PublicLayout({
 }) {
   const session = await getSession();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/login");
   }
 

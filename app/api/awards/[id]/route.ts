@@ -40,7 +40,7 @@ export async function PUT(
     const session = await getSession();
     if (session) {
       await logActivity(
-        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "UPDATE",
         "award",
         id,
@@ -72,7 +72,7 @@ export async function DELETE(
     const session = await getSession();
     if (session) {
       await logActivity(
-        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "DELETE",
         "award",
         id,

@@ -1,24 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createSession, setSessionCookie } from "@/lib/auth";
+import { createSession, createAlumniSession, setSessionCookie } from "@/lib/auth";
 import {
   exchangeCodeForToken,
   fetchCmuProfile,
   clearOAuthCookies,
 } from "@/lib/oauth";
 
-function loginRedirect(error: string) {
+function adminLoginRedirect(error: string) {
+  return NextResponse.redirect(
+    new URL(`/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
+  );
+}
+
+function alumniLoginRedirect(error: string) {
   return NextResponse.redirect(
     new URL(`/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
   );
 }
 
 export async function GET(request: NextRequest) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const error = searchParams.get("error");
+
+    // Detect flow type
+    const flowType = request.cookies.get("cmu-oauth-flow")?.value || "admin";
+    const isAlumniFlow = flowType === "alumni";
+    console.log(`[OAuth Callback] flowType=${flowType}, isAlumniFlow=${isAlumniFlow}`);
+    const loginRedirect = isAlumniFlow ? alumniLoginRedirect : adminLoginRedirect;
 
     // OAuth provider error (e.g. user denied)
     if (error) {
@@ -26,13 +40,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate state for CSRF protection
-    const cookieState = request.cookies.get("cmu-oauth-state")?.value;
+    const stateCookieName = isAlumniFlow ? "alumni-oauth-state" : "cmu-oauth-state";
+    const cookieState = request.cookies.get(stateCookieName)?.value;
     if (!state || state !== cookieState) {
       return loginRedirect("oauth_invalid_state");
     }
 
     // Retrieve PKCE code verifier
-    const codeVerifier = request.cookies.get("cmu-oauth-verifier")?.value;
+    const verifierCookieName = isAlumniFlow ? "alumni-oauth-verifier" : "cmu-oauth-verifier";
+    const codeVerifier = request.cookies.get(verifierCookieName)?.value;
     if (!codeVerifier || !code) {
       return loginRedirect("oauth_expired");
     }
@@ -41,50 +57,128 @@ export async function GET(request: NextRequest) {
     let accessToken: string;
     try {
       accessToken = await exchangeCodeForToken(code, codeVerifier);
-    } catch {
+    } catch (err) {
+      console.error("Token exchange error:", err);
       return loginRedirect("oauth_token_failed");
     }
 
     // Fetch CMU user profile
-    let profile: { email: string; firstName: string; lastName: string };
+    let profile;
     try {
       profile = await fetchCmuProfile(accessToken);
-    } catch {
+    } catch (err) {
+      console.error("Profile fetch error:", err);
       return loginRedirect("oauth_profile_failed");
     }
 
-    // Match email to existing AdminUser
-    const user = await prisma.adminUser.findUnique({
-      where: { email: profile.email },
-    });
+    let response: NextResponse;
 
-    if (!user || !user.isActive) {
-      return loginRedirect("oauth_user_not_found");
+    if (isAlumniFlow) {
+      response = await handleAlumniOAuth(profile, baseUrl);
+    } else {
+      response = await handleAdminOAuth(profile, baseUrl);
     }
 
-    // Create session
-    const token = await createSession(user.id);
-
-    await prisma.adminUser.update({
-      where: { id: user.id },
-      data: {
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        lastLoginAt: new Date(),
-      },
-    });
-
-    // Set session cookie and clean up OAuth cookies
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const response = NextResponse.redirect(new URL("/", baseUrl));
-    response.cookies.set(setSessionCookie(token));
-
+    // Clean up all OAuth cookies
     for (const cookie of clearOAuthCookies()) {
       response.cookies.set(cookie);
     }
 
     return response;
-  } catch {
-    return loginRedirect("oauth_error");
+  } catch (err) {
+    console.error("OAuth callback error:", err);
+    const flowType = request.cookies.get("cmu-oauth-flow")?.value || "admin";
+    return flowType === "alumni"
+      ? alumniLoginRedirect("oauth_error")
+      : adminLoginRedirect("oauth_error");
   }
+}
+
+async function handleAdminOAuth(
+  profile: { email: string; firstName: string; lastName: string },
+  baseUrl: string
+): Promise<NextResponse> {
+  // Match email to existing AdminUser
+  const user = await prisma.adminUser.findUnique({
+    where: { email: profile.email },
+  });
+
+  if (!user || !user.isActive) {
+    return adminLoginRedirect("oauth_user_not_found");
+  }
+
+  // Create admin session
+  const token = await createSession(user.id);
+
+  await prisma.adminUser.update({
+    where: { id: user.id },
+    data: {
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      lastLoginAt: new Date(),
+    },
+  });
+
+  const response = NextResponse.redirect(new URL("/", baseUrl));
+  response.cookies.set(setSessionCookie(token));
+
+  return response;
+}
+
+async function handleAlumniOAuth(
+  profile: { email: string; firstName: string; lastName: string; organizationName?: string },
+  baseUrl: string
+): Promise<NextResponse> {
+  console.log(`[Alumni OAuth] Profile: email=${profile.email}, org=${profile.organizationName}`);
+
+  // Faculty restriction: only Faculty of Nursing CMU
+  if (
+    profile.organizationName &&
+    !profile.organizationName.includes("พยาบาลศาสตร์") &&
+    !profile.organizationName.toLowerCase().includes("nursing")
+  ) {
+    console.log("[Alumni OAuth] Rejected: not nursing faculty");
+    return alumniLoginRedirect("not_nursing_faculty");
+  }
+
+  // Try to match alumni by email
+  let alumni = await prisma.alumni.findFirst({
+    where: { email: profile.email },
+  });
+
+  // If no match by email, try by studentId extracted from CMU account (if available)
+  if (!alumni && profile.email) {
+    const possibleStudentId = profile.email.split("@")[0];
+    if (/^\d+$/.test(possibleStudentId)) {
+      alumni = await prisma.alumni.findUnique({
+        where: { studentId: possibleStudentId },
+      });
+    }
+  }
+
+  if (!alumni) {
+    console.log("[Alumni OAuth] No matching alumni found");
+    return alumniLoginRedirect("alumni_not_found");
+  }
+
+  console.log(`[Alumni OAuth] Found alumni: ${alumni.studentId} (${alumni.firstName})`);
+
+  // Create alumni session
+  const isFirstLogin = !alumni.hasLoggedIn;
+  const token = await createAlumniSession(alumni.id);
+
+  await prisma.alumni.update({
+    where: { id: alumni.id },
+    data: {
+      hasLoggedIn: true,
+      lastLoginAt: new Date(),
+    },
+  });
+
+  const response = NextResponse.redirect(
+    new URL(`/alumni/profile${isFirstLogin ? "?first=1" : ""}`, baseUrl)
+  );
+  response.cookies.set(setSessionCookie(token));
+
+  return response;
 }

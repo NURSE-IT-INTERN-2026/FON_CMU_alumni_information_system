@@ -70,7 +70,7 @@ export async function PUT(
     });
 
     await logActivity(
-      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "UPDATE",
       "news",
       id,
@@ -113,7 +113,7 @@ export async function DELETE(
     await prisma.news.delete({ where: { id } });
 
     await logActivity(
-      { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "DELETE",
       "news",
       id,

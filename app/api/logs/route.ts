@@ -18,11 +18,14 @@ export async function GET(request: NextRequest) {
     const resource = searchParams.get("resource") || "";
     const action = searchParams.get("action") || "";
     const userId = searchParams.get("userId") || "";
+    const source = searchParams.get("source") || "";
 
     const where: Record<string, unknown> = {};
     if (resource) where.resource = resource;
     if (action) where.action = action;
     if (userId) where.userId = userId;
+    if (source === "alumni") where.actorType = "ALUMNI";
+    else if (source === "admin") where.actorType = "ADMIN";
 
     const [data, total] = await Promise.all([
       prisma.activityLog.findMany({

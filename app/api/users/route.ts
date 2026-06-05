@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     if (session) {
       await logActivity(
-        { userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "CREATE",
         "user",
         user.id,
