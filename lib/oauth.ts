@@ -5,6 +5,7 @@ const OAUTH_VERIFIER_COOKIE = "cmu-oauth-verifier";
 const ALUMNI_OAUTH_STATE_COOKIE = "alumni-oauth-state";
 const ALUMNI_OAUTH_VERIFIER_COOKIE = "alumni-oauth-verifier";
 const OAUTH_FLOW_COOKIE = "cmu-oauth-flow";
+const OAUTH_PENDING_EMAIL_COOKIE = "cmu-oauth-pending-email";
 const OAUTH_COOKIE_MAX_AGE = 600; // 10 minutes
 
 export function generateCodeVerifier(): string {
@@ -172,4 +173,20 @@ export function clearOAuthCookies() {
     { name: ALUMNI_OAUTH_VERIFIER_COOKIE, ...base },
     { name: OAUTH_FLOW_COOKIE, ...base },
   ];
+}
+
+export function setPendingEmailCookie(email: string) {
+  return {
+    name: OAUTH_PENDING_EMAIL_COOKIE,
+    value: email,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    maxAge: OAUTH_COOKIE_MAX_AGE,
+    path: "/",
+  };
+}
+
+export function getPendingEmailCookieName() {
+  return OAUTH_PENDING_EMAIL_COOKIE;
 }

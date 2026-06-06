@@ -5,6 +5,7 @@ import {
   exchangeCodeForToken,
   fetchCmuProfile,
   clearOAuthCookies,
+  setPendingEmailCookie,
 } from "@/lib/oauth";
 
 function adminLoginRedirect(error: string) {
@@ -131,54 +132,13 @@ async function handleAlumniOAuth(
 ): Promise<NextResponse> {
   console.log(`[Alumni OAuth] Profile: email=${profile.email}, org=${profile.organizationName}`);
 
-  // Faculty restriction: only Faculty of Nursing CMU
-  if (
-    profile.organizationName &&
-    !profile.organizationName.includes("พยาบาลศาสตร์") &&
-    !profile.organizationName.toLowerCase().includes("nursing")
-  ) {
-    console.log("[Alumni OAuth] Rejected: not nursing faculty");
-    return alumniLoginRedirect("not_nursing_faculty");
-  }
-
-  // Try to match alumni by email
-  let alumni = await prisma.alumni.findFirst({
-    where: { email: profile.email },
-  });
-
-  // If no match by email, try by studentId extracted from CMU account (if available)
-  if (!alumni && profile.email) {
-    const possibleStudentId = profile.email.split("@")[0];
-    if (/^\d+$/.test(possibleStudentId)) {
-      alumni = await prisma.alumni.findUnique({
-        where: { studentId: possibleStudentId },
-      });
-    }
-  }
-
-  if (!alumni) {
-    console.log("[Alumni OAuth] No matching alumni found");
-    return alumniLoginRedirect("alumni_not_found");
-  }
-
-  console.log(`[Alumni OAuth] Found alumni: ${alumni.studentId} (${alumni.firstName})`);
-
-  // Create alumni session
-  const isFirstLogin = !alumni.hasLoggedIn;
-  const token = await createAlumniSession(alumni.id);
-
-  await prisma.alumni.update({
-    where: { id: alumni.id },
-    data: {
-      hasLoggedIn: true,
-      lastLoginAt: new Date(),
-    },
-  });
-
+  // Always redirect to identity verification page with the CMU email.
+  // The verify-identity page handles matching against alumni records,
+  // checking approval status, and creating sessions.
+  console.log("[Alumni OAuth] Redirecting to verify-identity");
   const response = NextResponse.redirect(
-    new URL(`/alumni/profile${isFirstLogin ? "?first=1" : ""}`, baseUrl)
+    new URL("/alumni/verify-identity", baseUrl)
   );
-  response.cookies.set(setSessionCookie(token));
-
+  response.cookies.set(setPendingEmailCookie(profile.email));
   return response;
 }

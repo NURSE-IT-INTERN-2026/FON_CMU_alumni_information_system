@@ -43,6 +43,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|intern/api/auth|intern/api/alumni-auth|api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
+    "/((?!login|alumni|intern/api/auth|intern/api/alumni-auth|api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
   ],
 };

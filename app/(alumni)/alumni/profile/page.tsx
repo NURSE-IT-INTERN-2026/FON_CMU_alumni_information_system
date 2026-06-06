@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { DEGREE_LEVEL_OPTIONS, PREFIX_OPTIONS } from "@/lib/constants";
 
 interface AlumniData {
@@ -33,6 +33,7 @@ const DEGREE_LABELS: Record<string, string> = {
 };
 
 export default function AlumniProfilePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [alumni, setAlumni] = useState<AlumniData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,10 @@ export default function AlumniProfilePage() {
   const fetchProfile = useCallback(async () => {
     try {
       const res = await fetch("/api/alumni-profile");
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setAlumni(data);

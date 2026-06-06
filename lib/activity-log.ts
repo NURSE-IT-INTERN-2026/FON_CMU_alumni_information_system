@@ -7,7 +7,13 @@ export type LogAction =
   | "DELETE"
   | "IMPORT"
   | "EXPORT"
-  | "BULK_DELETE";
+  | "BULK_DELETE"
+  | "SIGNUP"
+  | "PASSWORD_RESET_REQUEST"
+  | "PASSWORD_RESET_COMPLETE"
+  | "APPROVE"
+  | "REJECT"
+  | "VERIFY_IDENTITY";
 
 export type LogResource =
   | "alumni"
@@ -19,7 +25,8 @@ export type LogResource =
   | "abroad_alumni"
   | "news"
   | "user"
-  | "alumni_profile";
+  | "alumni_profile"
+  | "alumni_auth";
 
 interface AdminLogContext {
   actorType: "ADMIN";

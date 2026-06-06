@@ -35,6 +35,12 @@ enum ActorType {
   ALUMNI
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Alumni {
   id                    String    @id @default(uuid())
   studentId             String    @unique
@@ -56,7 +62,11 @@ model Alumni {
   photoUrl              String?
   hasLoggedIn           Boolean   @default(false)
   adminEditedAt         DateTime?
+  passwordHash          String?
   lastLoginAt           DateTime?
+  approvalStatus        ApprovalStatus @default(APPROVED)
+  approvedAt            DateTime?
+  cmuEmail              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -65,12 +75,14 @@ model Alumni {
   graduateCommittees    GraduateCommittee[]
   potentials            Potential[]
   modelRepresentatives  ModelRepresentative[]
+  passwordResets        PasswordReset[]
   sessions             Session[]
   activityLogs         ActivityLog[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
   @@index([cohort])
+  @@index([approvalStatus])
   @@map("alumni")
 }
 
@@ -228,6 +240,21 @@ model ActivityLog {
   @@index([resource])
   @@index([actorType])
   @@map("activity_logs")
+}
+
+model PasswordReset {
+  id          String    @id @default(uuid())
+  alumniId    String
+  token       String    @unique
+  used        Boolean   @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  alumni      Alumni    @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@index([alumniId])
+  @@index([expiresAt])
+  @@map("password_resets")
 }
 
 model Session {

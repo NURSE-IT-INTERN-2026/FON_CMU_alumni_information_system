@@ -3,21 +3,36 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { clearSessionCookie } from "@/lib/auth";
 
+async function performLogout() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("fon-cmu-session")?.value;
+
+  if (token) {
+    await prisma.session.deleteMany({ where: { token } });
+  }
+
+  const response = NextResponse.redirect(
+    new URL("/login", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
+  );
+  response.cookies.set(clearSessionCookie());
+
+  return response;
+}
+
+export async function GET() {
+  try {
+    return await performLogout();
+  } catch {
+    return NextResponse.json(
+      { error: "เกิดข้อผิดพลาดในการออกจากระบบ" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("fon-cmu-session")?.value;
-
-    if (token) {
-      await prisma.session.deleteMany({ where: { token } });
-    }
-
-    const response = NextResponse.redirect(
-      new URL("/alumni/login", process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
-    );
-    response.cookies.set(clearSessionCookie());
-
-    return response;
+    return await performLogout();
   } catch {
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการออกจากระบบ" },

@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const ALUMNI_ERROR_KEYS = new Set(["alumni_not_found", "not_nursing_faculty"]);
+const ALUMNI_ERROR_KEYS = new Set(["alumni_not_found", "alumni_rejected"]);
 
 const OAUTH_ERRORS: Record<string, string> = {
   oauth_denied: "การเข้าสู่ระบบด้วยบัญชี CMU ถูกปฏิเสธ",
@@ -13,7 +13,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   oauth_profile_failed: "ไม่สามารถดึงข้อมูลจาก CMU ได้ กรุณาลองใหม่",
   oauth_user_not_found: "บัญชี CMU นี้ยังไม่ได้ลงทะเบียนในระบบ",
   alumni_not_found: "ไม่พบข้อมูลของท่านในระบบ กรุณาติดต่อผู้ดูแลระบบ",
-  not_nursing_faculty: "บัญชีของท่านไม่ได้สังกัดคณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่ กรุณาติดต่อผู้ดูแลระบบ",
+  alumni_rejected: "บัญชีของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ",
   oauth_error: "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย CMU กรุณาลองใหม่",
 };
 
@@ -31,29 +31,49 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
+  const resetSuccess = searchParams.get("reset") === "success";
+  const signupSuccess = searchParams.get("signup") === "success";
 
-  // Auto-switch to alumni tab if the error is alumni-specific
+  // Auto-switch to alumni tab if the error/params are alumni-specific
   const isAlumniError = oauthError ? ALUMNI_ERROR_KEYS.has(oauthError) : false;
-  const [mode, setMode] = useState<LoginMode>(isAlumniError ? "alumni" : "admin");
+  const [mode, setMode] = useState<LoginMode>(
+    isAlumniError || resetSuccess || signupSuccess ? "alumni" : "admin"
+  );
 
   // Admin form
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   // Alumni form
-  const [citizenId, setCitizenId] = useState("");
-  const [birthDate, setBirthDate] = useState("");
+  const [alumniEmail, setAlumniEmail] = useState("");
+  const [alumniPassword, setAlumniPassword] = useState("");
 
   const [error, setError] = useState(
     oauthError
       ? OAUTH_ERRORS[oauthError] || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ"
       : ""
   );
+  const [success, setSuccess] = useState(
+    resetSuccess
+      ? "รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่"
+      : signupSuccess
+        ? "ลงทะเบียนสำเร็จ กรุณารอผู้ดูแลระบบอนุมัติบัญชีของท่าน จึงจะสามารถเข้าสู่ระบบได้"
+        : ""
+  );
   const [loading, setLoading] = useState(false);
+
+  // Clear success message after 10 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   async function handleAdminSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -81,13 +101,14 @@ function LoginForm() {
   async function handleAlumniSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/alumni-auth/login-id", {
+      const res = await fetch("/api/alumni-auth/login-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citizenId, birthDate }),
+        body: JSON.stringify({ email: alumniEmail.trim().toLowerCase(), password: alumniPassword }),
       });
 
       const data = await res.json();
@@ -97,16 +118,17 @@ function LoginForm() {
         return;
       }
 
+      if (data.pendingApproval) {
+        router.push(data.redirect || "/alumni/pending");
+        return;
+      }
+
       router.push("/alumni/profile");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
       setLoading(false);
     }
-  }
-
-  function formatBirthDate(value: string): string {
-    return value.replace(/\D/g, "").slice(0, 8);
   }
 
   return (
@@ -182,6 +204,12 @@ function LoginForm() {
           {error && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[var(--danger)]">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-[var(--success)]">
+              {success}
             </div>
           )}
 
@@ -270,40 +298,44 @@ function LoginForm() {
                 <div className="h-px flex-1 bg-[var(--border)]" />
               </div>
 
-              {/* Thai ID + Birthday form */}
+              {/* Email + Password form */}
               <form onSubmit={handleAlumniSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="citizenId" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                    เลขบัตรประชาชน (13 หลัก)
+                  <label htmlFor="alumniEmail" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                    อีเมล
                   </label>
                   <input
-                    id="citizenId"
-                    type="text"
-                    inputMode="numeric"
-                    value={citizenId}
-                    onChange={(e) => setCitizenId(e.target.value.replace(/\D/g, "").slice(0, 13))}
+                    id="alumniEmail"
+                    type="email"
+                    value={alumniEmail}
+                    onChange={(e) => setAlumniEmail(e.target.value)}
                     required
-                    autoComplete="off"
-                    placeholder="0000000000000"
+                    autoComplete="email"
+                    placeholder="example@email.com"
                     className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
                   />
                 </div>
                 <div>
-                  <label htmlFor="birthDate" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                    วันเกิด (ววปปปป พ.ศ.)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="alumniPassword" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                      รหัสผ่าน
+                    </label>
+                    <a
+                      href="/alumni/forgot-password"
+                      className="mb-1.5 text-xs text-[var(--primary)] hover:underline"
+                    >
+                      ลืมรหัสผ่าน?
+                    </a>
+                  </div>
                   <input
-                    id="birthDate"
-                    type="text"
-                    inputMode="numeric"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(formatBirthDate(e.target.value))}
+                    id="alumniPassword"
+                    type="password"
+                    value={alumniPassword}
+                    onChange={(e) => setAlumniPassword(e.target.value)}
                     required
-                    autoComplete="off"
-                    placeholder="01122504"
+                    autoComplete="current-password"
                     className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
                   />
-                  <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122504</p>
                 </div>
                 <button
                   type="submit"
@@ -318,6 +350,13 @@ function LoginForm() {
                   )}
                 </button>
               </form>
+
+              <p className="mt-4 text-center text-sm text-[var(--muted)]">
+                ยังไม่มีบัญชี?{" "}
+                <a href="/alumni/signup" className="text-[var(--primary)] hover:underline font-medium">
+                  ลงทะเบียน
+                </a>
+              </p>
             </>
           )}
         </div>

@@ -22,41 +22,53 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
     setLoggingOut(true);
     try {
       await fetch("/api/alumni-auth/logout", { method: "POST" });
-      router.push("/alumni/login");
+      router.push("/login");
     } catch {
       setLoggingOut(false);
     }
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-        {/* Logo and title */}
-        <div className="flex items-center gap-3">
-          <img src="/fon-cmu-logo.png" alt="FON CMU" className="h-8 w-auto" />
-          <div>
-            <span className="text-sm font-semibold text-[var(--foreground)]">
+    <header className="sticky top-0 z-50 bg-[var(--primary)] text-white shadow-md">
+      {/* Cyan gradient overlay on the left */}
+      <div className="relative">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-2/5"
+          style={{
+            background:
+              "linear-gradient(to right, rgba(0, 188, 212, 0.7) 0%, rgba(0, 188, 212, 0.4) 40%, transparent 100%)",
+          }}
+        />
+
+        <div className="relative mx-auto flex max-w-full items-center justify-between px-5 py-3 sm:px-7 lg:px-9">
+          {/* Logo & Title */}
+          <div className="flex shrink-0 items-center gap-3">
+            <img
+              src="/fon-cmu-logo.png"
+              alt="FON CMU Logo"
+              className="h-16 w-auto"
+            />
+            <span className="hidden text-sm font-semibold leading-snug sm:block md:text-base">
               ระบบสารสนเทศศิษย์เก่า
-            </span>
-            <span className="ml-2 hidden text-xs text-[var(--muted)] sm:inline">
+              <br />
               คณะพยาบาลศาสตร์ มช.
             </span>
           </div>
-        </div>
 
-        {/* User info and logout */}
-        <div className="flex items-center gap-4">
-          <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-[var(--foreground)]">{displayName}</p>
-            <p className="text-xs text-[var(--muted)]">ศิษย์เก่า</p>
+          {/* User info and logout */}
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium text-white/90">{displayName}</p>
+              <p className="text-xs text-white/60">ศิษย์เก่า</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="cursor-pointer rounded-md bg-white/20 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/30 disabled:opacity-60"
+            >
+              {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-red-50 disabled:opacity-50"
-          >
-            {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
-          </button>
         </div>
       </div>
     </header>
