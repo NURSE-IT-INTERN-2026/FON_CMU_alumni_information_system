@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 interface AlumniHeaderProps {
@@ -12,8 +13,14 @@ interface AlumniHeaderProps {
   };
 }
 
+const NAV_ITEMS = [
+  { href: "/alumni/profile", label: "ข้อมูลส่วนตัว" },
+  { href: "/alumni/news", label: "ข่าวสาร" },
+];
+
 export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const displayName = `${alumni.prefix}${alumni.firstName} ${alumni.newLastName || alumni.maidenLastName}`;
@@ -71,6 +78,28 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
           </div>
         </div>
       </div>
+
+      {/* Navigation */}
+      <nav className="border-t border-white/10">
+        <div className="mx-auto flex max-w-full gap-1 px-5 py-2 sm:px-7 lg:px-9">
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : "text-white/70 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </header>
   );
 }
