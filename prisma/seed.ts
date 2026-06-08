@@ -676,11 +676,11 @@ async function main() {
   // ── 9. Upsert model representatives (from reference site) ──
   console.log("Upserting model representatives...");
 
-  const ASSIST = "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล";
-  const MASTER = "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท";
-  const ASSOC = "รายชื่อเครือข่ายศิษย์เก่าอนุปริญญาพยาบาล";
-  const BACHELOR = "รายชื่อเครือข่ายศิษย์เก่าปริญญาพยาบาล";
-  const DOCTORAL = "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก";
+  const ASSIST = "ผู้ช่วยพยาบาล";
+  const MASTER = "ปริญญาโท";
+  const ASSOC = "อนุปริญญาพยาบาล";
+  const BACHELOR = "ปริญญาพยาบาล";
+  const DOCTORAL = "ปริญญาเอก";
 
   const modelRepData = [
     // ผู้ช่วยพยาบาล รุ่น 1–38

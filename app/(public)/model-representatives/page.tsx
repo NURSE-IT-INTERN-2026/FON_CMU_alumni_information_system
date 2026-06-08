@@ -18,16 +18,15 @@ interface ApiResponse {
   data: ModelRepresentative[];
 }
 
-const COHORT_ORDER = [
-  "รายชื่อเครือข่ายศิษย์เก่าอนุปริญญาพยาบาล",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาพยาบาล",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาโท",
-  "รายชื่อเครือข่ายศิษย์เก่าปริญญาเอก",
-  "รายชื่อเครือข่ายศิษย์เก่าผู้ช่วยพยาบาล",
+const NETWORK_ORDER = [
+  "ปริญญาพยาบาล",
+  "ผู้ช่วยพยาบาล",
+  "อนุปริญญาพยาบาล",
+  "ปริญญาโท",
+  "ปริญญาเอก",
 ];
 
-type ViewSortField = "generation" | "studentId" | "name";
-type MgmtSortField = "generation" | "studentId" | "cohort" | "name";
+type SortField = "network" | "generation" | "studentId" | "name";
 type SortDir = "asc" | "desc";
 
 const EMPTY_FORM = { studentId: "", name: "", cohort: "", generation: "" };
@@ -53,6 +52,12 @@ function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; c
   );
 }
 
+function compareNetwork(a: string, b: string): number {
+  const ai = NETWORK_ORDER.indexOf(a);
+  const bi = NETWORK_ORDER.indexOf(b);
+  return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+}
+
 export default function ModelRepresentativesPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
@@ -60,12 +65,13 @@ export default function ModelRepresentativesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [pages, setPages] = useState<Record<string, number>>({});
-  const [viewSortFields, setViewSortFields] = useState<Record<string, ViewSortField>>({});
-  const [viewSortDirs, setViewSortDirs] = useState<Record<string, SortDir>>({});
+  const [networkFilter, setNetworkFilter] = useState<string>("all");
 
-  const [mgmtSortField, setMgmtSortField] = useState<MgmtSortField>("generation");
+  const [viewSortField, setViewSortField] = useState<SortField>("network");
+  const [viewSortDir, setViewSortDir] = useState<SortDir>("asc");
+  const [viewPage, setViewPage] = useState(1);
+
+  const [mgmtSortField, setMgmtSortField] = useState<SortField>("network");
   const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("asc");
 
   const [manageMode, setManageMode] = useState(false);
@@ -120,34 +126,50 @@ export default function ModelRepresentativesPage() {
     setSearchField(null);
   };
 
-  const toggle = (label: string) =>
-    setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
-
-  const getPage = (label: string) => pages[label] ?? 1;
-  const setPage = (label: string, p: number) =>
-    setPages((prev) => ({ ...prev, [label]: p }));
-
-  const getViewSortField = (label: string) => viewSortFields[label] ?? "generation";
-  const getViewSortDir = (label: string) => viewSortDirs[label] ?? "asc";
-  const handleViewSort = (label: string, field: ViewSortField) => {
-    const currentField = viewSortFields[label] ?? "generation";
-    const currentDir = viewSortDirs[label] ?? "asc";
-    if (currentField === field) {
-      setViewSortDirs((prev) => ({ ...prev, [label]: currentDir === "asc" ? "desc" : "asc" }));
+  const handleSort = (field: SortField, isManage: boolean) => {
+    if (isManage) {
+      if (mgmtSortField === field) {
+        setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
+      } else {
+        setMgmtSortField(field);
+        setMgmtSortDir("asc");
+      }
     } else {
-      setViewSortFields((prev) => ({ ...prev, [label]: field }));
-      setViewSortDirs((prev) => ({ ...prev, [label]: "asc" }));
+      if (viewSortField === field) {
+        setViewSortDir((d) => d === "asc" ? "desc" : "asc");
+      } else {
+        setViewSortField(field);
+        setViewSortDir("asc");
+      }
+      setViewPage(1);
     }
   };
 
-  const handleMgmtSort = (field: MgmtSortField) => {
-    if (mgmtSortField === field) {
-      setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
-    } else {
-      setMgmtSortField(field);
-      setMgmtSortDir("asc");
-    }
-  };
+  const sortItems = useCallback((items: ModelRepresentative[], field: SortField, dir: SortDir) => {
+    return [...items].sort((a, b) => {
+      let cmp: number;
+      switch (field) {
+        case "network":
+          cmp = compareNetwork(a.cohort, b.cohort);
+          if (cmp !== 0) break;
+          // Secondary sort by generation
+          cmp = a.generation - b.generation;
+          break;
+        case "generation":
+          cmp = a.generation - b.generation;
+          break;
+        case "studentId":
+          cmp = a.studentId.localeCompare(b.studentId, "th");
+          break;
+        case "name":
+          cmp = a.name.localeCompare(b.name, "th");
+          break;
+        default:
+          cmp = 0;
+      }
+      return dir === "asc" ? cmp : -cmp;
+    });
+  }, []);
 
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
@@ -156,7 +178,6 @@ export default function ModelRepresentativesPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
-      setPages({});
     } catch (err) {
       console.error(err);
     } finally {
@@ -200,33 +221,30 @@ export default function ModelRepresentativesPage() {
     }
   }, [filterField]);
 
-  const grouped = useMemo(() => {
-    const filtered = search
-      ? alumni.filter((a) => matchesSearch(a, search))
-      : alumni;
-
-    const byCohort = new Map<string, ModelRepresentative[]>();
-    for (const a of filtered) {
-      const list = byCohort.get(a.cohort) || [];
-      list.push(a);
-      byCohort.set(a.cohort, list);
+  const filteredAlumni = useMemo(() => {
+    let filtered = search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
+    if (networkFilter !== "all") {
+      filtered = filtered.filter((a) => a.cohort === networkFilter);
     }
+    return filtered;
+  }, [alumni, search, matchesSearch, networkFilter]);
 
-    const sorted = [...byCohort.entries()].sort(([a], [b]) => {
-      const ai = COHORT_ORDER.indexOf(a);
-      const bi = COHORT_ORDER.indexOf(b);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    });
+  const viewSorted = useMemo(() => {
+    return sortItems(filteredAlumni, viewSortField, viewSortDir);
+  }, [filteredAlumni, viewSortField, viewSortDir, sortItems]);
 
-    return sorted.map(([cohort, items]) => ({
-      label: cohort,
-      items: [...items].sort((a, b) => a.generation - b.generation),
-    }));
-  }, [alumni, search, matchesSearch]);
+  const mgmtSorted = useMemo(() => {
+    return sortItems(filteredAlumni, mgmtSortField, mgmtSortDir);
+  }, [filteredAlumni, mgmtSortField, mgmtSortDir, sortItems]);
 
   const allCohorts = useMemo(() => {
-    const seen = new Set(COHORT_ORDER);
-    const result = [...COHORT_ORDER];
+    const seen = new Set<string>();
+    const result: string[] = [];
+    // Put known networks first in order
+    for (const n of NETWORK_ORDER) {
+      seen.add(n);
+      result.push(n);
+    }
     for (const a of alumni) {
       if (!seen.has(a.cohort)) {
         seen.add(a.cohort);
@@ -394,29 +412,21 @@ export default function ModelRepresentativesPage() {
     }
   };
 
-  const filteredAlumni = useMemo(() => {
-    const filtered = search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
-    return [...filtered].sort((a, b) => {
-      let va: string | number, vb: string | number;
-      switch (mgmtSortField) {
-        case "generation": va = a.generation; vb = b.generation; break;
-        case "studentId": va = a.studentId; vb = b.studentId; break;
-        case "cohort": va = a.cohort; vb = b.cohort; break;
-        case "name": va = a.name; vb = b.name; break;
-      }
-      const cmp = typeof va === "number"
-        ? (va as number) - (vb as number)
-        : String(va).localeCompare(String(vb), "th");
-      return mgmtSortDir === "asc" ? cmp : -cmp;
-    });
-  }, [alumni, search, matchesSearch, mgmtSortField, mgmtSortDir]);
+  // ── View mode pagination ──
+  const viewTotalPages = Math.max(1, Math.ceil(viewSorted.length / PAGE_SIZE));
+  const currentViewPage = Math.min(viewPage, viewTotalPages);
+  const viewStart = (currentViewPage - 1) * PAGE_SIZE;
+  const viewPageItems = viewSorted.slice(viewStart, viewStart + PAGE_SIZE);
+  const viewPageStart = viewSorted.length === 0 ? 0 : viewStart + 1;
+  const viewPageEnd = Math.min(viewStart + PAGE_SIZE, viewSorted.length);
 
-  const manageTotalPages = Math.max(1, Math.ceil(filteredAlumni.length / PAGE_SIZE));
+  // ── Manage mode pagination ──
+  const manageTotalPages = Math.max(1, Math.ceil(mgmtSorted.length / PAGE_SIZE));
   const currentManagePage = Math.min(managePage, manageTotalPages);
   const manageStart = (currentManagePage - 1) * PAGE_SIZE;
-  const managePageItems = filteredAlumni.slice(manageStart, manageStart + PAGE_SIZE);
-  const managePageStart = filteredAlumni.length === 0 ? 0 : manageStart + 1;
-  const managePageEnd = Math.min(manageStart + PAGE_SIZE, filteredAlumni.length);
+  const managePageItems = mgmtSorted.slice(manageStart, manageStart + PAGE_SIZE);
+  const managePageStart = mgmtSorted.length === 0 ? 0 : manageStart + 1;
+  const managePageEnd = Math.min(manageStart + PAGE_SIZE, mgmtSorted.length);
 
   const handleExport = () => {
     const params = new URLSearchParams();
@@ -445,21 +455,85 @@ export default function ModelRepresentativesPage() {
     }
   };
 
-  const managePaginationNumbers = (() => {
+  const paginationNumbers = (totalPages: number, currentPage: number) => {
     const nums: (number | "...")[] = [];
-    if (manageTotalPages <= 7) {
-      for (let i = 1; i <= manageTotalPages; i++) nums.push(i);
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) nums.push(i);
     } else {
       nums.push(1);
-      if (currentManagePage > 3) nums.push("...");
-      const start = Math.max(2, currentManagePage - 1);
-      const end = Math.min(manageTotalPages - 1, currentManagePage + 1);
+      if (currentPage > 3) nums.push("...");
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
       for (let i = start; i <= end; i++) nums.push(i);
-      if (currentManagePage < manageTotalPages - 2) nums.push("...");
-      nums.push(manageTotalPages);
+      if (currentPage < totalPages - 2) nums.push("...");
+      nums.push(totalPages);
     }
     return nums;
-  })();
+  };
+
+  const renderPagination = (
+    totalPages: number,
+    currentPage: number,
+    onPageChange: (p: number) => void,
+    pageStart: number,
+    pageEnd: number,
+    totalItems: number,
+  ) => {
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3 sm:flex-row">
+        <span className="text-sm text-gray-500">
+          แสดง {pageStart}-{pageEnd} จาก {totalItems} รายการ
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+          >
+            ก่อนหน้า
+          </button>
+          {paginationNumbers(totalPages, currentPage).map((p, i) =>
+            p === "..." ? (
+              <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onPageChange(p)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  currentPage === p
+                    ? "bg-[var(--primary)] text-white"
+                    : "text-gray-600 bg-white hover:bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const tableHeader = (field: SortField, label: string, isManage: boolean, align: "left" | "center" = "left") => (
+    <th
+      onClick={() => handleSort(field, isManage)}
+      className={`cursor-pointer select-none px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10`}
+    >
+      {label}{" "}
+      <SortIcon
+        active={(isManage ? mgmtSortField : viewSortField) === field}
+        dir={isManage ? mgmtSortDir : viewSortDir}
+      />
+    </th>
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -617,7 +691,7 @@ export default function ModelRepresentativesPage() {
             )}
             <div className="relative" ref={cohortDropdownRef}>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                ชื่อเครือข่าย *
+                เครือข่าย *
               </label>
               <input
                 type="text"
@@ -686,7 +760,7 @@ export default function ModelRepresentativesPage() {
         </div>
       )}
 
-      {/* Manage mode: add button */}
+      {/* Manage mode: action buttons */}
       {manageMode && (
         <div className="mb-4 flex flex-wrap gap-2">
           <button
@@ -749,7 +823,7 @@ export default function ModelRepresentativesPage() {
           <option value="name">ชื่อ-นามสกุล</option>
           <option value="studentId">รหัสนักศึกษา</option>
           <option value="generation">รุ่นที่</option>
-          <option value="cohort">ชื่อเครือข่าย</option>
+          <option value="cohort">เครือข่าย</option>
         </select>
         <input
           type="text"
@@ -758,9 +832,24 @@ export default function ModelRepresentativesPage() {
           onChange={(e) => {
             setSearch(e.target.value);
             if (manageMode) setManagePage(1);
+            else setViewPage(1);
           }}
           className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
         />
+        <select
+          value={networkFilter}
+          onChange={(e) => {
+            setNetworkFilter(e.target.value);
+            if (manageMode) setManagePage(1);
+            else setViewPage(1);
+          }}
+          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        >
+          <option value="all">เครือข่ายทั้งหมด</option>
+          {allCohorts.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
@@ -778,57 +867,45 @@ export default function ModelRepresentativesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  {manageMode && (
-                    <th className="px-4 py-3 w-12">
-                      <input
-                        type="checkbox"
-                        checked={managePageItems.length > 0 && isAllSelected(managePageItems.map((item) => item.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) selectAll(managePageItems.map((item) => item.id));
-                          else deselectAll();
-                        }}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </th>
-                  )}
-                  <th onClick={() => handleMgmtSort("generation")} className="cursor-pointer select-none px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
-                    รุ่นที่ <SortIcon active={mgmtSortField === "generation"} dir={mgmtSortDir} />
+                  <th className="px-4 py-3 w-12">
+                    <input
+                      type="checkbox"
+                      checked={managePageItems.length > 0 && isAllSelected(managePageItems.map((item) => item.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) selectAll(managePageItems.map((item) => item.id));
+                        else deselectAll();
+                      }}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
                   </th>
-                  <th onClick={() => handleMgmtSort("studentId")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
-                    รหัสนักศึกษา <SortIcon active={mgmtSortField === "studentId"} dir={mgmtSortDir} />
-                  </th>
-                  <th onClick={() => handleMgmtSort("cohort")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
-                    ชื่อเครือข่าย <SortIcon active={mgmtSortField === "cohort"} dir={mgmtSortDir} />
-                  </th>
-                  <th onClick={() => handleMgmtSort("name")} className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10">
-                    ชื่อ-นามสกุล <SortIcon active={mgmtSortField === "name"} dir={mgmtSortDir} />
-                  </th>
+                  {tableHeader("network", "เครือข่าย", true)}
+                  {tableHeader("generation", "รุ่นที่", true, "center")}
+                  {tableHeader("studentId", "รหัสนักศึกษา", true)}
+                  {tableHeader("name", "ชื่อ-นามสกุล", true)}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {managePageItems.map((a, i) => (
+                {managePageItems.map((a) => (
                   <tr
                     key={a.id}
                     className="transition-colors hover:bg-gray-50"
                   >
-                    {manageMode && (
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(a.id)}
-                          onChange={() => toggleSelect(a.id)}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                      </td>
-                    )}
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected(a.id)}
+                        onChange={() => toggleSelect(a.id)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </td>
+                    <td className="px-4 py-3">{a.cohort}</td>
                     <td className="px-4 py-3 text-center text-gray-500">
                       {a.generation}
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
-                    <td className="px-4 py-3">{a.cohort}</td>
                     <td className="px-4 py-3">{a.name}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -876,207 +953,43 @@ export default function ModelRepresentativesPage() {
                 ))}
               </tbody>
             </table>
-            <div className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3 sm:flex-row">
-              <span className="text-sm text-gray-500">
-                แสดง {managePageStart}-{managePageEnd} จาก {filteredAlumni.length}{" "}
-                รายการ
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => { setManagePage(Math.max(1, currentManagePage - 1)); deselectAll(); }}
-                  disabled={currentManagePage === 1}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                >
-                  ก่อนหน้า
-                </button>
-                {managePaginationNumbers.map((p, i) =>
-                  p === "..." ? (
-                    <span
-                      key={`dot-${i}`}
-                      className="px-2 text-gray-400"
-                    >
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => { setManagePage(p); deselectAll(); }}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                        currentManagePage === p
-                          ? "bg-[var(--primary)] text-white"
-                          : "text-gray-600 bg-white hover:bg-gray-100"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-                <button
-                  onClick={() => {
-                    setManagePage(Math.min(manageTotalPages, currentManagePage + 1));
-                    deselectAll();
-                  }}
-                  disabled={currentManagePage === manageTotalPages}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                >
-                  ถัดไป
-                </button>
-              </div>
-            </div>
+            {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); deselectAll(); }, managePageStart, managePageEnd, mgmtSorted.length)}
           </div>
         )
-      ) : /* ===== VIEW MODE: sectioned tables by cohort ===== */
-      grouped.length === 0 ? (
+      ) : /* ===== VIEW MODE: single merged table ===== */
+      viewSorted.length === 0 ? (
         <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
       ) : (
-        <div className="space-y-8">
-          {grouped.map((group) => {
-            const isCollapsed = collapsed[group.label] ?? true;
-            const sortField = getViewSortField(group.label);
-            const sortDir = getViewSortDir(group.label);
-            const sortedItems = [...group.items].sort((a, b) => {
-              let va: string | number, vb: string | number;
-              switch (sortField) {
-                case "generation": va = a.generation; vb = b.generation; break;
-                case "studentId": va = a.studentId; vb = b.studentId; break;
-                case "name": va = a.name; vb = b.name; break;
-              }
-              const cmp = typeof va === "number"
-                ? (va as number) - (vb as number)
-                : String(va).localeCompare(String(vb), "th");
-              return sortDir === "asc" ? cmp : -cmp;
-            });
-            const totalPages = Math.max(
-              1,
-              Math.ceil(sortedItems.length / PAGE_SIZE)
-            );
-            const currentPage = Math.min(getPage(group.label), totalPages);
-            const start = (currentPage - 1) * PAGE_SIZE;
-            const pageItems = sortedItems.slice(start, start + PAGE_SIZE);
-
-            return (
-              <div
-                key={group.label}
-                className="overflow-hidden rounded-lg bg-white shadow-sm"
+        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr
+                className="text-white text-left"
+                style={{ backgroundColor: "#1e3a5f" }}
               >
-                <button
-                  type="button"
-                  onClick={() => toggle(group.label)}
-                  className="flex w-full items-center justify-between bg-[var(--primary)] px-4 py-3 text-left"
+                {tableHeader("network", "เครือข่าย", false)}
+                {tableHeader("generation", "รุ่นที่", false, "center")}
+                {tableHeader("studentId", "รหัสนักศึกษา", false)}
+                {tableHeader("name", "ชื่อ - นามสกุล", false)}
+              </tr>
+            </thead>
+            <tbody>
+              {viewPageItems.map((a) => (
+                <tr
+                  key={a.id}
+                  className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                 >
-                  <h2 className="text-sm font-semibold text-white sm:text-base">
-                    {group.label}
-                  </h2>
-                  <svg
-                    className={`h-5 w-5 shrink-0 text-white transition-transform ${isCollapsed ? "" : "rotate-180"}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
-
-                {!isCollapsed && (
-                  <>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr
-                            className="text-white text-left"
-                            style={{ backgroundColor: "#1e3a5f" }}
-                          >
-                            <th
-                              className="w-20 cursor-pointer px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
-                              onClick={() => handleViewSort(group.label, "generation")}
-                            >
-                              รุ่นที่ <SortIcon active={sortField === "generation"} dir={sortDir} />
-                            </th>
-                            <th
-                              className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
-                              onClick={() => handleViewSort(group.label, "studentId")}
-                            >
-                              รหัสนักศึกษา <SortIcon active={sortField === "studentId"} dir={sortDir} />
-                            </th>
-                            <th
-                              className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap select-none hover:bg-white/10"
-                              onClick={() => handleViewSort(group.label, "name")}
-                            >
-                              ชื่อ - นามสกุล <SortIcon active={sortField === "name"} dir={sortDir} />
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pageItems.map((a) => (
-                            <tr
-                              key={a.id}
-                              className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
-                            >
-                              <td className="px-4 py-3 text-center">
-                                {a.generation}
-                              </td>
-                              <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
-                              <td className="px-4 py-3">{a.name}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                        <span className="text-sm text-gray-500">แสดง {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, sortedItems.length)} จาก {sortedItems.length} รายการ</span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() =>
-                              setPage(group.label, Math.max(1, currentPage - 1))
-                            }
-                            disabled={currentPage === 1}
-                            className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50"
-                          >
-                            ก่อนหน้า
-                          </button>
-                          {Array.from(
-                            { length: totalPages },
-                            (_, i) => i + 1
-                          ).map((p) => (
-                            <button
-                              key={p}
-                              onClick={() => setPage(group.label, p)}
-                              className={`rounded-md px-3 py-1.5 text-sm ${
-                                p === currentPage
-                                  ? "bg-[var(--primary)] text-white"
-                                  : "border border-[var(--border)] bg-white hover:bg-gray-100"
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() =>
-                              setPage(
-                                group.label,
-                                Math.min(totalPages, currentPage + 1)
-                              )
-                            }
-                            disabled={currentPage === totalPages}
-                            className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50"
-                          >
-                            ถัดไป
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })}
+                  <td className="px-4 py-3">{a.cohort}</td>
+                  <td className="px-4 py-3 text-center">
+                    {a.generation}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
+                  <td className="px-4 py-3">{a.name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {renderPagination(viewTotalPages, currentViewPage, setViewPage, viewPageStart, viewPageEnd, viewSorted.length)}
         </div>
       )}
 

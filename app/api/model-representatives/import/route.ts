@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
       const name = row["ชื่อ-นามสกุล"]?.toString().trim();
-      const cohort = row["รุ่น"]?.toString().trim();
+      const cohort = row["เครือข่าย"]?.toString().trim();
       const generationStr = row["ลำดับรุ่น"]?.toString().trim();
 
       if (!studentId || !name || !cohort || !generationStr) {
