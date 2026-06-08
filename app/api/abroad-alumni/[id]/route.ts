@@ -11,7 +11,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { cohort, prefix, thaiName, englishName, workplace, country, notes, order } = body;
+    const { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order } = body;
 
     if (!country) {
       return NextResponse.json(
@@ -35,6 +35,7 @@ export async function PUT(
         thaiName: thaiName?.trim() || null,
         englishName: englishName?.trim() || null,
         workplace: workplace?.trim() || null,
+        homeAddress: homeAddress?.trim() || null,
         country: country.trim(),
         notes: notes?.trim() || null,
         order: order !== undefined ? Number(order) : 0,

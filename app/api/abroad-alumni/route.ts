@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { cohort, prefix, thaiName, englishName, workplace, country, notes, order } = body;
+    const { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order } = body;
 
     if (!country) {
       return NextResponse.json(
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
         thaiName: thaiName?.trim() || null,
         englishName: englishName?.trim() || null,
         workplace: workplace?.trim() || null,
+        homeAddress: homeAddress?.trim() || null,
         country: country.trim(),
         notes: notes?.trim() || null,
         order: order !== undefined ? Number(order) : 0,
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "cohort"];
+    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "homeAddress", "cohort"];
 
     const where: Record<string, unknown> = {};
 
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
           { englishName: { contains: search, mode: "insensitive" } },
           { workplace: { contains: search, mode: "insensitive" } },
           { country: { contains: search, mode: "insensitive" } },
+          { homeAddress: { contains: search, mode: "insensitive" } },
           { cohort: { contains: search, mode: "insensitive" } },
         ];
       }

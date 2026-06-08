@@ -4,6 +4,7 @@ export interface ParsedAbroadAlumniRow {
   thaiName: string | null;
   englishName: string | null;
   workplace: string | null;
+  homeAddress: string | null;
   country: string;
   notes: string | null;
   order: number;
@@ -57,10 +58,11 @@ export function parseOriginalFormat(
     const thaiName = String(r[2] || "").trim() || null;
     const englishName = String(r[3] || "").trim() || null;
     const workplace = String(r[4] || "").trim() || null;
-    const notes = String(r[5] || "").trim() || null;
+    const homeAddress = String(r[5] || "").trim() || null;
+    const notes = String(r[6] || "").trim() || null;
     const country = inferCountry(workplace || "");
     result.push({
-      data: { cohort, prefix, thaiName, englishName, workplace, country, notes, order: i },
+      data: { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order: i },
       rowNumber: i + 1,
     });
   }
@@ -90,6 +92,7 @@ export function parseExportFormat(
         thaiName: thaiName || null,
         englishName: englishName || null,
         workplace: row["สถานที่ทำงาน"]?.toString().trim() || null,
+        homeAddress: row["ที่อยู่บ้าน"]?.toString().trim() || null,
         country,
         notes: row["หมายเหตุ"]?.toString().trim() || null,
         order: isNaN(order) ? 0 : order,

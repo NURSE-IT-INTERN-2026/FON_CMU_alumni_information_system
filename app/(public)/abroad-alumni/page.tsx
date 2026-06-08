@@ -12,6 +12,7 @@ interface AbroadAlumni {
   thaiName: string | null;
   englishName: string | null;
   workplace: string | null;
+  homeAddress: string | null;
   country: string;
   notes: string | null;
   order: number;
@@ -28,12 +29,13 @@ const EMPTY_FORM = {
   thaiName: "",
   englishName: "",
   workplace: "",
+  homeAddress: "",
   country: "",
   notes: "",
   order: "0",
 };
 
-type SearchField = "all" | "thaiName" | "englishName" | "country" | "workplace" | "cohort";
+type SearchField = "all" | "thaiName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
@@ -41,6 +43,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "englishName", label: "ชื่ออังกฤษ" },
   { value: "country", label: "ประเทศ" },
   { value: "workplace", label: "สถานที่ทำงาน" },
+  { value: "homeAddress", label: "ที่อยู่บ้าน" },
   { value: "cohort", label: "รุ่น" },
 ];
 
@@ -49,7 +52,7 @@ function displayName(a: AbroadAlumni): string {
   return a.thaiName || a.englishName || "-";
 }
 
-type SortField = "cohort" | "thaiName" | "englishName" | "country" | "workplace" | "notes" | "order";
+type SortField = "cohort" | "thaiName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
 const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
@@ -58,6 +61,7 @@ const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "homeAddress", label: "ที่อยู่บ้าน" },
   { field: "notes", label: "หมายเหตุ" },
 ];
 
@@ -65,7 +69,9 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
   { field: "thaiName", label: "ชื่อ - นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
+  { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "homeAddress", label: "ที่อยู่บ้าน" },
   { field: "notes", label: "หมายเหตุ" },
 ];
 
@@ -76,6 +82,7 @@ function getFieldValue(a: AbroadAlumni, field: SortField): string {
     case "englishName": return a.englishName || "";
     case "country": return a.country;
     case "workplace": return a.workplace || "";
+    case "homeAddress": return a.homeAddress || "";
     case "notes": return a.notes || "";
     case "order": return String(a.order);
   }
@@ -121,12 +128,10 @@ export default function AbroadAlumniPage() {
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState("");
   const [countries, setCountries] = useState<string[]>([]);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [pageByGroup, setPageByGroup] = useState<Record<string, number>>({});
-  const perGroupPage = 10;
 
   const [manageMode, setManageMode] = useState(false);
   const [mgmtPage, setMgmtPage] = useState(1);
+  const [viewPage, setViewPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -155,12 +160,6 @@ export default function AbroadAlumniPage() {
   const [viewSortField, setViewSortField] = useState<SortField>("cohort");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("desc");
 
-  const toggle = (label: string) =>
-    setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
-  const pageFor = (label: string) => pageByGroup[label] ?? 1;
-  const setPageFor = (label: string, p: number) =>
-    setPageByGroup((prev) => ({ ...prev, [label]: p }));
-
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
@@ -183,27 +182,18 @@ export default function AbroadAlumniPage() {
     fetchAlumni();
   }, [fetchAlumni]);
 
-  // Group by country
-  const grouped = useMemo(() => {
-    const groups: { country: string; items: AbroadAlumni[] }[] = [];
-    const byCountry = new Map<string, AbroadAlumni[]>();
-    for (const a of alumni) {
-      const list = byCountry.get(a.country) || [];
-      list.push(a);
-      byCountry.set(a.country, list);
-    }
-    for (const [country, items] of byCountry) {
-      const sorted = [...items].sort((a, b) => {
-        const va = getFieldValue(a, viewSortField);
-        const vb = getFieldValue(b, viewSortField);
-        const cmp = va.localeCompare(vb, "th");
-        return viewSortDir === "asc" ? cmp : -cmp;
-      });
-      groups.push({ country, items: sorted });
-    }
-    groups.sort((a, b) => b.items.length - a.items.length);
-    return groups;
-  }, [alumni, viewSortField, viewSortDir]);
+  // View mode: flat sorted list
+  const viewSortedAlumni = useMemo(() =>
+    [...alumni].sort((a, b) => {
+      const va = getFieldValue(a, viewSortField);
+      const vb = getFieldValue(b, viewSortField);
+      const cmp = va.localeCompare(vb, "th");
+      return viewSortDir === "asc" ? cmp : -cmp;
+    }),
+    [alumni, viewSortField, viewSortDir]
+  );
+  const viewTotalPages = Math.max(1, Math.ceil(viewSortedAlumni.length / PAGE_SIZE));
+  const pagedViewAlumni = viewSortedAlumni.slice((viewPage - 1) * PAGE_SIZE, viewPage * PAGE_SIZE);
 
   // Management mode: flat sorted list
   const sortedAlumni = useMemo(() =>
@@ -232,6 +222,7 @@ export default function AbroadAlumniPage() {
       thaiName: a.thaiName || "",
       englishName: a.englishName || "",
       workplace: a.workplace || "",
+      homeAddress: a.homeAddress || "",
       country: a.country,
       notes: a.notes || "",
       order: String(a.order),
@@ -267,6 +258,7 @@ export default function AbroadAlumniPage() {
         thaiName: form.thaiName.trim() || null,
         englishName: form.englishName.trim() || null,
         workplace: form.workplace.trim() || null,
+        homeAddress: form.homeAddress.trim() || null,
         country: form.country.trim(),
         notes: form.notes.trim() || null,
         order: Number(form.order) || 0,
@@ -459,6 +451,10 @@ export default function AbroadAlumniPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">สถานที่ทำงาน</label>
               <textarea value={form.workplace} onChange={(e) => setForm((f) => ({ ...f, workplace: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
             </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">ที่อยู่บ้าน</label>
+              <textarea value={form.homeAddress} onChange={(e) => setForm((f) => ({ ...f, homeAddress: e.target.value }))} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">ประเทศ *</label>
               <input type="text" list="country-list" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.country ? "border-red-400" : "border-gray-300"}`} />
@@ -613,6 +609,7 @@ export default function AbroadAlumniPage() {
                     <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
                     <td className="px-4 py-3">{a.country}</td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.workplace || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.homeAddress || "-"}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{a.notes || "-"}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -644,87 +641,61 @@ export default function AbroadAlumniPage() {
           )}
         </div>
       ) : (
-        /* View mode: grouped by country */
-        <div className="space-y-8">
-          {grouped.map((group) => {
-            const isCollapsed = collapsed[group.country] ?? true;
-            const page = pageFor(group.country);
-            const totalPages = Math.ceil(group.items.length / perGroupPage);
-            const paged = group.items.slice((page - 1) * perGroupPage, page * perGroupPage);
-
-            return (
-              <div key={group.country} className="overflow-hidden rounded-lg bg-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => toggle(group.country)}
-                  className="flex w-full items-center justify-between bg-[var(--primary)] px-4 py-3 text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-semibold text-white sm:text-base">{group.country}</h2>
-                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs text-white">{group.items.length} คน</span>
-                  </div>
-                  <svg className={`h-5 w-5 shrink-0 text-white transition-transform ${isCollapsed ? "" : "rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {!isCollapsed && (
-                  <>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
-                            <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                            {VIEW_SORT_FIELDS.map(({ field, label }) => (
-                              <th
-                                key={field}
-                                onClick={() => {
-                                  if (viewSortField === field) setViewSortDir((d) => d === "asc" ? "desc" : "asc");
-                                  else { setViewSortField(field); setViewSortDir("asc"); }
-                                }}
-                                className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                              >
-                                {label}
-                                <SortIcon active={viewSortField === field} dir={viewSortField === field ? viewSortDir : "asc"} />
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paged.map((a, idx) => (
-                            <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                              <td className="px-4 py-3 text-center">{(page - 1) * perGroupPage + idx + 1}</td>
-                              <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
-                              <td className="px-4 py-3">{a.thaiName || a.englishName || "-"}</td>
-                              <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
-                              <td className="px-4 py-3 text-[var(--muted)]">{a.workplace || "-"}</td>
-                              <td className="px-4 py-3">
-                                {a.notes ? (
-                                  <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
-                                ) : "-"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {totalPages > 1 && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                        <span className="text-sm text-gray-500">แสดง {(page - 1) * perGroupPage + 1}-{Math.min(page * perGroupPage, group.items.length)} จาก {group.items.length} รายการ</span>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => setPageFor(group.country, Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                          {getPageNumbers(page, totalPages).map((p, i) => (
-                            p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
-                            <button key={p} onClick={() => setPageFor(group.country, p)} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-                          ))}
-                          <button onClick={() => setPageFor(group.country, Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
+        /* View mode: single flat table */
+        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--primary)] text-white">
+                  <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                  {VIEW_SORT_FIELDS.map(({ field, label }) => (
+                    <th
+                      key={field}
+                      onClick={() => {
+                        if (viewSortField === field) setViewSortDir((d) => d === "asc" ? "desc" : "asc");
+                        else { setViewSortField(field); setViewSortDir("asc"); }
+                      }}
+                      className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                    >
+                      {label}
+                      <SortIcon active={viewSortField === field} dir={viewSortField === field ? viewSortDir : "asc"} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedViewAlumni.map((a, idx) => (
+                  <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
+                    <td className="px-4 py-3">{a.thaiName || a.englishName || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
+                    <td className="px-4 py-3">{a.country}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.workplace || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{a.homeAddress || "-"}</td>
+                    <td className="px-4 py-3">
+                      {a.notes ? (
+                        <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
+                      ) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {viewTotalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+              <span className="text-sm text-gray-500">แสดง {viewSortedAlumni.length === 0 ? 0 : (viewPage - 1) * PAGE_SIZE + 1}-{Math.min(viewPage * PAGE_SIZE, viewSortedAlumni.length)} จาก {viewSortedAlumni.length} รายการ</span>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setViewPage(Math.max(1, viewPage - 1))} disabled={viewPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                {getPageNumbers(viewPage, viewTotalPages).map((p, i) => (
+                  p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
+                  <button key={p} onClick={() => setViewPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${viewPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                ))}
+                <button onClick={() => setViewPage(Math.min(viewTotalPages, viewPage + 1))} disabled={viewPage === viewTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
       )}
 

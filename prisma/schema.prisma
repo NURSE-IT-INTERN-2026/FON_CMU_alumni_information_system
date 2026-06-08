@@ -191,6 +191,7 @@ model AbroadAlumni {
   thaiName    String?
   englishName String?
   workplace   String?
+  homeAddress String?
   country     String
   notes       String?
   order       Int
