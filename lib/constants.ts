@@ -39,8 +39,9 @@ export const SETTINGS_NAV_ITEMS = [
 export const PAGE_SIZE = 10;
 
 export const DEGREE_LEVEL_OPTIONS = [
+  { value: "NURSING_ASSISTANT", label: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล" },
+  { value: "ASSOCIATE", label: "อนุปริญญา" },
   { value: "BACHELOR", label: "ปริญญาตรี" },
   { value: "MASTER", label: "ปริญญาโท" },
   { value: "DOCTORAL", label: "ปริญญาเอก" },
-  { value: "NURSING_ASSISTANT", label: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล" },
 ];

@@ -12,10 +12,12 @@ const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
   "ปริญญาโท": "MASTER",
   "ปริญญาตรี": "BACHELOR",
   "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล": "NURSING_ASSISTANT",
+  "อนุปริญญา": "ASSOCIATE",
   "DOCTORAL": "DOCTORAL",
   "MASTER": "MASTER",
   "BACHELOR": "BACHELOR",
   "NURSING_ASSISTANT": "NURSING_ASSISTANT",
+  "ASSOCIATE": "ASSOCIATE",
 };
 
 export async function POST(request: NextRequest) {

@@ -7,9 +7,10 @@ const DEGREE_LABELS: Record<string, string> = {
   MASTER: "ปริญญาโท",
   BACHELOR: "ปริญญาตรี",
   NURSING_ASSISTANT: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
+  ASSOCIATE: "อนุปริญญา",
 };
 
-const DEGREE_ORDER = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"];
+const DEGREE_ORDER = ["NURSING_ASSISTANT", "ASSOCIATE", "BACHELOR", "MASTER", "DOCTORAL"];
 
 export async function GET() {
   const session = await getSession();

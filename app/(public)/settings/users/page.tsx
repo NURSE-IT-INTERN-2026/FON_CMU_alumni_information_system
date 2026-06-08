@@ -44,6 +44,7 @@ const DEGREE_LABELS: Record<string, string> = {
   MASTER: "ปริญญาโท",
   BACHELOR: "ปริญญาตรี",
   NURSING_ASSISTANT: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
+  ASSOCIATE: "อนุปริญญา",
 };
 
 export default function UsersPage() {

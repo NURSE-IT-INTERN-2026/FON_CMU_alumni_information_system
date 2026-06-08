@@ -25,7 +25,7 @@ interface NewsItem {
   title: string;
   body: string;
   coverImageUrl: string | null;
-  status: "DRAFT" | "PUBLISHED";
+  status: "DRAFT" | "PUBLISHED" | "DISCONTINUED";
   publishedAt: string | null;
   createdAt: string;
 }
@@ -41,13 +41,14 @@ interface ApiResponse {
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "ฉบับร่าง",
   PUBLISHED: "เผยแพร่",
+  DISCONTINUED: "ยุติการเผยแพร่",
 };
 
 const EMPTY_FORM: {
   title: string;
   body: string;
   coverImageUrl: string;
-  status: "DRAFT" | "PUBLISHED";
+  status: "DRAFT" | "PUBLISHED" | "DISCONTINUED";
 } = {
   title: "",
   body: "",
@@ -653,11 +654,12 @@ export default function NewsListPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">สถานะ</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "DRAFT" | "PUBLISHED" }))}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "DRAFT" | "PUBLISHED" | "DISCONTINUED" }))}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               >
                 <option value="DRAFT">ฉบับร่าง</option>
                 <option value="PUBLISHED">เผยแพร่</option>
+                <option value="DISCONTINUED">ยุติการเผยแพร่</option>
               </select>
             </div>
           </div>
@@ -704,6 +706,7 @@ export default function NewsListPage() {
             <option value="">ทั้งหมด</option>
             <option value="DRAFT">ฉบับร่าง</option>
             <option value="PUBLISHED">เผยแพร่</option>
+            <option value="DISCONTINUED">ยุติการเผยแพร่</option>
           </select>
         )}
       </div>
@@ -780,7 +783,7 @@ export default function NewsListPage() {
                     <td className="px-4 py-3 text-gray-500">{(page - 1) * PAGE_SIZE + i + 1}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{item.title}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
                         {STATUS_LABELS[item.status]}
                       </span>
                     </td>

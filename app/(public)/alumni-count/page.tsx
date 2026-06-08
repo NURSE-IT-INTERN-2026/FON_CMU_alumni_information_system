@@ -35,7 +35,7 @@ interface ChartData {
   totalCount: number;
 }
 
-const SERIES_COLORS = ["#1e3a5f", "#2e7d32", "#c62828", "#f57f17"];
+const SERIES_COLORS = ["#1e3a5f", "#2e7d32", "#c62828", "#f57f17", "#6a1b9a"];
 
 interface Alumni {
   id: string;
@@ -1001,10 +1001,35 @@ export default function AlumniCountPage() {
           </div>
         </>
       ) : (
-        /* View mode: multi-line chart and count cards */
+        /* View mode: count cards and multi-line chart */
         <>
+          {/* Group count cards */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {chartData?.cards.map((card, i) => {
+              const color = SERIES_COLORS[i % SERIES_COLORS.length];
+              return (
+                <div
+                  key={card.key}
+                  className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm"
+                >
+                  <div
+                    className="absolute inset-y-0 left-0 w-1.5"
+                    style={{ backgroundColor: color }}
+                  />
+                  <p className="pl-3 text-xs font-medium tracking-wide text-gray-400 uppercase">
+                    {card.label}
+                  </p>
+                  <p className="mt-1 pl-3 text-3xl font-bold" style={{ color }}>
+                    {card.count.toLocaleString()}
+                  </p>
+                  <p className="pl-3 text-xs text-gray-400">คน</p>
+                </div>
+              );
+            })}
+          </div>
+
           {/* Line chart */}
-          <div className="overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
+          <div className="mt-8 overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
             <div className="h-[450px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -1070,31 +1095,6 @@ export default function AlumniCountPage() {
                 จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
               </p>
             </div>
-          </div>
-
-          {/* Group count cards */}
-          <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {chartData?.cards.map((card, i) => {
-              const color = SERIES_COLORS[i % SERIES_COLORS.length];
-              return (
-                <div
-                  key={card.key}
-                  className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm"
-                >
-                  <div
-                    className="absolute inset-y-0 left-0 w-1.5"
-                    style={{ backgroundColor: color }}
-                  />
-                  <p className="pl-3 text-xs font-medium tracking-wide text-gray-400 uppercase">
-                    {card.label}
-                  </p>
-                  <p className="mt-1 pl-3 text-3xl font-bold" style={{ color }}>
-                    {card.count.toLocaleString()}
-                  </p>
-                  <p className="pl-3 text-xs text-gray-400">คน</p>
-                </div>
-              );
-            })}
           </div>
         </>
       )}

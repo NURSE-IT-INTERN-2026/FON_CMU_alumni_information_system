@@ -12,6 +12,7 @@ enum DegreeLevel {
   MASTER
   BACHELOR
   NURSING_ASSISTANT
+  ASSOCIATE
 }
 
 enum AwardType {
@@ -23,6 +24,7 @@ enum AwardType {
 enum NewsStatus {
   DRAFT
   PUBLISHED
+  DISCONTINUED
 }
 
 enum SessionType {
