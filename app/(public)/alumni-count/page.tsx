@@ -1069,7 +1069,7 @@ export default function AlumniCountPage() {
                       dataKey={s.key}
                       stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
                       strokeWidth={2}
-                      dot={{ r: 4 }}
+                      dot={false}
                       activeDot={{ r: 6 }}
                     />
                   ))}
