@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
       Math.min(100, parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10)),
     );
     const search = searchParams.get("search")?.trim().toLowerCase() || "";
+    const degreeLevel = searchParams.get("degreeLevel") || "";
+    const sortField = searchParams.get("sortField") || "student_id";
+    const sortDir = searchParams.get("sortDir") || "asc";
 
     // 4. Fetch from CMU Registrar API
     const graduates = await fetchCmuGraduates();
@@ -61,6 +64,44 @@ export async function GET(request: NextRequest) {
         return haystack.includes(search);
       });
     }
+
+    // 5b. Apply degree level filter
+    if (degreeLevel) {
+      filtered = filtered.filter((g: CmuGraduate) => {
+        // Map CMU level_id + major_name_th to our degree level enum values
+        switch (degreeLevel) {
+          case "DOCTORAL":
+            return g.level_id === "5";
+          case "MASTER":
+            return g.level_id === "3";
+          case "BACHELOR":
+            return g.level_id === "1";
+          case "ASSOCIATE":
+            return g.level_id === "0" && g.major_name_th !== "ประกาศนียบัตรผู้ช่วยพยาบาล";
+          case "NURSING_ASSISTANT":
+            return g.level_id === "2" || (g.level_id === "0" && g.major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล");
+          default:
+            return true;
+        }
+      });
+    }
+
+    // 5c. Sort
+    const sortFieldMap: Record<string, string> = {
+      studentId: "student_id",
+      name: "name_th",
+      surname: "surname_th",
+      degreeLevel: "level_id",
+      major: "major_name_th",
+      year: "grad_year",
+    };
+    const orderKey = sortFieldMap[sortField] || "student_id";
+    const dir = sortDir === "desc" ? -1 : 1;
+    filtered.sort((a: CmuGraduate, b: CmuGraduate) => {
+      const va = String((a as unknown as Record<string, string>)[orderKey] || "");
+      const vb = String((b as unknown as Record<string, string>)[orderKey] || "");
+      return va.localeCompare(vb, "th") * dir;
+    });
 
     // 6. Paginate
     const total = filtered.length;

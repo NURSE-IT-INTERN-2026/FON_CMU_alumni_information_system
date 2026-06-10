@@ -6,6 +6,10 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 
+type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province";
+type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year";
+type SortDir = "asc" | "desc";
+
 const DEGREE_COLORS: Record<string, string> = {
   NURSING_ASSISTANT: "#f57f17",
   ASSOCIATE: "#00838f",
@@ -98,6 +102,9 @@ export default function AlumniCountPage() {
   const [totalAlumni, setTotalAlumni] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [degreeLevelFilter, setDegreeLevelFilter] = useState("");
+  const [sortField, setSortField] = useState<ManageSortField | ViewSortField>("studentId");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [tableLoading, setTableLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_EDIT_FORM);
@@ -133,7 +140,10 @@ export default function AlumniCountPage() {
         page: String(page),
         pageSize: String(PAGE_SIZE),
         search,
+        sortField: sortField as string,
+        sortOrder: sortDir,
       });
+      if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
       const res = await fetch(`${BASE_PATH}/api/alumni?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: AlumniApiResponse = await res.json();
@@ -144,7 +154,7 @@ export default function AlumniCountPage() {
     } finally {
       setTableLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, degreeLevelFilter, sortField, sortDir]);
 
   // CMU Registrar data (view mode only)
   const [cmuAlumni, setCmuAlumni] = useState<CmuAlumni[]>([]);
@@ -157,7 +167,10 @@ export default function AlumniCountPage() {
         page: String(page),
         pageSize: String(PAGE_SIZE),
         search,
+        sortField: sortField as string,
+        sortDir,
       });
+      if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
       const res = await fetch(`${BASE_PATH}/api/cmu-alumni?${params}`);
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
@@ -171,7 +184,7 @@ export default function AlumniCountPage() {
     } finally {
       setTableLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, degreeLevelFilter, sortField, sortDir]);
 
   useEffect(() => {
     if (manageMode) {
@@ -208,6 +221,25 @@ export default function AlumniCountPage() {
     setSearch(value);
     setPage(1);
   };
+
+  const handleFilter = (value: string) => {
+    setDegreeLevelFilter(value);
+    setPage(1);
+  };
+
+  const handleSort = (field: ManageSortField | ViewSortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ field }: { field: ManageSortField | ViewSortField }) => (
+    <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
+  );
 
   const openEdit = (a: Alumni) => {
     setForm({
@@ -349,6 +381,9 @@ export default function AlumniCountPage() {
     setManageMode(true);
     setPage(1);
     setSearch("");
+    setDegreeLevelFilter("");
+    setSortField("studentId");
+    setSortDir("asc");
     setEditingId(null);
     deselectAll();
   };
@@ -363,6 +398,7 @@ export default function AlumniCountPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
+    if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
     window.location.href = `${BASE_PATH}/api/alumni/export?${params}`;
   };
 
@@ -797,6 +833,16 @@ export default function AlumniCountPage() {
               onChange={(e) => handleSearch(e.target.value)}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
+            <select
+              value={degreeLevelFilter}
+              onChange={(e) => handleFilter(e.target.value)}
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            >
+              <option value="">ทุกระดับการศึกษา</option>
+              {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Alumni table */}
@@ -822,26 +868,26 @@ export default function AlumniCountPage() {
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      รหัสนักศึกษา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
+                      รหัสนักศึกษา <SortIcon field="studentId" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      คำนำหน้า
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
+                      คำนำหน้า <SortIcon field="prefix" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ชื่อ
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("firstName")}>
+                      ชื่อ <SortIcon field="firstName" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุลเดิม
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("maidenLastName")}>
+                      นามสกุลเดิม <SortIcon field="maidenLastName" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุลใหม่
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("newLastName")}>
+                      นามสกุลใหม่ <SortIcon field="newLastName" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      รุ่น/สาขา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
+                      รุ่น/สาขา <SortIcon field="cohort" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      จังหวัด
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("province")}>
+                      จังหวัด <SortIcon field="province" />
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       จัดการ
@@ -997,6 +1043,16 @@ export default function AlumniCountPage() {
               onChange={(e) => handleSearch(e.target.value)}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
+            <select
+              value={degreeLevelFilter}
+              onChange={(e) => handleFilter(e.target.value)}
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            >
+              <option value="">ทุกระดับการศึกษา</option>
+              {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Alumni table (read-only, CMU Registrar data) */}
@@ -1011,23 +1067,23 @@ export default function AlumniCountPage() {
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      รหัสนักศึกษา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
+                      รหัสนักศึกษา <SortIcon field="studentId" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ชื่อ
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
+                      ชื่อ <SortIcon field="name" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุล
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("surname")}>
+                      นามสกุล <SortIcon field="surname" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ระดับการศึกษา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
+                      ระดับการศึกษา <SortIcon field="degreeLevel" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      สาขาวิชา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
+                      สาขาวิชา <SortIcon field="major" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      ปีที่สำเร็จการศึกษา
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
+                      ปีที่สำเร็จการศึกษา <SortIcon field="year" />
                     </th>
                   </tr>
                 </thead>

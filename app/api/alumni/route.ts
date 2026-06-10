@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
-import { Prisma } from "@/app/generated/prisma/client";
+import { Prisma, DegreeLevel } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const search = searchParams.get("search") || "";
+    const degreeLevel = searchParams.get("degreeLevel") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
@@ -27,6 +28,9 @@ export async function GET(request: NextRequest) {
       "newLastName",
       "studentId",
       "cohort",
+      "prefix",
+      "degreeLevel",
+      "province",
     ];
     const validSortField = allowedSortFields.includes(sortField) ? sortField : "createdAt";
     const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
@@ -41,6 +45,10 @@ export async function GET(request: NextRequest) {
         { studentId: { contains: search, mode: "insensitive" } },
         { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
+    }
+
+    if (degreeLevel && Object.values(DegreeLevel).includes(degreeLevel as DegreeLevel)) {
+      where.degreeLevel = degreeLevel as DegreeLevel;
     }
 
     const [data, total] = await Promise.all([
