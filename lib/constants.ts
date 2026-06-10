@@ -1,3 +1,5 @@
+export const BASE_PATH = "/alumni";
+
 export const AWARD_TYPE_LABELS: Record<string, string> = {
   INTERNATIONAL: "รางวัลระดับนานาชาติ",
   NATIONAL: "รางวัลระดับชาติ",

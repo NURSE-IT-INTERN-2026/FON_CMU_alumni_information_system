@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { BASE_PATH } from "@/lib/constants";
 import {
   LineChart,
   Line,
@@ -230,11 +231,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/dashboard").then((res) => {
+      fetch(`${BASE_PATH}/api/dashboard`).then((res) => {
         if (!res.ok) throw new Error("Failed to fetch dashboard data");
         return res.json();
       }),
-      fetch("/api/alumni-count").then((res) => {
+      fetch(`${BASE_PATH}/api/alumni-count`).then((res) => {
         if (!res.ok) throw new Error("Failed to fetch chart data");
         return res.json();
       }),

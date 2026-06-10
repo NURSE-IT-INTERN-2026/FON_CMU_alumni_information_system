@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { BASE_PATH } from "@/lib/constants";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -28,7 +29,7 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      await fetch("/api/alumni-auth/logout", { method: "POST" });
+      await fetch(`${BASE_PATH}/api/alumni-auth/logout`, { method: "POST" });
       router.push("/login");
     } catch {
       setLoggingOut(false);
@@ -51,7 +52,7 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
           {/* Logo & Title */}
           <div className="flex shrink-0 items-center gap-3">
             <img
-              src="/fon-cmu-logo.png"
+              src={`${BASE_PATH}/fon-cmu-logo.png`}
               alt="FON CMU Logo"
               className="h-16 w-auto"
             />

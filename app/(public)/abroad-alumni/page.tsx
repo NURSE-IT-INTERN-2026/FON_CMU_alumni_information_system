@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface AbroadAlumni {
@@ -164,7 +164,7 @@ export default function AbroadAlumniPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ search, country: countryFilter, searchField });
-      const res = await fetch(`/api/abroad-alumni?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/abroad-alumni?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
@@ -264,7 +264,7 @@ export default function AbroadAlumniPage() {
         order: Number(form.order) || 0,
       };
       if (editingId) {
-        const res = await fetch(`/api/abroad-alumni/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/abroad-alumni/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -274,7 +274,7 @@ export default function AbroadAlumniPage() {
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        const res = await fetch("/api/abroad-alumni", {
+        const res = await fetch(`${BASE_PATH}/api/abroad-alumni`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -296,7 +296,7 @@ export default function AbroadAlumniPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/abroad-alumni/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchAlumni();
@@ -311,7 +311,7 @@ export default function AbroadAlumniPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/abroad-alumni/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -334,7 +334,7 @@ export default function AbroadAlumniPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/abroad-alumni/export", {
+      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -355,7 +355,7 @@ export default function AbroadAlumniPage() {
 
   const handleExport = () => {
     const params = new URLSearchParams({ search, country: countryFilter, searchField });
-    window.location.href = `/api/abroad-alumni/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/abroad-alumni/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,7 +366,7 @@ export default function AbroadAlumniPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/abroad-alumni/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

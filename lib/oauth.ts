@@ -1,4 +1,5 @@
 import { randomBytes, createHash, randomUUID } from "crypto";
+import { BASE_PATH } from "@/lib/constants";
 
 const OAUTH_STATE_COOKIE = "cmu-oauth-state";
 const OAUTH_VERIFIER_COOKIE = "cmu-oauth-verifier";
@@ -119,7 +120,7 @@ export function setOAuthCookies(state: string, verifier: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: "/",
+    path: BASE_PATH,
   };
 
   return [
@@ -134,7 +135,7 @@ export function setAlumniOAuthCookies(state: string, verifier: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: "/",
+    path: BASE_PATH,
   };
 
   return [
@@ -152,7 +153,7 @@ export function setAdminFlowCookie() {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: "/",
+    path: BASE_PATH,
   };
 }
 
@@ -162,7 +163,7 @@ export function clearOAuthCookies() {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: 0,
-    path: "/",
+    path: BASE_PATH,
     value: "",
   };
 
@@ -183,7 +184,7 @@ export function setPendingEmailCookie(email: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: "/",
+    path: BASE_PATH,
   };
 }
 

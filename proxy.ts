@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BASE_PATH } from "@/lib/constants";
 
 const SESSION_COOKIE = "fon-cmu-session";
 
@@ -28,7 +29,7 @@ export function proxy(request: NextRequest) {
   // Auth check: redirect to login if no session cookie
   const session = request.cookies.get(SESSION_COOKIE);
   if (!session) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
+    const response = NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
     response.headers.set("Content-Security-Policy", cspHeader);
     return response;
   }

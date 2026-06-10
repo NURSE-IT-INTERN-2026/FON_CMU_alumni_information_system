@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRole } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
+import { BASE_PATH } from "@/lib/constants";
 
 interface ActivityLog {
   id: string;
@@ -89,7 +90,7 @@ export default function LogsPage() {
       if (actionFilter) params.set("action", actionFilter);
       if (sourceFilter) params.set("source", sourceFilter);
 
-      const res = await fetch(`/api/logs?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/logs?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setLogs(data.data);

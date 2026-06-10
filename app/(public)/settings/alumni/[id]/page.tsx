@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCanWrite } from "@/lib/role-context";
-import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 interface AlumniData {
   id: string;
@@ -126,7 +126,7 @@ export default function AlumniProfilePage() {
 
   const fetchAlumni = useCallback(async () => {
     try {
-      const res = await fetch(`/api/alumni/${id}`);
+      const res = await fetch(`${BASE_PATH}/api/alumni/${id}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: AlumniData = await res.json();
 
@@ -359,7 +359,7 @@ export default function AlumniProfilePage() {
     }
 
     try {
-      const res = await fetch(`/api/alumni/update-with-related/${id}`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni/update-with-related/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

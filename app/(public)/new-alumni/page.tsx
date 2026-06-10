@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 interface AwardRow {
   awardName: string;
@@ -314,7 +314,7 @@ export default function NewAlumniPage() {
     }
 
     try {
-      const res = await fetch("/api/alumni/create-with-related", {
+      const res = await fetch(`${BASE_PATH}/api/alumni/create-with-related`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

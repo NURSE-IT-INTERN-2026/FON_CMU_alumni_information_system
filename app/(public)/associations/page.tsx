@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface Association {
@@ -79,7 +79,7 @@ export default function AssociationsPage() {
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
     try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
       if (!res.ok) return;
       const data = await res.json();
       setAlumniResults(data.data || []);
@@ -118,7 +118,7 @@ export default function AssociationsPage() {
       });
       if (search.trim()) params.set("search", search.trim());
       params.set("searchField", searchField);
-      const res = await fetch(`/api/associations?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/associations?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setItems(data.data);
@@ -198,7 +198,7 @@ export default function AssociationsPage() {
     try {
       if (editingId) {
         const payload = { ...form, recordedYear: Number(form.recordedYear) };
-        const res = await fetch(`/api/associations/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/associations/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -209,7 +209,7 @@ export default function AssociationsPage() {
         }
       } else {
         const payload = { ...form, recordedYear: Number(form.recordedYear) };
-        const res = await fetch("/api/associations", {
+        const res = await fetch(`${BASE_PATH}/api/associations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -231,7 +231,7 @@ export default function AssociationsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/associations/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/associations/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchItems();
@@ -246,7 +246,7 @@ export default function AssociationsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/associations/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/associations/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -269,7 +269,7 @@ export default function AssociationsPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/associations/export", {
+      const res = await fetch(`${BASE_PATH}/api/associations/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -297,7 +297,7 @@ export default function AssociationsPage() {
     if (searchField !== "all") params.set("searchField", searchField);
     params.set("sortField", sortField);
     params.set("sortOrder", sortDir);
-    window.location.href = `/api/associations/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/associations/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,7 +308,7 @@ export default function AssociationsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/associations/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/associations/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

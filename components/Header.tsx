@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_ITEMS, SETTINGS_NAV_ITEMS } from "@/lib/constants";
+import { NAV_ITEMS, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -35,7 +35,7 @@ export default function Header() {
           {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
             <img
-              src="/fon-cmu-logo.png"
+              src={`${BASE_PATH}/fon-cmu-logo.png`}
               alt="FON CMU Logo"
               className="h-16 w-auto"
             />
@@ -82,7 +82,7 @@ export default function Header() {
             )}
 
             {showLogout && (
-              <form action="/api/auth/logout" method="POST">
+              <form action={`${BASE_PATH}/api/auth/logout`} method="POST">
                 <button
                   type="submit"
                   className="rounded-md bg-white/20 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/30 cursor-pointer"
@@ -178,7 +178,7 @@ export default function Header() {
             </button>
             )}
             {showLogout && (
-              <form action="/api/auth/logout" method="POST">
+              <form action={`${BASE_PATH}/api/auth/logout`} method="POST">
                 <button
                   type="submit"
                   className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"

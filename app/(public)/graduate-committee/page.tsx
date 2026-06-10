@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface Committee {
@@ -87,7 +87,7 @@ export default function GraduateCommitteePage() {
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
     try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
       if (!res.ok) return;
       const data = await res.json();
       setAlumniResults(data.data || []);
@@ -107,7 +107,7 @@ export default function GraduateCommitteePage() {
 
   const fetchFilterOptions = useCallback(async () => {
     try {
-      const res = await fetch("/api/graduate-committee?pageSize=9999");
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee?pageSize=9999`);
       if (!res.ok) return;
       const json = await res.json();
       const all: Committee[] = json.data;
@@ -143,7 +143,7 @@ export default function GraduateCommitteePage() {
       if (filterCohort) params.set("cohort", filterCohort);
       if (filterPosition) params.set("position", filterPosition);
 
-      const res = await fetch(`/api/graduate-committee?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setCommittees(data.data);
@@ -207,7 +207,7 @@ export default function GraduateCommitteePage() {
     try {
       if (editingId) {
         const payload = { ...form, termYear: Number(form.termYear) };
-        const res = await fetch(`/api/graduate-committee/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/graduate-committee/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -219,7 +219,7 @@ export default function GraduateCommitteePage() {
       } else {
         if (form.studentId) {
           const payload = { ...form, termYear: Number(form.termYear) };
-          const res = await fetch("/api/graduate-committee", {
+          const res = await fetch(`${BASE_PATH}/api/graduate-committee`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -251,7 +251,7 @@ export default function GraduateCommitteePage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/graduate-committee/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchCommittees();
@@ -267,7 +267,7 @@ export default function GraduateCommitteePage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/graduate-committee/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -291,7 +291,7 @@ export default function GraduateCommitteePage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/graduate-committee/export", {
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -318,7 +318,7 @@ export default function GraduateCommitteePage() {
     if (filterPosition) params.set("position", filterPosition);
     params.set("sortBy", sortField);
     params.set("sortOrder", sortDir);
-    window.location.href = `/api/graduate-committee/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/graduate-committee/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +329,7 @@ export default function GraduateCommitteePage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/graduate-committee/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/graduate-committee/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

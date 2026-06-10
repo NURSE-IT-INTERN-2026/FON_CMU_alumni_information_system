@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -142,7 +142,7 @@ export default function NewsListPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/upload`, { method: "POST", body: formData });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -181,7 +181,7 @@ export default function NewsListPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (!manageMode) params.set("status", "PUBLISHED");
 
-      const res = await fetch(`/api/news?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/news?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setNews(data.data || []);
@@ -262,12 +262,12 @@ export default function NewsListPage() {
         status: form.status,
       };
       const res = editingId
-        ? await fetch(`/api/news/${editingId}`, {
+        ? await fetch(`${BASE_PATH}/api/news/${editingId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           })
-        : await fetch("/api/news", {
+        : await fetch(`${BASE_PATH}/api/news`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -288,7 +288,7 @@ export default function NewsListPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/news/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/news/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchNews();
@@ -303,7 +303,7 @@ export default function NewsListPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/news/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/news/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),

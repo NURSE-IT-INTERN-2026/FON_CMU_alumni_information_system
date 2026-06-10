@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 const DEGREE_COLORS: Record<string, string> = {
   NURSING_ASSISTANT: "#f57f17",
@@ -134,7 +134,7 @@ export default function AlumniCountPage() {
         pageSize: String(PAGE_SIZE),
         search,
       });
-      const res = await fetch(`/api/alumni?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: AlumniApiResponse = await res.json();
       setAlumni(data.data);
@@ -158,7 +158,7 @@ export default function AlumniCountPage() {
         pageSize: String(PAGE_SIZE),
         search,
       });
-      const res = await fetch(`/api/cmu-alumni?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/cmu-alumni?${params}`);
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
         throw new Error(errBody?.error || "Failed to fetch CMU data");
@@ -265,7 +265,7 @@ export default function AlumniCountPage() {
         currentWorkplace: form.currentWorkplace.trim() || null,
         country: form.country.trim() || null,
       };
-      const res = await fetch(`/api/alumni/${editingId}`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni/${editingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -286,7 +286,7 @@ export default function AlumniCountPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/alumni/${deleteId}`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni/${deleteId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
@@ -303,7 +303,7 @@ export default function AlumniCountPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/alumni/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/alumni/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -326,7 +326,7 @@ export default function AlumniCountPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/alumni/export", {
+      const res = await fetch(`${BASE_PATH}/api/alumni/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -363,7 +363,7 @@ export default function AlumniCountPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    window.location.href = `/api/alumni/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/alumni/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -374,7 +374,7 @@ export default function AlumniCountPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/alumni/import", {
+      const res = await fetch(`${BASE_PATH}/api/alumni/import`, {
         method: "POST",
         body: formData,
       });

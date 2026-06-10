@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface Potential {
@@ -82,7 +82,7 @@ export default function PotentialsPage() {
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
     try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
       if (!res.ok) return;
       const data = await res.json();
       setAlumniResults(data.data || []);
@@ -121,7 +121,7 @@ export default function PotentialsPage() {
       });
       if (search.trim()) params.set("search", search.trim());
       params.set("searchField", searchField);
-      const res = await fetch(`/api/potentials?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/potentials?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setPotentials(data.data);
@@ -194,7 +194,7 @@ export default function PotentialsPage() {
     try {
       if (editingId) {
         const payload = { ...form, recordedYear: Number(form.recordedYear) };
-        const res = await fetch(`/api/potentials/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/potentials/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -205,7 +205,7 @@ export default function PotentialsPage() {
         }
       } else {
         const payload = { ...form, recordedYear: Number(form.recordedYear) };
-        const res = await fetch("/api/potentials", {
+        const res = await fetch(`${BASE_PATH}/api/potentials`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -227,7 +227,7 @@ export default function PotentialsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/potentials/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/potentials/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchPotentials();
@@ -242,7 +242,7 @@ export default function PotentialsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/potentials/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/potentials/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -265,7 +265,7 @@ export default function PotentialsPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/potentials/export", {
+      const res = await fetch(`${BASE_PATH}/api/potentials/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -290,7 +290,7 @@ export default function PotentialsPage() {
     if (searchField !== "all") params.set("searchField", searchField);
     params.set("sortBy", sortField);
     params.set("sortOrder", sortDir);
-    window.location.href = `/api/potentials/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/potentials/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,7 +301,7 @@ export default function PotentialsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/potentials/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/potentials/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

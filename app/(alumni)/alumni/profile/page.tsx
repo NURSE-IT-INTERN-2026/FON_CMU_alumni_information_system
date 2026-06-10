@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { DEGREE_LEVEL_OPTIONS, PREFIX_OPTIONS } from "@/lib/constants";
+import { DEGREE_LEVEL_OPTIONS, PREFIX_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 interface AlumniData {
   id: string;
@@ -63,8 +63,7 @@ export default function AlumniProfilePage() {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const res = await fetch("/api/alumni-profile");
-      if (res.status === 401) {
+      const res = await fetch(`${BASE_PATH}/api/alumni-profile`);      if (res.status === 401) {
         router.push("/login");
         return;
       }
@@ -133,7 +132,7 @@ export default function AlumniProfilePage() {
     setSuccessMsg("");
 
     try {
-      const res = await fetch("/api/alumni-profile", {
+      const res = await fetch(`${BASE_PATH}/api/alumni-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

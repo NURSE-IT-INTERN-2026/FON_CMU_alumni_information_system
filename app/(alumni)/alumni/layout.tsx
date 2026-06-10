@@ -1,4 +1,5 @@
 import { getAlumniSession } from "@/lib/auth";
+import { BASE_PATH } from "@/lib/constants";
 import prisma from "@/lib/prisma";
 import AlumniHeader from "@/components/AlumniHeader";
 import Footer from "@/components/Footer";
@@ -59,7 +60,7 @@ export default async function AlumniPortalLayout({
                 </p>
                 <div className="mt-6">
                   <a
-                    href="/api/alumni-auth/logout"
+                    href={`${BASE_PATH}/api/alumni-auth/logout`}
                     className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

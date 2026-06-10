@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { BASE_PATH } from "@/lib/constants";
 
 export default function VerifyIdentityPage() {
   return (
@@ -27,7 +28,7 @@ function VerifyIdentityForm() {
   // a warning if the user navigated here directly
   useEffect(() => {
     // Try a quick fetch to check if the cookie exists
-    fetch("/api/alumni-auth/verify-identity", {
+    fetch(`${BASE_PATH}/api/alumni-auth/verify-identity`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -57,7 +58,7 @@ function VerifyIdentityForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/alumni-auth/verify-identity", {
+      const res = await fetch(`${BASE_PATH}/api/alumni-auth/verify-identity`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,7 +99,7 @@ function VerifyIdentityForm() {
             กรุณาเข้าสู่ระบบด้วย CMU IT Account ก่อน
           </p>
           <a
-            href="/login"
+            href={`${BASE_PATH}/login`}
             className="mt-6 inline-block text-sm font-medium text-[var(--primary)] hover:underline"
           >
             ← กลับไปเข้าสู่ระบบ
@@ -117,7 +118,7 @@ function VerifyIdentityForm() {
         <div className="pointer-events-none absolute top-1/2 right-12 h-48 w-48 rounded-full bg-[var(--accent)]/10" />
 
         <div className="relative z-10 flex items-center gap-3">
-          <img src="/fon-cmu-logo.png" alt="FON CMU" className="h-10 w-auto" />
+          <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="h-10 w-auto" />
           <span className="text-sm font-semibold text-white/80">FON CMU · Alumni</span>
         </div>
 
@@ -142,7 +143,7 @@ function VerifyIdentityForm() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="mb-8 text-center lg:hidden">
-            <img src="/fon-cmu-logo.png" alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
+            <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
             <h1 className="text-lg font-bold text-[var(--foreground)]">ระบบสารสนเทศศิษย์เก่า</h1>
             <p className="text-sm text-[var(--muted)]">คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่</p>
           </div>
@@ -259,7 +260,7 @@ function VerifyIdentityForm() {
           </form>
 
           <p className="mt-6 text-center text-sm text-[var(--muted)]">
-            <a href="/login" className="text-[var(--primary)] hover:underline font-medium">
+            <a href={`${BASE_PATH}/login`} className="text-[var(--primary)] hover:underline font-medium">
               ← กลับไปเข้าสู่ระบบ
             </a>
           </p>

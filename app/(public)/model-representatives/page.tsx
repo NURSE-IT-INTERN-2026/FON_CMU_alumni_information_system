@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface ModelRepresentative {
@@ -108,7 +108,7 @@ export default function ModelRepresentativesPage() {
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
     try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
       if (!res.ok) return;
       const data = await res.json();
       setAlumniResults(data.data || []);
@@ -174,7 +174,7 @@ export default function ModelRepresentativesPage() {
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/model-representatives`);
+      const res = await fetch(`${BASE_PATH}/api/model-representatives`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
@@ -313,7 +313,7 @@ export default function ModelRepresentativesPage() {
         generation: Number(form.generation),
       };
       if (editingId) {
-        const res = await fetch(`/api/model-representatives/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/model-representatives/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -324,7 +324,7 @@ export default function ModelRepresentativesPage() {
         }
       } else {
         if (form.studentId) {
-          const res = await fetch("/api/model-representatives", {
+          const res = await fetch(`${BASE_PATH}/api/model-representatives`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -353,7 +353,7 @@ export default function ModelRepresentativesPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/model-representatives/${deleteId}`, {
+      const res = await fetch(`${BASE_PATH}/api/model-representatives/${deleteId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
@@ -370,7 +370,7 @@ export default function ModelRepresentativesPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/model-representatives/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/model-representatives/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -393,7 +393,7 @@ export default function ModelRepresentativesPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/model-representatives/export", {
+      const res = await fetch(`${BASE_PATH}/api/model-representatives/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -431,7 +431,7 @@ export default function ModelRepresentativesPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    window.location.href = `/api/model-representatives/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/model-representatives/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,7 +442,7 @@ export default function ModelRepresentativesPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/model-representatives/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/model-representatives/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

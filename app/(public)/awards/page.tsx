@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE } from "@/lib/constants";
+import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 
 interface Award {
@@ -109,7 +109,7 @@ export default function AwardsPage() {
         sortDir,
         searchField,
       });
-      const res = await fetch(`/api/awards?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/awards?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAwards(data.data);
@@ -125,9 +125,9 @@ export default function AwardsPage() {
   const fetchTypeCounts = useCallback(async () => {
     try {
       const [international, national, local] = await Promise.all([
-        fetch("/api/awards?pageSize=1&awardType=INTERNATIONAL").then((r) => r.json()),
-        fetch("/api/awards?pageSize=1&awardType=NATIONAL").then((r) => r.json()),
-        fetch("/api/awards?pageSize=1&awardType=LOCAL").then((r) => r.json()),
+        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=INTERNATIONAL`).then((r) => r.json()),
+        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=NATIONAL`).then((r) => r.json()),
+        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=LOCAL`).then((r) => r.json()),
       ]);
       setTypeCounts({ INTERNATIONAL: international.total, NATIONAL: national.total, LOCAL: local.total });
     } catch (err) {
@@ -181,7 +181,7 @@ export default function AwardsPage() {
   const searchAlumni = useCallback(async (term: string) => {
     if (term.length < 2) { setAlumniResults([]); return; }
     try {
-      const res = await fetch(`/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
+      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
       if (!res.ok) return;
       const data = await res.json();
       setAlumniResults(data.data || []);
@@ -255,7 +255,7 @@ export default function AwardsPage() {
           year: Number(form.year),
           description: form.description.trim() || null,
         };
-        const res = await fetch(`/api/awards/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/awards/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -274,7 +274,7 @@ export default function AwardsPage() {
           year: Number(form.year),
           description: form.description.trim() || null,
         };
-        const res = await fetch("/api/awards", {
+        const res = await fetch(`${BASE_PATH}/api/awards`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -297,7 +297,7 @@ export default function AwardsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/awards/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/awards/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchAwards();
@@ -313,7 +313,7 @@ export default function AwardsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/awards/bulk-delete", {
+      const res = await fetch(`${BASE_PATH}/api/awards/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -337,7 +337,7 @@ export default function AwardsPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch("/api/awards/export", {
+      const res = await fetch(`${BASE_PATH}/api/awards/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -363,7 +363,7 @@ export default function AwardsPage() {
     if (awardTypeFilter) params.set("awardType", awardTypeFilter);
     params.set("sortField", sortField);
     params.set("sortDir", sortDir);
-    window.location.href = `/api/awards/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/awards/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -374,7 +374,7 @@ export default function AwardsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/awards/import", { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/awards/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);

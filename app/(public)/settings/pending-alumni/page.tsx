@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useCanWrite } from "@/lib/role-context";
+import { BASE_PATH } from "@/lib/constants";
 
 interface PendingAlumni {
   id: string;
@@ -39,7 +40,7 @@ export default function PendingAlumniPage() {
 
   const fetchPending = useCallback(async () => {
     try {
-      const res = await fetch("/api/alumni-auth/pending");
+      const res = await fetch(`${BASE_PATH}/api/alumni-auth/pending`);
       if (res.ok) {
         const data = await res.json();
         setPendingList(data);
@@ -58,7 +59,7 @@ export default function PendingAlumniPage() {
   async function handleAction(type: "approve" | "reject", alumniId: string) {
     setActionLoading(alumniId);
     try {
-      const res = await fetch(`/api/alumni-auth/${type}`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni-auth/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ alumniId }),

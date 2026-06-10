@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCanWrite } from "@/lib/role-context";
-import { DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import { DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 /* ───── Admin User types & tab ───── */
 interface AdminUser {
@@ -110,7 +110,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const fetchMembers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/users");
+      const res = await fetch(`${BASE_PATH}/api/users`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setMembers(data);
@@ -143,8 +143,8 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
     try {
       const payload = { firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), role: form.role };
       const res = editingId
-        ? await fetch(`/api/users/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-        : await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        ? await fetch(`${BASE_PATH}/api/users/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+        : await fetch(`${BASE_PATH}/api/users`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "เกิดข้อผิดพลาด"); }
       closeForm(); fetchMembers();
     } catch (err) { setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด"); } finally { setSaving(false); }
@@ -153,7 +153,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`/api/users/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/users/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null); fetchMembers();
     } catch { setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล"); }
@@ -298,7 +298,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (search) params.set("search", search);
-      const res = await fetch(`/api/alumni-accounts?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/alumni-accounts?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setAlumni(data.data);

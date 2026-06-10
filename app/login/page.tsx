@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { BASE_PATH } from "@/lib/constants";
 
 const ALUMNI_ERROR_KEYS = new Set(["alumni_not_found", "alumni_rejected"]);
 
@@ -77,7 +78,7 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${BASE_PATH}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -105,7 +106,7 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/alumni-auth/login-email", {
+      const res = await fetch(`${BASE_PATH}/api/alumni-auth/login-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: alumniEmail.trim().toLowerCase(), password: alumniPassword }),
@@ -140,7 +141,7 @@ function LoginForm() {
         <div className="pointer-events-none absolute top-1/2 right-12 h-48 w-48 rounded-full bg-[var(--accent)]/10" />
 
         <div className="relative z-10 flex items-center gap-3">
-          <img src="/fon-cmu-logo.png" alt="FON CMU" className="h-10 w-auto" />
+          <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="h-10 w-auto" />
           <span className="text-sm font-semibold text-white/80">FON CMU · Alumni</span>
         </div>
 
@@ -166,7 +167,7 @@ function LoginForm() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="mb-8 text-center lg:hidden">
-            <img src="/fon-cmu-logo.png" alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
+            <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
             <h1 className="text-lg font-bold text-[var(--foreground)]">ระบบสารสนเทศศิษย์เก่า</h1>
             <p className="text-sm text-[var(--muted)]">คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่</p>
           </div>
@@ -218,10 +219,10 @@ function LoginForm() {
             <>
               {/* CMU OAuth */}
               <a
-                href="/api/auth/cmu-login"
+                href={`${BASE_PATH}/api/auth/cmu-login`}
                 className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-all hover:bg-gray-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-900/30"
               >
-                <img src="/CMU_logo.png" alt="CMU" className="h-6 w-6 rounded-sm" />
+                <img src={`${BASE_PATH}/CMU_logo.png`} alt="CMU" className="h-6 w-6 rounded-sm" />
                 <span className="bg-gradient-to-r from-purple-900 to-purple-700 bg-clip-text text-transparent font-semibold">
                   เข้าสู่ระบบด้วยบัญชี CMU IT Account
                 </span>
@@ -282,10 +283,10 @@ function LoginForm() {
             <>
               {/* CMU OAuth for alumni */}
               <a
-                href="/api/alumni-auth/login"
+                href={`${BASE_PATH}/api/alumni-auth/login`}
                 className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-all hover:bg-gray-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-900/30"
               >
-                <img src="/CMU_logo.png" alt="CMU" className="h-6 w-6 rounded-sm" />
+                <img src={`${BASE_PATH}/CMU_logo.png`} alt="CMU" className="h-6 w-6 rounded-sm" />
                 <span className="bg-gradient-to-r from-purple-900 to-purple-700 bg-clip-text text-transparent font-semibold">
                   เข้าสู่ระบบด้วยบัญชี CMU IT Account
                 </span>
@@ -321,7 +322,7 @@ function LoginForm() {
                       รหัสผ่าน
                     </label>
                     <a
-                      href="/alumni/forgot-password"
+                      href={`${BASE_PATH}/alumni/forgot-password`}
                       className="mb-1.5 text-xs text-[var(--primary)] hover:underline"
                     >
                       ลืมรหัสผ่าน?
@@ -353,7 +354,7 @@ function LoginForm() {
 
               <p className="mt-4 text-center text-sm text-[var(--muted)]">
                 ยังไม่มีบัญชี?{" "}
-                <a href="/alumni/signup" className="text-[var(--primary)] hover:underline font-medium">
+                <a href={`${BASE_PATH}/alumni/signup`} className="text-[var(--primary)] hover:underline font-medium">
                   ลงทะเบียน
                 </a>
               </p>
