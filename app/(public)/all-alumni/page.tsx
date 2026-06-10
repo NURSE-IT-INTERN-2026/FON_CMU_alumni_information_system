@@ -8,7 +8,7 @@ import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants
 
 const DEGREE_COLORS: Record<string, string> = {
   NURSING_ASSISTANT: "#f57f17",
-  ASSOCIATE: "#6a1b9a",
+  ASSOCIATE: "#00838f",
   BACHELOR: "#5b21b6",
   MASTER: "#2e7d32",
   DOCTORAL: "#c62828",
@@ -36,6 +36,41 @@ interface Alumni {
 interface AlumniApiResponse {
   data: Alumni[];
   total: number;
+}
+
+// CMU Registrar API data shape (from /api/cmu-alumni proxy)
+interface CmuAlumni {
+  student_id: string;
+  name_th: string;
+  middle_name_th: string;
+  surname_th: string;
+  name_en: string;
+  surname_en: string;
+  level_id: string;
+  major_name_th: string;
+  major_sub_name_th: string;
+  grad_year: string;
+  grad_semester: string;
+  std_mobile: string;
+  adm_type: string;
+}
+
+// Map CMU registrar level_id to Thai degree labels
+const CMU_LEVEL_LABELS: Record<string, string> = {
+  "0": "อนุปริญญา",
+  "1": "ปริญญาตรี",
+  "2": "ผู้ช่วยพยาบาล",
+  "3": "ปริญญาโท",
+  "5": "ปริญญาเอก",
+};
+
+/** Resolve display label for level_id, accounting for the special case where
+ *  level_id=0 + major_name_th='ประกาศนียบัตรผู้ช่วยพยาบาล' → ประกาศนียบัตรบัณฑิต. */
+function getLevelLabel(level_id: string, major_name_th: string): string {
+  if (level_id === "0" && major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล") {
+    return "ประกาศนียบัตรบัณฑิต";
+  }
+  return CMU_LEVEL_LABELS[level_id] || level_id;
 }
 
 const EMPTY_EDIT_FORM = {
@@ -90,7 +125,7 @@ export default function AlumniCountPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Fetch alumni table data
+  // Fetch alumni table data (local DB — used in manage mode)
   const fetchAlumni = useCallback(async () => {
     setTableLoading(true);
     try {
@@ -111,11 +146,43 @@ export default function AlumniCountPage() {
     }
   }, [page, search]);
 
-  useEffect(() => {
-    fetchAlumni();
-  }, [fetchAlumni]);
+  // CMU Registrar data (view mode only)
+  const [cmuAlumni, setCmuAlumni] = useState<CmuAlumni[]>([]);
+  const [cmuTotal, setCmuTotal] = useState(0);
 
-  const totalPages = Math.max(1, Math.ceil(totalAlumni / PAGE_SIZE));
+  const fetchCmuAlumni = useCallback(async () => {
+    setTableLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        search,
+      });
+      const res = await fetch(`/api/cmu-alumni?${params}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "Failed to fetch CMU data");
+      }
+      const data = await res.json();
+      setCmuAlumni(data.data);
+      setCmuTotal(data.total);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTableLoading(false);
+    }
+  }, [page, search]);
+
+  useEffect(() => {
+    if (manageMode) {
+      fetchAlumni();
+    } else {
+      fetchCmuAlumni();
+    }
+  }, [manageMode, fetchAlumni, fetchCmuAlumni]);
+
+  const activeTotal = manageMode ? totalAlumni : cmuTotal;
+  const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE));
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -880,7 +947,7 @@ export default function AlumniCountPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                <span className="text-sm text-gray-500">แสดง {totalAlumni === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalAlumni)} จาก {totalAlumni} รายการ</span>
+                <span className="text-sm text-gray-500">แสดง {activeTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, activeTotal)} จาก {activeTotal} รายการ</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }}
@@ -932,7 +999,7 @@ export default function AlumniCountPage() {
             />
           </div>
 
-          {/* Alumni table (read-only) */}
+          {/* Alumni table (read-only, CMU Registrar data) */}
           <div className="overflow-hidden rounded-lg bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -948,80 +1015,64 @@ export default function AlumniCountPage() {
                       รหัสนักศึกษา
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      คำนำหน้า
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       ชื่อ
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุลเดิม
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      นามสกุลใหม่
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      รุ่น/สาขา
+                      นามสกุล
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       ระดับการศึกษา
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      จังหวัด
+                      สาขาวิชา
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      ปีที่สำเร็จการศึกษา
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center">
+                      <td colSpan={7} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
                       </td>
                     </tr>
-                  ) : alumni.length === 0 ? (
+                  ) : cmuAlumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={7}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
                       </td>
                     </tr>
                   ) : (
-                    alumni.map((a, idx) => {
-                      const degreeLabel = DEGREE_LEVEL_OPTIONS.find(
-                        (o) => o.value === a.degreeLevel
-                      )?.label;
+                    cmuAlumni.map((a, idx) => {
+                      const levelLabel = getLevelLabel(a.level_id, a.major_name_th);
                       return (
                         <tr
-                          key={a.id}
+                          key={a.student_id}
                           className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                         >
                           <td className="px-4 py-3 text-center">
                             {(page - 1) * PAGE_SIZE + idx + 1}
                           </td>
-                          <td className="px-4 py-3">{a.studentId}</td>
-                          <td className="px-4 py-3">{a.prefix}</td>
-                          <td className="px-4 py-3">{a.firstName}</td>
-                          <td className="px-4 py-3">{a.maidenLastName}</td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.newLastName || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.cohort || "-"}
-                          </td>
+                          <td className="px-4 py-3">{a.student_id}</td>
+                          <td className="px-4 py-3">{a.name_th || "-"}</td>
+                          <td className="px-4 py-3">{a.surname_th || "-"}</td>
                           <td className="px-4 py-3">
-                            {degreeLabel ? (
-                              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${DEGREE_COLORS[a.degreeLevel ?? ""] ?? "#5b21b6"}15`, color: DEGREE_COLORS[a.degreeLevel ?? ""] ?? "#5b21b6" }}>
-                                {degreeLabel}
-                              </span>
-                            ) : (
-                              <span className="text-[var(--muted)]">-</span>
-                            )}
+                            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "#5b21b615", color: "#5b21b6" }}>
+                              {levelLabel}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.province || "-"}
+                            {a.major_name_th || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.grad_year || "-"}
                           </td>
                         </tr>
                       );
@@ -1033,7 +1084,7 @@ export default function AlumniCountPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                <span className="text-sm text-gray-500">แสดง {totalAlumni === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalAlumni)} จาก {totalAlumni} รายการ</span>
+                <span className="text-sm text-gray-500">แสดง {activeTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, activeTotal)} จาก {activeTotal} รายการ</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setPage(Math.max(1, page - 1))}

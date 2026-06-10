@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { fetchCmuGraduates } from "@/lib/cmu-registrar";
 
 const DEGREE_LABELS: Record<string, string> = {
   DOCTORAL: "ปริญญาเอก",
@@ -12,41 +12,55 @@ const DEGREE_LABELS: Record<string, string> = {
 
 const DEGREE_ORDER = ["NURSING_ASSISTANT", "ASSOCIATE", "BACHELOR", "MASTER", "DOCTORAL"];
 
+// Map CMU Registrar level_id to local degree level keys
+const CMU_LEVEL_MAP: Record<string, string> = {
+  "0": "ASSOCIATE",
+  "1": "BACHELOR",
+  "2": "NURSING_ASSISTANT",
+  "3": "MASTER",
+  "5": "DOCTORAL",
+};
+
+/** Resolve the internal degree key, accounting for the special case where
+ *  level_id=0 + major_name_th='ประกาศนียบัตรผู้ช่วยพยาบาล' → NURSING_ASSISTANT. */
+function resolveDegreeKey(level_id: string, major_name_th: string): string {
+  if (level_id === "0" && major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล") {
+    return "NURSING_ASSISTANT";
+  }
+  return CMU_LEVEL_MAP[level_id] ?? "OTHER";
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
   try {
-    const alumni = await prisma.alumni.findMany({
-      select: {
-        studentId: true,
-        degreeLevel: true,
-      },
-    });
+    const graduates = await fetchCmuGraduates();
 
-    // Group by generation (first 2 digits of studentId) x degreeLevel
+    // Group by grad_year x degree level
     const grouped: Record<string, Record<string, number>> = {};
     const degreeTotals: Record<string, number> = {};
 
-    for (const a of alumni) {
-      const gen = a.studentId.length === 5 ? a.studentId.slice(0, 1) : a.studentId.slice(0, 2);
-      const degree = a.degreeLevel!;
-      if (!grouped[gen]) grouped[gen] = {};
-      grouped[gen][degree] = (grouped[gen][degree] || 0) + 1;
+    for (const g of graduates) {
+      const year = (g.grad_year || "").trim();
+      if (!year) continue; // skip records without a grad year
+      const degree = resolveDegreeKey((g.level_id || "").trim(), (g.major_name_th || "").trim());
+      if (!grouped[year]) grouped[year] = {};
+      grouped[year][degree] = (grouped[year][degree] || 0) + 1;
       degreeTotals[degree] = (degreeTotals[degree] || 0) + 1;
     }
 
-    // Sort generations numerically
+    // Sort years numerically
     const generations = Object.keys(grouped).sort(
       (a, b) => parseInt(a, 10) - parseInt(b, 10)
     );
 
-    // Build per-series data: one array per degree level, indexed by generation
+    // Build per-series data: one array per degree level, indexed by year
     const series = DEGREE_ORDER.map((degree) => ({
       key: degree,
       label: DEGREE_LABELS[degree],
-      data: generations.map((gen) => grouped[gen][degree] || 0),
+      data: generations.map((year) => grouped[year][degree] || 0),
     }));
 
     // Cards data: total per degree level

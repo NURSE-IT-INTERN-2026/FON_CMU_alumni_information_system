@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { fetchCmuGraduates } from "@/lib/cmu-registrar";
 
 const DEGREE_LABELS: Record<string, string> = {
   DOCTORAL: "ปริญญาเอก",
@@ -10,6 +11,24 @@ const DEGREE_LABELS: Record<string, string> = {
   ASSOCIATE: "อนุปริญญา",
 };
 
+// Map CMU Registrar level_id to local degree level keys
+const CMU_LEVEL_MAP: Record<string, string> = {
+  "0": "ASSOCIATE",
+  "1": "BACHELOR",
+  "2": "NURSING_ASSISTANT",
+  "3": "MASTER",
+  "5": "DOCTORAL",
+};
+
+/** Resolve the internal degree key, accounting for the special case where
+ *  level_id=0 + major_name_th='ประกาศนียบัตรผู้ช่วยพยาบาล' → NURSING_ASSISTANT. */
+function resolveDegreeKey(level_id: string, major_name_th: string): string {
+  if (level_id === "0" && major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล") {
+    return "NURSING_ASSISTANT";
+  }
+  return CMU_LEVEL_MAP[level_id] ?? "OTHER";
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) {
@@ -18,8 +37,7 @@ export async function GET() {
 
   try {
     const [
-      alumniTotal,
-      alumniByDegree,
+      cmuGraduates,
       awardsTotal,
       awardsByYear,
       potentialsTotal,
@@ -37,15 +55,8 @@ export async function GET() {
       pendingAlumniCount,
       recentNews,
     ] = await Promise.all([
-      // Alumni total
-      prisma.alumni.count({ where: { approvalStatus: "APPROVED" } }),
-
-      // Alumni by degree level
-      prisma.alumni.groupBy({
-        by: ["degreeLevel"],
-        _count: true,
-        where: { approvalStatus: "APPROVED" },
-      }),
+      // Alumni from CMU Registrar API
+      fetchCmuGraduates(),
 
       // Awards total
       prisma.award.count(),
@@ -131,11 +142,11 @@ export async function GET() {
       }),
     ]);
 
-    // Build byDegreeLevel map
+    // Build byDegreeLevel map from CMU Registrar data
     const byDegreeLevel: Record<string, number> = {};
-    for (const row of alumniByDegree) {
-      const key = row.degreeLevel as string;
-      byDegreeLevel[key] = row._count;
+    for (const grad of cmuGraduates) {
+      const key = resolveDegreeKey(grad.level_id?.trim() ?? "", grad.major_name_th?.trim() ?? "");
+      byDegreeLevel[key] = (byDegreeLevel[key] ?? 0) + 1;
     }
 
     // Format degree breakdown string for sub-stat
@@ -147,7 +158,7 @@ export async function GET() {
 
     return NextResponse.json({
       alumni: {
-        total: alumniTotal,
+        total: cmuGraduates.length,
         byDegreeLevel,
         degreeBreakdown,
       },

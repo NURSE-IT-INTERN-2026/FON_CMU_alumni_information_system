@@ -19,7 +19,7 @@ export const PREFIX_OPTIONS = [
 
 export const NAV_ITEMS = [
   { href: "/", label: "แผงควบคุม" },
-  { href: "/alumni-count", label: "จำนวนนักศึกษาเก่า" },
+  { href: "/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
   { href: "/awards", label: "รางวัล" },
   { href: "/potentials", label: "ศักยภาพ" },
   { href: "/associations", label: "สมาคม/ชมรม" },

@@ -98,7 +98,7 @@ interface ChartData {
   series: ChartSeries[];
 }
 
-const SERIES_COLORS = ["#5b21b6", "#2e7d32", "#c62828", "#f57f17", "#6a1b9a"];
+const SERIES_COLORS = ["#f57f17", "#00838f", "#5b21b6", "#2e7d32", "#c62828"];
 
 // ---------------------------------------------------------------------------
 // Card config
@@ -114,11 +114,11 @@ interface CardConfig {
 }
 
 const DEGREE_MINI_CARDS = [
+  { key: "NURSING_ASSISTANT", label: "ผู้ช่วยพยาบาล", color: "#f57f17" },
+  { key: "ASSOCIATE", label: "อนุปริญญา", color: "#00838f" },
   { key: "BACHELOR", label: "ปริญญาตรี", color: "#5b21b6" },
   { key: "MASTER", label: "ปริญญาโท", color: "#2e7d32" },
   { key: "DOCTORAL", label: "ปริญญาเอก", color: "#c62828" },
-  { key: "NURSING_ASSISTANT", label: "ผู้ช่วยพยาบาล", color: "#f57f17" },
-  { key: "ASSOCIATE", label: "อนุปริญญา", color: "#6a1b9a" },
 ];
 
 const CARDS: CardConfig[] = [
@@ -262,7 +262,7 @@ export default function DashboardPage() {
   const rechartsData = useMemo(
     () =>
       chartData?.generations.map((gen, gi) => {
-        const point: Record<string, string | number> = { generation: gen };
+        const point: Record<string, string | number> = { year: gen };
         for (const s of chartData.series) {
           point[s.key] = s.data[gi] || 0;
         }
@@ -369,7 +369,7 @@ export default function DashboardPage() {
 
       {/* Featured Alumni Count Card */}
       <Link
-        href="/alumni-count"
+        href="/all-alumni"
         className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
         style={{ borderLeftColor: "#5b21b6" }}
       >
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
-                    dataKey="generation"
+                    dataKey="year"
                     tick={{ fontSize: 12 }}
                   />
                   <YAxis
@@ -426,11 +426,11 @@ export default function DashboardPage() {
                   />
                   <Tooltip
                     formatter={(value, name) => {
-                      const series = chartData.series.find((s) => s.key === name);
+                      const series = chartData!.series.find((s) => s.key === name);
                       return [`${value} คน`, series?.label ?? String(name)];
                     }}
                   />
-                  {chartData.series.map((s, i) => (
+                  {chartData!.series.map((s, i) => (
                     <Line
                       key={s.key}
                       type="monotone"
@@ -446,7 +446,7 @@ export default function DashboardPage() {
             </div>
             {/* Legend */}
             <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-              {chartData.series.map((s, i) => (
+              {chartData!.series.map((s, i) => (
                 <span key={s.key} className="flex items-center gap-1.5 text-xs text-gray-600">
                   <span
                     className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"

@@ -26,7 +26,8 @@ export type LogResource =
   | "news"
   | "user"
   | "alumni_profile"
-  | "alumni_auth";
+  | "alumni_auth"
+  | "cmu_alumni";
 
 interface AdminLogContext {
   actorType: "ADMIN";

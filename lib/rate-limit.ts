@@ -15,7 +15,11 @@ const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Returns true if the key is within limits, false if it should be blocked. */
-export function checkRateLimit(key: string): {
+export function checkRateLimit(
+  key: string,
+  maxAttempts: number = MAX_ATTEMPTS,
+  windowMs: number = WINDOW_MS,
+): {
   allowed: boolean;
   remaining: number;
   retryAfterMs: number;
@@ -24,11 +28,11 @@ export function checkRateLimit(key: string): {
   const entry = store.get(key);
 
   if (!entry || now >= entry.resetAt) {
-    store.set(key, { attempts: 1, resetAt: now + WINDOW_MS });
-    return { allowed: true, remaining: MAX_ATTEMPTS - 1, retryAfterMs: 0 };
+    store.set(key, { attempts: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: maxAttempts - 1, retryAfterMs: 0 };
   }
 
-  if (entry.attempts >= MAX_ATTEMPTS) {
+  if (entry.attempts >= maxAttempts) {
     return {
       allowed: false,
       remaining: 0,
@@ -39,7 +43,7 @@ export function checkRateLimit(key: string): {
   entry.attempts += 1;
   return {
     allowed: true,
-    remaining: MAX_ATTEMPTS - entry.attempts,
+    remaining: maxAttempts - entry.attempts,
     retryAfterMs: 0,
   };
 }
