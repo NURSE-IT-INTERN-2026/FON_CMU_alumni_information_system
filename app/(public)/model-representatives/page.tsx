@@ -658,7 +658,7 @@ export default function ModelRepresentativesPage() {
                   {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
                           {a.studentId} - {alumniDisplayName(a)}
                         </button>
                       ))}
@@ -680,7 +680,7 @@ export default function ModelRepresentativesPage() {
                   {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
                           {a.studentId} - {alumniDisplayName(a)}
                         </button>
                       ))}
@@ -715,7 +715,7 @@ export default function ModelRepresentativesPage() {
                         setForm((f) => ({ ...f, cohort: c }));
                         setShowCohortDropdown(false);
                       }}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors"
                     >
                       {c}
                     </button>
@@ -911,7 +911,7 @@ export default function ModelRepresentativesPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => openEdit(a)}
-                          className="rounded p-1.5 text-blue-600 hover:bg-blue-100"
+                          className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                           title="แก้ไข"
                         >
                           <svg
@@ -965,7 +965,7 @@ export default function ModelRepresentativesPage() {
             <thead>
               <tr
                 className="text-white text-left"
-                style={{ backgroundColor: "#1e3a5f" }}
+                style={{ backgroundColor: "#5b21b6" }}
               >
                 {tableHeader("network", "เครือข่าย", false)}
                 {tableHeader("generation", "รุ่นที่", false, "center")}

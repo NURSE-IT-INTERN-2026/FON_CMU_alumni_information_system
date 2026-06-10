@@ -1,7 +1,7 @@
 import "dotenv/config";
 import prisma from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
-import * as XLSX from "xlsx";
+import { readExcelFileRawRows } from "../lib/excel-import";
 
 const ALL_DEGREE_LEVELS = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"] as const;
 
@@ -314,8 +314,7 @@ async function main() {
   }
 
   // --- File 1: back up รางวัลศิษย์เก่า.xlsx ---
-  const wb1 = XLSX.readFile("imports/award/back up รางวัลศิษย์เก่า.xlsx");
-  const d1 = XLSX.utils.sheet_to_json(wb1.Sheets["Sheet1"], { header: 1, defval: "" }) as (string | number)[][];
+  const d1 = await readExcelFileRawRows("imports/award/back up รางวัลศิษย์เก่า.xlsx", "Sheet1");
   for (let i = 2; i < d1.length; i++) {
     const row = d1[i];
     const studentId = String(row[1] || "").trim();
@@ -343,8 +342,7 @@ async function main() {
   }
 
   // --- File 2: ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx ---
-  const wb2 = XLSX.readFile("imports/award/ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx");
-  const d2 = XLSX.utils.sheet_to_json(wb2.Sheets["Sheet1"], { header: 1, defval: "" }) as (string | number)[][];
+  const d2 = await readExcelFileRawRows("imports/award/ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx", "Sheet1");
   for (let i = 1; i < d2.length; i++) {
     const row = d2[i];
     const studentId = String(row[1] || "").trim();
@@ -371,8 +369,7 @@ async function main() {
   }
 
   // --- File 3: รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx — ศิษย์เก่า sheet ---
-  const wb3 = XLSX.readFile("imports/award/รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx");
-  const d3a = XLSX.utils.sheet_to_json(wb3.Sheets["ศิษย์เก่า"], { header: 1, defval: "" }) as (string | number)[][];
+  const d3a = await readExcelFileRawRows("imports/award/รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx", "ศิษย์เก่า");
   let currentYear3a = 0;
   for (let i = 2; i < d3a.length; i++) {
     const row = d3a[i];
@@ -404,7 +401,7 @@ async function main() {
   }
 
   // --- File 3: นักศึกษา sheet ---
-  const d3b = XLSX.utils.sheet_to_json(wb3.Sheets["นักศึกษา"], { header: 1, defval: "" }) as (string | number)[][];
+  const d3b = await readExcelFileRawRows("imports/award/รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx", "นักศึกษา");
   let currentYear3b = 0;
   for (let i = 2; i < d3b.length; i++) {
     const row = d3b[i];
@@ -637,8 +634,7 @@ async function main() {
   // ── 8. Upsert abroad alumni (from Excel import) ──
   console.log("Upserting abroad alumni from xlsx file...");
 
-  const abroadWb = XLSX.readFile("imports/abroad-alumni/ศิษย์เก่าที่ทำงานในต่างประเทศ.xlsx");
-  const abroadRows = XLSX.utils.sheet_to_json(abroadWb.Sheets[abroadWb.SheetNames[0]], { header: 1, defval: "" }) as (string | number)[][];
+  const abroadRows = await readExcelFileRawRows("imports/abroad-alumni/ศิษย์เก่าที่ทำงานในต่างประเทศ.xlsx");
 
   function inferCountry(wp: string): string {
     const w = wp.toLowerCase();

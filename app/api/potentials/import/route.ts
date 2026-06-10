@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureAlumni } from "@/lib/ensure-alumni";
-import * as XLSX from "xlsx";
 import { checkWritePermission } from "@/lib/permissions";
+import { readExcelRows } from "@/lib/excel-import";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -31,10 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
+    const rows = await readExcelRows(buffer);
 
     const errors: { row: number; message: string }[] = [];
     const records: { studentId: string; fullName: string; career: string; position: string; recordedYear: number }[] = [];

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import * as XLSX from "xlsx";
 import { checkWritePermission } from "@/lib/permissions";
+import { readExcelRows, readExcelRawRows } from "@/lib/excel-import";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -37,22 +37,19 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
 
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
 
     // Read raw rows to detect format
-    const rawRows = XLSX.utils.sheet_to_json<(string | number)[]>(worksheet, { header: 1, defval: "" });
+    const rawRows = await readExcelRawRows(buffer);
 
     let parsed: { data: ParsedAbroadAlumniRow; rowNumber: number }[];
 
     if (isOriginalFormat(rawRows)) {
       parsed = parseOriginalFormat(rawRows);
     } else {
-      const objectRows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
+      const objectRows = await readExcelRows(buffer);
       parsed = parseExportFormat(objectRows);
     }
 

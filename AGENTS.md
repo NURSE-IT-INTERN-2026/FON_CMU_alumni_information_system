@@ -35,7 +35,7 @@ Heed all deprecation notices.
 
 ## Project-Specific Patterns
 
-- **Auth is layout-level, not middleware:** `app/(public)/layout.tsx` checks session server-side. There is NO `middleware.ts`.
+- **Auth via `proxy.ts` (Next.js 16 middleware):** `proxy.ts` at project root handles CSP headers and auth redirects. Next.js 16 renamed `middleware.ts` to `proxy.ts` — do NOT create a `middleware.ts` file. Auth is also enforced at layout level via `app/(public)/layout.tsx`.
 - **API routes follow a strict pattern:** Each entity has `/`, `/[id]`, `/import`, `/export`, `/bulk-delete` sub-routes.
 - **Write permission guard:** Import `checkWritePermission` from `@/lib/permissions` for any mutating API route.
 - **Activity logging:** Import `logActivity` from `@/lib/activity-log` for create/update/delete/import/export actions.

@@ -34,7 +34,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE: "bg-blue-100 text-blue-700",
+  CREATE: "bg-purple-100 text-purple-700",
   UPDATE: "bg-yellow-100 text-yellow-700",
   DELETE: "bg-red-100 text-red-700",
   BULK_DELETE: "bg-red-100 text-red-700",

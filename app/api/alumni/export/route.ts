@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
-import * as XLSX from "xlsx";
+import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -32,25 +32,6 @@ function mapRows(alumni: Awaited<ReturnType<typeof prisma.alumni.findMany>>) {
   }));
 }
 
-function buildResponse(rows: Record<string, unknown>[], filename: string) {
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  XLSX.utils.book_append_sheet(workbook, worksheet, "ศิษย์เก่า");
-
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-
-  return new NextResponse(buffer, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${filename}_${dateStr}.xlsx"`,
-    },
-  });
-}
-
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -78,7 +59,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return buildResponse(mapRows(alumni), "alumni_export");
+    return buildExcelResponse(mapRows(alumni), "ศิษย์เก่า", "alumni_export");
   } catch (error) {
     console.error("GET /api/alumni/export error:", error);
     return NextResponse.json(
@@ -113,7 +94,7 @@ export async function POST(request: NextRequest) {
       where: { id: { in: ids } },
     });
 
-    return buildResponse(mapRows(alumni), "alumni_export");
+    return buildExcelResponse(mapRows(alumni), "ศิษย์เก่า", "alumni_export");
   } catch (error) {
     console.error("POST /api/alumni/export error:", error);
     return NextResponse.json(

@@ -69,7 +69,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 - **Role context:** `lib/role-context.tsx` provides `useRole()`, `useCanWrite()`, `useIsAdmin()` hooks.
 - **Write permission check:** `lib/permissions.ts` — `checkWritePermission()` returns 401/403 for unauthorized requests.
 - **Rate limiting:** `lib/rate-limit.ts` — in-memory sliding-window (5 attempts / 15 min).
-- **No middleware.ts** — auth is enforced at the layout level (`app/(public)/layout.tsx` checks session server-side).
+- **Auth middleware via `proxy.ts`** (Next.js 16 renamed middleware to proxy) — enforces CSP headers and redirects unauthenticated users. Also enforced at layout level (`app/(public)/layout.tsx` checks session server-side).
 
 ### Route Structure
 
@@ -124,7 +124,7 @@ Each data entity follows a consistent route structure:
 |---|---|
 | `chart.js` + `react-chartjs-2` | Chart rendering (doughnut, bar) |
 | `recharts` | Data visualization (line graphs) |
-| `xlsx` | Excel import/export parsing |
+| `exceljs` | Excel import/export parsing |
 | `sanitize-html` | HTML sanitization for news body |
 | `bcryptjs` | Password hashing |
 
@@ -148,6 +148,8 @@ Each data entity follows a consistent route structure:
 | `lib/useBulkSelection.ts` | React hook for bulk table row selection |
 | `lib/abroad-alumni-parse.ts` | Excel parser for abroad alumni |
 | `lib/award-import-parse.ts` | Excel parser for awards |
+| `lib/excel-export.ts` | Shared Excel export helper (ExcelJS) |
+| `lib/excel-import.ts` | Shared Excel import helpers (ExcelJS) |
 
 ## Key Constraints
 

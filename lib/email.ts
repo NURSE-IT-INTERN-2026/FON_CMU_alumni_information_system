@@ -29,7 +29,7 @@ export async function sendPasswordResetEmail(
       <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
         <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #1e3a5f; margin: 0; font-size: 22px;">รีเซ็ตรหัสผ่าน</h2>
+            <h2 style="color: #5b21b6; margin: 0; font-size: 22px;">รีเซ็ตรหัสผ่าน</h2>
           </div>
           <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
             ท่านได้รับอีเมลนี้เนื่องจากมีการขอรีเซ็ตรหัสผ่านสำหรับระบบสารสนเทศศิษย์เก่า
@@ -40,7 +40,7 @@ export async function sendPasswordResetEmail(
             <span style="color: #e53e3e; font-weight: 600;">(ลิงก์นี้จะหมดอายุใน 1 ชั่วโมง)</span>
           </p>
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${resetUrl}" style="display: inline-block; background-color: #1e3a5f; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
+            <a href="${resetUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
               รีเซ็ตรหัสผ่าน
             </a>
           </div>

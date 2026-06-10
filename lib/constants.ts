@@ -18,7 +18,7 @@ export const PREFIX_OPTIONS = [
 ];
 
 export const NAV_ITEMS = [
-  { href: "/", label: "หน้าหลัก" },
+  { href: "/", label: "แผงควบคุม" },
   { href: "/alumni-count", label: "จำนวนนักศึกษาเก่า" },
   { href: "/awards", label: "รางวัล" },
   { href: "/potentials", label: "ศักยภาพ" },

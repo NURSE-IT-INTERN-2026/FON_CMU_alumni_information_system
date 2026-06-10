@@ -4,38 +4,15 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 
-interface ChartSeries {
-  key: string;
-  label: string;
-  data: number[];
-}
-
-interface ChartCard {
-  key: string;
-  label: string;
-  count: number;
-}
-
-interface ChartData {
-  generations: string[];
-  series: ChartSeries[];
-  cards: ChartCard[];
-  totalCount: number;
-}
-
-const SERIES_COLORS = ["#1e3a5f", "#2e7d32", "#c62828", "#f57f17", "#6a1b9a"];
+const DEGREE_COLORS: Record<string, string> = {
+  NURSING_ASSISTANT: "#f57f17",
+  ASSOCIATE: "#6a1b9a",
+  BACHELOR: "#5b21b6",
+  MASTER: "#2e7d32",
+  DOCTORAL: "#c62828",
+};
 
 interface Alumni {
   id: string;
@@ -80,18 +57,13 @@ export default function AlumniCountPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
 
-  // View mode state
-  const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [chartLoading, setChartLoading] = useState(true);
-
-  // Manage mode state
+  // State
   const [manageMode, setManageMode] = useState(false);
   const [alumni, setAlumni] = useState<Alumni[]>([]);
   const [totalAlumni, setTotalAlumni] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [tableLoading, setTableLoading] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_EDIT_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -118,22 +90,6 @@ export default function AlumniCountPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Fetch chart data
-  const fetchChartData = useCallback(async () => {
-    setChartLoading(true);
-    try {
-      const res = await fetch("/api/alumni-count");
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ChartData = await res.json();
-      setChartData(data);
-      setTotalCount(data.totalCount);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setChartLoading(false);
-    }
-  }, []);
-
   // Fetch alumni table data
   const fetchAlumni = useCallback(async () => {
     setTableLoading(true);
@@ -156,14 +112,8 @@ export default function AlumniCountPage() {
   }, [page, search]);
 
   useEffect(() => {
-    fetchChartData();
-  }, [fetchChartData]);
-
-  useEffect(() => {
-    if (manageMode) {
-      fetchAlumni();
-    }
-  }, [manageMode, fetchAlumni]);
+    fetchAlumni();
+  }, [fetchAlumni]);
 
   const totalPages = Math.max(1, Math.ceil(totalAlumni / PAGE_SIZE));
 
@@ -259,7 +209,6 @@ export default function AlumniCountPage() {
       }
       closeForm();
       fetchAlumni();
-      fetchChartData();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -276,7 +225,6 @@ export default function AlumniCountPage() {
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchAlumni();
-      fetchChartData();
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -300,7 +248,6 @@ export default function AlumniCountPage() {
       deselectAll();
       setShowBulkDeleteDialog(false);
       fetchAlumni();
-      fetchChartData();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -368,7 +315,6 @@ export default function AlumniCountPage() {
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);
       fetchAlumni();
-      fetchChartData();
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า"
@@ -378,34 +324,6 @@ export default function AlumniCountPage() {
       if (importFileRef.current) importFileRef.current.value = "";
     }
   };
-
-  // Prepare recharts data: one object per generation with counts per degree level
-  const rechartsData =
-    chartData?.generations.map((gen, gi) => {
-      const point: Record<string, string | number> = { generation: gen };
-      for (const s of chartData.series) {
-        point[s.key] = s.data[gi] || 0;
-      }
-      return point;
-    }) ?? [];
-
-  // View mode loading
-  if (!manageMode && chartLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
-      </div>
-    );
-  }
-
-  // View mode error
-  if (!manageMode && !chartData) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-8 text-center">
-        <p className="text-[var(--muted)]">ไม่สามารถโหลดข้อมูลได้</p>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -821,7 +739,7 @@ export default function AlumniCountPage() {
                 <thead>
                   <tr
                     className="text-white text-left"
-                    style={{ backgroundColor: "#1e3a5f" }}
+                    style={{ backgroundColor: "#5b21b6" }}
                   >
                     <th className="px-4 py-3 w-12">
                       <input
@@ -915,7 +833,7 @@ export default function AlumniCountPage() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => openEdit(a)}
-                              className="rounded p-1.5 text-blue-600 hover:bg-blue-100"
+                              className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                               title="แก้ไข"
                             >
                               <svg
@@ -1001,100 +919,156 @@ export default function AlumniCountPage() {
           </div>
         </>
       ) : (
-        /* View mode: count cards and multi-line chart */
+        /* View mode: read-only alumni table */
         <>
-          {/* Group count cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {chartData?.cards.map((card, i) => {
-              const color = SERIES_COLORS[i % SERIES_COLORS.length];
-              return (
-                <div
-                  key={card.key}
-                  className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm"
-                >
-                  <div
-                    className="absolute inset-y-0 left-0 w-1.5"
-                    style={{ backgroundColor: color }}
-                  />
-                  <p className="pl-3 text-xs font-medium tracking-wide text-gray-400 uppercase">
-                    {card.label}
-                  </p>
-                  <p className="mt-1 pl-3 text-3xl font-bold" style={{ color }}>
-                    {card.count.toLocaleString()}
-                  </p>
-                  <p className="pl-3 text-xs text-gray-400">คน</p>
-                </div>
-              );
-            })}
+          {/* Search */}
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            />
           </div>
 
-          {/* Line chart */}
-          <div className="mt-8 overflow-hidden rounded-lg bg-white p-4 shadow-sm sm:p-6">
-            <div className="h-[450px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={rechartsData}
-                  margin={{ top: 10, right: 20, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="generation"
-                    tick={{ fontSize: 13 }}
-                    label={{
-                      value: "รุ่น (จากเลข 2 หลักแรกของรหัสนักศึกษา)",
-                      position: "insideBottom",
-                      offset: -5,
-                      style: { fontSize: 12, fill: "#666" },
-                    }}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    label={{
-                      value: "จำนวน (คน)",
-                      angle: -90,
-                      position: "insideLeft",
-                      style: { fontSize: 14, fontWeight: 600 },
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const series = chartData?.series.find((s) => s.key === name);
-                      return [`${value} คน`, series?.label ?? String(name)];
-                    }}
-                  />
-                  {chartData?.series.map((s, i) => (
-                    <Line
-                      key={s.key}
-                      type="monotone"
-                      dataKey={s.key}
-                      stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 6 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+          {/* Alumni table (read-only) */}
+          <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr
+                    className="text-white text-left"
+                    style={{ backgroundColor: "#5b21b6" }}
+                  >
+                    <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                      ลำดับ
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      รหัสนักศึกษา
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      คำนำหน้า
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      ชื่อ
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      นามสกุลเดิม
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      นามสกุลใหม่
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      รุ่น/สาขา
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      ระดับการศึกษา
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      จังหวัด
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableLoading ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-12 text-center">
+                        <div className="flex justify-center">
+                          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+                        </div>
+                      </td>
+                    </tr>
+                  ) : alumni.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="px-4 py-12 text-center text-[var(--muted)]"
+                      >
+                        ไม่พบข้อมูล
+                      </td>
+                    </tr>
+                  ) : (
+                    alumni.map((a, idx) => {
+                      const degreeLabel = DEGREE_LEVEL_OPTIONS.find(
+                        (o) => o.value === a.degreeLevel
+                      )?.label;
+                      return (
+                        <tr
+                          key={a.id}
+                          className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3 text-center">
+                            {(page - 1) * PAGE_SIZE + idx + 1}
+                          </td>
+                          <td className="px-4 py-3">{a.studentId}</td>
+                          <td className="px-4 py-3">{a.prefix}</td>
+                          <td className="px-4 py-3">{a.firstName}</td>
+                          <td className="px-4 py-3">{a.maidenLastName}</td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.newLastName || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.cohort || "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {degreeLabel ? (
+                              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${DEGREE_COLORS[a.degreeLevel ?? ""] ?? "#5b21b6"}15`, color: DEGREE_COLORS[a.degreeLevel ?? ""] ?? "#5b21b6" }}>
+                                {degreeLabel}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--muted)]">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.province || "-"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-
-            {/* Custom legend */}
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-              {chartData?.series.map((s, i) => (
-                <span key={s.key} className="flex items-center gap-1.5 text-sm text-gray-600">
-                  <span
-                    className="inline-block h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }}
-                  />
-                  {s.label}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-3 border-t border-[var(--border)] pt-3">
-              <p className="text-center text-lg font-semibold text-[var(--primary)]">
-                จำนวนนักศึกษาเก่าทั้งหมด: {totalCount.toLocaleString()} คน
-              </p>
-            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+                <span className="text-sm text-gray-500">แสดง {totalAlumni === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalAlumni)} จาก {totalAlumni} รายการ</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
+                  >
+                    ก่อนหน้า
+                  </button>
+                  {paginationNumbers.map((p, i) =>
+                    p === "..." ? (
+                      <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`rounded-md px-3 py-1.5 text-sm ${
+                          page === p
+                            ? "bg-[var(--primary)] text-white"
+                            : "border border-[var(--border)] bg-white hover:bg-gray-100"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page === totalPages}
+                    className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

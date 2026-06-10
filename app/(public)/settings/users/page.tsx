@@ -162,7 +162,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const formatDate = (d: string) => new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
 
   const roleBadge = (role: string) => {
-    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", executive: "bg-amber-100 text-amber-700", admin: "bg-blue-100 text-blue-700" };
+    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", executive: "bg-amber-100 text-amber-700", admin: "bg-purple-100 text-purple-700" };
     const l: Record<string, string> = { superadmin: "ผู้ดูแลระบบสูงสุด", executive: "ผู้บริหาร", admin: "ผู้ดูแลระบบ" };
     return <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${s[role] || "bg-gray-100 text-gray-700"}`}>{l[role] || role}</span>;
   };
@@ -224,7 +224,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+              <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลำดับ</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ-นามสกุล</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">วันที่เพิ่ม</th>
@@ -247,7 +247,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
                     {canWrite && (
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEdit(m)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" title="แก้ไข">
+                          <button onClick={() => openEdit(m)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="แก้ไข">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                           </button>
                           <button onClick={() => setDeleteId(m.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" title="ลบ">
@@ -339,7 +339,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-white text-left" style={{ backgroundColor: "#1e3a5f" }}>
+              <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลำดับ</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ-สกุล</th>

@@ -126,7 +126,7 @@ export default function PendingAlumniPage() {
                       รอการอนุมัติ
                     </span>
                     {alumni.prefix === "-" && (
-                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                      <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
                         รอตรวจสอบข้อมูล
                       </span>
                     )}
