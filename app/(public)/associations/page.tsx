@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import { useAlumniSearch } from "@/lib/useAlumniSearch";
 
 interface Association {
   id: string;
@@ -73,28 +74,12 @@ export default function AssociationsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "fullName" | null>(null);
-  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
-  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
-
-  const searchAlumni = useCallback(async (term: string) => {
-    if (term.length < 2) { setAlumniResults([]); return; }
-    try {
-      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setAlumniResults(data.data || []);
-      setShowAlumniDropdown(true);
-    } catch {}
-  }, []);
-
-  const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string }) =>
-    `${a.prefix}${a.firstName} ${a.maidenLastName}`;
+  const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId, fullName: alumniDisplayName(a) }));
+    setForm((f) => ({ ...f, studentId: a.studentId, fullName: displayName(a) }));
     setAlumniSearchField(null);
-    setShowAlumniDropdown(false);
-    setAlumniResults([]);
+    clearResults();
   };
 
   const handleSort = (field: SortField) => {
@@ -174,7 +159,7 @@ export default function AssociationsPage() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setAlumniSearchField(null);
-    setAlumniResults([]);
+    clearResults();
     setFormErrors({});
   };
 
@@ -426,7 +411,7 @@ export default function AssociationsPage() {
         <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
           {alumniResults.map((a) => (
             <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-              {a.studentId} - {alumniDisplayName(a)}
+              {a.studentId} - {displayName(a)}
             </button>
           ))}
         </div>
@@ -446,7 +431,7 @@ export default function AssociationsPage() {
         <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
           {alumniResults.map((a) => (
             <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-              {a.studentId} - {alumniDisplayName(a)}
+              {a.studentId} - {displayName(a)}
             </button>
           ))}
         </div>

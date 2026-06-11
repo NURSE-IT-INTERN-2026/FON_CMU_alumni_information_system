@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import { useAlumniSearch } from "@/lib/useAlumniSearch";
 
 interface Award {
   id: string;
@@ -94,8 +94,7 @@ export default function AwardsPage() {
   // Alumni search for form
   const [nameSearch, setNameSearch] = useState("");
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
-  const [alumniResults, setAlumniResults] = useState<{ id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }[]>([]);
-  const [showAlumniDropdown, setShowAlumniDropdown] = useState(false);
+  const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
   const fetchAwards = useCallback(async () => {
     setLoading(true);
@@ -151,12 +150,6 @@ export default function AwardsPage() {
     <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
   );
 
-  const chartData = Object.entries(typeCounts).map(([key, value]) => ({
-    name: AWARD_TYPE_LABELS[key] || key,
-    value,
-    color: AWARD_COLORS[key] || "#999",
-  }));
-
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
@@ -177,23 +170,10 @@ export default function AwardsPage() {
     return pages;
   })();
 
-  // Alumni search for form
-  const searchAlumni = useCallback(async (term: string) => {
-    if (term.length < 2) { setAlumniResults([]); return; }
-    try {
-      const res = await fetch(`${BASE_PATH}/api/alumni?search=${encodeURIComponent(term)}&pageSize=10`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setAlumniResults(data.data || []);
-      setShowAlumniDropdown(true);
-    } catch {}
-  }, []);
-
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setForm((f) => ({ ...f, studentId: a.studentId }));
-    setNameSearch(`${a.prefix}${a.firstName} ${a.maidenLastName}`);
-    setShowAlumniDropdown(false);
-    setAlumniResults([]);
+    setNameSearch(displayName(a));
+    clearResults();
     setFormSearchField(null);
   };
 
@@ -226,7 +206,7 @@ export default function AwardsPage() {
     setForm(EMPTY_FORM);
     setNameSearch("");
     setFormSearchField(null);
-    setAlumniResults([]);
+    clearResults();
     setFormErrors({});
   };
 
@@ -449,7 +429,7 @@ export default function AwardsPage() {
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-                      {a.studentId} - {alumniDisplayName(a)}
+                      {a.studentId} - {displayName(a)}
                     </button>
                   ))}
                 </div>
@@ -468,7 +448,7 @@ export default function AwardsPage() {
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
                     <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-                      {a.studentId} - {alumniDisplayName(a)}
+                      {a.studentId} - {displayName(a)}
                     </button>
                   ))}
                 </div>
@@ -506,32 +486,52 @@ export default function AwardsPage() {
         </div>
       )}
 
-      {/* Doughnut Chart - only in view mode */}
+      {/* Award type summary cards - only in view mode */}
       {!manageMode && Object.keys(typeCounts).length > 0 && (
-        <div className="mb-8 flex justify-center">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  dataKey="value"
-                  paddingAngle={2}
-                  stroke="#ffffff"
-                  strokeWidth={2}
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            {
+              key: "INTERNATIONAL",
+              label: AWARD_TYPE_LABELS["INTERNATIONAL"],
+              color: AWARD_COLORS["INTERNATIONAL"],
+              icon: (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5a17.92 17.92 0 0 1-8.716-2.247m0 0A8.966 8.966 0 0 1 3 12c0-1.264.26-2.466.732-3.558" />
+                </svg>
+              ),
+            },
+            {
+              key: "NATIONAL",
+              label: AWARD_TYPE_LABELS["NATIONAL"],
+              color: AWARD_COLORS["NATIONAL"],
+              icon: (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-4.5A3.375 3.375 0 0 0 13.125 10.875h-2.25A3.375 3.375 0 0 0 7.5 14.25v4.5m6-15a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              ),
+            },
+            {
+              key: "LOCAL",
+              label: AWARD_TYPE_LABELS["LOCAL"],
+              color: AWARD_COLORS["LOCAL"],
+              icon: (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+              ),
+            },
+          ].map(({ key, label, color, icon }) => (
+            <div key={key} className="rounded-xl border-l-4 bg-white p-5 shadow-sm" style={{ borderLeftColor: color }}>
+              <div className="rounded-lg p-2" style={{ backgroundColor: `${color}10`, color }}>
+                {icon}
+              </div>
+              <p className="mt-3 text-xs font-medium text-[var(--muted)]">{label}</p>
+              <p className="mt-1 text-2xl font-bold sm:text-3xl" style={{ color }}>
+                {(typeCounts[key] ?? 0).toLocaleString()}
+              </p>
+            </div>
+          ))}
         </div>
       )}
 

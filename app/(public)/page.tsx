@@ -133,10 +133,7 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.awards.total,
-    getSubStat: (d) =>
-      d.awards.latestYear
-        ? `ปี ${d.awards.latestYear}: ${d.awards.latestYearCount.toLocaleString()} รายการ`
-        : "ยังไม่มีข้อมูล",
+    getSubStat: () => "",
   },
   {
     label: "ศักยภาพ",
@@ -175,10 +172,7 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.graduateCommittee.total,
-    getSubStat: (d) =>
-      d.graduateCommittee.latestTermYear
-        ? `ปีการศึกษาล่าสุด: ${d.graduateCommittee.latestTermYear}`
-        : "ยังไม่มีข้อมูล",
+    getSubStat: () => "",
   },
   {
     label: "ผู้แทนรุ่น",
@@ -203,18 +197,6 @@ const CARDS: CardConfig[] = [
     ),
     getCount: (d) => d.abroadAlumni.total,
     getSubStat: (d) => `${d.abroadAlumni.distinctCountries.toLocaleString()} ประเทศ`,
-  },
-  {
-    label: "ข่าวสาร",
-    href: "/news",
-    color: "#558b2f",
-    icon: (
-      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3Z" />
-      </svg>
-    ),
-    getCount: (d) => d.news.total,
-    getSubStat: (d) => `เผยแพร่แล้ว ${d.news.publishedCount.toLocaleString()} ข่าว`,
   },
 ];
 
@@ -462,7 +444,7 @@ export default function DashboardPage() {
       </Link>
 
       {/* Dashboard Cards Grid */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
         {CARDS.map((card) => {
           const count = card.getCount(data);
           const subStat = card.getSubStat(data);

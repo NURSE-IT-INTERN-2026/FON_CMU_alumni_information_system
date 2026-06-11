@@ -3,6 +3,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/alumni",
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/alumni",
+        basePath: false,
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

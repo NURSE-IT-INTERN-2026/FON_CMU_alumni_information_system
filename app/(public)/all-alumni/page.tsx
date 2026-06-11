@@ -57,6 +57,7 @@ interface CmuAlumni {
   grad_semester: string;
   std_mobile: string;
   adm_type: string;
+  cohort?: string | null;
 }
 
 // Map CMU registrar level_id to Thai degree labels
@@ -132,23 +133,63 @@ export default function AlumniCountPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Fetch alumni table data (local DB — used in manage mode)
+  // Fetch alumni table data (local DB + CMU — used in manage mode)
   const fetchAlumni = useCallback(async () => {
     setTableLoading(true);
     try {
-      const params = new URLSearchParams({
+      // Fetch CMU alumni data
+      const cmuParams = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
         search,
         sortField: sortField as string,
-        sortOrder: sortDir,
+        sortDir,
       });
-      if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
-      const res = await fetch(`${BASE_PATH}/api/alumni?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: AlumniApiResponse = await res.json();
-      setAlumni(data.data);
-      setTotalAlumni(data.total);
+      if (degreeLevelFilter) cmuParams.set("degreeLevel", degreeLevelFilter);
+      const cmuRes = await fetch(`${BASE_PATH}/api/cmu-alumni?${cmuParams}`);
+      let cmuData: CmuAlumni[] = [];
+      let cmuTotalCount = 0;
+      if (cmuRes.ok) {
+        const cmuJson = await cmuRes.json();
+        cmuData = cmuJson.data || [];
+        cmuTotalCount = cmuJson.total || 0;
+      }
+
+      // Fetch local alumni data for cohort + existing records
+      const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999`);
+      let localMap: Record<string, Alumni> = {};
+      if (localRes.ok) {
+        const localJson: AlumniApiResponse = await localRes.json();
+        for (const a of localJson.data) {
+          if (a.studentId) localMap[a.studentId] = a;
+        }
+      }
+
+      // Map CMU records to Alumni shape, overlaying local data where available
+      const merged: Alumni[] = cmuData.map((c) => {
+        const local = localMap[c.student_id];
+        if (local) return local;
+        return {
+          id: c.student_id,
+          studentId: c.student_id,
+          prefix: "",
+          firstName: c.name_th || "",
+          maidenLastName: c.surname_th || "",
+          newLastName: null,
+          cohort: null,
+          degreeLevel: null,
+          province: null,
+          email: null,
+          phone: null,
+          currentWorkplace: null,
+          country: null,
+          isPotential: false,
+          isModelRepresentative: false,
+          photoUrl: null,
+        };
+      });
+      setAlumni(merged);
+      setTotalAlumni(cmuTotalCount);
     } catch (err) {
       console.error(err);
     } finally {
@@ -177,7 +218,27 @@ export default function AlumniCountPage() {
         throw new Error(errBody?.error || "Failed to fetch CMU data");
       }
       const data = await res.json();
-      setCmuAlumni(data.data);
+
+      // Fetch local alumni to get cohort data
+      let cohortMap: Record<string, string> = {};
+      try {
+        const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999`);
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          for (const a of localData.data) {
+            if (a.studentId && a.cohort) {
+              cohortMap[a.studentId] = a.cohort;
+            }
+          }
+        }
+      } catch {}
+
+      // Merge cohort into CMU records
+      const merged = data.data.map((a: CmuAlumni) => ({
+        ...a,
+        cohort: cohortMap[a.student_id] || null,
+      }));
+      setCmuAlumni(merged);
       setCmuTotal(data.total);
     } catch (err) {
       console.error(err);
@@ -871,6 +932,9 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
                       รหัสนักศึกษา <SortIcon field="studentId" />
                     </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
+                      รุ่น <SortIcon field="cohort" />
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
                       คำนำหน้า <SortIcon field="prefix" />
                     </th>
@@ -882,9 +946,6 @@ export default function AlumniCountPage() {
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("newLastName")}>
                       นามสกุลใหม่ <SortIcon field="newLastName" />
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น/สาขา <SortIcon field="cohort" />
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("province")}>
                       จังหวัด <SortIcon field="province" />
@@ -930,14 +991,14 @@ export default function AlumniCountPage() {
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
                         <td className="px-4 py-3">{a.studentId}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          {a.cohort || "-"}
+                        </td>
                         <td className="px-4 py-3">{a.prefix}</td>
                         <td className="px-4 py-3">{a.firstName}</td>
                         <td className="px-4 py-3">{a.maidenLastName}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {a.newLastName || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.cohort || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           {a.province || "-"}
@@ -1070,6 +1131,9 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
                       รหัสนักศึกษา <SortIcon field="studentId" />
                     </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      รุ่น
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                       ชื่อ <SortIcon field="name" />
                     </th>
@@ -1090,7 +1154,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center">
+                      <td colSpan={8} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -1099,7 +1163,7 @@ export default function AlumniCountPage() {
                   ) : cmuAlumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -1117,6 +1181,9 @@ export default function AlumniCountPage() {
                             {(page - 1) * PAGE_SIZE + idx + 1}
                           </td>
                           <td className="px-4 py-3">{a.student_id}</td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.cohort || "-"}
+                          </td>
                           <td className="px-4 py-3">{a.name_th || "-"}</td>
                           <td className="px-4 py-3">{a.surname_th || "-"}</td>
                           <td className="px-4 py-3">
