@@ -149,7 +149,10 @@ export async function DELETE(
       );
     }
 
-    await prisma.alumni.delete({ where: { id } });
+    await prisma.alumni.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     const session = await getSession();
     if (session) {

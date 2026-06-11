@@ -21,8 +21,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const result = await prisma.alumni.deleteMany({
+    const result = await prisma.alumni.updateMany({
       where: { id: { in: ids } },
+      data: { deletedAt: new Date() },
     });
 
     const session = await getSession();

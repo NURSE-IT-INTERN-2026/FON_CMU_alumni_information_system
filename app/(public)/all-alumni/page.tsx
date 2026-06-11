@@ -93,6 +93,11 @@ const EMPTY_EDIT_FORM = {
   country: "",
 };
 
+/** Check if an id looks like a UUID (local DB record) vs a student_id (CMU-only record). */
+function isLocalRecordId(id: string): boolean {
+  return id.includes("-"); // UUIDs have dashes, student IDs are numeric only
+}
+
 export default function AlumniCountPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
@@ -155,41 +160,72 @@ export default function AlumniCountPage() {
         cmuTotalCount = cmuJson.total || 0;
       }
 
-      // Fetch local alumni data for cohort + existing records
-      const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999`);
+      // Fetch ALL local alumni (including soft-deleted) to build overlay map
+      const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999&includeDeleted=true`);
       let localMap: Record<string, Alumni> = {};
+      let deletedStudentIds = new Set<string>();
       if (localRes.ok) {
         const localJson: AlumniApiResponse = await localRes.json();
         for (const a of localJson.data) {
-          if (a.studentId) localMap[a.studentId] = a;
+          if (a.studentId) {
+            localMap[a.studentId] = a;
+            // Track soft-deleted records
+            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) {
+              deletedStudentIds.add(a.studentId);
+            }
+          }
         }
       }
 
-      // Map CMU records to Alumni shape, overlaying local data where available
-      const merged: Alumni[] = cmuData.map((c) => {
+      // Map CMU records to Alumni shape, overlaying local data where available.
+      // Skip records that have been soft-deleted locally.
+      const merged: Alumni[] = [];
+      const localStudentIdsUsed = new Set<string>();
+
+      for (const c of cmuData) {
+        // Skip CMU records that were soft-deleted locally
+        if (deletedStudentIds.has(c.student_id)) continue;
+
         const local = localMap[c.student_id];
-        if (local) return local;
-        return {
-          id: c.student_id,
-          studentId: c.student_id,
-          prefix: "",
-          firstName: c.name_th || "",
-          maidenLastName: c.surname_th || "",
-          newLastName: null,
-          cohort: null,
-          degreeLevel: null,
-          province: null,
-          email: null,
-          phone: null,
-          currentWorkplace: null,
-          country: null,
-          isPotential: false,
-          isModelRepresentative: false,
-          photoUrl: null,
-        };
-      });
+        localStudentIdsUsed.add(c.student_id);
+
+        if (local) {
+          merged.push(local);
+        } else {
+          merged.push({
+            id: c.student_id,
+            studentId: c.student_id,
+            prefix: "",
+            firstName: c.name_th || "",
+            maidenLastName: c.surname_th || "",
+            newLastName: null,
+            cohort: null,
+            degreeLevel: null,
+            province: null,
+            email: null,
+            phone: null,
+            currentWorkplace: null,
+            country: null,
+            isPotential: false,
+            isModelRepresentative: false,
+            photoUrl: null,
+          });
+        }
+      }
+
+      // Append local-only records (not in CMU data) that are not soft-deleted
+      for (const a of Object.values(localMap)) {
+        if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) {
+          merged.push(a);
+        }
+      }
+
+      // Adjust total: start from CMU total, subtract soft-deleted, add local-only
+      const adjustedTotal = cmuTotalCount - deletedStudentIds.size +
+        Object.values(localMap).filter(a => !localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)).length;
+
       setAlumni(merged);
-      setTotalAlumni(cmuTotalCount);
+      setTotalAlumni(Math.max(0, adjustedTotal));
     } catch (err) {
       console.error(err);
     } finally {
@@ -219,27 +255,51 @@ export default function AlumniCountPage() {
       }
       const data = await res.json();
 
-      // Fetch local alumni to get cohort data
-      let cohortMap: Record<string, string> = {};
+      // Fetch local alumni (including soft-deleted) for overlay and filtering
+      let localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
+      let deletedStudentIds = new Set<string>();
       try {
-        const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999`);
+        const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999&includeDeleted=true`);
         if (localRes.ok) {
           const localData = await localRes.json();
           for (const a of localData.data) {
-            if (a.studentId && a.cohort) {
-              cohortMap[a.studentId] = a.cohort;
+            if (a.studentId) {
+              localMap[a.studentId] = a;
+              if (a.deletedAt) {
+                deletedStudentIds.add(a.studentId);
+              }
             }
           }
         }
       } catch {}
 
-      // Merge cohort into CMU records
-      const merged = data.data.map((a: CmuAlumni) => ({
-        ...a,
-        cohort: cohortMap[a.student_id] || null,
-      }));
+      // Merge: overlay local data on CMU records, skip soft-deleted
+      const merged: CmuAlumni[] = [];
+      for (const a of data.data as CmuAlumni[]) {
+        // Skip soft-deleted records
+        if (deletedStudentIds.has(a.student_id)) continue;
+
+        const local = localMap[a.student_id];
+        if (local) {
+          // Local record overrides — use local firstName/lastName if available
+          merged.push({
+            ...a,
+            name_th: local.firstName || a.name_th,
+            surname_th: local.maidenLastName || a.surname_th,
+            cohort: local.cohort || null,
+          });
+        } else {
+          merged.push({
+            ...a,
+            cohort: null,
+          });
+        }
+      }
+
+      // Adjust total by subtracting soft-deleted count
+      const adjustedTotal = data.total - deletedStudentIds.size;
       setCmuAlumni(merged);
-      setCmuTotal(data.total);
+      setCmuTotal(Math.max(0, adjustedTotal));
     } catch (err) {
       console.error(err);
     } finally {
@@ -358,11 +418,18 @@ export default function AlumniCountPage() {
         currentWorkplace: form.currentWorkplace.trim() || null,
         country: form.country.trim() || null,
       };
-      const res = await fetch(`${BASE_PATH}/api/alumni/${editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+
+      // CMU-only record (not yet in local DB) → POST to create
+      // Local record (already in DB) → PUT to update
+      const isLocal = editingId && isLocalRecordId(editingId);
+      const res = await fetch(
+        `${BASE_PATH}/api/alumni${isLocal ? `/${editingId}` : ""}`,
+        {
+          method: isLocal ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "เกิดข้อผิดพลาด");
@@ -379,10 +446,31 @@ export default function AlumniCountPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni/${deleteId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error();
+      if (isLocalRecordId(deleteId)) {
+        // Local record → soft delete via DELETE endpoint
+        const res = await fetch(`${BASE_PATH}/api/alumni/${deleteId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error();
+      } else {
+        // CMU-only record → create a soft-deleted local record to hide it
+        const alumniRecord = alumni.find((a) => a.id === deleteId);
+        if (alumniRecord) {
+          await fetch(`${BASE_PATH}/api/alumni`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              studentId: alumniRecord.studentId,
+              prefix: alumniRecord.prefix || "นางสาว",
+              firstName: alumniRecord.firstName,
+              maidenLastName: alumniRecord.maidenLastName,
+              cohort: alumniRecord.cohort || null,
+              degreeLevel: alumniRecord.degreeLevel || null,
+              softDelete: true,
+            }),
+          });
+        }
+      }
       setDeleteId(null);
       fetchAlumni();
     } catch {
@@ -396,15 +484,43 @@ export default function AlumniCountPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      // Separate local records (UUID) from CMU-only records (student_id)
+      const localIds = ids.filter((id) => isLocalRecordId(id));
+      const cmuIds = ids.filter((id) => !isLocalRecordId(id));
+
+      // Soft delete local records via bulk-delete endpoint
+      if (localIds.length > 0) {
+        const res = await fetch(`${BASE_PATH}/api/alumni/bulk-delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: localIds }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
       }
+
+      // For CMU-only records, create soft-deleted local records to hide them
+      for (const cmuId of cmuIds) {
+        const record = alumni.find((a) => a.id === cmuId);
+        if (record) {
+          await fetch(`${BASE_PATH}/api/alumni`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              studentId: record.studentId,
+              prefix: record.prefix || "นางสาว",
+              firstName: record.firstName,
+              maidenLastName: record.maidenLastName,
+              cohort: record.cohort || null,
+              degreeLevel: record.degreeLevel || null,
+              softDelete: true,
+            }),
+          });
+        }
+      }
+
       deselectAll();
       setShowBulkDeleteDialog(false);
       fetchAlumni();
@@ -1255,7 +1371,7 @@ export default function AlumniCountPage() {
               ยืนยันการลบข้อมูล
             </h3>
             <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+              คุณต้องการลบข้อมูลนี้หรือไม่?
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -1280,7 +1396,7 @@ export default function AlumniCountPage() {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
             <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>

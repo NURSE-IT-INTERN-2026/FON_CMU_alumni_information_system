@@ -62,6 +62,7 @@ model Alumni {
   isPotential           Boolean   @default(false)
   isModelRepresentative Boolean   @default(false)
   photoUrl              String?
+  deletedAt             DateTime?
   hasLoggedIn           Boolean   @default(false)
   adminEditedAt         DateTime?
   passwordHash          String?

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const degreeLevel = searchParams.get("degreeLevel") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
+    const includeDeleted = searchParams.get("includeDeleted") === "true";
 
     const allowedSortFields = [
       "createdAt",
@@ -35,7 +36,9 @@ export async function GET(request: NextRequest) {
     const validSortField = allowedSortFields.includes(sortField) ? sortField : "createdAt";
     const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
 
-    const where: Prisma.AlumniWhereInput = {};
+    const where: Prisma.AlumniWhereInput = {
+      ...(includeDeleted ? {} : { deletedAt: null }),
+    };
 
     if (search) {
       where.OR = [
@@ -99,6 +102,7 @@ export async function POST(request: NextRequest) {
       isPotential,
       isModelRepresentative,
       photoUrl,
+      softDelete,
     } = body;
 
     if (!studentId || !prefix || !firstName || !maidenLastName) {
@@ -110,6 +114,10 @@ export async function POST(request: NextRequest) {
 
     const existing = await prisma.alumni.findUnique({ where: { studentId } });
     if (existing) {
+      // If record exists and is already soft-deleted, just return it
+      if (existing.deletedAt) {
+        return NextResponse.json(existing, { status: 200 });
+      }
       return NextResponse.json(
         { error: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
         { status: 409 }
@@ -133,6 +141,7 @@ export async function POST(request: NextRequest) {
         isPotential: isPotential ?? false,
         isModelRepresentative: isModelRepresentative ?? false,
         photoUrl: photoUrl || null,
+        deletedAt: softDelete ? new Date() : null,
       },
       include: {
         awards: true,
