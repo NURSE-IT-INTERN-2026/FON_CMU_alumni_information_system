@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 import { useCanWrite } from "@/lib/role-context";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { awardFormSchema, type AwardFormData } from "@/lib/validations";
 
 interface Award {
   id: string;
@@ -38,7 +44,9 @@ const AWARD_COLORS: Record<string, string> = {
 type SortField = "name" | "award" | "type" | "year";
 type SortDir = "asc" | "desc";
 
-const EMPTY_FORM = { studentId: "", awardName: "", awardType: "INTERNATIONAL", year: "", description: "" };
+type FormValues = AwardFormData & { studentId: string };
+
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", awardName: "", awardType: "INTERNATIONAL" as const, year: "", description: "" };
 
 type SearchField = "all" | "awardName" | "recipientName" | "description" | "name" | "year";
 
@@ -70,8 +78,10 @@ export default function AwardsPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
+    resolver: zodResolver(awardFormSchema) as any,
+    defaultValues: DEFAULT_FORM_VALUES,
+  });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -171,31 +181,29 @@ export default function AwardsPage() {
   })();
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId }));
+    setValue("studentId", a.studentId);
     setNameSearch(displayName(a));
     clearResults();
     setFormSearchField(null);
   };
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
+    formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setFormSearchField(null);
-    setFormErrors({});
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (a: Award) => {
-    setForm({
+    formReset({
       studentId: a.studentId || "",
       awardName: a.awardName,
-      awardType: a.awardType,
+      awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
       year: String(a.year),
       description: a.description || "",
     });
     setNameSearch(alumniDisplayName(a.alumni, a.recipientName));
-    setFormErrors({});
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -203,37 +211,26 @@ export default function AwardsPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setFormSearchField(null);
     clearResults();
-    setFormErrors({});
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.awardName.trim()) errors.awardName = "กรุณากรอกชื่อรางวัล";
-    if (!form.awardType) errors.awardType = "กรุณาเลือกประเภท";
-    if (!form.year) errors.year = "กรุณากรอกปี";
-    if (form.year && isNaN(Number(form.year))) errors.year = "ปีต้องเป็นตัวเลข";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const onSave = async (data: AwardFormData) => {
+    const studentId = getValues("studentId");
     setSaving(true);
     setErrorMsg("");
     try {
       if (editingId) {
         // Edit mode
         const payload = {
-          studentId: form.studentId || null,
-          recipientName: form.studentId ? null : (nameSearch.trim() || null),
-          awardName: form.awardName.trim(),
-          awardType: form.awardType,
-          year: Number(form.year),
-          description: form.description.trim() || null,
+          studentId: studentId || null,
+          recipientName: studentId ? null : (nameSearch.trim() || null),
+          awardName: data.awardName.trim(),
+          awardType: data.awardType,
+          year: Number(data.year),
+          description: data.description.trim() || null,
         };
         const res = await fetch(`${BASE_PATH}/api/awards/${editingId}`, {
           method: "PUT",
@@ -241,18 +238,18 @@ export default function AwardsPage() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       } else {
         // Create mode
         const payload = {
-          studentId: form.studentId || null,
-          recipientName: form.studentId ? null : (nameSearch.trim() || null),
-          awardName: form.awardName.trim(),
-          awardType: form.awardType,
-          year: Number(form.year),
-          description: form.description.trim() || null,
+          studentId: studentId || null,
+          recipientName: studentId ? null : (nameSearch.trim() || null),
+          awardName: data.awardName.trim(),
+          awardType: data.awardType,
+          year: Number(data.year),
+          description: data.description.trim() || null,
         };
         const res = await fetch(`${BASE_PATH}/api/awards`, {
           method: "POST",
@@ -260,8 +257,8 @@ export default function AwardsPage() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       }
       closeForm();
@@ -418,13 +415,15 @@ export default function AwardsPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="relative">
               <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา</label>
-              <input
-                type="text"
-                value={form.studentId}
-                onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value })); searchAlumni(e.target.value); setFormSearchField("studentId"); setNameSearch(""); }}
-                placeholder="พิมพ์รหัสนักศึกษา..."
-                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-              />
+              <Controller name="studentId" control={control} render={({ field }) => (
+                <input
+                  type="text"
+                  value={field.value}
+                  onChange={(e) => { field.onChange(e.target.value); searchAlumni(e.target.value); setFormSearchField("studentId"); setNameSearch(""); }}
+                  placeholder="พิมพ์รหัสนักศึกษา..."
+                  className="w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] border-gray-300"
+                />
+              )} />
               {showAlumniDropdown && formSearchField === "studentId" && alumniResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                   {alumniResults.map((a) => (
@@ -440,7 +439,7 @@ export default function AwardsPage() {
               <input
                 type="text"
                 value={nameSearch}
-                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setFormSearchField("name"); setForm((f) => ({ ...f, studentId: "" })); }}
+                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setFormSearchField("name"); setValue("studentId", ""); }}
                 placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
                 className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] border-gray-300"
               />
@@ -454,32 +453,26 @@ export default function AwardsPage() {
                 </div>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อรางวัล *</label>
-              <input type="text" value={form.awardName} onChange={(e) => setForm((f) => ({ ...f, awardName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.awardName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.awardName && <p className="mt-1 text-xs text-red-500">{formErrors.awardName}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ประเภท *</label>
-              <select value={form.awardType} onChange={(e) => setForm((f) => ({ ...f, awardType: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
+            <FormField label="ชื่อรางวัล" required error={errors.awardName?.message}>
+              <FormInput registration={register("awardName")} error={errors.awardName?.message} type="text" />
+            </FormField>
+            <FormField label="ประเภท" required error={errors.awardType?.message}>
+              <FormSelect registration={register("awardType")} error={errors.awardType?.message}>
                 {AWARD_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ปี (พ.ศ.) *</label>
-              <input type="number" value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))} placeholder="เช่น 2568" className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.year ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.year && <p className="mt-1 text-xs text-red-500">{formErrors.year}</p>}
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">รายละเอียด</label>
-              <input type="text" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
+              </FormSelect>
+            </FormField>
+            <FormField label="ปี (พ.ศ.)" required error={errors.year?.message}>
+              <FormInput registration={register("year")} error={errors.year?.message} type="text" placeholder="เช่น 2568" />
+            </FormField>
+            <FormField label="รายละเอียด" required error={errors.description?.message} className="sm:col-span-2">
+              <FormInput registration={register("description")} error={errors.description?.message} type="text" />
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
               {saving ? "กำลังบันทึก..." : "บันทึก"}
             </button>
           </div>

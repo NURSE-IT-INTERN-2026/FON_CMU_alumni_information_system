@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormTextarea from "@/components/form/FormTextarea";
 
 interface AbroadAlumni {
   id: string;
@@ -23,17 +29,21 @@ interface ApiResponse {
   countries: string[];
 }
 
-const EMPTY_FORM = {
-  cohort: "",
-  prefix: "คุณ",
-  thaiName: "",
-  englishName: "",
-  workplace: "",
-  homeAddress: "",
-  country: "",
-  notes: "",
-  order: "0",
-};
+const abroadFormSchema = z.object({
+  cohort: z.string(),
+  prefix: z.string(),
+  thaiName: z.string(),
+  englishName: z.string(),
+  workplace: z.string(),
+  homeAddress: z.string(),
+  country: z.string().min(1, "กรุณากรอกประเทศ"),
+  notes: z.string(),
+  order: z.string(),
+}).refine((data) => data.thaiName.trim() || data.englishName.trim(), {
+  message: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ",
+  path: ["thaiName"],
+});
+type AbroadFormValues = z.infer<typeof abroadFormSchema>;
 
 type SearchField = "all" | "thaiName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
 
@@ -134,8 +144,10 @@ export default function AbroadAlumniPage() {
   const [viewPage, setViewPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { register, handleSubmit, formState: { errors }, reset: formReset } = useForm<AbroadFormValues>({
+    resolver: zodResolver(abroadFormSchema) as any,
+    defaultValues: { cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" },
+  });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -209,25 +221,13 @@ export default function AbroadAlumniPage() {
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (a: AbroadAlumni) => {
-    setForm({
-      cohort: a.cohort || "",
-      prefix: a.prefix || "",
-      thaiName: a.thaiName || "",
-      englishName: a.englishName || "",
-      workplace: a.workplace || "",
-      homeAddress: a.homeAddress || "",
-      country: a.country,
-      notes: a.notes || "",
-      order: String(a.order),
-    });
-    setFormErrors({});
+    formReset({ cohort: a.cohort || "", prefix: a.prefix || "", thaiName: a.thaiName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -235,33 +235,23 @@ export default function AbroadAlumniPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.thaiName.trim() && !form.englishName.trim()) errors.thaiName = "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ";
-    if (!form.country.trim()) errors.country = "กรุณากรอกประเทศ";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const onSave = async (data: AbroadFormValues) => {
     setSaving(true);
     setErrorMsg("");
     try {
       const payload = {
-        cohort: form.cohort.trim() || null,
-        prefix: form.prefix.trim() || null,
-        thaiName: form.thaiName.trim() || null,
-        englishName: form.englishName.trim() || null,
-        workplace: form.workplace.trim() || null,
-        homeAddress: form.homeAddress.trim() || null,
-        country: form.country.trim(),
-        notes: form.notes.trim() || null,
-        order: Number(form.order) || 0,
+        cohort: data.cohort.trim() || null,
+        prefix: data.prefix.trim() || null,
+        thaiName: data.thaiName.trim() || null,
+        englishName: data.englishName.trim() || null,
+        workplace: data.workplace.trim() || null,
+        homeAddress: data.homeAddress.trim() || null,
+        country: data.country.trim(),
+        notes: data.notes.trim() || null,
+        order: Number(data.order) || 0,
       };
       if (editingId) {
         const res = await fetch(`${BASE_PATH}/api/abroad-alumni/${editingId}`, {
@@ -270,8 +260,8 @@ export default function AbroadAlumniPage() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       } else {
         const res = await fetch(`${BASE_PATH}/api/abroad-alumni`, {
@@ -280,8 +270,8 @@ export default function AbroadAlumniPage() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       }
       closeForm();
@@ -430,51 +420,40 @@ export default function AbroadAlumniPage() {
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">รุ่น</label>
-              <input type="text" value={form.cohort} onChange={(e) => setForm((f) => ({ ...f, cohort: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">คำนำหน้า</label>
-              <input type="text" value={form.prefix} onChange={(e) => setForm((f) => ({ ...f, prefix: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อไทย *</label>
-              <input type="text" value={form.thaiName} onChange={(e) => setForm((f) => ({ ...f, thaiName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.thaiName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.thaiName && <p className="mt-1 text-xs text-red-500">{formErrors.thaiName}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่ออังกฤษ</label>
-              <input type="text" value={form.englishName} onChange={(e) => setForm((f) => ({ ...f, englishName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">สถานที่ทำงาน</label>
-              <textarea value={form.workplace} onChange={(e) => setForm((f) => ({ ...f, workplace: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">ที่อยู่บ้าน</label>
-              <textarea value={form.homeAddress} onChange={(e) => setForm((f) => ({ ...f, homeAddress: e.target.value }))} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ประเทศ *</label>
-              <input type="text" list="country-list" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.country ? "border-red-400" : "border-gray-300"}`} />
+            <FormField label="รุ่น">
+              <FormInput registration={register("cohort")} type="text" />
+            </FormField>
+            <FormField label="คำนำหน้า">
+              <FormInput registration={register("prefix")} type="text" />
+            </FormField>
+            <FormField label="ชื่อไทย" required error={errors.thaiName?.message}>
+              <FormInput registration={register("thaiName")} error={errors.thaiName?.message} type="text" />
+            </FormField>
+            <FormField label="ชื่ออังกฤษ">
+              <FormInput registration={register("englishName")} type="text" />
+            </FormField>
+            <FormField label="สถานที่ทำงาน" className="sm:col-span-2">
+              <FormTextarea registration={register("workplace")} rows={3} />
+            </FormField>
+            <FormField label="ที่อยู่บ้าน" className="sm:col-span-2">
+              <FormTextarea registration={register("homeAddress")} rows={2} />
+            </FormField>
+            <FormField label="ประเทศ" required error={errors.country?.message}>
+              <FormInput registration={register("country")} error={errors.country?.message} type="text" list="country-list" />
               <datalist id="country-list">
                 {countries.map((c) => <option key={c} value={c} />)}
               </datalist>
-              {formErrors.country && <p className="mt-1 text-xs text-red-500">{formErrors.country}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">หมายเหตุ</label>
-              <input type="text" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ลำดับ</label>
-              <input type="number" value={form.order} onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
+            </FormField>
+            <FormField label="หมายเหตุ">
+              <FormInput registration={register("notes")} type="text" />
+            </FormField>
+            <FormField label="ลำดับ">
+              <FormInput registration={register("order")} type="number" />
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
               {saving ? "กำลังบันทึก..." : "บันทึก"}
             </button>
           </div>

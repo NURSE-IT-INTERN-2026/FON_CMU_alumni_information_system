@@ -1,8 +1,13 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { BASE_PATH } from "@/lib/constants";
+import { alumniSignupSchema, type AlumniSignupData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 export default function AlumniSignupPage() {
   return (
@@ -14,14 +19,6 @@ export default function AlumniSignupPage() {
 
 function AlumniSignupForm() {
   const router = useRouter();
-  const [studentId, setStudentId] = useState("");
-  const [cohort, setCohort] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [maidenLastName, setMaidenLastName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,26 +26,26 @@ function AlumniSignupForm() {
     return value.replace(/\D/g, "").slice(0, 8);
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<AlumniSignupData>({
+    resolver: zodResolver(alumniSignupSchema),
+    defaultValues: {
+      studentId: "",
+      cohort: "",
+      firstName: "",
+      maidenLastName: "",
+      birthDate: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  async function onSubmit(data: AlumniSignupData) {
     setError("");
-
-    // Client-side validation
-    if (password.length < 8) {
-      setError("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("รหัสผ่านไม่ตรงกัน");
-      return;
-    }
-
-    if (!/^\d{8}$/.test(birthDate)) {
-      setError("รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -56,20 +53,20 @@ function AlumniSignupForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: studentId.trim(),
-          cohort: cohort.trim(),
-          firstName: firstName.trim(),
-          maidenLastName: maidenLastName.trim(),
-          birthDate,
-          email: email.trim().toLowerCase(),
-          password,
+          studentId: data.studentId.trim(),
+          cohort: data.cohort.trim(),
+          firstName: data.firstName.trim(),
+          maidenLastName: data.maidenLastName.trim(),
+          birthDate: data.birthDate,
+          email: data.email.trim().toLowerCase(),
+          password: data.password,
         }),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "เกิดข้อผิดพลาดในการลงทะเบียน");
+        setError(resData.error || "เกิดข้อผิดพลาดในการลงทะเบียน");
         return;
       }
 
@@ -133,91 +130,77 @@ function AlumniSignupForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Identity verification fields */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="studentId" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                  รหัสนักศึกษา
-                </label>
-                <input
+              <FormField label="รหัสนักศึกษา" error={errors.studentId?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                <FormInput
+                  registration={register("studentId")}
+                  error={errors.studentId?.message}
                   id="studentId"
                   type="text"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  required
                   autoComplete="off"
                   placeholder="512045xxx"
-                  className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                  className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
-              </div>
-              <div>
-                <label htmlFor="cohort" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                  ปีที่จบ / รุ่น
-                </label>
-                <input
+              </FormField>
+              <FormField label="ปีที่จบ / รุ่น" error={errors.cohort?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                <FormInput
+                  registration={register("cohort")}
+                  error={errors.cohort?.message}
                   id="cohort"
                   type="text"
-                  value={cohort}
-                  onChange={(e) => setCohort(e.target.value)}
-                  required
                   autoComplete="off"
                   placeholder="1"
-                  className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                  className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
-              </div>
+              </FormField>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="firstName" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                  ชื่อ (ขณะศึกษา)
-                </label>
-                <input
+              <FormField label="ชื่อ (ขณะศึกษา)" error={errors.firstName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                <FormInput
+                  registration={register("firstName")}
+                  error={errors.firstName?.message}
                   id="firstName"
                   type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
                   autoComplete="off"
                   placeholder="สมหญิง"
-                  className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                  className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
-              </div>
-              <div>
-                <label htmlFor="maidenLastName" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                  สกุล (ขณะศึกษา)
-                </label>
-                <input
+              </FormField>
+              <FormField label="สกุล (ขณะศึกษา)" error={errors.maidenLastName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                <FormInput
+                  registration={register("maidenLastName")}
+                  error={errors.maidenLastName?.message}
                   id="maidenLastName"
                   type="text"
-                  value={maidenLastName}
-                  onChange={(e) => setMaidenLastName(e.target.value)}
-                  required
                   autoComplete="off"
                   placeholder="รักเรียน"
-                  className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                  className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
-              </div>
+              </FormField>
             </div>
 
-            <div>
-              <label htmlFor="birthDate" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                วันเกิด (ววปปปป พ.ศ.)
-              </label>
-              <input
+            <FormField label="วันเกิด (ววปปปป พ.ศ.)" error={errors.birthDate?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("birthDate", {
+                  onChange: (e) => {
+                    e.target.value = formatBirthDate(e.target.value);
+                  },
+                })}
+                error={errors.birthDate?.message}
                 id="birthDate"
                 type="text"
                 inputMode="numeric"
-                value={birthDate}
-                onChange={(e) => setBirthDate(formatBirthDate(e.target.value))}
-                required
                 autoComplete="off"
                 placeholder="01122540"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-              <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
-            </div>
+              {!errors.birthDate && (
+                <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
+              )}
+            </FormField>
 
             {/* Divider */}
             <div className="flex items-center gap-3">
@@ -227,55 +210,41 @@ function AlumniSignupForm() {
             </div>
 
             {/* Account fields */}
-            <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                อีเมล
-              </label>
-              <input
+            <FormField label="อีเมล" error={errors.email?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("email")}
+                error={errors.email?.message}
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
                 autoComplete="email"
                 placeholder="example@email.com"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                รหัสผ่าน
-              </label>
-              <input
+            <FormField label="รหัสผ่าน" error={errors.password?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("password")}
+                error={errors.password?.message}
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
                 autoComplete="new-password"
-                minLength={8}
                 placeholder="อย่างน้อย 8 ตัวอักษร"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                ยืนยันรหัสผ่าน
-              </label>
-              <input
+            <FormField label="ยืนยันรหัสผ่าน" error={errors.confirmPassword?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("confirmPassword")}
+                error={errors.confirmPassword?.message}
                 id="confirmPassword"
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
                 autoComplete="new-password"
-                minLength={8}
                 placeholder="กรอกรหัสผ่านอีกครั้ง"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-            </div>
+            </FormField>
 
             <button
               type="submit"

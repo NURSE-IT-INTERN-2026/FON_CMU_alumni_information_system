@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { handleZodError, associationUpdateSchema } from "@/lib/validations";
 
 export async function PUT(
   request: NextRequest,
@@ -11,28 +13,22 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { studentId, fullName, associationName, position, recordedYear } = body;
-
-    if (!studentId || !fullName || !associationName || !position || !recordedYear) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = associationUpdateSchema.parse(body);
 
     const item = await prisma.association.update({
       where: { id },
       data: {
-        studentId: studentId.trim(),
-        fullName: fullName.trim(),
-        associationName: associationName.trim(),
-        position: position.trim(),
-        recordedYear: Number(recordedYear),
+        studentId: validated.studentId!.trim(),
+        fullName: validated.fullName!.trim(),
+        associationName: validated.associationName!.trim(),
+        position: validated.position!.trim(),
+        recordedYear: Number(validated.recordedYear),
       },
     });
 
     return NextResponse.json(item);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to update association:", error);
     return NextResponse.json(
       { error: "Failed to update association" },

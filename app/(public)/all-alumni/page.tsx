@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
 type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province";
 type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year";
@@ -78,7 +84,7 @@ function getLevelLabel(level_id: string, major_name_th: string): string {
   return CMU_LEVEL_LABELS[level_id] || level_id;
 }
 
-const EMPTY_EDIT_FORM = {
+const EMPTY_EDIT_FORM: AlumniEditFormData = {
   studentId: "",
   prefix: "",
   firstName: "",
@@ -113,9 +119,12 @@ export default function AlumniCountPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [tableLoading, setTableLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_EDIT_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<AlumniEditFormData>({
+    resolver: zodResolver(alumniEditFormSchema) as any,
+    defaultValues: EMPTY_EDIT_FORM,
+  });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
@@ -363,7 +372,7 @@ export default function AlumniCountPage() {
   );
 
   const openEdit = (a: Alumni) => {
-    setForm({
+    formReset({
       studentId: a.studentId,
       prefix: a.prefix,
       firstName: a.firstName,
@@ -377,46 +386,31 @@ export default function AlumniCountPage() {
       currentWorkplace: a.currentWorkplace || "",
       country: a.country || "",
     });
-    setFormErrors({});
     setEditingId(a.id);
   };
 
   const closeForm = () => {
     setEditingId(null);
-    setForm(EMPTY_EDIT_FORM);
-    setFormErrors({});
+    formReset(EMPTY_EDIT_FORM);
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    else if (!/^\d+$/.test(form.studentId.trim())) errors.studentId = "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น";
-    if (!form.prefix) errors.prefix = "กรุณาเลือกคำนำหน้า";
-    if (!form.firstName.trim()) errors.firstName = "กรุณากรอกชื่อ";
-    if (!form.maidenLastName.trim())
-      errors.maidenLastName = "กรุณากรอกนามสกุลเดิม";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleSave = async (data: AlumniEditFormData) => {
     setSaving(true);
     setErrorMsg("");
     try {
       const payload = {
-        studentId: form.studentId.trim(),
-        prefix: form.prefix,
-        firstName: form.firstName.trim(),
-        maidenLastName: form.maidenLastName.trim(),
-        cohort: form.cohort.trim() || null,
-        degreeLevel: form.degreeLevel || null,
-        newLastName: form.newLastName.trim() || null,
-        province: form.province.trim() || null,
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        currentWorkplace: form.currentWorkplace.trim() || null,
-        country: form.country.trim() || null,
+        studentId: data.studentId.trim(),
+        prefix: data.prefix,
+        firstName: data.firstName.trim(),
+        maidenLastName: data.maidenLastName.trim(),
+        cohort: data.cohort.trim() || null,
+        degreeLevel: data.degreeLevel || null,
+        newLastName: data.newLastName.trim() || null,
+        province: data.province.trim() || null,
+        email: data.email.trim() || null,
+        phone: data.phone.trim() || null,
+        currentWorkplace: data.currentWorkplace.trim() || null,
+        country: data.country.trim() || null,
       };
 
       // CMU-only record (not yet in local DB) → POST to create
@@ -431,8 +425,8 @@ export default function AlumniCountPage() {
         },
       );
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+        const errBody = await res.json();
+        throw new Error(errBody.error || "เกิดข้อผิดพลาด");
       }
       closeForm();
       fetchAlumni();
@@ -689,210 +683,56 @@ export default function AlumniCountPage() {
                 แก้ไขข้อมูล
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    รหัสนักศึกษา *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, studentId: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.studentId ? "border-red-400" : "border-gray-300"
-                    }`}
-                  />
-                  {formErrors.studentId && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.studentId}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    คำนำหน้า *
-                  </label>
-                  <select
-                    value={form.prefix}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, prefix: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.prefix ? "border-red-400" : "border-gray-300"
-                    }`}
-                  >
+                <FormField label="รหัสนักศึกษา" required error={formErrors.studentId?.message}>
+                  <FormInput registration={register("studentId")} error={formErrors.studentId?.message} type="text" />
+                </FormField>
+                <FormField label="คำนำหน้า" required error={formErrors.prefix?.message}>
+                  <FormSelect registration={register("prefix")} error={formErrors.prefix?.message}>
                     <option value="">-- เลือกคำนำหน้า --</option>
                     {PREFIX_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                  </select>
-                  {formErrors.prefix && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.prefix}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ชื่อ *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.firstName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, firstName: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.firstName ? "border-red-400" : "border-gray-300"
-                    }`}
-                  />
-                  {formErrors.firstName && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.firstName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    นามสกุลเดิม *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.maidenLastName}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        maidenLastName: e.target.value,
-                      }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${
-                      formErrors.maidenLastName
-                        ? "border-red-400"
-                        : "border-gray-300"
-                    }`}
-                  />
-                  {formErrors.maidenLastName && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {formErrors.maidenLastName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    นามสกุลใหม่
-                  </label>
-                  <input
-                    type="text"
-                    value={form.newLastName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, newLastName: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    รุ่น/สาขา
-                  </label>
-                  <input
-                    type="text"
-                    value={form.cohort}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, cohort: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ระดับการศึกษา
-                  </label>
-                  <select
-                    value={form.degreeLevel}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, degreeLevel: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  >
+                  </FormSelect>
+                </FormField>
+                <FormField label="ชื่อ" required error={formErrors.firstName?.message}>
+                  <FormInput registration={register("firstName")} error={formErrors.firstName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุลเดิม" required error={formErrors.maidenLastName?.message}>
+                  <FormInput registration={register("maidenLastName")} error={formErrors.maidenLastName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุลใหม่">
+                  <FormInput registration={register("newLastName")} type="text" />
+                </FormField>
+                <FormField label="รุ่น/สาขา">
+                  <FormInput registration={register("cohort")} type="text" />
+                </FormField>
+                <FormField label="ระดับการศึกษา">
+                  <FormSelect registration={register("degreeLevel")}>
                     <option value="">-- เลือกระดับการศึกษา --</option>
                     {DEGREE_LEVEL_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    จังหวัด
-                  </label>
-                  <input
-                    type="text"
-                    value={form.province}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, province: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    อีเมล
-                  </label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, email: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    เบอร์โทร
-                  </label>
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, phone: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    สถานที่ทำงาน
-                  </label>
-                  <input
-                    type="text"
-                    value={form.currentWorkplace}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        currentWorkplace: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ประเทศ
-                  </label>
-                  <input
-                    type="text"
-                    value={form.country}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, country: e.target.value }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                  />
-                </div>
+                  </FormSelect>
+                </FormField>
+                <FormField label="จังหวัด">
+                  <FormInput registration={register("province")} type="text" />
+                </FormField>
+                <FormField label="อีเมล">
+                  <FormInput registration={register("email")} type="email" />
+                </FormField>
+                <FormField label="เบอร์โทร">
+                  <FormInput registration={register("phone")} type="text" />
+                </FormField>
+                <FormField label="สถานที่ทำงาน">
+                  <FormInput registration={register("currentWorkplace")} type="text" />
+                </FormField>
+                <FormField label="ประเทศ">
+                  <FormInput registration={register("country")} type="text" />
+                </FormField>
               </div>
               <div className="mt-4 flex justify-end gap-3">
                 <button
@@ -902,7 +742,7 @@ export default function AlumniCountPage() {
                   ยกเลิก
                 </button>
                 <button
-                  onClick={handleSave}
+                  onClick={handleSubmit(handleSave)}
                   disabled={saving}
                   className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >

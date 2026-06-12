@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { verifyPassword, createSession, setSessionCookie } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { handleZodError } from "@/lib/validations/helpers";
+import { adminLoginSchema } from "@/lib/validations/auth";
 
 export async function POST(request: Request) {
   try {
@@ -25,24 +28,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "กรุณากรอกอีเมลและรหัสผ่าน" },
-        { status: 400 }
-      );
-    }
-
-    if (!email.endsWith("@cmu.ac.th")) {
-      return NextResponse.json(
-        { error: "กรุณาใช้อีเมล @cmu.ac.th" },
-        { status: 400 }
-      );
-    }
+    const validated = adminLoginSchema.parse(body);
 
     const user = await prisma.adminUser.findUnique({
-      where: { email },
+      where: { email: validated.email },
     });
 
     if (!user || !user.isActive) {
@@ -52,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const isValid = await verifyPassword(password, user.passwordHash);
+    const isValid = await verifyPassword(validated.password, user.passwordHash);
     if (!isValid) {
       return NextResponse.json(
         { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" },
@@ -81,7 +70,8 @@ export async function POST(request: Request) {
         role: user.role,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง" },
       { status: 500 }

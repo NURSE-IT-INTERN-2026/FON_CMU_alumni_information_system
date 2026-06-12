@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, passwordField } from "@/lib/validations/helpers";
+
+const resetPasswordApiSchema = z.object({
+  token: z.string().min(1, "โทเคนไม่ถูกต้อง"),
+  password: passwordField(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -26,33 +33,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { token, password } = body;
-
-    if (!token || !password) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
-
-    // Validate password length
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" },
-        { status: 400 }
-      );
-    }
-
-    if (password.length > 128) {
-      return NextResponse.json(
-        { error: "รหัสผ่านต้องไม่เกิน 128 ตัวอักษร" },
-        { status: 400 }
-      );
-    }
+    const validated = resetPasswordApiSchema.parse(body);
 
     // Find valid reset token
     const resetRecord = await prisma.passwordReset.findUnique({
-      where: { token },
+      where: { token: validated.token },
       include: { alumni: true },
     });
 
@@ -68,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     // Hash new password and update in transaction
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(validated.password);
 
     await prisma.$transaction([
       // Update alumni password
@@ -105,7 +90,8 @@ export async function POST(request: Request) {
       success: true,
       message: "รีเซ็ตรหัสผ่านสำเร็จ",
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง" },
       { status: 500 }

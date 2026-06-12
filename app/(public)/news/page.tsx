@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { newsFormSchema, type NewsFormData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -69,11 +75,15 @@ export default function NewsListPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset, control, setValue: setFormValue, watch } = useForm<NewsFormData>({
+    resolver: zodResolver(newsFormSchema) as any,
+    defaultValues: EMPTY_FORM,
+  });
+
   const {
     selectedIds,
     selectedCount,
@@ -126,7 +136,7 @@ export default function NewsListPage() {
       sel?.addRange(range);
     }
     document.execCommand(command, false, value);
-    setForm((f) => ({ ...f, body: editor.innerHTML }));
+    setFormValue("body", editor.innerHTML);
     updateToolbarState();
   }, [updateToolbarState]);
 
@@ -158,17 +168,19 @@ export default function NewsListPage() {
   const uploadCoverImage = async (file: File) => {
     setCoverUploading(true);
     const url = await uploadImage(file);
-    if (url) setForm((f) => ({ ...f, coverImageUrl: url }));
+    if (url) setFormValue("coverImageUrl", url);
     setCoverUploading(false);
   };
 
+  const formBody = watch("body");
+
   const bodyStats = useMemo(() => {
-    const text = stripHtml(form.body);
+    const text = stripHtml(formBody || "");
     return {
       chars: text.length,
       words: text.trim() ? text.trim().split(/\s+/).length : 0,
     };
-  }, [form.body]);
+  }, [formBody]);
 
   const fetchNews = useCallback(async () => {
     setLoading(true);
@@ -211,26 +223,24 @@ export default function NewsListPage() {
 
   useEffect(() => {
     if (showForm && editorRef.current) {
-      editorRef.current.innerHTML = form.body || "";
+      editorRef.current.innerHTML = watch("body") || "";
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, editingId]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset(EMPTY_FORM);
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (item: NewsItem) => {
-    setForm({
+    formReset({
       title: item.title,
       body: item.body,
       coverImageUrl: item.coverImageUrl || "",
       status: item.status,
     });
-    setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
   };
@@ -238,28 +248,18 @@ export default function NewsListPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset(EMPTY_FORM);
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.title.trim()) errors.title = "กรุณากรอกชื่อเรื่อง";
-    if (!form.body.trim()) errors.body = "กรุณากรอกเนื้อหา";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleSave = async (data: NewsFormData) => {
     setSaving(true);
     setErrorMsg("");
     try {
       const payload = {
-        title: form.title.trim(),
-        body: form.body,
-        coverImageUrl: form.coverImageUrl.trim() || null,
-        status: form.status,
+        title: data.title.trim(),
+        body: data.body,
+        coverImageUrl: data.coverImageUrl?.trim() || null,
+        status: data.status,
       };
       const res = editingId
         ? await fetch(`${BASE_PATH}/api/news/${editingId}`, {
@@ -374,7 +374,7 @@ export default function NewsListPage() {
               {editingId ? "แก้ไขข่าวสาร" : "สร้างข่าวใหม่"}
             </h2>
             <button
-              onClick={handleSave}
+              onClick={handleSubmit(handleSave)}
               disabled={saving}
               className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-[var(--primary)] transition-colors hover:bg-gray-100 disabled:opacity-50"
             >
@@ -389,27 +389,19 @@ export default function NewsListPage() {
             )}
 
             {/* Title */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                หัวข้อ <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.title ? "border-red-400" : "border-gray-300"}`}
-              />
-            </div>
+            <FormField label="หัวข้อ" required error={formErrors.title?.message}>
+              <FormInput registration={register("title")} error={formErrors.title?.message} type="text" />
+            </FormField>
 
             {/* Cover Image Upload */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">รูปปก</label>
-              {form.coverImageUrl ? (
+              {watch("coverImageUrl") ? (
                 <div className="relative inline-block w-full">
-                  <img src={form.coverImageUrl} alt="preview" className="w-full rounded-lg" />
+                  <img src={watch("coverImageUrl")!} alt="preview" className="w-full rounded-lg" />
                   <button
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, coverImageUrl: "" }))}
+                    onClick={() => setFormValue("coverImageUrl", "")}
                     className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -623,7 +615,7 @@ export default function NewsListPage() {
                 contentEditable
                 onInput={() => {
                   if (editorRef.current) {
-                    setForm((f) => ({ ...f, body: editorRef.current!.innerHTML }));
+                    setFormValue("body", editorRef.current!.innerHTML);
                   }
                   updateToolbarState();
                 }}
@@ -650,18 +642,13 @@ export default function NewsListPage() {
             </div>
 
             {/* Status */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">สถานะ</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "DRAFT" | "PUBLISHED" | "DISCONTINUED" }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              >
+            <FormField label="สถานะ">
+              <FormSelect registration={register("status")}>
                 <option value="DRAFT">ฉบับร่าง</option>
                 <option value="PUBLISHED">เผยแพร่</option>
                 <option value="DISCONTINUED">ยุติการเผยแพร่</option>
-              </select>
-            </div>
+              </FormSelect>
+            </FormField>
           </div>
 
           {/* Footer */}
@@ -677,7 +664,7 @@ export default function NewsListPage() {
                 ยกเลิก
               </button>
               <button
-                onClick={handleSave}
+                onClick={handleSubmit(handleSave)}
                 disabled={saving}
                 className="rounded-lg bg-[var(--primary)] px-4 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
               >

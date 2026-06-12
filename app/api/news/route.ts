@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, newsCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,22 +64,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, body: newsBody, coverImageUrl, status } = body;
-
-    if (!title || !newsBody) {
-      return NextResponse.json(
-        { error: "กรุณากรอกชื่อเรื่องและเนื้อหา" },
-        { status: 400 }
-      );
-    }
+    const validated = newsCreateSchema.parse(body);
 
     const news = await prisma.news.create({
       data: {
-        title,
-        body: newsBody,
-        coverImageUrl: coverImageUrl || null,
-        status: status || "DRAFT",
-        publishedAt: status === "PUBLISHED" ? new Date() : null,
+        title: validated.title,
+        body: validated.body,
+        coverImageUrl: validated.coverImageUrl || null,
+        status: validated.status,
+        publishedAt: validated.status === "PUBLISHED" ? new Date() : null,
       },
     });
 
@@ -92,6 +87,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(news, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("POST /api/news error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการสร้างข่าวสาร" },

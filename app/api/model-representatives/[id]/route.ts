@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { handleZodError, modelRepUpdateSchema } from "@/lib/validations";
 
 export async function PUT(
   request: NextRequest,
@@ -11,27 +13,21 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { studentId, name, cohort, generation } = body;
-
-    if (!studentId || !name || !cohort || generation === undefined) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = modelRepUpdateSchema.parse(body);
 
     const item = await prisma.modelRepresentative.update({
       where: { id },
       data: {
-        studentId: studentId.trim(),
-        name: name.trim(),
-        cohort: cohort.trim(),
-        generation: Number(generation),
+        studentId: validated.studentId!.trim(),
+        name: validated.name!.trim(),
+        cohort: validated.cohort!.trim(),
+        generation: Number(validated.generation),
       },
     });
 
     return NextResponse.json(item);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to update model representative:", error);
     return NextResponse.json(
       { error: "Failed to update model representative" },

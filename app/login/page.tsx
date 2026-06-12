@@ -2,7 +2,12 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { BASE_PATH } from "@/lib/constants";
+import { adminLoginSchema, alumniLoginSchema, type AdminLoginData, type AlumniLoginData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 const ALUMNI_ERROR_KEYS = new Set(["alumni_not_found", "alumni_rejected"]);
 
@@ -19,6 +24,9 @@ const OAUTH_ERRORS: Record<string, string> = {
 };
 
 type LoginMode = "admin" | "alumni";
+
+const AUTH_INPUT_CLASS = "px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]";
+const AUTH_LABEL_CLASS = "mb-1.5 block text-sm font-medium text-[var(--foreground)]";
 
 export default function LoginPage() {
   return (
@@ -41,14 +49,6 @@ function LoginForm() {
     isAlumniError || resetSuccess || signupSuccess ? "alumni" : "admin"
   );
 
-  // Admin form
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  // Alumni form
-  const [alumniEmail, setAlumniEmail] = useState("");
-  const [alumniPassword, setAlumniPassword] = useState("");
-
   const [error, setError] = useState(
     oauthError
       ? OAUTH_ERRORS[oauthError] || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ"
@@ -63,6 +63,18 @@ function LoginForm() {
   );
   const [loading, setLoading] = useState(false);
 
+  // Admin form
+  const adminForm = useForm<AdminLoginData>({
+    resolver: zodResolver(adminLoginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  // Alumni form
+  const alumniForm = useForm<AlumniLoginData>({
+    resolver: zodResolver(alumniLoginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
   // Clear success message after 10 seconds
   useEffect(() => {
     if (success) {
@@ -71,8 +83,7 @@ function LoginForm() {
     }
   }, [success]);
 
-  async function handleAdminSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleAdminSubmit(data: AdminLoginData) {
     setError("");
     setSuccess("");
     setLoading(true);
@@ -81,13 +92,13 @@ function LoginForm() {
       const res = await fetch(`${BASE_PATH}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(data),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+        setError(resData.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
         return;
       }
 
@@ -99,8 +110,7 @@ function LoginForm() {
     }
   }
 
-  async function handleAlumniSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleAlumniSubmit(data: AlumniLoginData) {
     setError("");
     setSuccess("");
     setLoading(true);
@@ -109,18 +119,18 @@ function LoginForm() {
       const res = await fetch(`${BASE_PATH}/api/alumni-auth/login-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: alumniEmail.trim().toLowerCase(), password: alumniPassword }),
+        body: JSON.stringify({ email: data.email.trim().toLowerCase(), password: data.password }),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+        setError(resData.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
         return;
       }
 
-      if (data.pendingApproval) {
-        router.push(data.redirect || "/alumni/pending");
+      if (resData.pendingApproval) {
+        router.push(resData.redirect || "/alumni/pending");
         return;
       }
 
@@ -153,7 +163,7 @@ function LoginForm() {
           </h1>
           <p className="mt-4 max-w-md text-base leading-relaxed text-white/60">
             ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-            — ศูนย์กลางเชื่อมโยงเครือข่ายศิษย์เก่าสู่การพัฒนาวิชาชีพการพยาบาลอย่างยั่งยืน
+            — ศูนย์กลางเชื่อมโยงเคือข่ายศิษย์เก่าสู่การพัฒนาวิชาชีพการพยาบาลอย่างยั่งยืน
           </p>
         </div>
 
@@ -236,32 +246,28 @@ function LoginForm() {
               </div>
 
               {/* Email / Password form */}
-              <form onSubmit={handleAdminSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">อีเมล</label>
-                  <input
-                    id="email"
+              <form onSubmit={adminForm.handleSubmit(handleAdminSubmit)} className="space-y-4">
+                <FormField label="อีเมล" error={adminForm.formState.errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={adminForm.register("email")}
+                    error={adminForm.formState.errors.email?.message}
+                    id="admin-email"
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
                     autoComplete="email"
                     placeholder="example@cmu.ac.th"
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
-                <div>
-                  <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">รหัสผ่าน</label>
-                  <input
-                    id="password"
+                </FormField>
+                <FormField label="รหัสผ่าน" error={adminForm.formState.errors.password?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={adminForm.register("password")}
+                    error={adminForm.formState.errors.password?.message}
+                    id="admin-password"
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
                     autoComplete="current-password"
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
                 <button
                   type="submit"
                   disabled={loading}
@@ -300,25 +306,21 @@ function LoginForm() {
               </div>
 
               {/* Email + Password form */}
-              <form onSubmit={handleAlumniSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="alumniEmail" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                    อีเมล
-                  </label>
-                  <input
-                    id="alumniEmail"
+              <form onSubmit={alumniForm.handleSubmit(handleAlumniSubmit)} className="space-y-4">
+                <FormField label="อีเมล" error={alumniForm.formState.errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={alumniForm.register("email")}
+                    error={alumniForm.formState.errors.email?.message}
+                    id="alumni-email"
                     type="email"
-                    value={alumniEmail}
-                    onChange={(e) => setAlumniEmail(e.target.value)}
-                    required
                     autoComplete="email"
                     placeholder="example@email.com"
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
                 <div>
                   <div className="flex items-center justify-between">
-                    <label htmlFor="alumniPassword" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                    <label htmlFor="alumni-password" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                       รหัสผ่าน
                     </label>
                     <a
@@ -328,15 +330,17 @@ function LoginForm() {
                       ลืมรหัสผ่าน?
                     </a>
                   </div>
-                  <input
-                    id="alumniPassword"
+                  <FormInput
+                    registration={alumniForm.register("password")}
+                    error={alumniForm.formState.errors.password?.message}
+                    id="alumni-password"
                     type="password"
-                    value={alumniPassword}
-                    onChange={(e) => setAlumniPassword(e.target.value)}
-                    required
                     autoComplete="current-password"
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
+                  {alumniForm.formState.errors.password && (
+                    <p className="mt-1 text-xs text-red-500">{alumniForm.formState.errors.password.message}</p>
+                  )}
                 </div>
                 <button
                   type="submit"

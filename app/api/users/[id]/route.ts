@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkSuperAdminPermission } from "@/lib/permissions";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, userUpdateSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -62,6 +64,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+    const validated = userUpdateSchema.parse(body);
 
     const existing = await prisma.adminUser.findUnique({ where: { id } });
     if (!existing) {
@@ -72,11 +75,11 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = {};
-    if (body.firstName !== undefined) updateData.firstName = body.firstName;
-    if (body.lastName !== undefined) updateData.lastName = body.lastName;
-    if (body.email !== undefined) updateData.email = body.email;
-    if (body.role !== undefined) updateData.role = body.role;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+    if (validated.firstName !== undefined) updateData.firstName = validated.firstName;
+    if (validated.lastName !== undefined) updateData.lastName = validated.lastName;
+    if (validated.email !== undefined) updateData.email = validated.email;
+    if (validated.role !== undefined) updateData.role = validated.role;
+    if (validated.isActive !== undefined) updateData.isActive = validated.isActive;
 
     const user = await prisma.adminUser.update({
       where: { id },
@@ -105,6 +108,7 @@ export async function PUT(
 
     return NextResponse.json(user);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("PUT /api/users/[id] error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการอัปเดตข้อมูลผู้ใช้งาน" },

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, newsUpdateSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -44,6 +46,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+    const validated = newsUpdateSchema.parse(body);
 
     const existing = await prisma.news.findUnique({ where: { id } });
     if (!existing) {
@@ -54,12 +57,12 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = {};
-    if (body.title !== undefined) updateData.title = body.title;
-    if (body.body !== undefined) updateData.body = body.body;
-    if (body.coverImageUrl !== undefined) updateData.coverImageUrl = body.coverImageUrl;
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-      if (body.status === "PUBLISHED" && existing.status !== "PUBLISHED") {
+    if (validated.title !== undefined) updateData.title = validated.title;
+    if (validated.body !== undefined) updateData.body = validated.body;
+    if (validated.coverImageUrl !== undefined) updateData.coverImageUrl = validated.coverImageUrl;
+    if (validated.status !== undefined) {
+      updateData.status = validated.status;
+      if (validated.status === "PUBLISHED" && existing.status !== "PUBLISHED") {
         updateData.publishedAt = new Date();
       }
     }
@@ -80,6 +83,7 @@ export async function PUT(
 
     return NextResponse.json(news);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("PUT /api/news/[id] error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการอัปเดตข่าวสาร" },

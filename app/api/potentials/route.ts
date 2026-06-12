@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { handleZodError, potentialCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -69,27 +71,21 @@ export async function POST(request: NextRequest) {
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { studentId, fullName, career, position, recordedYear } = body;
-
-    if (!studentId || !fullName || !career || !position || !recordedYear) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = potentialCreateSchema.parse(body);
 
     const potential = await prisma.potential.create({
       data: {
-        studentId: studentId.trim(),
-        fullName: fullName.trim(),
-        career: career.trim(),
-        position: position.trim(),
-        recordedYear: Number(recordedYear),
+        studentId: validated.studentId.trim(),
+        fullName: validated.fullName.trim(),
+        career: validated.career.trim(),
+        position: validated.position.trim(),
+        recordedYear: Number(validated.recordedYear),
       },
     });
 
     return NextResponse.json(potential, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to create potential:", error);
     return NextResponse.json(
       { error: "Failed to create potential" },

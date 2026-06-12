@@ -1,45 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { handleZodError, abroadAlumniCreateSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order } = body;
-
-    if (!country) {
-      return NextResponse.json(
-        { error: "กรุณากรอกประเทศ" },
-        { status: 400 }
-      );
-    }
-
-    if (!thaiName && !englishName) {
-      return NextResponse.json(
-        { error: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ" },
-        { status: 400 }
-      );
-    }
+    const validated = abroadAlumniCreateSchema.parse(body);
 
     const item = await prisma.abroadAlumni.create({
       data: {
-        cohort: cohort?.trim() || null,
-        prefix: prefix?.trim() || null,
-        thaiName: thaiName?.trim() || null,
-        englishName: englishName?.trim() || null,
-        workplace: workplace?.trim() || null,
-        homeAddress: homeAddress?.trim() || null,
-        country: country.trim(),
-        notes: notes?.trim() || null,
-        order: order !== undefined ? Number(order) : 0,
+        cohort: validated.cohort?.trim() || null,
+        prefix: validated.prefix?.trim() || null,
+        thaiName: validated.thaiName?.trim() || null,
+        englishName: validated.englishName?.trim() || null,
+        workplace: validated.workplace?.trim() || null,
+        homeAddress: validated.homeAddress?.trim() || null,
+        country: validated.country,
+        notes: validated.notes?.trim() || null,
+        order: validated.order,
       },
     });
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to create abroad alumni:", error);
     return NextResponse.json(
       { error: "Failed to create abroad alumni" },

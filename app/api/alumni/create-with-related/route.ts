@@ -1,50 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { AwardType } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
+import { handleZodError, alumniWithRelatedCreateSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const {
-      studentId,
-      prefix,
-      firstName,
-      maidenLastName,
-      cohort,
-      degreeLevel,
-      newLastName,
-      province,
-      email,
-      phone,
-      currentWorkplace,
-      country,
-      photoUrl,
-      awards,
-      associations,
-      graduateCommittees,
-      potentials,
-      modelRepresentatives,
-      abroadAlumni,
-    } = body;
+    const validated = alumniWithRelatedCreateSchema.parse(body);
 
-    if (!studentId || !prefix || !firstName || !maidenLastName) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
-
-    if (!/^\d+$/.test(studentId)) {
-      return NextResponse.json(
-        { error: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น" },
-        { status: 400 }
-      );
-    }
-
-    const existing = await prisma.alumni.findUnique({ where: { studentId } });
+    // Business logic: check for duplicate studentId
+    const existing = await prisma.alumni.findUnique({
+      where: { studentId: validated.studentId },
+    });
     if (existing) {
       return NextResponse.json(
         { error: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
@@ -52,145 +23,111 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasPotentials = Array.isArray(potentials) && potentials.length > 0;
+    const hasPotentials = (validated.potentials?.length ?? 0) > 0;
     const hasModelReps =
-      Array.isArray(modelRepresentatives) && modelRepresentatives.length > 0;
+      (validated.modelRepresentatives?.length ?? 0) > 0;
 
     const alumni = await prisma.$transaction(async (tx) => {
       const created = await tx.alumni.create({
         data: {
-          studentId,
-          prefix,
-          firstName,
-          maidenLastName,
-          cohort: cohort || null,
-          degreeLevel: degreeLevel || null,
-          newLastName: newLastName || null,
-          province: province || null,
-          email: email || null,
-          phone: phone || null,
-          currentWorkplace: currentWorkplace || null,
-          country: country || null,
-          photoUrl: photoUrl || null,
+          studentId: validated.studentId,
+          prefix: validated.prefix,
+          firstName: validated.firstName,
+          maidenLastName: validated.maidenLastName,
+          cohort: validated.cohort || null,
+          degreeLevel: validated.degreeLevel || "BACHELOR",
+          newLastName: validated.newLastName || null,
+          province: validated.province || null,
+          email: validated.email || null,
+          phone: validated.phone || null,
+          currentWorkplace: validated.currentWorkplace || null,
+          country: validated.country || null,
+          photoUrl: validated.photoUrl || null,
           isPotential: hasPotentials,
           isModelRepresentative: hasModelReps,
         },
       });
 
-      if (Array.isArray(awards) && awards.length > 0) {
+      if (validated.awards && validated.awards.length > 0) {
         await tx.award.createMany({
-          data: awards.map(
-            (a: {
-              awardName: string;
-              awardType: string;
-              year: number;
-              description?: string;
-            }) => ({
-              studentId,
-              awardName: a.awardName,
-              awardType: a.awardType as AwardType,
-              year: Number(a.year),
-              description: a.description || null,
-            })
-          ),
+          data: validated.awards.map((a) => ({
+            studentId: validated.studentId,
+            awardName: a.awardName,
+            awardType: a.awardType as AwardType,
+            year: a.year,
+            description: a.description || null,
+          })),
         });
       }
 
-      if (Array.isArray(associations) && associations.length > 0) {
+      if (validated.associations && validated.associations.length > 0) {
         await tx.association.createMany({
-          data: associations.map(
-            (a: {
-              fullName: string;
-              associationName: string;
-              position: string;
-              recordedYear: number;
-            }) => ({
-              studentId,
-              fullName: a.fullName || `${prefix}${firstName} ${maidenLastName}`,
-              associationName: a.associationName,
-              position: a.position,
-              recordedYear: Number(a.recordedYear),
-            })
-          ),
+          data: validated.associations.map((a) => ({
+            studentId: validated.studentId,
+            fullName:
+              a.fullName ||
+              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            associationName: a.associationName,
+            position: a.position,
+            recordedYear: a.recordedYear,
+          })),
         });
       }
 
-      if (Array.isArray(graduateCommittees) && graduateCommittees.length > 0) {
+      if (validated.graduateCommittees && validated.graduateCommittees.length > 0) {
         await tx.graduateCommittee.createMany({
-          data: graduateCommittees.map(
-            (g: {
-              termYear: number;
-              fullName: string;
-              cohort: string;
-              position: string;
-              remarks?: string;
-            }) => ({
-              studentId,
-              termYear: Number(g.termYear),
-              fullName: g.fullName || `${prefix}${firstName} ${maidenLastName}`,
-              cohort: g.cohort,
-              position: g.position,
-              remarks: g.remarks || null,
-            })
-          ),
+          data: validated.graduateCommittees.map((g) => ({
+            studentId: validated.studentId,
+            termYear: g.termYear,
+            fullName:
+              g.fullName ||
+              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            cohort: g.cohort,
+            position: g.position,
+            remarks: g.remarks || null,
+          })),
         });
       }
 
       if (hasPotentials) {
         await tx.potential.createMany({
-          data: potentials.map(
-            (p: {
-              fullName: string;
-              career: string;
-              position: string;
-              recordedYear: number;
-            }) => ({
-              studentId,
-              fullName: p.fullName || `${prefix}${firstName} ${maidenLastName}`,
-              career: p.career,
-              position: p.position,
-              recordedYear: Number(p.recordedYear),
-            })
-          ),
+          data: validated.potentials!.map((p) => ({
+            studentId: validated.studentId,
+            fullName:
+              p.fullName ||
+              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            career: p.career,
+            position: p.position,
+            recordedYear: p.recordedYear,
+          })),
         });
       }
 
       if (hasModelReps) {
         await tx.modelRepresentative.createMany({
-          data: modelRepresentatives.map(
-            (m: { name: string; cohort: string; generation: number }) => ({
-              studentId,
-              name: m.name || `${prefix}${firstName} ${maidenLastName}`,
-              cohort: m.cohort,
-              generation: Number(m.generation),
-            })
-          ),
+          data: validated.modelRepresentatives!.map((m) => ({
+            studentId: validated.studentId,
+            name:
+              m.name ||
+              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            cohort: m.cohort,
+            generation: m.generation,
+          })),
         });
       }
 
-      if (Array.isArray(abroadAlumni) && abroadAlumni.length > 0) {
+      if (validated.abroadAlumni && validated.abroadAlumni.length > 0) {
         await tx.abroadAlumni.createMany({
-          data: abroadAlumni.map(
-            (a: {
-              cohort?: string;
-              prefix?: string;
-              thaiName?: string;
-              englishName?: string;
-              workplace?: string;
-              country: string;
-              notes?: string;
-              order: number;
-            }) => ({
-              cohort: a.cohort || null,
-              prefix: a.prefix || null,
-              thaiName: a.thaiName || null,
-              englishName: a.englishName || null,
-              workplace: a.workplace || null,
-              country: a.country,
-              notes: a.notes || null,
-              order: Number(a.order),
-            })
-          ),
+          data: validated.abroadAlumni.map((a) => ({
+            cohort: a.cohort || null,
+            prefix: a.prefix || null,
+            thaiName: a.thaiName || null,
+            englishName: a.englishName || null,
+            workplace: a.workplace || null,
+            country: a.country,
+            notes: a.notes || null,
+            order: a.order,
+          })),
         });
       }
 
@@ -199,6 +136,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(alumni, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("POST /api/alumni/create-with-related error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการสร้างข้อมูลศิษย์เก่า" },

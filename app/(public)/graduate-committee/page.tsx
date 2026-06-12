@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { committeeFormSchema, type CommitteeFormData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 interface Committee {
   id: string;
@@ -39,7 +44,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "termYear", label: "ปี พ.ศ." },
 ];
 
-const EMPTY_FORM = { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" };
+type FormValues = CommitteeFormData & { studentId: string; fullName: string };
 
 export default function GraduateCommitteePage() {
   const canWrite = useCanWrite();
@@ -61,8 +66,10 @@ export default function GraduateCommitteePage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
+    resolver: zodResolver(committeeFormSchema) as any,
+    defaultValues: { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" },
+  });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -85,7 +92,8 @@ export default function GraduateCommitteePage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId, fullName: displayName(a) }));
+    setValue("studentId", a.studentId);
+    setValue("fullName", displayName(a));
     setAlumniSearchField(null);
     clearResults();
   };
@@ -144,14 +152,13 @@ export default function GraduateCommitteePage() {
   useEffect(() => { fetchCommittees(); }, [fetchCommittees]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (c: Committee) => {
-    setForm({
+    formReset({
       termYear: String(c.termYear),
       studentId: c.studentId,
       fullName: c.fullName,
@@ -159,7 +166,6 @@ export default function GraduateCommitteePage() {
       position: c.position,
       remarks: c.remarks || "",
     });
-    setFormErrors({});
     setEditingId(c.id);
     setShowForm(true);
   };
@@ -167,58 +173,46 @@ export default function GraduateCommitteePage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
     setAlumniSearchField(null);
     clearResults();
-    setFormErrors({});
+    formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.termYear.trim()) errors.termYear = "กรุณากรอกปี พ.ศ.";
-    if (form.termYear && isNaN(Number(form.termYear))) errors.termYear = "ปี พ.ศ. ต้องเป็นตัวเลข";
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.fullName.trim()) errors.fullName = "กรุณากรอกชื่อ-นามสกุล";
-    if (!form.cohort.trim()) errors.cohort = "กรุณากรอกรุ่นที่";
-    if (!form.position.trim()) errors.position = "กรุณากรอกตำแหน่ง";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const onSave = async (data: CommitteeFormData) => {
+    const studentId = getValues("studentId");
+    const fullName = getValues("fullName");
     setSaving(true);
     setErrorMsg("");
     try {
       if (editingId) {
-        const payload = { ...form, termYear: Number(form.termYear) };
+        const payload = { studentId, fullName, ...data, termYear: Number(data.termYear) };
         const res = await fetch(`${BASE_PATH}/api/graduate-committee/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        if (form.studentId) {
-          const payload = { ...form, termYear: Number(form.termYear) };
+        if (studentId) {
+          const payload = { studentId, fullName, ...data, termYear: Number(data.termYear) };
           const res = await fetch(`${BASE_PATH}/api/graduate-committee`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
           if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || "เกิดข้อผิดพลาด");
+            const d = await res.json();
+            throw new Error(d.error || "เกิดข้อผิดพลาด");
           }
         } else {
-          const params = new URLSearchParams({ section: "committees", nameSearch: form.fullName });
-          if (form.termYear) params.set("termYear", form.termYear);
-          if (form.cohort) params.set("cohort", form.cohort);
-          if (form.position) params.set("position", form.position);
-          if (form.remarks) params.set("remarks", form.remarks);
+          const params = new URLSearchParams({ section: "committees", nameSearch: fullName });
+          if (data.termYear) params.set("termYear", data.termYear);
+          if (data.cohort) params.set("cohort", data.cohort);
+          if (data.position) params.set("position", data.position);
+          if (data.remarks) params.set("remarks", data.remarks);
           router.push(`/new-alumni?${params.toString()}`);
           return;
         }
@@ -397,36 +391,36 @@ export default function GraduateCommitteePage() {
             {editingId ? "แก้ไขข้อมูลกรรมการบัณฑิต" : "เพิ่มข้อมูลกรรมการบัณฑิต"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ปี พ.ศ. *</label>
-              <input type="number" value={form.termYear} onChange={(e) => setForm((f) => ({ ...f, termYear: e.target.value }))} placeholder="เช่น 2568" className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.termYear ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.termYear && <p className="mt-1 text-xs text-red-500">{formErrors.termYear}</p>}
-            </div>
+            <FormField label="ปี พ.ศ." required error={errors.termYear?.message}>
+              <FormInput registration={register("termYear")} error={errors.termYear?.message} type="number" placeholder="เช่น 2568" />
+            </FormField>
             {editingId ? (
               <>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-                  <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุล (ขณะกำลังศึกษา) *</label>
-                  <input type="text" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
-                </div>
+                <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
+                  <FormInput registration={register("studentId")} error={errors.studentId?.message} type="text" />
+                </FormField>
+                <FormField label="ชื่อ-สกุล (ขณะกำลังศึกษา)" required error={errors.fullName?.message}>
+                  <FormInput registration={register("fullName")} error={errors.fullName?.message} type="text" />
+                </FormField>
               </>
             ) : (
               <>
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, fullName: "" })); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
-                    placeholder="พิมพ์รหัสนักศึกษา..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+                  <Controller
+                    name="studentId"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="text"
+                        {...field}
+                        onChange={(e) => { field.onChange(e); setValue("fullName", ""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
+                        placeholder="พิมพ์รหัสนักศึกษา..."
+                        className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.studentId ? "border-red-400" : "border-gray-300"}`}
+                      />
+                    )}
                   />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+                  {errors.studentId && <p className="mt-1 text-xs text-red-500">{errors.studentId.message}</p>}
                   {showAlumniDropdown && alumniSearchField === "studentId" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
@@ -439,14 +433,20 @@ export default function GraduateCommitteePage() {
                 </div>
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-                  <input
-                    type="text"
-                    value={form.fullName}
-                    onChange={(e) => { setForm((f) => ({ ...f, fullName: e.target.value, studentId: "" })); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
-                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`}
+                  <Controller
+                    name="fullName"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="text"
+                        {...field}
+                        onChange={(e) => { field.onChange(e); setValue("studentId", ""); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
+                        placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                        className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.fullName ? "border-red-400" : "border-gray-300"}`}
+                      />
+                    )}
                   />
-                  {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
+                  {errors.fullName && <p className="mt-1 text-xs text-red-500">{errors.fullName.message}</p>}
                   {showAlumniDropdown && alumniSearchField === "fullName" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
@@ -459,24 +459,19 @@ export default function GraduateCommitteePage() {
                 </div>
               </>
             )}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">รุ่นที่ *</label>
-              <input type="text" value={form.cohort} onChange={(e) => setForm((f) => ({ ...f, cohort: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.cohort ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.cohort && <p className="mt-1 text-xs text-red-500">{formErrors.cohort}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ตำแหน่ง *</label>
-              <input type="text" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.position ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.position && <p className="mt-1 text-xs text-red-500">{formErrors.position}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">หมายเหตุ</label>
-              <input type="text" value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
-            </div>
+            <FormField label="รุ่นที่" required error={errors.cohort?.message}>
+              <FormInput registration={register("cohort")} error={errors.cohort?.message} type="text" />
+            </FormField>
+            <FormField label="ตำแหน่ง" required error={errors.position?.message}>
+              <FormInput registration={register("position")} error={errors.position?.message} type="text" />
+            </FormField>
+            <FormField label="หมายเหตุ" required error={errors.remarks?.message}>
+              <FormInput registration={register("remarks")} error={errors.remarks?.message} type="text" />
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
               {saving ? "กำลังบันทึก..." : "บันทึก"}
             </button>
           </div>

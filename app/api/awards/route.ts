@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, awardCreateSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { studentId, recipientName, awardName, awardType, year, description } = body;
-
-    if (!awardName || !awardType || !year) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = awardCreateSchema.parse(body);
 
     const award = await prisma.award.create({
       data: {
-        studentId: studentId || null,
-        recipientName: recipientName?.trim() || null,
-        awardName: awardName.trim(),
-        awardType,
-        year: Number(year),
-        description: description?.trim() || null,
+        studentId: validated.studentId || null,
+        recipientName: validated.recipientName?.trim() || null,
+        awardName: validated.awardName.trim(),
+        awardType: validated.awardType,
+        year: Number(validated.year),
+        description: validated.description?.trim() || null,
       },
       include: {
         alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
@@ -47,6 +42,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(award, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to create award:", error);
     return NextResponse.json(
       { error: "Failed to create award" },

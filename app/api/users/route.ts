@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkSuperAdminPermission } from "@/lib/permissions";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, userCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,23 +48,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { firstName, lastName, email, role } = body;
+    const validated = userCreateSchema.parse(body);
 
-    if (!firstName || !lastName || !email) {
-      return NextResponse.json(
-        { error: "กรุณากรอกชื่อ นามสกุล และอีเมล" },
-        { status: 400 }
-      );
-    }
-
-    if (!email.endsWith("@cmu.ac.th")) {
+    if (!validated.email.endsWith("@cmu.ac.th")) {
       return NextResponse.json(
         { error: "กรุณาใช้อีเมล @cmu.ac.th" },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.adminUser.findUnique({ where: { email } });
+    const existing = await prisma.adminUser.findUnique({ where: { email: validated.email } });
     if (existing) {
       return NextResponse.json(
         { error: "อีเมลนี้มีอยู่ในระบบแล้ว" },
@@ -72,10 +67,10 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.adminUser.create({
       data: {
-        firstName,
-        lastName,
-        email,
-        role: role || "admin",
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+        email: validated.email,
+        role: validated.role || "admin",
       },
       select: {
         id: true,
@@ -103,6 +98,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("POST /api/users error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการสร้างผู้ใช้งาน" },

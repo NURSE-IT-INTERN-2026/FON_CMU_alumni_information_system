@@ -1,8 +1,13 @@
 "use client";
 
 import { Suspense, useState } from "react";
-
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { BASE_PATH } from "@/lib/constants";
+import { forgotPasswordSchema, type ForgotPasswordData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+
 export default function ForgotPasswordPage() {
   return (
     <Suspense>
@@ -12,33 +17,34 @@ export default function ForgotPasswordPage() {
 }
 
 function ForgotPasswordForm() {
-  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ForgotPasswordData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: "" },
+  });
+
+  async function onSubmit(data: ForgotPasswordData) {
     setError("");
-
-    if (!email.trim()) {
-      setError("กรุณากรอกอีเมล");
-      return;
-    }
-
     setLoading(true);
 
     try {
       const res = await fetch(`${BASE_PATH}/api/alumni-auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({ email: data.email.trim().toLowerCase() }),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setError(resData.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
         return;
       }
 
@@ -130,22 +136,18 @@ function ForgotPasswordForm() {
                 กรอกอีเมลที่ท่านใช้ลงทะเบียน เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้ท่าน
               </p>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                    อีเมล
-                  </label>
-                  <input
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <FormField label="อีเมล" error={errors.email?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                  <FormInput
+                    registration={register("email")}
+                    error={errors.email?.message}
                     id="email"
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
                     autoComplete="email"
                     placeholder="example@email.com"
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                   />
-                </div>
+                </FormField>
 
                 <button
                   type="submit"

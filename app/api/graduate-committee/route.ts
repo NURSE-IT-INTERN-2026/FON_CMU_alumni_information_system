@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { handleZodError, committeeCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -87,28 +89,22 @@ export async function POST(request: NextRequest) {
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { termYear, studentId, fullName, cohort, position, remarks } = body;
-
-    if (!termYear || !studentId || !fullName || !cohort || !position) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = committeeCreateSchema.parse(body);
 
     const committee = await prisma.graduateCommittee.create({
       data: {
-        termYear: Number(termYear),
-        studentId: studentId.trim(),
-        fullName: fullName.trim(),
-        cohort: cohort.trim(),
-        position: position.trim(),
-        remarks: remarks?.trim() || null,
+        termYear: Number(validated.termYear),
+        studentId: validated.studentId.trim(),
+        fullName: validated.fullName.trim(),
+        cohort: validated.cohort.trim(),
+        position: validated.position.trim(),
+        remarks: validated.remarks?.trim() || null,
       },
     });
 
     return NextResponse.json(committee, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to create graduate committee:", error);
     return NextResponse.json(
       { error: "Failed to create graduate committee" },

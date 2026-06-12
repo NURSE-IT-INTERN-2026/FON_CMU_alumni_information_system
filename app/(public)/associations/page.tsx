@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { associationFormSchema, type AssociationFormData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 interface Association {
   id: string;
@@ -36,7 +41,9 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "recordedYear", label: "ปีที่บันทึก" },
 ];
 
-const EMPTY_FORM = { studentId: "", fullName: "", associationName: "", position: "", recordedYear: "" };
+type FormValues = AssociationFormData & { studentId: string; fullName: string };
+
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", fullName: "", associationName: "", position: "", recordedYear: "" };
 
 export default function AssociationsPage() {
   const canWrite = useCanWrite();
@@ -50,11 +57,13 @@ export default function AssociationsPage() {
   const [sortField, setSortField] = useState<SortField>("associationName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
+    resolver: zodResolver(associationFormSchema) as any,
+    defaultValues: DEFAULT_FORM_VALUES,
+  });
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -77,7 +86,8 @@ export default function AssociationsPage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId, fullName: displayName(a) }));
+    setValue("studentId", a.studentId);
+    setValue("fullName", displayName(a));
     setAlumniSearchField(null);
     clearResults();
   };
@@ -135,21 +145,19 @@ export default function AssociationsPage() {
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset(DEFAULT_FORM_VALUES);
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (item: Association) => {
-    setForm({
+    formReset({
       studentId: item.studentId,
       fullName: item.fullName,
       associationName: item.associationName,
       position: item.position,
       recordedYear: String(item.recordedYear),
     });
-    setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
   };
@@ -157,32 +165,19 @@ export default function AssociationsPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    formReset(DEFAULT_FORM_VALUES);
     setAlumniSearchField(null);
     clearResults();
-    setFormErrors({});
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.fullName.trim()) errors.fullName = "กรุณากรอกชื่อ-นามสกุล";
-    if (!form.associationName.trim()) errors.associationName = "กรุณากรอกชื่อสมาคม/ชมรม";
-    if (!form.position.trim()) errors.position = "กรุณากรอกตำแหน่ง";
-    if (!form.recordedYear) errors.recordedYear = "กรุณากรอกปีที่บันทึก";
-    if (form.recordedYear && isNaN(Number(form.recordedYear)))
-      errors.recordedYear = "ปีที่บันทึกต้องเป็นตัวเลข";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const onSave = async (data: AssociationFormData) => {
+    const studentId = getValues("studentId");
+    const fullName = getValues("fullName");
     setSaving(true);
     setErrorMsg("");
     try {
+      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear) };
       if (editingId) {
-        const payload = { ...form, recordedYear: Number(form.recordedYear) };
         const res = await fetch(`${BASE_PATH}/api/associations/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -193,7 +188,6 @@ export default function AssociationsPage() {
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        const payload = { ...form, recordedYear: Number(form.recordedYear) };
         const res = await fetch(`${BASE_PATH}/api/associations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -384,29 +378,26 @@ export default function AssociationsPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {editingId ? (
               <>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-                  <input type="text" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-สกุล *</label>
-                  <input type="text" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`} />
-                  {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
-                </div>
+                <FormField label="รหัสนักศึกษา" required>
+                  <FormInput registration={register("studentId")} type="text" />
+                </FormField>
+                <FormField label="ชื่อ-สกุล" required>
+                  <FormInput registration={register("fullName")} type="text" />
+                </FormField>
               </>
             ) : (
   <>
     <div className="relative">
       <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา *</label>
-      <input
-        type="text"
-        value={form.studentId}
-        onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, fullName: "" })); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
-        placeholder="พิมพ์รหัสนักศึกษา..."
-        className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-      />
-      {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
+      <Controller name="studentId" control={control} render={({ field }) => (
+        <input
+          type="text"
+          value={field.value}
+          onChange={(e) => { field.onChange(e.target.value); setValue("fullName", ""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
+          placeholder="พิมพ์รหัสนักศึกษา..."
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        />
+      )} />
       {showAlumniDropdown && alumniSearchField === "studentId" && alumniResults.length > 0 && (
         <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
           {alumniResults.map((a) => (
@@ -419,14 +410,15 @@ export default function AssociationsPage() {
     </div>
     <div className="relative">
       <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-      <input
-        type="text"
-        value={form.fullName}
-        onChange={(e) => { setForm((f) => ({ ...f, fullName: e.target.value, studentId: "" })); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
-        placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-        className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.fullName ? "border-red-400" : "border-gray-300"}`}
-      />
-      {formErrors.fullName && <p className="mt-1 text-xs text-red-500">{formErrors.fullName}</p>}
+      <Controller name="fullName" control={control} render={({ field }) => (
+        <input
+          type="text"
+          value={field.value}
+          onChange={(e) => { field.onChange(e.target.value); setValue("studentId", ""); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
+          placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        />
+      )} />
       {showAlumniDropdown && alumniSearchField === "fullName" && alumniResults.length > 0 && (
         <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
           {alumniResults.map((a) => (
@@ -439,25 +431,19 @@ export default function AssociationsPage() {
     </div>
   </>
 )}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อสมาคม/ชมรม *</label>
-              <input type="text" value={form.associationName} onChange={(e) => setForm((f) => ({ ...f, associationName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.associationName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.associationName && <p className="mt-1 text-xs text-red-500">{formErrors.associationName}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ตำแหน่ง *</label>
-              <input type="text" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.position ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.position && <p className="mt-1 text-xs text-red-500">{formErrors.position}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ปีที่บันทึก (พ.ศ.) *</label>
-              <input type="number" value={form.recordedYear} onChange={(e) => setForm((f) => ({ ...f, recordedYear: e.target.value }))} placeholder="เช่น 2568" className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.recordedYear ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.recordedYear && <p className="mt-1 text-xs text-red-500">{formErrors.recordedYear}</p>}
-            </div>
+            <FormField label="ชื่อสมาคม/ชมรม" required error={errors.associationName?.message}>
+              <FormInput registration={register("associationName")} error={errors.associationName?.message} type="text" />
+            </FormField>
+            <FormField label="ตำแหน่ง" required error={errors.position?.message}>
+              <FormInput registration={register("position")} error={errors.position?.message} type="text" />
+            </FormField>
+            <FormField label="ปีที่บันทึก (พ.ศ.)" required error={errors.recordedYear?.message}>
+              <FormInput registration={register("recordedYear")} error={errors.recordedYear?.message} type="text" placeholder="เช่น 2568" />
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+            <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
               {saving ? "กำลังบันทึก..." : "บันทึก"}
             </button>
           </div>

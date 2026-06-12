@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma, DegreeLevel } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, alumniCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -86,33 +88,9 @@ export async function POST(request: NextRequest) {
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const {
-      studentId,
-      prefix,
-      firstName,
-      maidenLastName,
-      cohort,
-      degreeLevel,
-      newLastName,
-      province,
-      email,
-      phone,
-      currentWorkplace,
-      country,
-      isPotential,
-      isModelRepresentative,
-      photoUrl,
-      softDelete,
-    } = body;
+    const validated = alumniCreateSchema.parse(body);
 
-    if (!studentId || !prefix || !firstName || !maidenLastName) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
-
-    const existing = await prisma.alumni.findUnique({ where: { studentId } });
+    const existing = await prisma.alumni.findUnique({ where: { studentId: validated.studentId } });
     if (existing) {
       // If record exists and is already soft-deleted, just return it
       if (existing.deletedAt) {
@@ -126,22 +104,22 @@ export async function POST(request: NextRequest) {
 
     const alumni = await prisma.alumni.create({
       data: {
-        studentId,
-        prefix,
-        firstName,
-        maidenLastName,
-        cohort: cohort || null,
-        degreeLevel: degreeLevel || "BACHELOR",
-        newLastName: newLastName || null,
-        province: province || null,
-        email: email || null,
-        phone: phone || null,
-        currentWorkplace: currentWorkplace || null,
-        country: country || null,
-        isPotential: isPotential ?? false,
-        isModelRepresentative: isModelRepresentative ?? false,
-        photoUrl: photoUrl || null,
-        deletedAt: softDelete ? new Date() : null,
+        studentId: validated.studentId,
+        prefix: validated.prefix,
+        firstName: validated.firstName,
+        maidenLastName: validated.maidenLastName,
+        cohort: validated.cohort || null,
+        degreeLevel: validated.degreeLevel,
+        newLastName: validated.newLastName || null,
+        province: validated.province || null,
+        email: validated.email || null,
+        phone: validated.phone || null,
+        currentWorkplace: validated.currentWorkplace || null,
+        country: validated.country || null,
+        isPotential: validated.isPotential,
+        isModelRepresentative: validated.isModelRepresentative,
+        photoUrl: validated.photoUrl || null,
+        deletedAt: validated.softDelete ? new Date() : null,
       },
       include: {
         awards: true,
@@ -166,6 +144,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(alumni, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("POST /api/alumni error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการสร้างข้อมูลศิษย์เก่า" },

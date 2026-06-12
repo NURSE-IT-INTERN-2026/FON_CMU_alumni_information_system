@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import {
   createAlumniSession,
@@ -8,6 +9,8 @@ import {
 } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError } from "@/lib/validations/helpers";
+import { alumniLoginSchema } from "@/lib/validations/auth";
 
 export async function POST(request: Request) {
   try {
@@ -30,18 +33,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "กรุณากรอกอีเมลและรหัสผ่าน" },
-        { status: 400 }
-      );
-    }
+    const validated = alumniLoginSchema.parse(body);
 
     // Look up alumni by email
     const alumni = await prisma.alumni.findFirst({
-      where: { email: email.trim().toLowerCase() },
+      where: { email: validated.email.trim().toLowerCase() },
     });
 
     if (!alumni) {
@@ -60,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     // Verify password
-    const valid = await verifyPassword(password, alumni.passwordHash);
+    const valid = await verifyPassword(validated.password, alumni.passwordHash);
     if (!valid) {
       return NextResponse.json(
         { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" },
@@ -139,7 +135,8 @@ export async function POST(request: Request) {
         newLastName: alumni.newLastName,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง" },
       { status: 500 }

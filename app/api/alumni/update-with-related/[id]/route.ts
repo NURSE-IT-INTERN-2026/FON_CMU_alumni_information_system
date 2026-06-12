@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
-import { AwardType } from "@/app/generated/prisma/client";
+import { AwardType, DegreeLevel } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, alumniWithRelatedUpdateSchema } from "@/lib/validations";
 
 export async function PUT(
   request: NextRequest,
@@ -15,32 +17,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-
-    const {
-      prefix,
-      firstName,
-      maidenLastName,
-      cohort,
-      degreeLevel,
-      newLastName,
-      province,
-      email,
-      phone,
-      currentWorkplace,
-      country,
-      awards,
-      associations,
-      graduateCommittees,
-      potentials,
-      modelRepresentatives,
-    } = body;
-
-    if (!prefix || !firstName || !maidenLastName) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = alumniWithRelatedUpdateSchema.parse(body);
 
     const existing = await prisma.alumni.findUnique({ where: { id } });
     if (!existing) {
@@ -50,28 +27,28 @@ export async function PUT(
       );
     }
 
-    const hasPotentials = Array.isArray(potentials) && potentials.length > 0;
+    const hasPotentials = (validated.potentials?.length ?? 0) > 0;
     const hasModelReps =
-      Array.isArray(modelRepresentatives) && modelRepresentatives.length > 0;
+      (validated.modelRepresentatives?.length ?? 0) > 0;
 
-    const fullName = `${prefix}${firstName} ${maidenLastName}`;
+    const fullName = `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`;
 
     const alumni = await prisma.$transaction(async (tx) => {
       // Update core alumni fields
       const updated = await tx.alumni.update({
         where: { id },
         data: {
-          prefix,
-          firstName,
-          maidenLastName,
-          cohort: cohort || null,
-          degreeLevel: degreeLevel || null,
-          newLastName: newLastName || null,
-          province: province || null,
-          email: email || null,
-          phone: phone || null,
-          currentWorkplace: currentWorkplace || null,
-          country: country || null,
+          prefix: validated.prefix,
+          firstName: validated.firstName,
+          maidenLastName: validated.maidenLastName,
+          cohort: validated.cohort || null,
+          degreeLevel: (validated.degreeLevel as DegreeLevel) || null,
+          newLastName: validated.newLastName || null,
+          province: validated.province || null,
+          email: validated.email || null,
+          phone: validated.phone || null,
+          currentWorkplace: validated.currentWorkplace || null,
+          country: validated.country || null,
           isPotential: hasPotentials,
           isModelRepresentative: hasModelReps,
         },
@@ -81,22 +58,15 @@ export async function PUT(
 
       // Awards: delete old, create new
       await tx.award.deleteMany({ where: { studentId: existing.studentId } });
-      if (Array.isArray(awards) && awards.length > 0) {
+      if (validated.awards && validated.awards.length > 0) {
         await tx.award.createMany({
-          data: awards.map(
-            (a: {
-              awardName: string;
-              awardType: string;
-              year: number;
-              description?: string;
-            }) => ({
-              studentId: existing.studentId,
-              awardName: a.awardName,
-              awardType: a.awardType as AwardType,
-              year: Number(a.year),
-              description: a.description || null,
-            })
-          ),
+          data: validated.awards.map((a) => ({
+            studentId: existing.studentId,
+            awardName: a.awardName,
+            awardType: a.awardType as AwardType,
+            year: a.year,
+            description: a.description || null,
+          })),
         });
       }
 
@@ -104,21 +74,15 @@ export async function PUT(
       await tx.association.deleteMany({
         where: { studentId: existing.studentId },
       });
-      if (Array.isArray(associations) && associations.length > 0) {
+      if (validated.associations && validated.associations.length > 0) {
         await tx.association.createMany({
-          data: associations.map(
-            (a: {
-              associationName: string;
-              position: string;
-              recordedYear: number;
-            }) => ({
-              studentId: existing.studentId,
-              fullName,
-              associationName: a.associationName,
-              position: a.position,
-              recordedYear: Number(a.recordedYear),
-            })
-          ),
+          data: validated.associations.map((a) => ({
+            studentId: existing.studentId,
+            fullName,
+            associationName: a.associationName,
+            position: a.position,
+            recordedYear: a.recordedYear,
+          })),
         });
       }
 
@@ -126,26 +90,16 @@ export async function PUT(
       await tx.graduateCommittee.deleteMany({
         where: { studentId: existing.studentId },
       });
-      if (
-        Array.isArray(graduateCommittees) &&
-        graduateCommittees.length > 0
-      ) {
+      if (validated.graduateCommittees && validated.graduateCommittees.length > 0) {
         await tx.graduateCommittee.createMany({
-          data: graduateCommittees.map(
-            (g: {
-              termYear: number;
-              cohort: string;
-              position: string;
-              remarks?: string;
-            }) => ({
-              studentId: existing.studentId,
-              termYear: Number(g.termYear),
-              fullName,
-              cohort: g.cohort,
-              position: g.position,
-              remarks: g.remarks || null,
-            })
-          ),
+          data: validated.graduateCommittees.map((g) => ({
+            studentId: existing.studentId,
+            termYear: g.termYear,
+            fullName,
+            cohort: g.cohort,
+            position: g.position,
+            remarks: g.remarks || null,
+          })),
         });
       }
 
@@ -155,19 +109,13 @@ export async function PUT(
       });
       if (hasPotentials) {
         await tx.potential.createMany({
-          data: potentials.map(
-            (p: {
-              career: string;
-              position: string;
-              recordedYear: number;
-            }) => ({
-              studentId: existing.studentId,
-              fullName,
-              career: p.career,
-              position: p.position,
-              recordedYear: Number(p.recordedYear),
-            })
-          ),
+          data: validated.potentials!.map((p) => ({
+            studentId: existing.studentId,
+            fullName,
+            career: p.career,
+            position: p.position,
+            recordedYear: p.recordedYear,
+          })),
         });
       }
 
@@ -177,14 +125,12 @@ export async function PUT(
       });
       if (hasModelReps) {
         await tx.modelRepresentative.createMany({
-          data: modelRepresentatives.map(
-            (m: { cohort: string; generation: number }) => ({
-              studentId: existing.studentId,
-              name: fullName,
-              cohort: m.cohort,
-              generation: Number(m.generation),
-            })
-          ),
+          data: validated.modelRepresentatives!.map((m) => ({
+            studentId: existing.studentId,
+            name: fullName,
+            cohort: m.cohort,
+            generation: m.generation,
+          })),
         });
       }
 
@@ -215,6 +161,7 @@ export async function PUT(
 
     return NextResponse.json(alumni);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("PUT /api/alumni/update-with-related/[id] error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการอัปเดตข้อมูลศิษย์เก่า" },

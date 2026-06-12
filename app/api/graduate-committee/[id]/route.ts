@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { handleZodError, committeeUpdateSchema } from "@/lib/validations";
 
 export async function PUT(
   request: NextRequest,
@@ -11,29 +13,23 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { termYear, studentId, fullName, cohort, position, remarks } = body;
-
-    if (!termYear || !studentId || !fullName || !cohort || !position) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = committeeUpdateSchema.parse(body);
 
     const committee = await prisma.graduateCommittee.update({
       where: { id },
       data: {
-        termYear: Number(termYear),
-        studentId: studentId.trim(),
-        fullName: fullName.trim(),
-        cohort: cohort.trim(),
-        position: position.trim(),
-        remarks: remarks?.trim() || null,
+        termYear: Number(validated.termYear),
+        studentId: validated.studentId!.trim(),
+        fullName: validated.fullName!.trim(),
+        cohort: validated.cohort!.trim(),
+        position: validated.position!.trim(),
+        remarks: validated.remarks?.trim() || null,
       },
     });
 
     return NextResponse.json(committee);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to update graduate committee:", error);
     return NextResponse.json(
       { error: "Failed to update graduate committee" },

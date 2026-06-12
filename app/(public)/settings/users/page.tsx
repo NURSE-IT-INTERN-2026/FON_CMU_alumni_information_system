@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { userCreateSchema, type UserCreateInput } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
 /* ───── Admin User types & tab ───── */
 interface AdminUser {
@@ -101,11 +107,14 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<UserCreateInput>({
+    resolver: zodResolver(userCreateSchema) as any,
+    defaultValues: EMPTY_FORM as any,
+  });
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
@@ -123,29 +132,18 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.firstName.trim()) errors.firstName = "กรุณากรอกชื่อ";
-    if (!form.lastName.trim()) errors.lastName = "กรุณากรอกนามสกุล";
-    if (!form.email.trim()) errors.email = "กรุณากรอกอีเมล";
-    else if (!form.email.trim().endsWith("@cmu.ac.th")) errors.email = "กรุณาใช้อีเมล @cmu.ac.th";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  const openCreate = () => { formReset(EMPTY_FORM as any); setEditingId(null); setShowForm(true); };
+  const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role } as any); setEditingId(m.id); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setEditingId(null); formReset(EMPTY_FORM as any); };
 
-  const openCreate = () => { setForm(EMPTY_FORM); setFormErrors({}); setEditingId(null); setShowForm(true); };
-  const openEdit = (m: AdminUser) => { setForm({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role }); setFormErrors({}); setEditingId(m.id); setShowForm(true); };
-  const closeForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setFormErrors({}); };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleSave = async (data: UserCreateInput) => {
     setSaving(true); setErrorMsg("");
     try {
-      const payload = { firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), role: form.role };
+      const payload = { firstName: data.firstName.trim(), lastName: data.lastName.trim(), email: data.email.trim(), role: data.role };
       const res = editingId
         ? await fetch(`${BASE_PATH}/api/users/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
         : await fetch(`${BASE_PATH}/api/users`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "เกิดข้อผิดพลาด"); }
+      if (!res.ok) { const resData = await res.json(); throw new Error(resData.error || "เกิดข้อผิดพลาด"); }
       closeForm(); fetchMembers();
     } catch (err) { setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด"); } finally { setSaving(false); }
   };
@@ -189,33 +187,26 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
         <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">{editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ *</label>
-              <input type="text" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.firstName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.firstName && <p className="mt-1 text-xs text-red-500">{formErrors.firstName}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">นามสกุล *</label>
-              <input type="text" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.lastName ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.lastName && <p className="mt-1 text-xs text-red-500">{formErrors.lastName}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">อีเมล *</label>
-              <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.email ? "border-red-400" : "border-gray-300"}`} />
-              {formErrors.email && <p className="mt-1 text-xs text-red-500">{formErrors.email}</p>}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">ตำแหน่ง</label>
-              <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]">
+            <FormField label="ชื่อ" required error={formErrors.firstName?.message}>
+              <FormInput registration={register("firstName")} error={formErrors.firstName?.message} type="text" />
+            </FormField>
+            <FormField label="นามสกุล" required error={formErrors.lastName?.message}>
+              <FormInput registration={register("lastName")} error={formErrors.lastName?.message} type="text" />
+            </FormField>
+            <FormField label="อีเมล" required error={formErrors.email?.message}>
+              <FormInput registration={register("email")} error={formErrors.email?.message} type="email" />
+            </FormField>
+            <FormField label="ตำแหน่ง">
+              <FormSelect registration={register("role")}>
                 <option value="admin">ผู้ดูแลระบบ</option>
                 <option value="superadmin">ผู้ดูแลระบบสูงสุด</option>
                 <option value="executive">ผู้บริหาร</option>
-              </select>
-            </div>
+              </FormSelect>
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
-            <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">ยกเลิก</button>
-            <button onClick={handleSave} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 cursor-pointer">{saving ? "กำลังบันทึก..." : "บันทึก"}</button>
+            <button type="button" onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">ยกเลิก</button>
+            <button type="button" onClick={handleSubmit(handleSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 cursor-pointer">{saving ? "กำลังบันทึก..." : "บันทึก"}</button>
           </div>
         </div>
       )}

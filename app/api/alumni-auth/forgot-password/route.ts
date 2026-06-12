@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { randomBytes } from "crypto";
+import { handleZodError } from "@/lib/validations/helpers";
+import { forgotPasswordSchema } from "@/lib/validations/auth";
 
 export async function POST(request: Request) {
   try {
@@ -27,14 +30,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { email } = body;
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "กรุณากรอกอีเมล" },
-        { status: 400 }
-      );
-    }
+    const validated = forgotPasswordSchema.parse(body);
 
     // Always return the same message to prevent email enumeration
     const successMessage =
@@ -43,7 +39,7 @@ export async function POST(request: Request) {
     // Look up alumni by email who has a password (signed up)
     const alumni = await prisma.alumni.findFirst({
       where: {
-        email: email.trim().toLowerCase(),
+        email: validated.email.trim().toLowerCase(),
         passwordHash: { not: null },
       },
     });
@@ -83,7 +79,8 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json({ message: successMessage });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     // Return generic message even on error to prevent info leakage
     return NextResponse.json({
       message:

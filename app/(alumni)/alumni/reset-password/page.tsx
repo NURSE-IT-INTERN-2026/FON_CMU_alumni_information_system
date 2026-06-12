@@ -1,8 +1,13 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BASE_PATH } from "@/lib/constants";
+import { resetPasswordSchema, type ResetPasswordData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 export default function ResetPasswordPage() {
   return (
@@ -17,10 +22,21 @@ function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResetPasswordData>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      token: token || "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
   // If no token, show error
   if (!token) {
@@ -47,33 +63,21 @@ function ResetPasswordForm() {
     );
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function onSubmit(data: ResetPasswordData) {
     setError("");
-
-    if (password.length < 8) {
-      setError("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("รหัสผ่านไม่ตรงกัน");
-      return;
-    }
-
     setLoading(true);
 
     try {
       const res = await fetch(`${BASE_PATH}/api/alumni-auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token: data.token, password: data.password }),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+        setError(resData.error || "เกิดข้อผิดพลาด กรุณาลองใหม่");
         return;
       }
 
@@ -132,40 +136,30 @@ function ResetPasswordForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                รหัสผ่านใหม่
-              </label>
-              <input
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <FormField label="รหัสผ่านใหม่" error={errors.password?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("password")}
+                error={errors.password?.message}
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
                 autoComplete="new-password"
-                minLength={8}
                 placeholder="อย่างน้อย 8 ตัวอักษร"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                ยืนยันรหัสผ่านใหม่
-              </label>
-              <input
+            <FormField label="ยืนยันรหัสผ่านใหม่" error={errors.confirmPassword?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormInput
+                registration={register("confirmPassword")}
+                error={errors.confirmPassword?.message}
                 id="confirmPassword"
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
                 autoComplete="new-password"
-                minLength={8}
                 placeholder="กรอกรหัสผ่านอีกครั้ง"
-                className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
               />
-            </div>
+            </FormField>
 
             <button
               type="submit"

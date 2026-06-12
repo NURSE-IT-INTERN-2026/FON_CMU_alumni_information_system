@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { DEGREE_LEVEL_OPTIONS, PREFIX_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { profileFormSchema, type ProfileFormData } from "@/lib/validations";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
 interface AlumniData {
   id: string;
@@ -32,6 +38,23 @@ const DEGREE_LABELS: Record<string, string> = {
   NURSING_ASSISTANT: "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล",
 };
 
+const AUTH_INPUT_CLASS = "px-4 py-2.5 text-[var(--foreground)] border-[var(--border)]";
+const AUTH_LABEL_CLASS = "mb-1.5 block text-sm font-medium text-[var(--foreground)]";
+
+const defaultFormValues: ProfileFormData = {
+  prefix: "",
+  firstName: "",
+  maidenLastName: "",
+  newLastName: "",
+  cohort: "",
+  degreeLevel: "",
+  province: "",
+  email: "",
+  phone: "",
+  currentWorkplace: "",
+  country: "",
+};
+
 export default function AlumniProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,19 +69,14 @@ export default function AlumniProfilePage() {
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
   const [showAdminEditModal, setShowAdminEditModal] = useState(false);
 
-  // Form state
-  const [form, setForm] = useState({
-    prefix: "",
-    firstName: "",
-    maidenLastName: "",
-    newLastName: "",
-    cohort: "",
-    degreeLevel: "",
-    province: "",
-    email: "",
-    phone: "",
-    currentWorkplace: "",
-    country: "",
+  const {
+    register,
+    handleSubmit,
+    reset: formReset,
+    formState: { errors },
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileFormSchema) as any,
+    defaultValues: defaultFormValues,
   });
 
   const fetchProfile = useCallback(async () => {
@@ -70,7 +88,7 @@ export default function AlumniProfilePage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setAlumni(data);
-      setForm({
+      formReset({
         prefix: data.prefix || "",
         firstName: data.firstName || "",
         maidenLastName: data.maidenLastName || "",
@@ -105,7 +123,7 @@ export default function AlumniProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [searchParams, formReset]);
 
   useEffect(() => {
     fetchProfile();
@@ -125,8 +143,7 @@ export default function AlumniProfilePage() {
     setShowAdminEditModal(false);
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSave(data: ProfileFormData) {
     setSaving(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -135,12 +152,12 @@ export default function AlumniProfilePage() {
       const res = await fetch(`${BASE_PATH}/api/alumni-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setErrorMsg(data.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+        const errData = await res.json();
+        setErrorMsg(errData.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
         return;
       }
 
@@ -153,6 +170,27 @@ export default function AlumniProfilePage() {
       setErrorMsg("ไม่สามารถบันทึกข้อมูลได้");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setEditMode(false);
+    setErrorMsg("");
+    // Reset form back to alumni data
+    if (alumni) {
+      formReset({
+        prefix: alumni.prefix || "",
+        firstName: alumni.firstName || "",
+        maidenLastName: alumni.maidenLastName || "",
+        newLastName: alumni.newLastName || "",
+        cohort: alumni.cohort || "",
+        degreeLevel: alumni.degreeLevel || "",
+        province: alumni.province || "",
+        email: alumni.email || "",
+        phone: alumni.phone || "",
+        currentWorkplace: alumni.currentWorkplace || "",
+        country: alumni.country || "",
+      });
     }
   }
 
@@ -252,7 +290,7 @@ export default function AlumniProfilePage() {
         {/* Profile card */}
         <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
           {editMode ? (
-            <form onSubmit={handleSave} className="space-y-5">
+            <form onSubmit={handleSubmit(handleSave)} className="space-y-5">
               {/* Read-only fields */}
               <div className="rounded-lg bg-gray-50 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลที่ไม่สามารถแก้ไขได้</h3>
@@ -278,125 +316,106 @@ export default function AlumniProfilePage() {
 
               {/* Editable fields */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">คำนำหน้า</label>
-                  <select
-                    value={form.prefix}
-                    onChange={(e) => setForm((f) => ({ ...f, prefix: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                <FormField label="คำนำหน้า" required error={errors.prefix?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormSelect
+                    registration={register("prefix")}
+                    error={errors.prefix?.message}
+                    className={AUTH_INPUT_CLASS}
                   >
                     <option value="">เลือกคำนำหน้า</option>
                     {PREFIX_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
-                  </select>
-                </div>
+                  </FormSelect>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">ชื่อ</label>
-                  <input
+                <FormField label="ชื่อ" required error={errors.firstName?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("firstName")}
+                    error={errors.firstName?.message}
                     type="text"
-                    value={form.firstName}
-                    onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                    required
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">นามสกุลเดิม</label>
-                  <input
+                <FormField label="นามสกุลเดิม" required error={errors.maidenLastName?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("maidenLastName")}
+                    error={errors.maidenLastName?.message}
                     type="text"
-                    value={form.maidenLastName}
-                    onChange={(e) => setForm((f) => ({ ...f, maidenLastName: e.target.value }))}
-                    required
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">นามสกุลใหม่ (หลังแต่งงาน)</label>
-                  <input
+                <FormField label="นามสกุลใหม่ (หลังแต่งงาน)" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("newLastName")}
                     type="text"
-                    value={form.newLastName}
-                    onChange={(e) => setForm((f) => ({ ...f, newLastName: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">รุ่นที่</label>
-                  <input
+                <FormField label="รุ่นที่" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("cohort")}
                     type="text"
-                    value={form.cohort}
-                    onChange={(e) => setForm((f) => ({ ...f, cohort: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">ระดับปริญญา</label>
-                  <select
-                    value={form.degreeLevel}
-                    onChange={(e) => setForm((f) => ({ ...f, degreeLevel: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                <FormField label="ระดับปริญญา" required error={errors.degreeLevel?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormSelect
+                    registration={register("degreeLevel")}
+                    error={errors.degreeLevel?.message}
+                    className={AUTH_INPUT_CLASS}
                   >
                     <option value="">เลือกระดับปริญญา</option>
                     {DEGREE_LEVEL_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
-                  </select>
-                </div>
+                  </FormSelect>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">จังหวัด</label>
-                  <input
+                <FormField label="จังหวัด" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("province")}
                     type="text"
-                    value={form.province}
-                    onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">อีเมล</label>
-                  <input
+                <FormField label="อีเมล" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("email")}
+                    error={errors.email?.message}
                     type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">เบอร์โทรศัพท์</label>
-                  <input
+                <FormField label="เบอร์โทรศัพท์" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("phone")}
                     type="text"
-                    value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">สถานที่ทำงานปัจจุบัน</label>
-                  <input
+                <FormField label="สถานที่ทำงานปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("currentWorkplace")}
                     type="text"
-                    value={form.currentWorkplace}
-                    onChange={(e) => setForm((f) => ({ ...f, currentWorkplace: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">ประเทศ</label>
-                  <input
+                <FormField label="ประเทศ" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("country")}
                     type="text"
-                    value={form.country}
-                    onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                    className="w-full rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+                    className={AUTH_INPUT_CLASS}
                   />
-                </div>
+                </FormField>
               </div>
 
               {/* Buttons */}
@@ -410,7 +429,7 @@ export default function AlumniProfilePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setEditMode(false); setErrorMsg(""); }}
+                  onClick={handleCancel}
                   className="rounded-lg border border-[var(--border)] px-6 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
                 >
                   ยกเลิก

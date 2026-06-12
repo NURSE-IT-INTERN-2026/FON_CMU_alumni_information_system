@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { modelRepFormSchema, type ModelRepFormData } from "@/lib/validations/model-representative";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
 
 interface ModelRepresentative {
   id: string;
@@ -30,7 +35,7 @@ const NETWORK_ORDER = [
 type SortField = "network" | "generation" | "studentId" | "name";
 type SortDir = "asc" | "desc";
 
-const EMPTY_FORM = { studentId: "", name: "", cohort: "", generation: "" };
+type FormValues = ModelRepFormData & { studentId: string; name: string };
 
 function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; className?: string }) {
   const color = className ?? "text-white";
@@ -78,8 +83,10 @@ export default function ModelRepresentativesPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
+    resolver: zodResolver(modelRepFormSchema) as any,
+    defaultValues: { studentId: "", name: "", cohort: "", generation: "" },
+  });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -106,7 +113,8 @@ export default function ModelRepresentativesPage() {
   const cohortDropdownRef = useRef<HTMLDivElement>(null);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
-    setForm((f) => ({ ...f, studentId: a.studentId, name: displayName(a) }));
+    setValue("studentId", a.studentId);
+    setValue("name", displayName(a));
     clearResults();
     setSearchField(null);
   };
@@ -239,27 +247,26 @@ export default function ModelRepresentativesPage() {
     return result;
   }, [alumni]);
 
+  const cohortValue = watch("cohort");
   const cohortOptions = useMemo(() => {
-    if (!form.cohort.trim()) return allCohorts;
-    const term = form.cohort.toLowerCase();
+    if (!cohortValue?.trim()) return allCohorts;
+    const term = cohortValue.toLowerCase();
     return allCohorts.filter((c) => c.toLowerCase().includes(term));
-  }, [allCohorts, form.cohort]);
+  }, [allCohorts, cohortValue]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset({ studentId: "", name: "", cohort: "", generation: "" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (item: ModelRepresentative) => {
-    setForm({
+    formReset({
       studentId: item.studentId,
       name: item.name,
       cohort: item.cohort,
       generation: String(item.generation),
     });
-    setFormErrors({});
     setEditingId(item.id);
     setShowForm(true);
   };
@@ -267,35 +274,23 @@ export default function ModelRepresentativesPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFormErrors({});
+    formReset({ studentId: "", name: "", cohort: "", generation: "" });
     setShowCohortDropdown(false);
     setSearchField(null);
     clearResults();
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!form.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนักศึกษา";
-    if (!form.name.trim()) errors.name = "กรุณากรอกชื่อ-นามสกุล";
-    if (!form.cohort.trim()) errors.cohort = "กรุณากรอกชื่อเครือข่าย";
-    if (!form.generation) errors.generation = "กรุณากรอกรุ่นที่";
-    if (form.generation && isNaN(Number(form.generation)))
-      errors.generation = "รุ่นที่ต้องเป็นตัวเลข";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const onSave = async (data: ModelRepFormData) => {
+    const studentId = getValues("studentId");
+    const name = getValues("name");
     setSaving(true);
     setErrorMsg("");
     try {
       const payload = {
-        studentId: form.studentId.trim(),
-        name: form.name.trim(),
-        cohort: form.cohort.trim(),
-        generation: Number(form.generation),
+        studentId: studentId.trim(),
+        name: name.trim(),
+        cohort: data.cohort.trim(),
+        generation: Number(data.generation),
       };
       if (editingId) {
         const res = await fetch(`${BASE_PATH}/api/model-representatives/${editingId}`, {
@@ -304,24 +299,24 @@ export default function ModelRepresentativesPage() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
+          const d = await res.json();
+          throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        if (form.studentId) {
+        if (studentId) {
           const res = await fetch(`${BASE_PATH}/api/model-representatives`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
           if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || "เกิดข้อผิดพลาด");
+            const d = await res.json();
+            throw new Error(d.error || "เกิดข้อผิดพลาด");
           }
         } else {
-          const params = new URLSearchParams({ section: "modelReps", nameSearch: form.name });
-          if (form.cohort) params.set("cohort", form.cohort);
-          if (form.generation) params.set("generation", form.generation);
+          const params = new URLSearchParams({ section: "modelReps", nameSearch: name });
+          if (data.cohort) params.set("cohort", data.cohort);
+          if (data.generation) params.set("generation", data.generation);
           router.push(`/new-alumni?${params.toString()}`);
           return;
         }
@@ -593,38 +588,12 @@ export default function ModelRepresentativesPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {editingId ? (
               <>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    รหัสนักศึกษา *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, studentId: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
-                  />
-                  {formErrors.studentId && (
-                    <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    ชื่อ-นามสกุล *
-                  </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
-                  />
-                  {formErrors.name && (
-                    <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
-                  )}
-                </div>
+                <FormField label="รหัสนักศึกษา" required>
+                  <FormInput registration={register("studentId")} type="text" className="font-mono" />
+                </FormField>
+                <FormField label="ชื่อ-นามสกุล" required>
+                  <FormInput registration={register("name")} type="text" />
+                </FormField>
               </>
             ) : (
               <>
@@ -632,45 +601,59 @@ export default function ModelRepresentativesPage() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     รหัสนักศึกษา *
                   </label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    onChange={(e) => { setForm((f) => ({ ...f, studentId: e.target.value, name: "" })); searchAlumni(e.target.value); setSearchField("studentId"); }}
-                    placeholder="พิมพ์รหัสนักศึกษา..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.studentId ? "border-red-400" : "border-gray-300"}`}
+                  <Controller
+                    name="studentId"
+                    control={control}
+                    render={({ field }) => (
+                      <>
+                        <input
+                          type="text"
+                          value={field.value}
+                          onChange={(e) => { field.onChange(e.target.value); setValue("name", ""); searchAlumni(e.target.value); setSearchField("studentId"); }}
+                          placeholder="พิมพ์รหัสนักศึกษา..."
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        />
+                        {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
+                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                            {alumniResults.map((a) => (
+                              <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                                {a.studentId} - {displayName(a)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   />
-                  {formErrors.studentId && <p className="mt-1 text-xs text-red-500">{formErrors.studentId}</p>}
-                  {showAlumniDropdown && searchField === "studentId" && alumniResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                      {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-                          {a.studentId} - {displayName(a)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     ชื่อ-นามสกุล *
                   </label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value, studentId: "" })); searchAlumni(e.target.value); setSearchField("name"); }}
-                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.name ? "border-red-400" : "border-gray-300"}`}
+                  <Controller
+                    name="name"
+                    control={control}
+                    render={({ field }) => (
+                      <>
+                        <input
+                          type="text"
+                          value={field.value}
+                          onChange={(e) => { field.onChange(e.target.value); setValue("studentId", ""); searchAlumni(e.target.value); setSearchField("name"); }}
+                          placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        />
+                        {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
+                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                            {alumniResults.map((a) => (
+                              <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                                {a.studentId} - {displayName(a)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   />
-                  {formErrors.name && <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>}
-                  {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                      {alumniResults.map((a) => (
-                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-                          {a.studentId} - {displayName(a)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </>
             )}
@@ -678,54 +661,33 @@ export default function ModelRepresentativesPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 เครือข่าย *
               </label>
-              <input
-                type="text"
-                value={form.cohort}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, cohort: e.target.value }))
-                }
-                onFocus={() => setShowCohortDropdown(true)}
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.cohort ? "border-red-400" : "border-gray-300"}`}
-              />
-              {formErrors.cohort && (
-                <p className="mt-1 text-xs text-red-500">{formErrors.cohort}</p>
-              )}
-              {showCohortDropdown && cohortOptions.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                  {cohortOptions.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => {
-                        setForm((f) => ({ ...f, cohort: c }));
-                        setShowCohortDropdown(false);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors"
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+              <Controller name="cohort" control={control} render={({ field }) => (
+                <>
+                  <input
+                    type="text"
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    onFocus={() => setShowCohortDropdown(true)}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.cohort ? "border-red-400" : "border-gray-300"}`}
+                  />
+                  {showCohortDropdown && cohortOptions.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      {cohortOptions.map((c) => (
+                        <button key={c} type="button" onClick={() => { field.onChange(c); setShowCohortDropdown(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )} />
+              {errors.cohort && (
+                <p className="mt-1 text-xs text-red-500">{errors.cohort.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                รุ่นที่ *
-              </label>
-              <input
-                type="number"
-                value={form.generation}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, generation: e.target.value }))
-                }
-                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${formErrors.generation ? "border-red-400" : "border-gray-300"}`}
-              />
-              {formErrors.generation && (
-                <p className="mt-1 text-xs text-red-500">
-                  {formErrors.generation}
-                </p>
-              )}
-            </div>
+            <FormField label="รุ่นที่" required error={errors.generation?.message}>
+              <FormInput registration={register("generation")} error={errors.generation?.message} type="number" />
+            </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button
@@ -735,7 +697,7 @@ export default function ModelRepresentativesPage() {
               ยกเลิก
             </button>
             <button
-              onClick={handleSave}
+              onClick={handleSubmit(onSave)}
               disabled={saving}
               className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >

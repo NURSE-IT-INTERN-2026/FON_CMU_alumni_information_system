@@ -3,49 +3,34 @@
 import { useState, useEffect, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import {
+  alumniWithRelatedFormSchema,
+  type AlumniWithRelatedFormData,
+} from "@/lib/validations";
+import SectionToggle from "@/components/form/SectionToggle";
+import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
+import FormField from "@/components/form/FormField";
+import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
-interface AwardRow {
-  awardName: string;
-  awardType: string;
-  year: string;
-  description: string;
-}
-interface AssociationRow {
-  associationName: string;
-  position: string;
-  recordedYear: string;
-}
-interface CommitteeRow {
-  termYear: string;
-  cohort: string;
-  position: string;
-  remarks: string;
-}
-interface PotentialRow {
-  career: string;
-  position: string;
-  recordedYear: string;
-}
-interface ModelRepRow {
-  cohort: string;
-  generation: string;
-}
-interface AbroadRow {
-  address: string;
-  country: string;
-  university: string;
-}
-
-const EMPTY_ALUMNI = {
+const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   studentId: "",
   prefix: "",
   firstName: "",
   maidenLastName: "",
+  degreeLevel: "" as any,
   cohort: "",
   newLastName: "",
   province: "",
-  degreeLevel: "",
+  awards: [],
+  associations: [],
+  graduateCommittees: [],
+  potentials: [],
+  modelRepresentatives: [],
+  abroadAlumni: [],
 };
 
 export default function NewAlumniPage() {
@@ -53,13 +38,11 @@ export default function NewAlumniPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialLoadDone = useRef(false);
-  const [alumni, setAlumni] = useState(EMPTY_ALUMNI);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Expandable sections
+  // Expandable sections (UI state only)
   const [sections, setSections] = useState({
     awards: false,
     associations: false,
@@ -69,12 +52,26 @@ export default function NewAlumniPage() {
     abroad: false,
   });
 
-  const [awardRows, setAwardRows] = useState<AwardRow[]>([]);
-  const [associationRows, setAssociationRows] = useState<AssociationRow[]>([]);
-  const [committeeRows, setCommitteeRows] = useState<CommitteeRow[]>([]);
-  const [potentialRows, setPotentialRows] = useState<PotentialRow[]>([]);
-  const [modelRepRows, setModelRepRows] = useState<ModelRepRow[]>([]);
-  const [abroadRows, setAbroadRows] = useState<AbroadRow[]>([]);
+  const form = useForm<AlumniWithRelatedFormData>({
+    resolver: zodResolver(alumniWithRelatedFormSchema) as any,
+    defaultValues: DEFAULT_VALUES,
+  });
+
+  const {
+    register,
+    control,
+    formState: { errors },
+    handleSubmit,
+    reset,
+  } = form;
+
+  // Field arrays for each section
+  const awardArray = useFieldArray({ control, name: "awards" });
+  const associationArray = useFieldArray({ control, name: "associations" });
+  const committeeArray = useFieldArray({ control, name: "graduateCommittees" });
+  const potentialArray = useFieldArray({ control, name: "potentials" });
+  const modelRepArray = useFieldArray({ control, name: "modelRepresentatives" });
+  const abroadArray = useFieldArray({ control, name: "abroadAlumni" });
 
   // Pre-fill from query params (redirected from entity pages)
   useEffect(() => {
@@ -90,223 +87,144 @@ export default function NewAlumniPage() {
 
     initialLoadDone.current = true;
 
-    if (nameSearch) setAlumni((prev) => ({ ...prev, firstName: nameSearch }));
-    if (firstName) setAlumni((prev) => ({ ...prev, firstName }));
-    if (maidenLastName) setAlumni((prev) => ({ ...prev, maidenLastName }));
-    if (prefix) setAlumni((prev) => ({ ...prev, prefix }));
+    const overrides: Partial<AlumniWithRelatedFormData> = {};
+    if (nameSearch) overrides.firstName = nameSearch;
+    if (firstName) overrides.firstName = firstName;
+    if (maidenLastName) overrides.maidenLastName = maidenLastName;
+    if (prefix) overrides.prefix = prefix;
 
-    const validSections = ["awards", "associations", "committees", "potentials", "modelReps", "abroad"];
-    if (section && validSections.includes(section)) {
+    const validSections = ["awards", "associations", "committees", "potentials", "modelReps", "abroad"] as const;
+    if (section && validSections.includes(section as any)) {
       setSections((prev) => ({ ...prev, [section]: true }));
 
       switch (section) {
-        case "awards": {
-          const row: AwardRow = {
+        case "awards":
+          overrides.awards = [{
             awardName: searchParams.get("awardName") || "",
-            awardType: searchParams.get("awardType") || "INTERNATIONAL",
+            awardType: (searchParams.get("awardType") as any) || "INTERNATIONAL",
             year: searchParams.get("year") || "",
             description: searchParams.get("description") || "",
-          };
-          if (row.awardName || row.year) setAwardRows([row]);
+          }];
           break;
-        }
-        case "associations": {
-          const row: AssociationRow = {
+        case "associations":
+          overrides.associations = [{
             associationName: searchParams.get("associationName") || "",
             position: searchParams.get("position") || "",
             recordedYear: searchParams.get("recordedYear") || "",
-          };
-          if (row.associationName) setAssociationRows([row]);
+          }];
           break;
-        }
-        case "committees": {
-          const row: CommitteeRow = {
+        case "committees":
+          overrides.graduateCommittees = [{
             termYear: searchParams.get("termYear") || "",
             cohort: searchParams.get("cohort") || "",
             position: searchParams.get("position") || "",
             remarks: searchParams.get("remarks") || "",
-          };
-          if (row.termYear || row.cohort) setCommitteeRows([row]);
+          }];
           break;
-        }
-        case "potentials": {
-          const row: PotentialRow = {
+        case "potentials":
+          overrides.potentials = [{
             career: searchParams.get("career") || "",
             position: searchParams.get("position") || "",
             recordedYear: searchParams.get("recordedYear") || "",
-          };
-          if (row.career) setPotentialRows([row]);
+          }];
           break;
-        }
-        case "modelReps": {
-          const row: ModelRepRow = {
+        case "modelReps":
+          overrides.modelRepresentatives = [{
             cohort: searchParams.get("cohort") || "",
             generation: searchParams.get("generation") || "",
-          };
-          if (row.cohort) setModelRepRows([row]);
+          }];
           break;
-        }
-        case "abroad": {
-          const row: AbroadRow = {
+        case "abroad":
+          overrides.abroadAlumni = [{
             address: searchParams.get("address") || "",
             country: searchParams.get("country") || "",
             university: searchParams.get("university") || "",
-          };
-          if (row.address || row.country) setAbroadRows([row]);
+          }];
           break;
-        }
       }
     }
-  }, [searchParams]);
+
+    reset({ ...DEFAULT_VALUES, ...overrides });
+  }, [searchParams, reset]);
 
   const toggleSection = (key: keyof typeof sections) =>
     setSections((prev) => {
       const next = !prev[key];
       if (next) {
-        if (key === "associations" && associationRows.length === 0)
-          setAssociationRows([{ associationName: "", position: "", recordedYear: "" }]);
-        if (key === "committees" && committeeRows.length === 0)
-          setCommitteeRows([{ termYear: "", cohort: "", position: "", remarks: "" }]);
-        if (key === "potentials" && potentialRows.length === 0)
-          setPotentialRows([{ career: "", position: "", recordedYear: "" }]);
-        if (key === "modelReps" && modelRepRows.length === 0)
-          setModelRepRows([{ cohort: "", generation: "" }]);
-        if (key === "abroad" && abroadRows.length === 0)
-          setAbroadRows([{ address: "", country: "", university: "" }]);
+        if (key === "associations" && associationArray.fields.length === 0)
+          associationArray.append({ associationName: "", position: "", recordedYear: "" });
+        if (key === "committees" && committeeArray.fields.length === 0)
+          committeeArray.append({ termYear: "", cohort: "", position: "", remarks: "" });
+        if (key === "potentials" && potentialArray.fields.length === 0)
+          potentialArray.append({ career: "", position: "", recordedYear: "" });
+        if (key === "modelReps" && modelRepArray.fields.length === 0)
+          modelRepArray.append({ cohort: "", generation: "" });
+        if (key === "abroad" && abroadArray.fields.length === 0)
+          abroadArray.append({ address: "", country: "", university: "" });
       }
       return { ...prev, [key]: next };
     });
 
-  const updateAlumni = (field: string, value: string) => {
-    setAlumni((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: "" }));
-  };
-
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!alumni.studentId.trim()) e.studentId = "กรุณากรอกรหัสนักศึกษา";
-    else if (!/^\d+$/.test(alumni.studentId.trim())) e.studentId = "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น";
-    if (!alumni.prefix.trim()) e.prefix = "กรุณากรอกคำนำหน้า";
-    if (!alumni.firstName.trim()) e.firstName = "กรุณากรอกชื่อ";
-    if (!alumni.maidenLastName.trim())
-      e.maidenLastName = "กรุณากรอกนามสกุลเดิม";
-    if (!alumni.degreeLevel) e.degreeLevel = "กรุณาเลือกระดับการศึกษา";
-
-    // Validate expanded sections — all fields required when section is open
-    if (sections.awards) {
-      awardRows.forEach((r, i) => {
-        const prefix = `awards_${i}_`;
-        if (!r.awardName.trim()) e[prefix + "awardName"] = "กรุณากรอกชื่อรางวัล";
-        if (!r.awardType) e[prefix + "awardType"] = "กรุณาเลือกประเภทรางวัล";
-        if (!r.year.trim()) e[prefix + "year"] = "กรุณากรอกปี";
-        if (!r.description.trim()) e[prefix + "description"] = "กรุณากรอกรายละเอียด";
-      });
-    }
-    if (sections.potentials) {
-      potentialRows.forEach((r, i) => {
-        const prefix = `potentials_${i}_`;
-        if (!r.career.trim()) e[prefix + "career"] = "กรุณากรอกอาชีพ";
-        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
-        if (!r.recordedYear.trim()) e[prefix + "recordedYear"] = "กรุณากรอกปีที่บันทึก";
-      });
-    }
-    if (sections.associations) {
-      associationRows.forEach((r, i) => {
-        const prefix = `associations_${i}_`;
-        if (!r.associationName.trim()) e[prefix + "associationName"] = "กรุณากรอกชื่อสมาคม/ชมรม";
-        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
-        if (!r.recordedYear.trim()) e[prefix + "recordedYear"] = "กรุณากรอกปีที่บันทึก";
-      });
-    }
-    if (sections.committees) {
-      committeeRows.forEach((r, i) => {
-        const prefix = `committees_${i}_`;
-        if (!r.termYear.trim()) e[prefix + "termYear"] = "กรุณากรอกปี พ.ศ.";
-        if (!r.cohort.trim()) e[prefix + "cohort"] = "กรุณากรอกรุ่นที่";
-        if (!r.position.trim()) e[prefix + "position"] = "กรุณากรอกตำแหน่ง";
-        if (!r.remarks.trim()) e[prefix + "remarks"] = "กรุณากรอกหมายเหตุ";
-      });
-    }
-    if (sections.modelReps) {
-      modelRepRows.forEach((r, i) => {
-        const prefix = `modelReps_${i}_`;
-        if (!r.cohort.trim()) e[prefix + "cohort"] = "กรุณากรอกรุ่น";
-        if (!r.generation.trim()) e[prefix + "generation"] = "กรุณากรอกลำดับรุ่น";
-      });
-    }
-    if (sections.abroad) {
-      abroadRows.forEach((r, i) => {
-        const prefix = `abroad_${i}_`;
-        if (!r.address.trim()) e[prefix + "address"] = "กรุณากรอกที่อยู่";
-        if (!r.country.trim()) e[prefix + "country"] = "กรุณากรอกประเทศ";
-        if (!r.university.trim()) e[prefix + "university"] = "กรุณากรอกมหาวิทยาลัย";
-      });
-    }
-
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) return;
-
+  const onSubmit = async (data: AlumniWithRelatedFormData) => {
     setSaving(true);
     setErrorMsg("");
 
+    const fullName = `${data.prefix}${data.firstName} ${data.maidenLastName}`;
+
     const payload: Record<string, unknown> = {
-      studentId: alumni.studentId.trim(),
-      prefix: alumni.prefix,
-      firstName: alumni.firstName.trim(),
-      maidenLastName: alumni.maidenLastName.trim(),
-      cohort: alumni.cohort.trim() || undefined,
-      newLastName: alumni.newLastName.trim() || undefined,
-      province: alumni.province.trim() || undefined,
-      degreeLevel: alumni.degreeLevel,
+      studentId: data.studentId.trim(),
+      prefix: data.prefix,
+      firstName: data.firstName.trim(),
+      maidenLastName: data.maidenLastName.trim(),
+      cohort: data.cohort?.trim() || undefined,
+      newLastName: data.newLastName?.trim() || undefined,
+      province: data.province?.trim() || undefined,
+      degreeLevel: data.degreeLevel,
     };
 
-    if (awardRows.length > 0) {
-      payload.awards = awardRows.map((r) => ({
+    if (data.awards && data.awards.length > 0) {
+      payload.awards = data.awards.map((r) => ({
         awardName: r.awardName,
         awardType: r.awardType,
         year: Number(r.year),
         description: r.description,
       }));
     }
-    if (associationRows.length > 0) {
-      payload.associations = associationRows.map((r) => ({
-        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+    if (data.associations && data.associations.length > 0) {
+      payload.associations = data.associations.map((r) => ({
+        fullName,
         associationName: r.associationName,
         position: r.position,
         recordedYear: Number(r.recordedYear),
       }));
     }
-    if (committeeRows.length > 0) {
-      payload.graduateCommittees = committeeRows.map((r) => ({
+    if (data.graduateCommittees && data.graduateCommittees.length > 0) {
+      payload.graduateCommittees = data.graduateCommittees.map((r) => ({
         termYear: Number(r.termYear),
-        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        fullName,
         cohort: r.cohort,
         position: r.position,
         remarks: r.remarks,
       }));
     }
-    if (potentialRows.length > 0) {
-      payload.potentials = potentialRows.map((r) => ({
-        fullName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+    if (data.potentials && data.potentials.length > 0) {
+      payload.potentials = data.potentials.map((r) => ({
+        fullName,
         career: r.career,
         position: r.position,
         recordedYear: Number(r.recordedYear),
       }));
     }
-    if (modelRepRows.length > 0) {
-      payload.modelRepresentatives = modelRepRows.map((r) => ({
-        name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+    if (data.modelRepresentatives && data.modelRepresentatives.length > 0) {
+      payload.modelRepresentatives = data.modelRepresentatives.map((r) => ({
+        name: fullName,
         cohort: r.cohort,
         generation: Number(r.generation),
       }));
     }
-    if (abroadRows.length > 0) {
-      payload.abroadAlumni = abroadRows.map((r) => ({
-        name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+    if (data.abroadAlumni && data.abroadAlumni.length > 0) {
+      payload.abroadAlumni = data.abroadAlumni.map((r) => ({
+        name: fullName,
         address: r.address,
         country: r.country,
         university: r.university,
@@ -321,19 +239,14 @@ export default function NewAlumniPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setErrorMsg(data.error || "เกิดข้อผิดพลาด");
+        const resData = await res.json();
+        setErrorMsg(resData.error || "เกิดข้อผิดพลาด");
         return;
       }
 
       setSuccessMsg("บันทึกข้อมูลศิษย์เก่าเรียบร้อยแล้ว");
-      setAlumni(EMPTY_ALUMNI);
-      setAwardRows([]);
-      setAssociationRows([]);
-      setCommitteeRows([]);
-      setPotentialRows([]);
-      setModelRepRows([]);
-      setAbroadRows([]);
+      reset(DEFAULT_VALUES);
+      setSections({ awards: false, associations: false, committees: false, potentials: false, modelReps: false, abroad: false });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
@@ -343,11 +256,11 @@ export default function NewAlumniPage() {
 
   const inputClass =
     "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
+  const errorInputClass =
+    "w-full border border-red-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
   const btnPrimary =
     "bg-[var(--primary)] text-white px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50";
-  const btnOutline =
-    "border border-[var(--primary)] text-[var(--primary)] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--primary)] hover:text-white";
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -381,111 +294,37 @@ export default function NewAlumniPage() {
             ข้อมูลศิษย์เก่า
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                รหัสนักศึกษา <span className="text-red-500">*</span>
-              </label>
-              <input
-                className={inputClass}
-                value={alumni.studentId}
-                onChange={(e) => updateAlumni("studentId", e.target.value)}
-                placeholder="รหัสนักศึกษา"
-              />
-              {errors.studentId && (
-                <p className="text-red-500 text-xs mt-1">{errors.studentId}</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>
-                คำนำหน้า <span className="text-red-500">*</span>
-              </label>
-              <input
-                className={inputClass}
-                value={alumni.prefix}
-                onChange={(e) => updateAlumni("prefix", e.target.value)}
-                placeholder="คำนำหน้า"
-              />
-              {errors.prefix && (
-                <p className="text-red-500 text-xs mt-1">{errors.prefix}</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>
-                ชื่อ <span className="text-red-500">*</span>
-              </label>
-              <input
-                className={inputClass}
-                value={alumni.firstName}
-                onChange={(e) => updateAlumni("firstName", e.target.value)}
-                placeholder="ชื่อ"
-              />
-              {errors.firstName && (
-                <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>
-                นามสกุล (เดิม) <span className="text-red-500">*</span>
-              </label>
-              <input
-                className={inputClass}
-                value={alumni.maidenLastName}
-                onChange={(e) =>
-                  updateAlumni("maidenLastName", e.target.value)
-                }
-                placeholder="นามสกุลเดิม"
-              />
-              {errors.maidenLastName && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.maidenLastName}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>รุ่น/สาขา</label>
-              <input
-                className={inputClass}
-                value={alumni.cohort}
-                onChange={(e) => updateAlumni("cohort", e.target.value)}
-                placeholder="รุ่น/สาขา"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>ระดับการศึกษา <span className="text-red-500">*</span></label>
-              <select
-                className={inputClass}
-                value={alumni.degreeLevel}
-                onChange={(e) => updateAlumni("degreeLevel", e.target.value)}
-              >
+            <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
+              <FormInput registration={register("studentId")} error={errors.studentId?.message} placeholder="รหัสนักศึกษา" />
+            </FormField>
+            <FormField label="คำนำหน้า" required error={errors.prefix?.message}>
+              <FormInput registration={register("prefix")} error={errors.prefix?.message} placeholder="คำนำหน้า" />
+            </FormField>
+            <FormField label="ชื่อ" required error={errors.firstName?.message}>
+              <FormInput registration={register("firstName")} error={errors.firstName?.message} placeholder="ชื่อ" />
+            </FormField>
+            <FormField label="นามสกุล (เดิม)" required error={errors.maidenLastName?.message}>
+              <FormInput registration={register("maidenLastName")} error={errors.maidenLastName?.message} placeholder="นามสกุลเดิม" />
+            </FormField>
+            <FormField label="รุ่น/สาขา">
+              <FormInput registration={register("cohort")} placeholder="รุ่น/สาขา" />
+            </FormField>
+            <FormField label="ระดับการศึกษา" required error={errors.degreeLevel?.message}>
+              <FormSelect registration={register("degreeLevel")} error={errors.degreeLevel?.message}>
                 <option value="">-- เลือกระดับการศึกษา --</option>
                 {DEGREE_LEVEL_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
-              {errors.degreeLevel && (
-                <p className="text-red-500 text-xs mt-1">{errors.degreeLevel}</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>นามสกุล (ใหม่)</label>
-              <input
-                className={inputClass}
-                value={alumni.newLastName}
-                onChange={(e) => updateAlumni("newLastName", e.target.value)}
-                placeholder="นามสกุลใหม่"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>จังหวัด</label>
-              <input
-                className={inputClass}
-                value={alumni.province}
-                onChange={(e) => updateAlumni("province", e.target.value)}
-                placeholder="จังหวัด"
-              />
-            </div>
+              </FormSelect>
+            </FormField>
+            <FormField label="นามสกุล (ใหม่)">
+              <FormInput registration={register("newLastName")} placeholder="นามสกุลใหม่" />
+            </FormField>
+            <FormField label="จังหวัด">
+              <FormInput registration={register("province")} placeholder="จังหวัด" />
+            </FormField>
           </div>
         </div>
 
@@ -495,12 +334,12 @@ export default function NewAlumniPage() {
           open={sections.awards}
           onToggle={() => toggleSection("awards")}
         >
-          <RepeatableForm<AwardRow>
-            rows={awardRows}
-            setRows={setAwardRows}
-            emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="awards"
+            name="awards"
+            emptyRow={{ awardName: "", awardType: "INTERNATIONAL" as any, year: "", description: "" }}
             fields={[
               { key: "awardName", label: "ชื่อรางวัล", required: true },
               {
@@ -521,12 +360,12 @@ export default function NewAlumniPage() {
           open={sections.associations}
           onToggle={() => toggleSection("associations")}
         >
-          <RepeatableForm<AssociationRow>
-            rows={associationRows}
-            setRows={setAssociationRows}
-            emptyRow={{ associationName: "", position: "", recordedYear: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="associations"
+            name="associations"
+            emptyRow={{ associationName: "", position: "", recordedYear: "" }}
             singleRow
             fields={[
               { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
@@ -541,12 +380,12 @@ export default function NewAlumniPage() {
           open={sections.committees}
           onToggle={() => toggleSection("committees")}
         >
-          <RepeatableForm<CommitteeRow>
-            rows={committeeRows}
-            setRows={setCommitteeRows}
-            emptyRow={{ termYear: "", cohort: "", position: "", remarks: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="committees"
+            name="graduateCommittees"
+            emptyRow={{ termYear: "", cohort: "", position: "", remarks: "" }}
             singleRow
             fields={[
               { key: "termYear", label: "ปี พ.ศ.", type: "number", required: true },
@@ -562,12 +401,12 @@ export default function NewAlumniPage() {
           open={sections.potentials}
           onToggle={() => toggleSection("potentials")}
         >
-          <RepeatableForm<PotentialRow>
-            rows={potentialRows}
-            setRows={setPotentialRows}
-            emptyRow={{ career: "", position: "", recordedYear: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="potentials"
+            name="potentials"
+            emptyRow={{ career: "", position: "", recordedYear: "" }}
             singleRow
             fields={[
               { key: "career", label: "อาชีพ", required: true },
@@ -582,12 +421,12 @@ export default function NewAlumniPage() {
           open={sections.modelReps}
           onToggle={() => toggleSection("modelReps")}
         >
-          <RepeatableForm<ModelRepRow>
-            rows={modelRepRows}
-            setRows={setModelRepRows}
-            emptyRow={{ cohort: "", generation: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="modelReps"
+            name="modelRepresentatives"
+            emptyRow={{ cohort: "", generation: "" }}
             singleRow
             fields={[
               { key: "cohort", label: "รุ่น", required: true },
@@ -601,12 +440,12 @@ export default function NewAlumniPage() {
           open={sections.abroad}
           onToggle={() => toggleSection("abroad")}
         >
-          <RepeatableForm<AbroadRow>
-            rows={abroadRows}
-            setRows={setAbroadRows}
-            emptyRow={{ address: "", country: "", university: "" }}
+          <RepeatableFieldArray
+            control={control}
+            register={register}
             errors={errors}
-            sectionKey="abroad"
+            name="abroadAlumni"
+            emptyRow={{ address: "", country: "", university: "" }}
             singleRow
             fields={[
               { key: "address", label: "ที่อยู่", required: true },
@@ -619,160 +458,24 @@ export default function NewAlumniPage() {
         {/* Submit */}
         <div className="mt-6 flex gap-3 justify-end">
           <button
+            type="button"
             onClick={() => router.back()}
             className="px-6 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
           >
             ยกเลิก
           </button>
-          {canWrite && (<button
-            onClick={handleSubmit}
-            disabled={saving}
-            className={btnPrimary}
-          >
-            {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-          </button>)}
+          {canWrite && (
+            <button
+              type="button"
+              onClick={handleSubmit(onSubmit)}
+              disabled={saving}
+              className={btnPrimary}
+            >
+              {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+            </button>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// --- Reusable Components ---
-
-function SectionToggle({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 mb-4">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-6 py-4 text-left"
-      >
-        <span className="text-sm font-semibold text-gray-700">{title}</span>
-        <span className="text-gray-400 text-lg">
-          {open ? "▲" : "▼"}
-        </span>
-      </button>
-      {open && <div className="px-6 pb-4">{children}</div>}
-    </div>
-  );
-}
-
-interface FieldDef {
-  key: string;
-  label: string;
-  type?: "text" | "number" | "select" | "textarea";
-  required?: boolean;
-  options?: { value: string; label: string }[];
-}
-
-function RepeatableForm<T>({
-  rows,
-  setRows,
-  emptyRow,
-  fields,
-  singleRow,
-  errors,
-  sectionKey,
-}: {
-  rows: T[];
-  setRows: React.Dispatch<React.SetStateAction<T[]>>;
-  emptyRow: T;
-  fields: FieldDef[];
-  singleRow?: boolean;
-  errors?: Record<string, string>;
-  sectionKey?: string;
-}) {
-  const inputClass =
-    "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
-  const errorInputClass =
-    "w-full border border-red-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent";
-
-  const getFieldError = (idx: number, key: string) =>
-    errors?.[`${sectionKey}_${idx}_${key}`];
-
-  const addRow = () => setRows((prev) => [...prev, { ...emptyRow }]);
-  const removeRow = (idx: number) =>
-    setRows((prev) => prev.filter((_, i) => i !== idx));
-  const resetRow = (idx: number) =>
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...emptyRow } : r)));
-  const updateRow = (idx: number, key: string, value: string) =>
-    setRows((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r))
-    );
-
-  return (
-    <div>
-      {rows.map((row, idx) => (
-        <div
-          key={idx}
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end mb-3 p-3 bg-gray-50 rounded-lg"
-        >
-          {fields.map((f) => (
-            <div key={f.key}>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                {f.label} {f.required && <span className="text-red-500">*</span>}
-              </label>
-              {f.type === "select" ? (
-                <select
-                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
-                  value={(row as Record<string, string>)[f.key]}
-                  onChange={(e) => updateRow(idx, f.key, e.target.value)}
-                >
-                  {f.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              ) : f.type === "textarea" ? (
-                <textarea
-                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
-                  rows={3}
-                  value={(row as Record<string, string>)[f.key]}
-                  onChange={(e) => updateRow(idx, f.key, e.target.value)}
-                  placeholder={f.label}
-                />
-              ) : (
-                <input
-                  className={getFieldError(idx, f.key) ? errorInputClass : inputClass}
-                  type={f.type || "text"}
-                  value={(row as Record<string, string>)[f.key]}
-                  onChange={(e) => updateRow(idx, f.key, e.target.value)}
-                  placeholder={f.label}
-                />
-              )}
-              {getFieldError(idx, f.key) && (
-                <p className="text-red-500 text-xs mt-1">{getFieldError(idx, f.key)}</p>
-              )}
-            </div>
-          ))}
-          <div className="flex items-end">
-            <button
-              onClick={() => (singleRow ? resetRow(idx) : removeRow(idx))}
-              className="text-red-500 text-sm hover:text-red-700"
-            >
-              {singleRow ? "ล้างข้อมูล" : "ลบ"}
-            </button>
-          </div>
-        </div>
-      ))}
-      {!singleRow && (
-        <button
-          onClick={addRow}
-          className="text-sm text-[var(--primary)] font-medium hover:underline"
-        >
-          + เพิ่มข้อมูล
-        </button>
-      )}
     </div>
   );
 }

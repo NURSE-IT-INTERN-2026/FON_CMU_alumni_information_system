@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -52,6 +54,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
+    const validated = alumniUpdateSchema.parse(body);
 
     const existing = await prisma.alumni.findUnique({ where: { id } });
     if (!existing) {
@@ -61,40 +64,23 @@ export async function PUT(
       );
     }
 
-    if (body.studentId && body.studentId !== existing.studentId) {
+    const updateData: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(validated as Record<string, unknown>)) {
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    }
+
+    if (updateData.studentId && updateData.studentId !== existing.studentId) {
       const duplicate = await prisma.alumni.findUnique({
-        where: { studentId: body.studentId },
+        where: { studentId: updateData.studentId as string },
       });
       if (duplicate) {
         return NextResponse.json(
           { error: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
           { status: 409 }
         );
-      }
-    }
-
-    const updateData: Record<string, unknown> = {};
-    const allowedFields = [
-      "studentId",
-      "prefix",
-      "firstName",
-      "maidenLastName",
-      "cohort",
-      "degreeLevel",
-      "newLastName",
-      "province",
-      "email",
-      "phone",
-      "currentWorkplace",
-      "country",
-      "isPotential",
-      "isModelRepresentative",
-      "photoUrl",
-    ];
-
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
       }
     }
 
@@ -124,6 +110,7 @@ export async function PUT(
 
     return NextResponse.json(alumni);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("PUT /api/alumni/[id] error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการอัปเดตข้อมูลศิษย์เก่า" },

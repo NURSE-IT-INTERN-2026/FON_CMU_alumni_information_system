@@ -1,33 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { handleZodError, modelRepCreateSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const { studentId, name, cohort, generation } = body;
-
-    if (!studentId || !name || !cohort || generation === undefined) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const validated = modelRepCreateSchema.parse(body);
 
     const item = await prisma.modelRepresentative.create({
       data: {
-        studentId: studentId.trim(),
-        name: name.trim(),
-        cohort: cohort.trim(),
-        generation: Number(generation),
+        studentId: validated.studentId.trim(),
+        name: validated.name.trim(),
+        cohort: validated.cohort.trim(),
+        generation: Number(validated.generation),
       },
     });
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to create model representative:", error);
     return NextResponse.json(
       { error: "Failed to create model representative" },

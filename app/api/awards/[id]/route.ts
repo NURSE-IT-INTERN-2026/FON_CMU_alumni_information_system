@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, awardUpdateSchema } from "@/lib/validations";
 
 export async function PUT(
   request: NextRequest,
@@ -13,25 +15,19 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { studentId, recipientName, awardName, awardType, year, description } = body;
+    const validated = awardUpdateSchema.parse(body);
 
-    if (!awardName || !awardType || !year) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
+    const updateData: Record<string, unknown> = {};
+    if (validated.studentId !== undefined) updateData.studentId = validated.studentId || null;
+    if (validated.recipientName !== undefined) updateData.recipientName = validated.recipientName?.trim() || null;
+    if (validated.awardName !== undefined) updateData.awardName = validated.awardName;
+    if (validated.awardType !== undefined) updateData.awardType = validated.awardType;
+    if (validated.year !== undefined) updateData.year = validated.year;
+    if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
 
     const award = await prisma.award.update({
       where: { id },
-      data: {
-        studentId: studentId || null,
-        recipientName: recipientName?.trim() || null,
-        awardName: awardName.trim(),
-        awardType,
-        year: Number(year),
-        description: description?.trim() || null,
-      },
+      data: updateData,
       include: {
         alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
       },
@@ -51,6 +47,7 @@ export async function PUT(
 
     return NextResponse.json(award);
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("Failed to update award:", error);
     return NextResponse.json(
       { error: "Failed to update award" },

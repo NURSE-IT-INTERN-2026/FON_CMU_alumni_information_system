@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { handleZodError, passwordField } from "@/lib/validations/helpers";
+
+const alumniSignupApiSchema = z.object({
+  studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
+  cohort: z.string().min(1, "กรุณากรอกรุ่น/สาขา"),
+  firstName: z.string().min(1, "กรุณากรอกชื่อ"),
+  maidenLastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
+  birthDate: z
+    .string()
+    .min(1, "กรุณากรอกวันเกิด")
+    .regex(/^\d{8}$/, "รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY"),
+  email: z.string().min(1, "กรุณากรอกอีเมล").email("รูปแบบอีเมลไม่ถูกต้อง"),
+  password: passwordField(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -26,72 +41,23 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { studentId, cohort, firstName, maidenLastName, birthDate, email, password } =
-      body;
-
-    // Validate all fields present
-    if (
-      !studentId ||
-      !cohort ||
-      !firstName ||
-      !maidenLastName ||
-      !birthDate ||
-      !email ||
-      !password
-    ) {
-      return NextResponse.json(
-        { error: "กรุณากรอกข้อมูลให้ครบถ้วน" },
-        { status: 400 }
-      );
-    }
-
-    // Validate birthDate format: DDMMYYYY
-    if (!/^\d{8}$/.test(birthDate)) {
-      return NextResponse.json(
-        { error: "รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY" },
-        { status: 400 }
-      );
-    }
-
-    // Validate password length
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" },
-        { status: 400 }
-      );
-    }
-
-    // Validate password max length (prevent bcrypt DoS)
-    if (password.length > 128) {
-      return NextResponse.json(
-        { error: "รหัสผ่านต้องไม่เกิน 128 ตัวอักษร" },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { error: "รูปแบบอีเมลไม่ถูกต้อง" },
-        { status: 400 }
-      );
-    }
+    const validated = alumniSignupApiSchema.parse(body);
 
     // Look up alumni matching all 5 identity fields
     const alumni = await prisma.alumni.findFirst({
       where: {
-        studentId,
-        cohort,
-        firstName: { equals: firstName.trim(), mode: "insensitive" },
-        maidenLastName: { equals: maidenLastName.trim(), mode: "insensitive" },
-        birthDate,
+        studentId: validated.studentId,
+        cohort: validated.cohort,
+        firstName: { equals: validated.firstName.trim(), mode: "insensitive" },
+        maidenLastName: { equals: validated.maidenLastName.trim(), mode: "insensitive" },
+        birthDate: validated.birthDate,
       },
     });
 
     if (!alumni) {
       // No exact match — don't reject, let admin verify instead
       const existingByStudentId = await prisma.alumni.findUnique({
-        where: { studentId },
+        where: { studentId: validated.studentId },
       });
 
       if (existingByStudentId) {
@@ -103,12 +69,12 @@ export async function POST(request: Request) {
           );
         }
 
-        const passwordHash = await hashPassword(password);
+        const passwordHash = await hashPassword(validated.password);
         await prisma.alumni.update({
           where: { id: existingByStudentId.id },
           data: {
             passwordHash,
-            email: email.trim().toLowerCase(),
+            email: validated.email.trim().toLowerCase(),
             approvalStatus: "PENDING",
           },
         });
@@ -122,7 +88,7 @@ export async function POST(request: Request) {
           "SIGNUP",
           "alumni_auth",
           existingByStudentId.id,
-          { email: email.trim().toLowerCase(), matchType: "studentId_only" },
+          { email: validated.email.trim().toLowerCase(), matchType: "studentId_only" },
           getIp(request)
         );
 
@@ -133,17 +99,17 @@ export async function POST(request: Request) {
       }
 
       // No record at all — create new alumni for admin to verify
-      const passwordHash = await hashPassword(password);
+      const passwordHash = await hashPassword(validated.password);
       const newAlumni = await prisma.alumni.create({
         data: {
-          studentId,
-          firstName: firstName.trim(),
-          maidenLastName: maidenLastName.trim(),
-          cohort,
-          birthDate,
+          studentId: validated.studentId,
+          firstName: validated.firstName.trim(),
+          maidenLastName: validated.maidenLastName.trim(),
+          cohort: validated.cohort,
+          birthDate: validated.birthDate,
           prefix: "-",
           degreeLevel: "BACHELOR",
-          email: email.trim().toLowerCase(),
+          email: validated.email.trim().toLowerCase(),
           passwordHash,
           approvalStatus: "PENDING",
         },
@@ -158,7 +124,7 @@ export async function POST(request: Request) {
         "SIGNUP",
         "alumni_auth",
         newAlumni.id,
-        { email: email.trim().toLowerCase(), matchType: "new_record" },
+        { email: validated.email.trim().toLowerCase(), matchType: "new_record" },
         getIp(request)
       );
 
@@ -185,12 +151,12 @@ export async function POST(request: Request) {
     }
 
     // Hash password and update alumni record with PENDING status
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(validated.password);
     await prisma.alumni.update({
       where: { id: alumni.id },
       data: {
         passwordHash,
-        email: email.trim().toLowerCase(),
+        email: validated.email.trim().toLowerCase(),
         approvalStatus: "PENDING",
       },
     });
@@ -205,7 +171,7 @@ export async function POST(request: Request) {
       "SIGNUP",
       "alumni_auth",
       alumni.id,
-      { email: email.trim().toLowerCase() },
+      { email: validated.email.trim().toLowerCase() },
       getIp(request)
     );
 
@@ -213,7 +179,8 @@ export async function POST(request: Request) {
       success: true,
       message: "ลงทะเบียนสำเร็จ กรุณารอผู้ดูแลระบบอนุมัติบัญชีของท่าน",
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง" },
       { status: 500 }
