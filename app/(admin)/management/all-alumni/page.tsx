@@ -756,7 +756,7 @@ export default function AlumniCountPage() {
           {!editingId && (
             <div className="mb-4 flex flex-wrap gap-2">
               <button
-                onClick={() => router.push("/new-alumni")}
+                onClick={() => router.push("/management/new-alumni")}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
                 <svg

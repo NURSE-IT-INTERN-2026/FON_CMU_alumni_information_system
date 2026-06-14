@@ -102,7 +102,7 @@ function LoginForm() {
         return;
       }
 
-      router.push("/");
+      router.push("/management/dashboard");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
@@ -130,11 +130,11 @@ function LoginForm() {
       }
 
       if (resData.pendingApproval) {
-        router.push(resData.redirect || "/alumni/pending");
+        router.push(resData.redirect || "/graduates/pending");
         return;
       }
 
-      router.push("/alumni/profile");
+      router.push("/graduates/profile");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
@@ -287,24 +287,6 @@ function LoginForm() {
           {/* ============ ALUMNI MODE ============ */}
           {mode === "alumni" && (
             <>
-              {/* CMU OAuth for alumni */}
-              <a
-                href={`${BASE_PATH}/api/alumni-auth/login`}
-                className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-all hover:bg-gray-50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-900/30"
-              >
-                <img src={`${BASE_PATH}/CMU_logo.png`} alt="CMU" className="h-6 w-6 rounded-sm" />
-                <span className="bg-gradient-to-r from-purple-900 to-purple-700 bg-clip-text text-transparent font-semibold">
-                  เข้าสู่ระบบด้วยบัญชี CMU IT Account
-                </span>
-              </a>
-
-              {/* Divider */}
-              <div className="my-6 flex items-center gap-3">
-                <div className="h-px flex-1 bg-[var(--border)]" />
-                <span className="text-xs text-[var(--muted)]">หรือ</span>
-                <div className="h-px flex-1 bg-[var(--border)]" />
-              </div>
-
               {/* Email + Password form */}
               <form onSubmit={alumniForm.handleSubmit(handleAlumniSubmit)} className="space-y-4">
                 <FormField label="อีเมล" error={alumniForm.formState.errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
@@ -324,7 +306,7 @@ function LoginForm() {
                       รหัสผ่าน
                     </label>
                     <a
-                      href={`${BASE_PATH}/alumni/forgot-password`}
+                      href={`${BASE_PATH}/graduates/forgot-password`}
                       className="mb-1.5 text-xs text-[var(--primary)] hover:underline"
                     >
                       ลืมรหัสผ่าน?
@@ -358,7 +340,7 @@ function LoginForm() {
 
               <p className="mt-4 text-center text-sm text-[var(--muted)]">
                 ยังไม่มีบัญชี?{" "}
-                <a href={`${BASE_PATH}/alumni/signup`} className="text-[var(--primary)] hover:underline font-medium">
+                <a href={`${BASE_PATH}/graduates/signup`} className="text-[var(--primary)] hover:underline font-medium">
                   ลงทะเบียน
                 </a>
               </p>

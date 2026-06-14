@@ -32,7 +32,7 @@ export default async function AlumniNewsDetailPage({
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
-        href="/alumni/news"
+        href="/graduates/news"
         className="mb-6 inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-light)]"
       >
         <svg

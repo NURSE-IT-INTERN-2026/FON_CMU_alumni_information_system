@@ -317,7 +317,7 @@ export default function ModelRepresentativesPage() {
           const params = new URLSearchParams({ section: "modelReps", nameSearch: name });
           if (data.cohort) params.set("cohort", data.cohort);
           if (data.generation) params.set("generation", data.generation);
-          router.push(`/new-alumni?${params.toString()}`);
+          router.push(`/management/new-alumni?${params.toString()}`);
           return;
         }
       }

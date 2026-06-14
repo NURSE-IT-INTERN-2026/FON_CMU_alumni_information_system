@@ -213,7 +213,7 @@ export default function GraduateCommitteePage() {
           if (data.cohort) params.set("cohort", data.cohort);
           if (data.position) params.set("position", data.position);
           if (data.remarks) params.set("remarks", data.remarks);
-          router.push(`/new-alumni?${params.toString()}`);
+          router.push(`/management/new-alumni?${params.toString()}`);
           return;
         }
       }

@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createSession, createAlumniSession, setSessionCookie } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/auth";
 import {
   exchangeCodeForToken,
   fetchCmuProfile,
   clearOAuthCookies,
-  setPendingEmailCookie,
 } from "@/lib/oauth";
+import { BASE_PATH } from "@/lib/constants";
 
-function adminLoginRedirect(error: string) {
+function loginRedirect(error: string) {
   return NextResponse.redirect(
-    new URL(`/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
-  );
-}
-
-function alumniLoginRedirect(error: string) {
-  return NextResponse.redirect(
-    new URL(`/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
+    new URL(`${BASE_PATH}/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
   );
 }
 
@@ -29,27 +23,19 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get("state");
     const error = searchParams.get("error");
 
-    // Detect flow type
-    const flowType = request.cookies.get("cmu-oauth-flow")?.value || "admin";
-    const isAlumniFlow = flowType === "alumni";
-    console.log(`[OAuth Callback] flowType=${flowType}, isAlumniFlow=${isAlumniFlow}`);
-    const loginRedirect = isAlumniFlow ? alumniLoginRedirect : adminLoginRedirect;
-
     // OAuth provider error (e.g. user denied)
     if (error) {
       return loginRedirect("oauth_denied");
     }
 
     // Validate state for CSRF protection
-    const stateCookieName = isAlumniFlow ? "alumni-oauth-state" : "cmu-oauth-state";
-    const cookieState = request.cookies.get(stateCookieName)?.value;
+    const cookieState = request.cookies.get("cmu-oauth-state")?.value;
     if (!state || state !== cookieState) {
       return loginRedirect("oauth_invalid_state");
     }
 
     // Retrieve PKCE code verifier
-    const verifierCookieName = isAlumniFlow ? "alumni-oauth-verifier" : "cmu-oauth-verifier";
-    const codeVerifier = request.cookies.get(verifierCookieName)?.value;
+    const codeVerifier = request.cookies.get("cmu-oauth-verifier")?.value;
     if (!codeVerifier || !code) {
       return loginRedirect("oauth_expired");
     }
@@ -72,15 +58,9 @@ export async function GET(request: NextRequest) {
       return loginRedirect("oauth_profile_failed");
     }
 
-    let response: NextResponse;
+    const response = await handleAdminOAuth(profile, baseUrl);
 
-    if (isAlumniFlow) {
-      response = await handleAlumniOAuth(profile, baseUrl);
-    } else {
-      response = await handleAdminOAuth(profile, baseUrl);
-    }
-
-    // Clean up all OAuth cookies
+    // Clean up OAuth cookies
     for (const cookie of clearOAuthCookies()) {
       response.cookies.set(cookie);
     }
@@ -88,10 +68,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error("OAuth callback error:", err);
-    const flowType = request.cookies.get("cmu-oauth-flow")?.value || "admin";
-    return flowType === "alumni"
-      ? alumniLoginRedirect("oauth_error")
-      : adminLoginRedirect("oauth_error");
+    return loginRedirect("oauth_error");
   }
 }
 
@@ -105,7 +82,7 @@ async function handleAdminOAuth(
   });
 
   if (!user || !user.isActive) {
-    return adminLoginRedirect("oauth_user_not_found");
+    return loginRedirect("oauth_user_not_found");
   }
 
   // Create admin session
@@ -120,25 +97,8 @@ async function handleAdminOAuth(
     },
   });
 
-  const response = NextResponse.redirect(new URL("/", baseUrl));
+  const response = NextResponse.redirect(new URL(BASE_PATH, baseUrl));
   response.cookies.set(setSessionCookie(token));
 
-  return response;
-}
-
-async function handleAlumniOAuth(
-  profile: { email: string; firstName: string; lastName: string; organizationName?: string },
-  baseUrl: string
-): Promise<NextResponse> {
-  console.log(`[Alumni OAuth] Profile: email=${profile.email}, org=${profile.organizationName}`);
-
-  // Always redirect to identity verification page with the CMU email.
-  // The verify-identity page handles matching against alumni records,
-  // checking approval status, and creating sessions.
-  console.log("[Alumni OAuth] Redirecting to verify-identity");
-  const response = NextResponse.redirect(
-    new URL("/alumni/verify-identity", baseUrl)
-  );
-  response.cookies.set(setPendingEmailCookie(profile.email));
   return response;
 }

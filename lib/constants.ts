@@ -20,22 +20,22 @@ export const PREFIX_OPTIONS = [
 ];
 
 export const NAV_ITEMS = [
-  { href: "/", label: "แผงควบคุม" },
-  { href: "/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
-  { href: "/awards", label: "รางวัล" },
-  { href: "/potentials", label: "ศักยภาพ" },
-  { href: "/associations", label: "สมาคม/ชมรม" },
-  { href: "/graduate-committee", label: "กรรมการบัณฑิต" },
-  { href: "/model-representatives", label: "ผู้แทนรุ่น" },
-  { href: "/abroad-alumni", label: "ข้อมูลการทำงานต่างประเทศ" },
-  { href: "/news", label: "ข่าวสาร" },
+  { href: "/management/dashboard", label: "แผงควบคุม" },
+  { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
+  { href: "/management/awards", label: "รางวัล" },
+  { href: "/management/potentials", label: "ศักยภาพ" },
+  { href: "/management/associations", label: "สมาคม/ชมรม" },
+  { href: "/management/graduate-committee", label: "กรรมการบัณฑิต" },
+  { href: "/management/model-representatives", label: "ผู้แทนรุ่น" },
+  { href: "/management/abroad-alumni", label: "ข้อมูลการทำงานต่างประเทศ" },
+  { href: "/management/news", label: "ข่าวสาร" },
 ];
 
 export const SETTINGS_NAV_ITEMS = [
-  { href: "/settings/profile", label: "ข้อมูลส่วนตัว" },
-  { href: "/settings/pending-alumni", label: "รอการอนุมัติ", adminOnly: true },
-  { href: "/settings/users", label: "จัดการผู้ใช้งาน" },
-  { href: "/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
+  { href: "/management/settings/profile", label: "ข้อมูลส่วนตัว" },
+  { href: "/management/settings/pending-alumni", label: "รอการอนุมัติ", adminOnly: true },
+  { href: "/management/settings/users", label: "จัดการผู้ใช้งาน" },
+  { href: "/management/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
 ];
 
 export const PAGE_SIZE = 10;

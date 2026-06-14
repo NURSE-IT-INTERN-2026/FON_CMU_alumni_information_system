@@ -53,7 +53,7 @@ function ResetPasswordForm() {
             ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้อง กรุณาขอลิงก์ใหม่
           </p>
           <a
-            href={`${BASE_PATH}/alumni/forgot-password`}
+            href={`${BASE_PATH}/graduates/forgot-password`}
             className="mt-6 inline-block text-sm font-medium text-[var(--primary)] hover:underline"
           >
             ขอลิงก์รีเซ็ตรหัสผ่านใหม่

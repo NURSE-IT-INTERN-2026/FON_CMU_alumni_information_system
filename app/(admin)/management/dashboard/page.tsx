@@ -125,7 +125,7 @@ const DEGREE_MINI_CARDS = [
 const CARDS: CardConfig[] = [
   {
     label: "รางวัล",
-    href: "/awards",
+    href: "/management/awards",
     color: "#e8a838",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -137,7 +137,7 @@ const CARDS: CardConfig[] = [
   },
   {
     label: "ศักยภาพ",
-    href: "/potentials",
+    href: "/management/potentials",
     color: "#38a169",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -152,7 +152,7 @@ const CARDS: CardConfig[] = [
   },
   {
     label: "สมาคม/ชมรม",
-    href: "/associations",
+    href: "/management/associations",
     color: "#6a1b9a",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -164,7 +164,7 @@ const CARDS: CardConfig[] = [
   },
   {
     label: "กรรมการบัณฑิต",
-    href: "/graduate-committee",
+    href: "/management/graduate-committee",
     color: "#00838f",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -176,7 +176,7 @@ const CARDS: CardConfig[] = [
   },
   {
     label: "ผู้แทนรุ่น",
-    href: "/model-representatives",
+    href: "/management/model-representatives",
     color: "#c62828",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -188,7 +188,7 @@ const CARDS: CardConfig[] = [
   },
   {
     label: "ข้อมูลการทำงานต่างประเทศ",
-    href: "/abroad-alumni",
+    href: "/management/abroad-alumni",
     color: "#1565c0",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -330,7 +330,7 @@ export default function DashboardPage() {
                 มีคำขอรอการอนุมัติ {data.pendingAlumni} รายการ
               </p>
               <Link
-                href="/settings/pending-alumni"
+                href="/management/settings/pending-alumni"
                 className="text-xs text-amber-600 hover:underline"
               >
                 ไปยังหน้าอนุมัติ →
@@ -352,7 +352,7 @@ export default function DashboardPage() {
 
       {/* Featured Alumni Count Card */}
       <Link
-        href="/all-alumni"
+        href="/management/all-alumni"
         className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
         style={{ borderLeftColor: "#5b21b6" }}
       >
@@ -490,7 +490,7 @@ export default function DashboardPage() {
             ข่าวสารล่าสุด
           </h2>
           <Link
-            href="/news"
+            href="/management/news"
             className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-light)]"
           >
             ดูทั้งหมด

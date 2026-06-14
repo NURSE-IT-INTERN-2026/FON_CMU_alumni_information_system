@@ -4,7 +4,6 @@ import {
   generateCodeVerifier,
   generateCodeChallenge,
   setOAuthCookies,
-  setAdminFlowCookie,
 } from "@/lib/oauth";
 
 export async function GET() {
@@ -28,8 +27,6 @@ export async function GET() {
   for (const cookie of setOAuthCookies(state, codeVerifier)) {
     response.cookies.set(cookie);
   }
-
-  response.cookies.set(setAdminFlowCookie());
 
   return response;
 }

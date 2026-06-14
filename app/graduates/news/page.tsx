@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { PAGE_SIZE } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -55,7 +55,7 @@ export default function AlumniNewsPage() {
       });
       if (search) params.set("search", search);
 
-      const res = await fetch(`/api/news?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/news?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setNews(data.data || []);
@@ -137,7 +137,7 @@ export default function AlumniNewsPage() {
             return (
               <Link
                 key={item.id}
-                href={`/alumni/news/${item.id}`}
+                href={`/graduates/news/${item.id}`}
                 className="group overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="aspect-video w-full overflow-hidden bg-gray-100">

@@ -74,7 +74,7 @@ export default function LogsPage() {
 
   useEffect(() => {
     if (role === "executive") {
-      router.replace("/");
+      router.replace("/management/dashboard");
     }
   }, [role, router]);
 

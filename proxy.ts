@@ -44,6 +44,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|alumni|intern/api/auth|intern/api/alumni-auth|api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
+    "/((?!login|graduates|intern/api/auth|intern/api/alumni-auth|api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
   ],
 };

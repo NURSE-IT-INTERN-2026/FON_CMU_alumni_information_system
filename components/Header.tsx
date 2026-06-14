@@ -10,13 +10,13 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const showLogout = pathname !== "/login";
-  const showSettings = pathname.startsWith("/settings");
+  const showSettings = pathname.startsWith("/management/settings");
 
   const items = showSettings ? SETTINGS_NAV_ITEMS : NAV_ITEMS;
 
   const toggleSettings = () => {
     setMobileMenuOpen(false);
-    router.push(showSettings ? "/" : "/settings/profile");
+    router.push(showSettings ? "/management/dashboard" : "/management/settings/profile");
   };
 
   return (

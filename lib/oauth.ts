@@ -3,10 +3,6 @@ import { BASE_PATH } from "@/lib/constants";
 
 const OAUTH_STATE_COOKIE = "cmu-oauth-state";
 const OAUTH_VERIFIER_COOKIE = "cmu-oauth-verifier";
-const ALUMNI_OAUTH_STATE_COOKIE = "alumni-oauth-state";
-const ALUMNI_OAUTH_VERIFIER_COOKIE = "alumni-oauth-verifier";
-const OAUTH_FLOW_COOKIE = "cmu-oauth-flow";
-const OAUTH_PENDING_EMAIL_COOKIE = "cmu-oauth-pending-email";
 const OAUTH_COOKIE_MAX_AGE = 600; // 10 minutes
 
 export function generateCodeVerifier(): string {
@@ -129,34 +125,6 @@ export function setOAuthCookies(state: string, verifier: string) {
   ];
 }
 
-export function setAlumniOAuthCookies(state: string, verifier: string) {
-  const base = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: BASE_PATH,
-  };
-
-  return [
-    { name: ALUMNI_OAUTH_STATE_COOKIE, value: state, ...base },
-    { name: ALUMNI_OAUTH_VERIFIER_COOKIE, value: verifier, ...base },
-    { name: OAUTH_FLOW_COOKIE, value: "alumni", ...base },
-  ];
-}
-
-export function setAdminFlowCookie() {
-  return {
-    name: OAUTH_FLOW_COOKIE,
-    value: "admin",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: BASE_PATH,
-  };
-}
-
 export function clearOAuthCookies() {
   const base = {
     httpOnly: true,
@@ -170,24 +138,5 @@ export function clearOAuthCookies() {
   return [
     { name: OAUTH_STATE_COOKIE, ...base },
     { name: OAUTH_VERIFIER_COOKIE, ...base },
-    { name: ALUMNI_OAUTH_STATE_COOKIE, ...base },
-    { name: ALUMNI_OAUTH_VERIFIER_COOKIE, ...base },
-    { name: OAUTH_FLOW_COOKIE, ...base },
   ];
-}
-
-export function setPendingEmailCookie(email: string) {
-  return {
-    name: OAUTH_PENDING_EMAIL_COOKIE,
-    value: email,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    maxAge: OAUTH_COOKIE_MAX_AGE,
-    path: BASE_PATH,
-  };
-}
-
-export function getPendingEmailCookieName() {
-  return OAUTH_PENDING_EMAIL_COOKIE;
 }

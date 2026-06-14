@@ -350,7 +350,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                 alumni.map((a, i) => (
                   <tr
                     key={a.id}
-                    onClick={() => canWrite && router.push(`/settings/alumni/${a.id}`)}
+                    onClick={() => canWrite && router.push(`/management/settings/alumni/${a.id}`)}
                     className={`border-b border-[var(--border)] transition-colors hover:bg-gray-50 ${canWrite ? "cursor-pointer" : ""}`}
                   >
                     <td className="px-4 py-3 text-center text-gray-500">{(page - 1) * pageSize + i + 1}</td>

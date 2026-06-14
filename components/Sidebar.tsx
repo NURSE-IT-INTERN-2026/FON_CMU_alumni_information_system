@@ -10,12 +10,12 @@ export default function Sidebar() {
   const router = useRouter();
   const canWrite = useCanWrite();
   const isAdmin = useIsAdmin();
-  const showSettings = pathname.startsWith("/settings");
+  const showSettings = pathname.startsWith("/management/settings");
 
   const items = showSettings
     ? SETTINGS_NAV_ITEMS.filter((item) => {
         if (item.adminOnly && !isAdmin) return false;
-        if (!item.adminOnly && !canWrite && item.href !== "/settings/profile") return false;
+        if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
         return true;
       })
     : NAV_ITEMS;
@@ -48,7 +48,7 @@ export default function Sidebar() {
         </ul>
         <button
           type="button"
-          onClick={() => router.push(showSettings ? "/" : "/settings/profile")}
+          onClick={() => router.push(showSettings ? "/management/dashboard" : "/management/settings/profile")}
           className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer w-full ${
             showSettings
               ? "bg-[var(--primary)] text-white"
