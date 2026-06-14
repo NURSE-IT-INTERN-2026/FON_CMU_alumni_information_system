@@ -1,23 +1,42 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@import "tw-animate-css";
 
 :root {
-  --background: #f5f7fa;
-  --foreground: #1a1a2e;
+  /* ── Existing custom variables (preserved) ── */
   --primary: #5b21b6;
   --primary-light: #7c3aed;
   --primary-dark: #4c1d95;
   --accent: #e8a838;
   --accent-light: #f6c567;
-  --card-bg: #ffffff;
-  --border: #e2e8f0;
-  --muted: #718096;
   --success: #38a169;
   --danger: #e53e3e;
   --info: #3182ce;
+  --card-bg: #ffffff;
+
+  /* ── shadcn semantic variables ── */
+  --background: #f5f7fa;
+  --foreground: #1a1a2e;
+  --card: #ffffff;
+  --card-foreground: #1a1a2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a2e;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1a1a2e;
+  --muted: #718096;
+  --muted-foreground: #64748b;
+  --accent-foreground: #1a1a2e;
+  --destructive: #e53e3e;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #5b21b6;
+  --radius: 0.625rem;
 }
 
 @theme inline {
+  /* Existing mappings (preserved) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
@@ -31,6 +50,27 @@
   --color-success: var(--success);
   --color-danger: var(--danger);
   --color-info: var(--info);
+
+  /* shadcn semantic mappings */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Font mappings (preserved) */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
