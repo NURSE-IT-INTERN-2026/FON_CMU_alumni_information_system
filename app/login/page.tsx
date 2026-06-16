@@ -41,12 +41,11 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
   const resetSuccess = searchParams.get("reset") === "success";
-  const signupSuccess = searchParams.get("signup") === "success";
 
   // Auto-switch to alumni tab if the error/params are alumni-specific
   const isAlumniError = oauthError ? ALUMNI_ERROR_KEYS.has(oauthError) : false;
   const [mode, setMode] = useState<LoginMode>(
-    isAlumniError || resetSuccess || signupSuccess ? "alumni" : "admin"
+    isAlumniError || resetSuccess ? "alumni" : "admin"
   );
 
   const [error, setError] = useState(
@@ -57,9 +56,7 @@ function LoginForm() {
   const [success, setSuccess] = useState(
     resetSuccess
       ? "รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่"
-      : signupSuccess
-        ? "ลงทะเบียนสำเร็จ กรุณารอผู้ดูแลระบบอนุมัติบัญชีของท่าน จึงจะสามารถเข้าสู่ระบบได้"
-        : ""
+      : ""
   );
   const [loading, setLoading] = useState(false);
 
@@ -126,11 +123,6 @@ function LoginForm() {
 
       if (!res.ok) {
         setError(resData.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
-        return;
-      }
-
-      if (resData.pendingApproval) {
-        router.push(resData.redirect || "/graduates/pending");
         return;
       }
 

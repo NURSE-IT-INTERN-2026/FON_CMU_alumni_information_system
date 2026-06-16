@@ -104,6 +104,12 @@ export async function getAlumniSession(): Promise<AlumniSession | null> {
     return null;
   }
 
+  // A tombstoned record must never yield a valid session, even if a session
+  // row still exists (e.g. a concurrent request during self-soft-delete).
+  if (session.alumni.deletedAt) {
+    return null;
+  }
+
   return session as AlumniSession;
 }
 

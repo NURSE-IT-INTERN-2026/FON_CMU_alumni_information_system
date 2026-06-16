@@ -70,8 +70,8 @@ function AlumniSignupForm() {
         return;
       }
 
-      // Redirect to login with success message
-      router.push("/login?signup=success");
+      // Auto-logged-in by the API (session cookie set) — go straight to profile
+      router.push(resData.redirect || "/graduates/profile");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
@@ -144,14 +144,14 @@ function AlumniSignupForm() {
                   className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
               </FormField>
-              <FormField label="ปีที่จบ / รุ่น" error={errors.cohort?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormField label="ปีที่จบ (พ.ศ.)" error={errors.cohort?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                 <FormInput
                   registration={register("cohort")}
                   error={errors.cohort?.message}
                   id="cohort"
                   type="text"
                   autoComplete="off"
-                  placeholder="1"
+                  placeholder="2569"
                   className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
               </FormField>

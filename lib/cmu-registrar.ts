@@ -9,6 +9,7 @@
 
 export interface CmuGraduate {
   student_id: string;
+  birthday: string;
   cmuitaccount: string;
   sex_id: string;
   name_th: string;

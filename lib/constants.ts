@@ -33,7 +33,6 @@ export const NAV_ITEMS = [
 
 export const SETTINGS_NAV_ITEMS = [
   { href: "/management/settings/profile", label: "ข้อมูลส่วนตัว" },
-  { href: "/management/settings/pending-alumni", label: "รอการอนุมัติ", adminOnly: true },
   { href: "/management/settings/users", label: "จัดการผู้ใช้งาน" },
   { href: "/management/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
 ];

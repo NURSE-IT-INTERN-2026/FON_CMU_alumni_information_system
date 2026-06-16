@@ -136,9 +136,10 @@ export default function NewAlumniPage() {
           break;
         case "abroad":
           overrides.abroadAlumni = [{
-            address: searchParams.get("address") || "",
             country: searchParams.get("country") || "",
-            university: searchParams.get("university") || "",
+            workplace: searchParams.get("workplace") || "",
+            homeAddress: searchParams.get("homeAddress") || "",
+            notes: searchParams.get("notes") || "",
           }];
           break;
       }
@@ -160,7 +161,7 @@ export default function NewAlumniPage() {
         if (key === "modelReps" && modelRepArray.fields.length === 0)
           modelRepArray.append({ cohort: "", generation: "" });
         if (key === "abroad" && abroadArray.fields.length === 0)
-          abroadArray.append({ address: "", country: "", university: "" });
+          abroadArray.append({ country: "", workplace: "", homeAddress: "", notes: "" });
       }
       return { ...prev, [key]: next };
     });
@@ -224,10 +225,10 @@ export default function NewAlumniPage() {
     }
     if (data.abroadAlumni && data.abroadAlumni.length > 0) {
       payload.abroadAlumni = data.abroadAlumni.map((r) => ({
-        name: fullName,
-        address: r.address,
         country: r.country,
-        university: r.university,
+        workplace: r.workplace,
+        homeAddress: r.homeAddress,
+        notes: r.notes,
       }));
     }
 
@@ -445,12 +446,13 @@ export default function NewAlumniPage() {
             register={register}
             errors={errors}
             name="abroadAlumni"
-            emptyRow={{ address: "", country: "", university: "" }}
+            emptyRow={{ country: "", workplace: "", homeAddress: "", notes: "" }}
             singleRow
             fields={[
-              { key: "address", label: "ที่อยู่", required: true },
               { key: "country", label: "ประเทศ", required: true },
-              { key: "university", label: "มหาวิทยาลัย", required: true },
+              { key: "workplace", label: "สถานที่ทำงาน" },
+              { key: "homeAddress", label: "ที่อยู่" },
+              { key: "notes", label: "หมายเหตุ", type: "textarea" },
             ]}
           />
         </SectionToggle>

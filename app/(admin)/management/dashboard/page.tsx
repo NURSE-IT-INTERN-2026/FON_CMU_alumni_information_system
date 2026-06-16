@@ -74,7 +74,6 @@ interface DashboardData {
     total: number;
     publishedCount: number;
   };
-  pendingAlumni: number;
   recentNews: Array<{
     id: string;
     title: string;
@@ -306,40 +305,6 @@ export default function DashboardPage() {
   // ---- Main content ----
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Pending Alumni Notification */}
-      {data.pendingAlumni > 0 && (
-        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
-              <svg
-                className="h-5 w-5 text-amber-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-amber-800">
-                มีคำขอรอการอนุมัติ {data.pendingAlumni} รายการ
-              </p>
-              <Link
-                href="/management/settings/pending-alumni"
-                className="text-xs text-amber-600 hover:underline"
-              >
-                ไปยังหน้าอนุมัติ →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">

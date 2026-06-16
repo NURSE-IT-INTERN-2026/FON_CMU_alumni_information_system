@@ -1,82 +1,20 @@
-import { getAlumniSession } from "@/lib/auth";
-import { BASE_PATH } from "@/lib/constants";
-import prisma from "@/lib/prisma";
-import AlumniHeader from "@/components/AlumniHeader";
-import Footer from "@/components/Footer";
+// Thin pass-through layout for the /graduates segment.
+//
+// Public self-service pages (signup, forgot-password, reset-password) live
+// directly under /graduates and are served by this layout — no auth, no shell.
+//
+// Authenticated alumni pages (profile, news) live under the (authed) route
+// group, whose own layout enforces the alumni session and renders the
+// header + sidebar + footer shell.
 
-export default async function AlumniPortalLayout({
+export default async function GraduatesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getAlumniSession();
-
-  // No session — render children without the alumni header.
-  // Individual pages handle their own auth redirects.
-  if (!session || !session.alumni) {
-    return (
-      <div className="flex min-h-screen flex-col bg-[var(--background)]">
-        <main className="flex-1">{children}</main>
-      </div>
-    );
-  }
-
-  // Fetch fresh approval status (session.alumni may be stale)
-  const alumni = await prisma.alumni.findUnique({
-    where: { id: session.alumni.id },
-    select: { approvalStatus: true },
-  });
-
-  if (!alumni) {
-    return (
-      <div className="flex min-h-screen flex-col bg-[var(--background)]">
-        <main className="flex-1">{children}</main>
-      </div>
-    );
-  }
-
-  // Rejected alumni — still show the header but let pages handle content
-  const isPending = alumni.approvalStatus === "PENDING";
-
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
-      <AlumniHeader alumni={session.alumni} />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
-          {isPending ? (
-            <div className="flex min-h-[60vh] items-center justify-center">
-              <div className="max-w-md text-center">
-                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
-                  <svg className="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold text-[var(--foreground)]">
-                  รอการอนุมัติจากผู้ดูแลระบบ
-                </h2>
-                <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-                  บัญชีของท่านอยู่ระหว่างการตรวจสอบโดยผู้ดูแลระบบ
-                  ท่านจะสามารถเข้าถึงและแก้ไขข้อมูลส่วนตัวได้หลังจากได้รับการอนุมัติแล้ว
-                </p>
-                <div className="mt-6">
-                  <a
-                    href={`${BASE_PATH}/api/alumni-auth/logout`}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-                    </svg>
-                    ออกจากระบบ
-                  </a>
-                </div>
-              </div>
-            </div>
-          ) : (
-            children
-          )}
-        </div>
-      </main>
-      <Footer />
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

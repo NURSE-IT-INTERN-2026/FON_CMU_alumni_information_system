@@ -138,9 +138,13 @@ export {
   alumniWithRelatedFormSchema,
   alumniWithRelatedCreateSchema,
   alumniWithRelatedUpdateSchema,
+  alumniProfileWithRelatedFormSchema,
+  alumniProfileUpdateSchema,
 } from "./alumni-with-related";
 export type {
   AlumniWithRelatedFormData,
   AlumniWithRelatedCreateInput,
   AlumniWithRelatedUpdateInput,
+  AlumniProfileWithRelatedFormData,
+  AlumniProfileUpdateInput,
 } from "./alumni-with-related";

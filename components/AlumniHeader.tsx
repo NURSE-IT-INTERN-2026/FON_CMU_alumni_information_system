@@ -22,9 +22,16 @@ const NAV_ITEMS = [
 export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const displayName = `${alumni.prefix}${alumni.firstName} ${alumni.newLastName || alumni.maidenLastName}`;
+
+  function isItemActive(href: string) {
+    return href === "/graduates/profile"
+      ? pathname === href
+      : pathname.startsWith(href);
+  }
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -72,35 +79,82 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="cursor-pointer rounded-md bg-white/20 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/30 disabled:opacity-60"
+              className="hidden cursor-pointer rounded-md bg-white/20 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/30 disabled:opacity-60 sm:inline-flex"
             >
               {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
+            </button>
+
+            {/* Hamburger button (mobile only) */}
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-md p-2 text-white hover:bg-white/10 lg:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="เปิดเมนู"
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? (
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                  />
+                </svg>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="border-t border-white/10">
-        <div className="mx-auto flex max-w-full gap-1 px-5 py-2 sm:px-7 lg:px-9">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
+      {/* Mobile Navigation */}
+      {mobileMenuOpen && (
+        <nav className="border-t border-white/10 lg:hidden">
+          <div className="space-y-1 px-4 py-3">
+            {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                  isActive
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isItemActive(item.href)
                     ? "bg-white/20 text-white"
-                    : "text-white/70 hover:text-white hover:bg-white/10"
+                    : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {item.label}
               </Link>
-            );
-          })}
-        </div>
-      </nav>
+            ))}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-60"
+            >
+              {loggingOut ? "กำลังออก..." : "ออกจากระบบ"}
+            </button>
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

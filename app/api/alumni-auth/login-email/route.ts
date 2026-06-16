@@ -35,9 +35,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = alumniLoginSchema.parse(body);
 
-    // Look up alumni by email
+    // Look up alumni by email. Exclude soft-deleted records so a tombstoned
+    // account cannot be used to log back in until an admin restores it.
     const alumni = await prisma.alumni.findFirst({
-      where: { email: validated.email.trim().toLowerCase() },
+      where: {
+        email: validated.email.trim().toLowerCase(),
+        deletedAt: null,
+      },
     });
 
     if (!alumni) {
@@ -64,33 +68,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check approval status
-    if (alumni.approvalStatus === "REJECTED") {
-      return NextResponse.json(
-        { error: "บัญชีของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ" },
-        { status: 403 }
-      );
-    }
-
-    if (alumni.approvalStatus === "PENDING") {
-      // Create session but redirect to pending page
-      const token = await createAlumniSession(alumni.id);
-      await prisma.alumni.update({
-        where: { id: alumni.id },
-        data: { hasLoggedIn: true, lastLoginAt: new Date() },
-      });
-      resetRateLimit(`alumni-login:${ip}`);
-      const cookieStore = await cookies();
-      cookieStore.set(setSessionCookie(token));
-
-      return NextResponse.json({
-        success: true,
-        pendingApproval: true,
-        redirect: "/graduates/pending",
-      });
-    }
-
-    // Create alumni session (APPROVED)
+    // Create alumni session
     const isFirstLogin = !alumni.hasLoggedIn;
     const token = await createAlumniSession(alumni.id);
 

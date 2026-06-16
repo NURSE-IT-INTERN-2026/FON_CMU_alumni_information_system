@@ -52,7 +52,6 @@ export async function GET() {
       distinctAbroadCountries,
       newsTotal,
       newsPublishedCount,
-      pendingAlumniCount,
       recentNews,
     ] = await Promise.all([
       // Alumni from CMU Registrar API
@@ -124,9 +123,6 @@ export async function GET() {
       // News published count
       prisma.news.count({ where: { status: "PUBLISHED" } }),
 
-      // Pending alumni count
-      prisma.alumni.count({ where: { approvalStatus: "PENDING" } }),
-
       // Recent published news (3 items)
       prisma.news.findMany({
         where: { status: "PUBLISHED" },
@@ -193,7 +189,6 @@ export async function GET() {
         total: newsTotal,
         publishedCount: newsPublishedCount,
       },
-      pendingAlumni: pendingAlumniCount,
       recentNews,
     });
   } catch (error) {

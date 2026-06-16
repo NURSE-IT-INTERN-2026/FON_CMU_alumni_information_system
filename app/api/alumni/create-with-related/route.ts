@@ -27,6 +27,9 @@ export async function POST(request: NextRequest) {
     const hasModelReps =
       (validated.modelRepresentatives?.length ?? 0) > 0;
 
+    // Auto-filled identity for related rows that carry a name.
+    const fullName = `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`;
+
     const alumni = await prisma.$transaction(async (tx) => {
       const created = await tx.alumni.create({
         data: {
@@ -118,15 +121,18 @@ export async function POST(request: NextRequest) {
 
       if (validated.abroadAlumni && validated.abroadAlumni.length > 0) {
         await tx.abroadAlumni.createMany({
-          data: validated.abroadAlumni.map((a) => ({
-            cohort: a.cohort || null,
-            prefix: a.prefix || null,
-            thaiName: a.thaiName || null,
-            englishName: a.englishName || null,
+          data: validated.abroadAlumni.map((a, idx) => ({
+            // Link to the alumni being created; identity is auto-filled from
+            // the record (the form only collects the alumni-owned fields).
+            studentId: validated.studentId,
+            prefix: validated.prefix,
+            thaiName: fullName,
+            cohort: validated.cohort || null,
             workplace: a.workplace || null,
+            homeAddress: a.homeAddress || null,
             country: a.country,
             notes: a.notes || null,
-            order: a.order,
+            order: idx, // column has no DB default
           })),
         });
       }

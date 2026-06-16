@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { alumniFormSchema } from "./alumni";
+import { alumniFormSchema, profileFormSchema } from "./alumni";
 import { awardFormSchema } from "./award";
 import { associationFormSchema } from "./association";
 import { committeeFormSchema } from "./graduate-committee";
 import { potentialFormSchema } from "./potential";
 import { modelRepFormSchema } from "./model-representative";
-import { abroadAlumniFormSchema } from "./abroad-alumni";
 import {
   alumniCreateSchema,
   awardCreateSchema,
@@ -16,6 +15,18 @@ import {
   abroadAlumniCreateSchema,
 } from ".";
 
+// Per-element form schema for an alumni self-editing their abroad info.
+// Collects only the real, meaningful AbroadAlumni columns the alumni owns;
+// identity fields (thaiName/prefix/cohort) are auto-filled server-side from
+// the alumni record. NOTE: do NOT reuse abroadAlumniFormSchema — its
+// address/university fields aren't real columns.
+const alumniAbroadFormSchema = z.object({
+  country: z.string().min(1, "กรุณากรอกประเทศ"),
+  workplace: z.string().optional().default(""),
+  homeAddress: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
+});
+
 // --- Form schema (composite: alumni core + nested arrays, all strings) ---
 
 export const alumniWithRelatedFormSchema = alumniFormSchema.extend({
@@ -24,7 +35,11 @@ export const alumniWithRelatedFormSchema = alumniFormSchema.extend({
   graduateCommittees: z.array(committeeFormSchema).optional().default([]),
   potentials: z.array(potentialFormSchema).optional().default([]),
   modelRepresentatives: z.array(modelRepFormSchema).optional().default([]),
-  abroadAlumni: z.array(abroadAlumniFormSchema).optional().default([]),
+  // Abroad section collects only the real AbroadAlumni columns the alumni owns;
+  // identity (thaiName/prefix/cohort) is auto-filled server-side. NOTE: do NOT
+  // reuse abroadAlumniFormSchema — its address/university fields aren't real
+  // columns, and it would force the form to collect fields that don't persist.
+  abroadAlumni: z.array(alumniAbroadFormSchema).optional().default([]),
 });
 
 // --- API schema (composite with proper types) ---
@@ -83,14 +98,15 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
   abroadAlumni: z
     .array(
       z.object({
+        country: z.string().min(1, "กรุณากรอกประเทศ"),
+        workplace: z.string().optional().nullable(),
+        homeAddress: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        // Identity fields are auto-filled server-side from the alumni record;
+        // kept optional so callers that supply them still validate.
         cohort: z.string().optional().nullable(),
         prefix: z.string().optional().nullable(),
         thaiName: z.string().optional().nullable(),
-        englishName: z.string().optional().nullable(),
-        workplace: z.string().optional().nullable(),
-        country: z.string().min(1, "กรุณากรอกประเทศ"),
-        notes: z.string().optional().nullable(),
-        order: z.coerce.number().int("ลำดับต้องเป็นตัวเลข"),
       }),
     )
     .optional(),
@@ -170,3 +186,32 @@ export const alumniWithRelatedUpdateSchema = z.object({
 export type AlumniWithRelatedFormData = z.infer<typeof alumniWithRelatedFormSchema>;
 export type AlumniWithRelatedCreateInput = z.infer<typeof alumniWithRelatedCreateSchema>;
 export type AlumniWithRelatedUpdateInput = z.infer<typeof alumniWithRelatedUpdateSchema>;
+
+// --- Alumni self-service profile (core + all 6 related sections) ---
+// Mirrors the admin new-alumni form, but built on profileFormSchema (no
+// editable studentId) and extended with abroad using real columns.
+
+export const alumniProfileWithRelatedFormSchema = profileFormSchema.extend({
+  awards: z.array(awardFormSchema).optional().default([]),
+  associations: z.array(associationFormSchema).optional().default([]),
+  graduateCommittees: z.array(committeeFormSchema).optional().default([]),
+  potentials: z.array(potentialFormSchema).optional().default([]),
+  modelRepresentatives: z.array(modelRepFormSchema).optional().default([]),
+  abroadAlumni: z.array(alumniAbroadFormSchema).optional().default([]),
+});
+
+// Server schema: alumniWithRelatedUpdateSchema already has the core profile
+// fields (incl. email/phone/currentWorkplace/country) + the 5 relation arrays;
+// we only add abroad (validated permissively — names are auto-filled in-txn,
+// so we must NOT route through abroadAlumniCreateSchema which requires a name).
+export const alumniProfileUpdateSchema = alumniWithRelatedUpdateSchema.extend({
+  abroadAlumni: z
+    .array(alumniAbroadFormSchema)
+    .optional()
+    .default([]),
+});
+
+export type AlumniProfileWithRelatedFormData = z.infer<
+  typeof alumniProfileWithRelatedFormSchema
+>;
+export type AlumniProfileUpdateInput = z.infer<typeof alumniProfileUpdateSchema>;
