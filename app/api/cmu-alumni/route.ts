@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity, getIp } from "@/lib/activity-log";
-import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
+import { fetchCmuGraduates, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
 import { PAGE_SIZE } from "@/lib/constants";
 
 const RATE_LIMIT_MAX = 300;
@@ -41,9 +41,18 @@ export async function GET(request: NextRequest) {
       Math.min(100, parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10)),
     );
     const search = searchParams.get("search")?.trim().toLowerCase() || "";
-    const degreeLevel = searchParams.get("degreeLevel") || "";
     const sortField = searchParams.get("sortField") || "student_id";
     const sortDir = searchParams.get("sortDir") || "asc";
+
+    // Facet filters are comma-separated (multi-select) — split into trimmed arrays.
+    const facetList = (key: string): string[] =>
+      (searchParams.get(key) || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const degreeLevels = facetList("degreeLevel");
+    const majors = facetList("major");
+    const graduationYears = facetList("graduationYear");
 
     // 4. Fetch from CMU Registrar API
     const graduates = await fetchCmuGraduates();
@@ -65,24 +74,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 5b. Apply degree level filter
-    if (degreeLevel) {
+    // 5b. Apply facet filters (degree level, major, graduation year) — AND-semantics.
+    if (degreeLevels.length || majors.length || graduationYears.length) {
       filtered = filtered.filter((g: CmuGraduate) => {
-        // Map CMU level_id + major_name_th to our degree level enum values
-        switch (degreeLevel) {
-          case "DOCTORAL":
-            return g.level_id === "5";
-          case "MASTER":
-            return g.level_id === "3";
-          case "BACHELOR":
-            return g.level_id === "1";
-          case "ASSOCIATE":
-            return g.level_id === "0" && g.major_name_th !== "ประกาศนียบัตรผู้ช่วยพยาบาล";
-          case "NURSING_ASSISTANT":
-            return g.level_id === "2" || (g.level_id === "0" && g.major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล");
-          default:
-            return true;
+        if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id, g.major_name_th) ?? "")) {
+          return false;
         }
+        if (majors.length && !majors.includes((g.major_name_th ?? "").trim())) {
+          return false;
+        }
+        if (graduationYears.length && !graduationYears.includes((g.grad_year ?? "").trim())) {
+          return false;
+        }
+        return true;
       });
     }
 

@@ -578,7 +578,7 @@ export default function AwardsPage() {
       </div>
 
       {/* Facet filters */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2">
         <FacetFilter entity="awards" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
         <FacetFilter entity="awards" field="awardType" label="ประเภท" selected={filters.awardType ?? []} onChange={(v) => setFilter("awardType", v)} valueLabels={AWARD_TYPE_LABELS} />
       </div>

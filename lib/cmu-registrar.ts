@@ -106,6 +106,42 @@ async function fetchFromCmuApi(
   }
 }
 
+/**
+ * Map a CMU Registrar record's `level_id` (+ `major_name_th`) to our local
+ * `DegreeLevel` enum value. Mirrors the predicate in the `/api/cmu-alumni`
+ * route so filtering, the table view, and facet counts all agree.
+ *
+ *   level_id 5            → DOCTORAL
+ *   level_id 3            → MASTER
+ *   level_id 1            → BACHELOR
+ *   level_id 2            → NURSING_ASSISTANT
+ *   level_id 0 + nursing  → NURSING_ASSISTANT
+ *   level_id 0 (other)    → ASSOCIATE
+ *
+ * Returns null if the level_id is unrecognized (so it is skipped in counts).
+ */
+export function cmuLevelToEnum(
+  level_id: string,
+  major_name_th: string,
+): "DOCTORAL" | "MASTER" | "BACHELOR" | "NURSING_ASSISTANT" | "ASSOCIATE" | null {
+  switch (level_id) {
+    case "5":
+      return "DOCTORAL";
+    case "3":
+      return "MASTER";
+    case "1":
+      return "BACHELOR";
+    case "2":
+      return "NURSING_ASSISTANT";
+    case "0":
+      return major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล"
+        ? "NURSING_ASSISTANT"
+        : "ASSOCIATE";
+    default:
+      return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

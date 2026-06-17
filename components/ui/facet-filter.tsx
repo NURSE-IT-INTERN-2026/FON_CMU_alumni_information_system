@@ -39,61 +39,52 @@ export default function FacetFilter({
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<FacetValue[]>([]);
   const [isYear, setIsYear] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchPage = useCallback(
-    async (targetPage: number, searchTerm: string, append: boolean) => {
-      if (append) setLoadingMore(true);
-      else setLoading(true);
+  // Fetch all facet values (optionally narrowed by a search term). The endpoint
+  // returns every matching value in one shot — no client-side pagination.
+  const fetchValues = useCallback(
+    async (searchTerm: string) => {
+      setLoading(true);
       try {
-        const params = new URLSearchParams({
-          entity,
-          field,
-          page: String(targetPage),
-        });
+        const params = new URLSearchParams({ entity, field });
         if (searchTerm) params.set("search", searchTerm);
         const res = await fetch(`${BASE_PATH}/api/filter-facets?${params}`);
         if (!res.ok) return;
         const data: FacetResponse = await res.json();
         setIsYear(data.isYear);
-        setTotalPages(data.totalPages);
-        setPage(data.page);
-        setValues((prev) => (append ? [...prev, ...data.values] : data.values));
+        setValues(data.values);
       } catch {
         /* ignore */
       } finally {
         setLoading(false);
-        setLoadingMore(false);
       }
     },
     [entity, field]
   );
 
-  // Load first page whenever the panel is opened.
+  // Load all values whenever the panel is opened.
   useEffect(() => {
     if (open) {
       setSearch("");
-      fetchPage(1, "", false);
+      fetchValues("");
     }
-  }, [open, fetchPage]);
+  }, [open, fetchValues]);
 
   // Debounced search.
   useEffect(() => {
     if (!open) return;
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
-      fetchPage(1, search, false);
+      fetchValues(search);
     }, 300);
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [search, open, fetchPage]);
+  }, [search, open, fetchValues]);
 
   // Outside-click to close.
   useEffect(() => {
@@ -115,7 +106,6 @@ export default function FacetFilter({
   const clear = () => onChange([]);
 
   const display = (v: string) => valueLabels?.[v] ?? v;
-  const hasMore = page < totalPages;
   const activeCount = selected.length;
 
   return (
@@ -144,7 +134,7 @@ export default function FacetFilter({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
           <div className="border-b border-gray-100 p-2">
             <input
               type="text"
@@ -197,16 +187,6 @@ export default function FacetFilter({
               </button>
             ) : (
               <span />
-            )}
-            {hasMore && !loading && (
-              <button
-                type="button"
-                onClick={() => fetchPage(page + 1, search, true)}
-                disabled={loadingMore}
-                className="text-xs font-medium text-[var(--primary)] hover:opacity-80 disabled:opacity-50"
-              >
-                {loadingMore ? "กำลังโหลด..." : "โหลดเพิ่มเติม"}
-              </button>
             )}
           </div>
         </div>

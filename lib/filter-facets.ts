@@ -9,8 +9,6 @@
  * and is server-only.
  */
 
-export const FACET_PAGE_SIZE = 5;
-
 /**
  * Entity slug (matches the API path, e.g. "potentials") -> Prisma delegate key.
  * Used by the generic facet endpoint and by parseFacetFilters consumers.
