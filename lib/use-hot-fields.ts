@@ -1,41 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BASE_PATH } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 
 /**
  * Returns `{ [recordId]: string[] }` — the fields that have ≥1 recorded change —
  * for the given resource and record IDs. Powers the orange "updated value"
  * indicators on the admin data pages (PRD §3.16).
  *
- * Pass the IDs of the records currently visible on the page.
+ * Pass the IDs of the records currently visible on the page. Backed by a React
+ * Query keyed on resourceType + the sorted id set, so it refetches when the
+ * visible rows change. `staleTime: 0` keeps the indicators fresh after edits.
  */
 export function useHotFields(
   resourceType: string,
   recordIds: string[]
 ): Record<string, string[]> {
-  const [hot, setHot] = useState<Record<string, string[]>>({});
-  // Stable key so the effect only refires when the actual set of IDs changes.
   const idsKey = recordIds.slice().sort().join(",");
-
-  useEffect(() => {
-    if (!resourceType || idsKey.length === 0) {
-      setHot({});
-      return;
-    }
-    let cancelled = false;
-    fetch(
-      `${BASE_PATH}/api/field-changes?resourceType=${encodeURIComponent(resourceType)}&ids=${encodeURIComponent(idsKey)}`
-    )
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((data: Record<string, string[]>) => {
-        if (!cancelled) setHot(data || {});
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [resourceType, idsKey]);
-
-  return hot;
+  const enabled = !!resourceType && idsKey.length > 0;
+  const { data } = useQuery({
+    queryKey: queryKeys.fieldChanges.for({ resourceType, idsKey }),
+    queryFn: () =>
+      apiFetch<Record<string, string[]>>(
+        `/api/field-changes?resourceType=${encodeURIComponent(resourceType)}&ids=${encodeURIComponent(idsKey)}`
+      ),
+    enabled,
+    staleTime: 0,
+  });
+  return data ?? {};
 }
