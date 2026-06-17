@@ -40,10 +40,19 @@ export function useEntityList<T>(
   scope: string,
   entityPath: string,
   params: EntityListParams,
-  options?: { enabled?: boolean },
+  options?: {
+    enabled?: boolean;
+    /** Query-string key for the sort field — entities differ: "sortField"
+     *  (associations, awards) vs "sortBy" (potentials, graduate-committee). */
+    sortKey?: string;
+    /** Query-string key for sort direction — "sortOrder" (most) vs "sortDir" (awards). */
+    sortOrderKey?: string;
+  },
 ) {
   const { page, search, searchField, sortField, sortDir, filters, filtersKey } =
     params;
+  const sortKeyName = options?.sortKey ?? "sortField";
+  const sortOrderKeyName = options?.sortOrderKey ?? "sortOrder";
 
   const query = useQuery<EntityListResponse<T>>({
     queryKey: [
@@ -55,8 +64,8 @@ export function useEntityList<T>(
       const p = new URLSearchParams({
         page: String(page),
         pageSize: String(PAGE_SIZE),
-        sortField,
-        sortOrder: sortDir,
+        [sortKeyName]: sortField,
+        [sortOrderKeyName]: sortDir,
         searchField,
       });
       if (search.trim()) p.set("search", search.trim());

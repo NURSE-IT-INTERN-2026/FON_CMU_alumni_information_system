@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
@@ -8,6 +8,10 @@ import FormInput from "@/components/form/FormInput";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEntityList } from "@/lib/use-entity-list";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -24,14 +28,6 @@ interface Potential {
   position: string;
   recordedYear: number;
   major?: string | null;
-}
-
-interface ApiResponse {
-  data: Potential[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear" | "major";
@@ -54,17 +50,21 @@ const FORM_DEFAULTS: FormValues = { studentId: "", fullName: "", career: "", pos
 export default function PotentialsPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
-  const [potentials, setPotentials] = useState<Potential[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("recordedYear");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+
+  const qc = useQueryClient();
+  const { items: potentials, total, totalPages, isPending: loading, isError } = useEntityList<Potential>(
+    "potentials",
+    "/api/potentials",
+    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { sortKey: "sortBy" },
+  );
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -113,35 +113,6 @@ export default function PotentialsPage() {
     }
     setPage(1);
   };
-
-  const fetchPotentials = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        sortBy: sortField,
-        sortOrder: sortDir,
-      });
-      if (search.trim()) params.set("search", search.trim());
-      params.set("searchField", searchField);
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/potentials?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setPotentials(data.data);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, searchField, sortField, sortDir, filtersKey]);
-
-  useEffect(() => {
-    fetchPotentials();
-  }, [fetchPotentials]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -194,31 +165,14 @@ export default function PotentialsPage() {
     }
     setSaving(true);
     try {
+      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
-        const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), reason: editReason };
-        const res = await fetch(`${BASE_PATH}/api/potentials/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/potentials/${editingId}`, { method: "PUT", json: payload });
       } else {
-        const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear) };
-        const res = await fetch(`${BASE_PATH}/api/potentials`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/potentials`, { method: "POST", json: payload });
       }
       closeForm();
-      fetchPotentials();
+      qc.invalidateQueries({ queryKey: queryKeys.potentials.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -229,10 +183,9 @@ export default function PotentialsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/potentials/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/potentials/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchPotentials();
+      qc.invalidateQueries({ queryKey: queryKeys.potentials.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -244,18 +197,10 @@ export default function PotentialsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/potentials/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/potentials/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchPotentials();
+      qc.invalidateQueries({ queryKey: queryKeys.potentials.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -303,11 +248,12 @@ export default function PotentialsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/potentials/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/potentials/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchPotentials();
+      qc.invalidateQueries({ queryKey: queryKeys.potentials.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
@@ -557,6 +503,10 @@ export default function PotentialsPage() {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : potentials.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
