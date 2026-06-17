@@ -6,6 +6,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, awardCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -60,7 +61,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
-    const awardType = searchParams.get("awardType") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const sortField = searchParams.get("sortField") || "year";
     const sortDir = searchParams.get("sortDir") || "desc";
@@ -68,11 +68,8 @@ export async function GET(request: NextRequest) {
 
     const validSearchFields = ["awardName", "recipientName", "description", "name", "year"];
 
-    const where: Record<string, unknown> = {};
-
-    if (awardType) {
-      where.awardType = awardType;
-    }
+    const where: Record<string, unknown> = { deletedAt: null };
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.awards));
 
     if (search) {
       if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
@@ -103,7 +100,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sortFieldMap: Record<string, string> = { name: "recipientName", award: "awardName", type: "awardType", year: "year" };
+    const sortFieldMap: Record<string, string> = { name: "recipientName", award: "awardName", type: "awardType", year: "year", major: "major", description: "description" };
     const orderKey = sortFieldMap[sortField] || "year";
     const dir = sortDir === "asc" ? "asc" : "desc";
 

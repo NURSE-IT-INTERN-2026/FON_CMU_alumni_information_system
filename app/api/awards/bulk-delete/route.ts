@@ -19,8 +19,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const result = await prisma.award.deleteMany({
+    const result = await prisma.award.updateMany({
       where: { id: { in: ids } },
+      data: { deletedAt: new Date() },
     });
     return NextResponse.json({ deleted: result.count });
   } catch (error) {

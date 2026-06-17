@@ -6,6 +6,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedUpdateSchema } from "@/lib/validations";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function PUT(
   request: NextRequest,
@@ -51,6 +52,9 @@ export async function PUT(
           country: validated.country || null,
           isPotential: hasPotentials,
           isModelRepresentative: hasModelReps,
+          // Admin edit — flag so the alumni sees the "edited by admin" popup
+          // on next login (PRD §3.15 / §3.1.4).
+          adminEditedAt: new Date(),
         },
       });
 
@@ -137,9 +141,11 @@ export async function PUT(
       return updated;
     });
 
-    // Log activity
+    // Log activity + field-change history
+    const changes = computeFieldChanges(existing, alumni, TRACKED_FIELDS.alumni);
     const session = await getSession();
     if (session) {
+      await recordFieldChanges({ resourceType: "alumni", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason });
       await logActivity(
         {
           actorType: "ADMIN",
@@ -150,12 +156,9 @@ export async function PUT(
         "UPDATE",
         "alumni",
         id,
-        {
-          studentId: alumni.studentId,
-          name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
-          source: "update-with-related",
-        },
-        getIp(request)
+        { changes, source: "update-with-related" },
+        getIp(request),
+        validated.reason
       );
     }
 

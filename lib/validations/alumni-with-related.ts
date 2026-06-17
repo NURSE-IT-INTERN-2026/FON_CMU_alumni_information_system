@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { alumniFormSchema, profileFormSchema } from "./alumni";
+import { editReasonField } from "./helpers";
 import { awardFormSchema } from "./award";
 import { associationFormSchema } from "./association";
 import { committeeFormSchema } from "./graduate-committee";
@@ -12,15 +13,15 @@ import {
   committeeCreateSchema,
   potentialCreateSchema,
   modelRepCreateSchema,
-  abroadAlumniCreateSchema,
+  alumniAgencyCreateSchema,
 } from ".";
 
 // Per-element form schema for an alumni self-editing their abroad info.
-// Collects only the real, meaningful AbroadAlumni columns the alumni owns;
+// Collects only the real, meaningful AlumniAgency columns the alumni owns;
 // identity fields (thaiName/prefix/cohort) are auto-filled server-side from
-// the alumni record. NOTE: do NOT reuse abroadAlumniFormSchema — its
+// the alumni record. NOTE: do NOT reuse alumniAgencyFormSchema — its
 // address/university fields aren't real columns.
-const alumniAbroadFormSchema = z.object({
+const alumniAgencyFormSchema = z.object({
   country: z.string().min(1, "กรุณากรอกประเทศ"),
   workplace: z.string().optional().default(""),
   homeAddress: z.string().optional().default(""),
@@ -35,11 +36,11 @@ export const alumniWithRelatedFormSchema = alumniFormSchema.extend({
   graduateCommittees: z.array(committeeFormSchema).optional().default([]),
   potentials: z.array(potentialFormSchema).optional().default([]),
   modelRepresentatives: z.array(modelRepFormSchema).optional().default([]),
-  // Abroad section collects only the real AbroadAlumni columns the alumni owns;
+  // Abroad section collects only the real AlumniAgency columns the alumni owns;
   // identity (thaiName/prefix/cohort) is auto-filled server-side. NOTE: do NOT
-  // reuse abroadAlumniFormSchema — its address/university fields aren't real
+  // reuse alumniAgencyFormSchema — its address/university fields aren't real
   // columns, and it would force the form to collect fields that don't persist.
-  abroadAlumni: z.array(alumniAbroadFormSchema).optional().default([]),
+  alumniAgency: z.array(alumniAgencyFormSchema).optional().default([]),
 });
 
 // --- API schema (composite with proper types) ---
@@ -95,7 +96,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
       }),
     )
     .optional(),
-  abroadAlumni: z
+  alumniAgency: z
     .array(
       z.object({
         country: z.string().min(1, "กรุณากรอกประเทศ"),
@@ -112,7 +113,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
     .optional(),
 });
 
-// --- Update schema (no studentId, no abroadAlumni, required core fields) ---
+// --- Update schema (no studentId, no alumniAgency, required core fields) ---
 
 export const alumniWithRelatedUpdateSchema = z.object({
   prefix: z.string().min(1, "กรุณากรอกคำนำหน้า"),
@@ -181,6 +182,7 @@ export const alumniWithRelatedUpdateSchema = z.object({
     )
     .optional()
     .default([]),
+  reason: editReasonField(),
 });
 
 export type AlumniWithRelatedFormData = z.infer<typeof alumniWithRelatedFormSchema>;
@@ -197,16 +199,16 @@ export const alumniProfileWithRelatedFormSchema = profileFormSchema.extend({
   graduateCommittees: z.array(committeeFormSchema).optional().default([]),
   potentials: z.array(potentialFormSchema).optional().default([]),
   modelRepresentatives: z.array(modelRepFormSchema).optional().default([]),
-  abroadAlumni: z.array(alumniAbroadFormSchema).optional().default([]),
+  alumniAgency: z.array(alumniAgencyFormSchema).optional().default([]),
 });
 
 // Server schema: alumniWithRelatedUpdateSchema already has the core profile
 // fields (incl. email/phone/currentWorkplace/country) + the 5 relation arrays;
 // we only add abroad (validated permissively — names are auto-filled in-txn,
-// so we must NOT route through abroadAlumniCreateSchema which requires a name).
+// so we must NOT route through alumniAgencyCreateSchema which requires a name).
 export const alumniProfileUpdateSchema = alumniWithRelatedUpdateSchema.extend({
-  abroadAlumni: z
-    .array(alumniAbroadFormSchema)
+  alumniAgency: z
+    .array(alumniAgencyFormSchema)
     .optional()
     .default([]),
 });

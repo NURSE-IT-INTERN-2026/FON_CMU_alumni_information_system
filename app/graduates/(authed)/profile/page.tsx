@@ -9,6 +9,7 @@ import {
   AWARD_TYPE_LABELS,
   DEGREE_LEVEL_OPTIONS,
   PREFIX_OPTIONS,
+  EDIT_REASON_OPTIONS,
   BASE_PATH,
 } from "@/lib/constants";
 import {
@@ -85,7 +86,7 @@ interface AlumniData {
   graduateCommittees?: CommitteeData[];
   potentials?: PotentialData[];
   modelRepresentatives?: ModelRepData[];
-  abroadAlumni?: AbroadData[];
+  alumniAgency?: AbroadData[];
 }
 
 const DEGREE_LABELS: Record<string, string> = Object.fromEntries(
@@ -112,7 +113,7 @@ const defaultFormValues: AlumniProfileWithRelatedFormData = {
   graduateCommittees: [],
   potentials: [],
   modelRepresentatives: [],
-  abroadAlumni: [],
+  alumniAgency: [],
 };
 
 // --- Repeatable-field definitions for each expandable section ---
@@ -190,7 +191,7 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
       cohort: m.cohort,
       generation: String(m.generation),
     })),
-    abroadAlumni: (data.abroadAlumni || []).map((a) => ({
+    alumniAgency: (data.alumniAgency || []).map((a) => ({
       country: a.country,
       workplace: a.workplace || "",
       homeAddress: a.homeAddress || "",
@@ -206,7 +207,7 @@ function sectionsFromData(data: AlumniData) {
     committees: (data.graduateCommittees?.length ?? 0) > 0,
     potentials: (data.potentials?.length ?? 0) > 0,
     modelReps: (data.modelRepresentatives?.length ?? 0) > 0,
-    abroad: (data.abroadAlumni?.length ?? 0) > 0,
+    abroad: (data.alumniAgency?.length ?? 0) > 0,
   };
 }
 
@@ -216,6 +217,7 @@ export default function AlumniProfilePage() {
   const [alumni, setAlumni] = useState<AlumniData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  const [editReason, setEditReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -305,13 +307,18 @@ export default function AlumniProfilePage() {
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   async function handleSave(data: AlumniProfileWithRelatedFormData) {
-    setSaving(true);
     setErrorMsg("");
     setSuccessMsg("");
+    if (!editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
 
     const fullName = `${data.prefix}${data.firstName} ${data.maidenLastName}`;
 
     const payload: Record<string, unknown> = {
+      reason: editReason,
       prefix: data.prefix,
       firstName: data.firstName.trim(),
       maidenLastName: data.maidenLastName.trim(),
@@ -355,7 +362,7 @@ export default function AlumniProfilePage() {
         cohort: m.cohort,
         generation: Number(m.generation),
       })),
-      abroadAlumni: (data.abroadAlumni || []).map((a) => ({
+      alumniAgency: (data.alumniAgency || []).map((a) => ({
         country: a.country,
         workplace: a.workplace,
         homeAddress: a.homeAddress,
@@ -500,7 +507,7 @@ export default function AlumniProfilePage() {
           </div>
           {!editMode && (
             <button
-              onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); }}
+              onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); setEditReason(""); }}
               className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
             >
               แก้ไข
@@ -712,16 +719,32 @@ export default function AlumniProfilePage() {
                 />
               </SectionToggle>
 
-              <SectionToggle title="ข้อมูลการทำงานต่างประเทศ" open={sections.abroad} onToggle={() => toggleSection("abroad")}>
+              <SectionToggle title="ต้นสังกัดศิษย์เก่า" open={sections.abroad} onToggle={() => toggleSection("abroad")}>
                 <RepeatableFieldArray
                   control={control}
                   register={register}
                   errors={errors}
-                  name="abroadAlumni"
+                  name="alumniAgency"
                   emptyRow={{ country: "", workplace: "", homeAddress: "", notes: "" }}
                   fields={ABROAD_FIELDS}
                 />
               </SectionToggle>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  เหตุผลในการแก้ไข <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                >
+                  <option value="">— กรุณาเลือก —</option>
+                  {EDIT_REASON_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Buttons */}
               <div className="flex gap-3 pt-2">
@@ -859,11 +882,11 @@ export default function AlumniProfilePage() {
                 </>
               )}
 
-              {alumni.abroadAlumni && alumni.abroadAlumni.length > 0 && (
+              {alumni.alumniAgency && alumni.alumniAgency.length > 0 && (
                 <>
                   <div className="h-px bg-[var(--border)]" />
-                  <RelatedSection title="ข้อมูลการทำงานต่างประเทศ">
-                    {alumni.abroadAlumni.map((a) => (
+                  <RelatedSection title="ต้นสังกัดศิษย์เก่า">
+                    {alumni.alumniAgency.map((a) => (
                       <RelatedItem
                         key={a.id}
                         title={a.country}

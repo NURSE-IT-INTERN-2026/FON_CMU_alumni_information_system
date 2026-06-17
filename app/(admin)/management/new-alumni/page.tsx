@@ -30,7 +30,7 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   graduateCommittees: [],
   potentials: [],
   modelRepresentatives: [],
-  abroadAlumni: [],
+  alumniAgency: [],
 };
 
 export default function NewAlumniPage() {
@@ -71,7 +71,7 @@ export default function NewAlumniPage() {
   const committeeArray = useFieldArray({ control, name: "graduateCommittees" });
   const potentialArray = useFieldArray({ control, name: "potentials" });
   const modelRepArray = useFieldArray({ control, name: "modelRepresentatives" });
-  const abroadArray = useFieldArray({ control, name: "abroadAlumni" });
+  const abroadArray = useFieldArray({ control, name: "alumniAgency" });
 
   // Pre-fill from query params (redirected from entity pages)
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function NewAlumniPage() {
           }];
           break;
         case "abroad":
-          overrides.abroadAlumni = [{
+          overrides.alumniAgency = [{
             country: searchParams.get("country") || "",
             workplace: searchParams.get("workplace") || "",
             homeAddress: searchParams.get("homeAddress") || "",
@@ -223,8 +223,8 @@ export default function NewAlumniPage() {
         generation: Number(r.generation),
       }));
     }
-    if (data.abroadAlumni && data.abroadAlumni.length > 0) {
-      payload.abroadAlumni = data.abroadAlumni.map((r) => ({
+    if (data.alumniAgency && data.alumniAgency.length > 0) {
+      payload.alumniAgency = data.alumniAgency.map((r) => ({
         country: r.country,
         workplace: r.workplace,
         homeAddress: r.homeAddress,
@@ -437,7 +437,7 @@ export default function NewAlumniPage() {
         </SectionToggle>
 
         <SectionToggle
-          title="ข้อมูลการทำงานต่างประเทศ"
+          title="ต้นสังกัดศิษย์เก่า"
           open={sections.abroad}
           onToggle={() => toggleSection("abroad")}
         >
@@ -445,7 +445,7 @@ export default function NewAlumniPage() {
             control={control}
             register={register}
             errors={errors}
-            name="abroadAlumni"
+            name="alumniAgency"
             emptyRow={{ country: "", workplace: "", homeAddress: "", notes: "" }}
             singleRow
             fields={[

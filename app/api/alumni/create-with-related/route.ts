@@ -119,9 +119,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      if (validated.abroadAlumni && validated.abroadAlumni.length > 0) {
-        await tx.abroadAlumni.createMany({
-          data: validated.abroadAlumni.map((a, idx) => ({
+      if (validated.alumniAgency && validated.alumniAgency.length > 0) {
+        await tx.alumniAgency.createMany({
+          data: validated.alumniAgency.map((a, idx) => ({
             // Link to the alumni being created; identity is auto-filled from
             // the record (the form only collects the alumni-owned fields).
             studentId: validated.studentId,

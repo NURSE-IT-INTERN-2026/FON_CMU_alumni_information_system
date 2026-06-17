@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { editReasonField } from "./helpers";
 
 const MSG = {
   countryRequired: "กรุณากรอกประเทศ",
@@ -10,15 +11,15 @@ const MSG = {
 // --- Form schema (all strings, for new-alumni expandable section) ---
 // Used in the composite alumni-with-related form where context is simpler
 
-export const abroadAlumniFormSchema = z.object({
+export const alumniAgencyFormSchema = z.object({
   address: z.string().min(1, MSG.addressRequired),
   country: z.string().min(1, MSG.countryRequired),
   university: z.string().min(1, MSG.universityRequired),
 });
 
-// --- API schemas (full fields matching AbroadAlumni Prisma model) ---
+// --- API schemas (full fields matching AlumniAgency Prisma model) ---
 
-export const abroadAlumniCreateSchema = z
+export const alumniAgencyCreateSchema = z
   .object({
     cohort: z.string().optional().nullable(),
     prefix: z.string().optional().nullable(),
@@ -35,7 +36,7 @@ export const abroadAlumniCreateSchema = z
     path: ["thaiName"],
   });
 
-export const abroadAlumniUpdateSchema = z.object({
+export const alumniAgencyUpdateSchema = z.object({
   cohort: z.string().optional().nullable(),
   prefix: z.string().optional().nullable(),
   thaiName: z.string().optional().nullable(),
@@ -45,8 +46,9 @@ export const abroadAlumniUpdateSchema = z.object({
   country: z.string().min(1, MSG.countryRequired).trim().optional(),
   notes: z.string().optional().nullable(),
   order: z.coerce.number().int().optional(),
+  reason: editReasonField(),
 });
 
-export type AbroadAlumniFormData = z.infer<typeof abroadAlumniFormSchema>;
-export type AbroadAlumniCreateInput = z.infer<typeof abroadAlumniCreateSchema>;
-export type AbroadAlumniUpdateInput = z.infer<typeof abroadAlumniUpdateSchema>;
+export type AlumniAgencyFormData = z.infer<typeof alumniAgencyFormSchema>;
+export type AlumniAgencyCreateInput = z.infer<typeof alumniAgencyCreateSchema>;
+export type AlumniAgencyUpdateInput = z.infer<typeof alumniAgencyUpdateSchema>;

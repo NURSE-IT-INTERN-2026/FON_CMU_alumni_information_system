@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCanWrite } from "@/lib/role-context";
-import { DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { useCanWrite, useRole } from "@/lib/role-context";
+import { DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
 import { userCreateSchema, type UserCreateInput } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -43,6 +43,7 @@ interface AlumniAccount {
   email: string | null;
   phone: string | null;
   lastLoginAt: string | null;
+  suspendedAt: string | null;
 }
 
 const DEGREE_LABELS: Record<string, string> = {
@@ -110,6 +111,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const role = useRole();
 
   const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<UserCreateInput>({
     resolver: zodResolver(userCreateSchema) as any,
@@ -135,6 +137,18 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const openCreate = () => { formReset(EMPTY_FORM as any); setEditingId(null); setShowForm(true); };
   const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role } as any); setEditingId(m.id); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditingId(null); formReset(EMPTY_FORM as any); };
+
+  const toggleSuspend = async (m: AdminUser) => {
+    try {
+      const res = await fetch(`${BASE_PATH}/api/users/${m.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !m.isActive }),
+      });
+      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); return; }
+      fetchMembers();
+    } catch { setErrorMsg("เกิดข้อผิดพลาดในการดำเนินการ"); }
+  };
 
   const handleSave = async (data: UserCreateInput) => {
     setSaving(true); setErrorMsg("");
@@ -241,6 +255,11 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
                           <button onClick={() => openEdit(m)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="แก้ไข">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                           </button>
+                          {role === "superadmin" && (
+                            <button onClick={() => toggleSuspend(m)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${m.isActive ? "text-amber-600" : "text-green-600"}`} title={m.isActive ? "ระงับบัญชี" : "ยกเลิกการระงับ"}>
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                            </button>
+                          )}
                           <button onClick={() => setDeleteId(m.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" title="ลบ">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
@@ -281,6 +300,10 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [emailEdit, setEmailEdit] = useState<AlumniAccount | null>(null);
+  const [emailValue, setEmailValue] = useState("");
+  const [emailReason, setEmailReason] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
 
   const pageSize = 10;
 
@@ -305,6 +328,42 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
 
   const totalPages = Math.ceil(total / pageSize);
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
+  const toggleSuspend = async (a: AlumniAccount) => {
+    try {
+      const res = await fetch(`${BASE_PATH}/api/alumni-accounts/${a.id}/suspend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suspend: !a.suspendedAt }),
+      });
+      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); return; }
+      fetchAlumni();
+    } catch { setErrorMsg("เกิดข้อผิดพลาดในการดำเนินการ"); }
+  };
+
+  const openEmailEdit = (a: AlumniAccount) => {
+    setEmailEdit(a);
+    setEmailValue(a.email || "");
+    setEmailReason("");
+  };
+
+  const saveEmail = async () => {
+    if (!emailEdit) return;
+    if (!emailValue.trim()) { setErrorMsg("กรุณากรอกอีเมล"); return; }
+    if (!emailReason) { setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข"); return; }
+    setEmailSaving(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch(`${BASE_PATH}/api/alumni-accounts/${emailEdit.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailValue.trim(), reason: emailReason }),
+      });
+      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); setEmailSaving(false); return; }
+      setEmailEdit(null);
+      fetchAlumni();
+    } catch { setErrorMsg("เกิดข้อผิดพลาด"); } finally { setEmailSaving(false); }
+  };
 
   return (
     <>
@@ -339,6 +398,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">อีเมล</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">เบอร์โทรศัพท์</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">เข้าสู่ระบบล่าสุด</th>
+                {canWrite && <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">การจัดการ</th>}
               </tr>
             </thead>
             <tbody>
@@ -361,6 +421,18 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                     <td className="px-4 py-3 whitespace-nowrap">{a.email || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.phone || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{formatDate(a.lastLoginAt)}</td>
+                    {canWrite && (
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openEmailEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="เปลี่ยนอีเมล">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                          </button>
+                          <button onClick={() => toggleSuspend(a)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${a.suspendedAt ? "text-green-600" : "text-amber-600"}`} title={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"}>
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -375,6 +447,43 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50">ก่อนหน้า</button>
           <span className="text-sm text-[var(--muted)]">{page} / {totalPages}</span>
           <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50">ถัดไป</button>
+        </div>
+      )}
+
+      {/* Change email modal */}
+      {emailEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">
+              เปลี่ยนอีเมล — {emailEdit.firstName} {emailEdit.newLastName || emailEdit.maidenLastName}
+            </h3>
+            <label className="mb-1 block text-sm font-medium text-gray-700">อีเมลใหม่</label>
+            <input
+              type="email"
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+              className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+            />
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              เหตุผลในการแก้ไข <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={emailReason}
+              onChange={(e) => setEmailReason(e.target.value)}
+              className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+            >
+              <option value="">— กรุณาเลือก —</option>
+              {EDIT_REASON_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setEmailEdit(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">ยกเลิก</button>
+              <button onClick={saveEmail} disabled={emailSaving} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+                {emailSaving ? "กำลังบันทึก..." : "บันทึก"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

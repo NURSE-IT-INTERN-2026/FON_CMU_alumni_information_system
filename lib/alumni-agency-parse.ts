@@ -1,4 +1,4 @@
-export interface ParsedAbroadAlumniRow {
+export interface ParsedAlumniAgencyRow {
   cohort: string | null;
   prefix: string | null;
   thaiName: string | null;
@@ -49,8 +49,8 @@ export function isOriginalFormat(rawRows: (string | number)[][]): boolean {
 
 export function parseOriginalFormat(
   rows: (string | number)[][]
-): { data: ParsedAbroadAlumniRow; rowNumber: number }[] {
-  const result: { data: ParsedAbroadAlumniRow; rowNumber: number }[] = [];
+): { data: ParsedAlumniAgencyRow; rowNumber: number }[] {
+  const result: { data: ParsedAlumniAgencyRow; rowNumber: number }[] = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const cohort = String(r[0] || "").trim() || null;
@@ -71,8 +71,8 @@ export function parseOriginalFormat(
 
 export function parseExportFormat(
   rows: Record<string, string>[]
-): { data: ParsedAbroadAlumniRow; rowNumber: number }[] {
-  const result: { data: ParsedAbroadAlumniRow; rowNumber: number }[] = [];
+): { data: ParsedAlumniAgencyRow; rowNumber: number }[] {
+  const result: { data: ParsedAlumniAgencyRow; rowNumber: number }[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const country = row["ประเทศ"]?.toString().trim();

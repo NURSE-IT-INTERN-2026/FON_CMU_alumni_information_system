@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buddhistYearField } from "./helpers";
+import { buddhistYearField, editReasonField } from "./helpers";
 
 const MSG = {
   awardNameRequired: "กรุณากรอกชื่อรางวัล",
@@ -41,6 +41,7 @@ export const awardUpdateSchema = z.object({
   awardType: z.enum(AWARD_TYPE_VALUES).optional(),
   year: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
   description: z.string().optional().nullable(),
+  reason: editReasonField(),
 });
 
 export type AwardFormData = z.infer<typeof awardFormSchema>;

@@ -5,6 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, awardUpdateSchema } from "@/lib/validations";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function PUT(
   request: NextRequest,
@@ -25,6 +26,8 @@ export async function PUT(
     if (validated.year !== undefined) updateData.year = validated.year;
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
 
+    const old = await prisma.award.findUnique({ where: { id } });
+
     const award = await prisma.award.update({
       where: { id },
       data: updateData,
@@ -33,15 +36,24 @@ export async function PUT(
       },
     });
 
+    const changes = computeFieldChanges(old, award, TRACKED_FIELDS.award);
     const session = await getSession();
     if (session) {
+      await recordFieldChanges({
+        resourceType: "award",
+        resourceId: id,
+        changes,
+        actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email },
+        reason: validated.reason,
+      });
       await logActivity(
         { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "UPDATE",
         "award",
         id,
-        { awardName: award.awardName, awardType: award.awardType, year: award.year },
-        getIp(request)
+        { changes },
+        getIp(request),
+        validated.reason
       );
     }
 
@@ -64,7 +76,7 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
-    await prisma.award.delete({ where: { id } });
+    await prisma.award.update({ where: { id }, data: { deletedAt: new Date() } });
 
     const session = await getSession();
     if (session) {

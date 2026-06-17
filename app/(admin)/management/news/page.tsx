@@ -6,11 +6,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { BASE_PATH } from "@/lib/constants";
 import { newsFormSchema, type NewsFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+
+// PRD §3.12: news lists show at most 9 cards per page.
+const NEWS_PAGE_SIZE = 9;
+const MAX_INLINE_IMAGES = 4;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -172,6 +176,18 @@ export default function NewsListPage() {
     setCoverUploading(false);
   };
 
+  // PRD §3.12: at most MAX_INLINE_IMAGES inline images per news body.
+  const inlineImageCount = () => editorRef.current?.querySelectorAll("img").length ?? 0;
+  const tryAddInlineImage = (file: File) => {
+    if (inlineImageCount() >= MAX_INLINE_IMAGES) {
+      setErrorMsg(`อนุญาตใส่รูปภาพในเนื้อหาได้สูงสุด ${MAX_INLINE_IMAGES} รูป`);
+      return;
+    }
+    uploadImage(file).then((url) => {
+      if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`);
+    });
+  };
+
   const formBody = watch("body");
 
   const bodyStats = useMemo(() => {
@@ -187,7 +203,7 @@ export default function NewsListPage() {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: String(PAGE_SIZE),
+        pageSize: String(NEWS_PAGE_SIZE),
       });
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
@@ -322,8 +338,8 @@ export default function NewsListPage() {
     }
   };
 
-  const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const pageEnd = Math.min(page * PAGE_SIZE, total);
+  const pageStart = total === 0 ? 0 : (page - 1) * NEWS_PAGE_SIZE + 1;
+  const pageEnd = Math.min(page * NEWS_PAGE_SIZE, total);
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -489,7 +505,7 @@ export default function NewsListPage() {
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => inlineImageRef.current?.click()} title="แทรกรูปภาพ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </button>
-                <input ref={inlineImageRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImage(file).then((url) => { if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`); }); e.target.value = ""; }} />
+                <input ref={inlineImageRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) tryAddInlineImage(file); e.target.value = ""; }} />
                 <span className="mx-1 h-5 w-px bg-gray-300" />
                 {/* Bulleted list */}
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertUnorderedList")} title="รายการแบบ bullet" className={`rounded p-1.5 ${activeStates.insertUnorderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
@@ -627,11 +643,7 @@ export default function NewsListPage() {
                     if (items[i].type.match(/^image\/(jpeg|png)$/)) {
                       e.preventDefault();
                       const file = items[i].getAsFile();
-                      if (file) {
-                        uploadImage(file).then((url) => {
-                          if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`);
-                        });
-                      }
+                      if (file) tryAddInlineImage(file);
                       return;
                     }
                   }
@@ -710,7 +722,7 @@ export default function NewsListPage() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-              ลบที่เลือก ({selectedCount})
+              ยุติการเผยแพร่ที่เลือก ({selectedCount})
             </button>
           )}
         </div>
@@ -728,80 +740,81 @@ export default function NewsListPage() {
           <p className="text-[var(--muted)]">ยังไม่มีข่าวสาร</p>
         </div>
       ) : manageMode ? (
-        /* Management mode: table */
-        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[var(--primary)] text-white">
-                  {manageMode && (
-                    <th className="px-4 py-3 w-12">
-                      <input
-                        type="checkbox"
-                        checked={news.length > 0 && isAllSelected(news.map((n) => n.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) selectAll(news.map((n) => n.id));
-                          else deselectAll();
-                        }}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </th>
-                  )}
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-16">ลำดับ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">ชื่อเรื่อง</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-32">สถานะ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-40">วันที่เผยแพร่</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider w-28">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {news.map((item, i) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    {manageMode && (
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(item.id)}
-                          onChange={() => toggleSelect(item.id)}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-3 text-gray-500">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-gray-800">{item.title}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
-                        {STATUS_LABELS[item.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{formatThaiDate(item.publishedAt)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(item)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                        </button>
-                        <button onClick={() => setDeleteId(item.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        /* Management mode: cards with edit/delete (PRD §3.12 — not a table) */
+        <div>
+          <div className="mb-3 flex items-center justify-end">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={news.length > 0 && isAllSelected(news.map((n) => n.id))}
+                onChange={(e) => { if (e.target.checked) selectAll(news.map((n) => n.id)); else deselectAll(); }}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              เลือกทั้งหมดในหน้านี้
+            </label>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-            <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-            <div className="flex items-center gap-1">
-              <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
-              {paginationNumbers.map((p, i) =>
-                p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
-                  <button key={p} onClick={() => setPage(p)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${page === p ? "bg-[var(--primary)] text-white" : "text-gray-600 bg-white hover:bg-gray-100"}`}>{p}</button>
-                )
-              )}
-              <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ถัดไป</button>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {news.map((item) => {
+              const summary = stripHtml(item.body).slice(0, 150);
+              return (
+                <div key={item.id} className="group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md">
+                  <div className="absolute right-2 top-2 z-10">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
+                      {STATUS_LABELS[item.status]}
+                    </span>
+                  </div>
+                  <Link href={`/news/${item.id}`} className="block">
+                    <div className="aspect-video w-full overflow-hidden bg-gray-100">
+                      {item.coverImageUrl ? (
+                        <img src={item.coverImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
+                          <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="mb-2 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{item.title}</h3>
+                      <p className="mb-2 text-xs text-[var(--muted)]">{item.publishedAt ? formatThaiDate(item.publishedAt) : ""}</p>
+                      {summary && <p className="line-clamp-3 text-sm text-[var(--muted)]">{summary}{stripHtml(item.body).length > 150 ? "..." : ""}</p>}
+                    </div>
+                  </Link>
+                  <div className="mt-auto flex items-center justify-between border-t border-gray-100 px-4 py-2.5">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-500">
+                      <input type="checkbox" checked={isSelected(item.id)} onChange={() => toggleSelect(item.id)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                      เลือก
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                        แก้ไข
+                      </button>
+                      <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        ยุติการเผยแพร่
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
+                {paginationNumbers.map((p, i) =>
+                  p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
+                    <button key={p} onClick={() => setPage(p)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${page === p ? "bg-[var(--primary)] text-white" : "text-gray-600 bg-white hover:bg-gray-100"}`}>{p}</button>
+                  )
+                )}
+                <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ถัดไป</button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         /* View mode: news cards */
@@ -860,8 +873,8 @@ export default function NewsListPage() {
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข่าว</h3>
-            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข่าวสารนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการยุติการเผยแพร่</h3>
+            <p className="mb-6 text-sm text-gray-600">คุณต้องการยุติการเผยแพร่ข่าวสารนี้หรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ</p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
               <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
@@ -873,9 +886,9 @@ export default function NewsListPage() {
       {showBulkDeleteDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการยุติการเผยแพร่</h3>
             <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+              คุณต้องการยุติการเผยแพร่ข่าวสาร <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>

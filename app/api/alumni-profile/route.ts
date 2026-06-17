@@ -5,6 +5,7 @@ import { AwardType, DegreeLevel } from "@/app/generated/prisma/client";
 import { getAlumniSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, alumniProfileUpdateSchema } from "@/lib/validations";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 const RELATED_INCLUDE = {
   awards: true,
@@ -12,7 +13,7 @@ const RELATED_INCLUDE = {
   graduateCommittees: true,
   potentials: true,
   modelRepresentatives: true,
-  abroadAlumni: true,
+  alumniAgency: true,
 } as const;
 
 export async function GET() {
@@ -68,9 +69,10 @@ export async function PUT(request: NextRequest) {
 
     const hasPotentials = (validated.potentials?.length ?? 0) > 0;
     const hasModelReps = (validated.modelRepresentatives?.length ?? 0) > 0;
-    const hasAbroad = (validated.abroadAlumni?.length ?? 0) > 0;
+    const hasAbroad = (validated.alumniAgency?.length ?? 0) > 0;
 
     try {
+      const oldCore = await prisma.alumni.findUnique({ where: { id: alumniId } });
       const alumni = await prisma.$transaction(async (tx) => {
         // --- Core fields ---
         const updated = await tx.alumni.update({
@@ -170,10 +172,10 @@ export async function PUT(request: NextRequest) {
 
         // Abroad alumni (only touches rows linked to this studentId;
         // imported flat-list rows with studentId = null are left alone).
-        await tx.abroadAlumni.deleteMany({ where: { studentId } });
+        await tx.alumniAgency.deleteMany({ where: { studentId } });
         if (hasAbroad) {
-          await tx.abroadAlumni.createMany({
-            data: validated.abroadAlumni!.map((a, idx) => ({
+          await tx.alumniAgency.createMany({
+            data: validated.alumniAgency!.map((a, idx) => ({
               studentId,
               // Identity fields are auto-filled from the alumni record:
               prefix: validated.prefix,
@@ -192,7 +194,9 @@ export async function PUT(request: NextRequest) {
         return updated;
       });
 
-      // Log alumni profile edit
+      // Log alumni profile edit + field-change history
+      const changes = computeFieldChanges(oldCore, alumni, TRACKED_FIELDS.alumni_profile);
+      await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}` }, reason: validated.reason });
       const ip = getIp(request);
       await logActivity(
         {
@@ -211,10 +215,11 @@ export async function PUT(request: NextRequest) {
             graduateCommittees: validated.graduateCommittees?.length ?? 0,
             potentials: validated.potentials?.length ?? 0,
             modelRepresentatives: validated.modelRepresentatives?.length ?? 0,
-            abroadAlumni: validated.abroadAlumni?.length ?? 0,
+            alumniAgency: validated.alumniAgency?.length ?? 0,
           },
         },
-        ip
+        ip,
+        validated.reason
       );
 
       return NextResponse.json(alumni);

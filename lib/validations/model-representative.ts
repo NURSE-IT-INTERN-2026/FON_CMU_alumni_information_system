@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณาระบุรหัสนักศึกษา",
@@ -32,6 +33,7 @@ export const modelRepUpdateSchema = z.object({
   name: z.string().min(1, MSG.nameRequired).trim().optional(),
   cohort: z.string().min(1, MSG.cohortRequired).trim().optional(),
   generation: z.coerce.number().int(MSG.generationInvalid).optional(),
+  reason: editReasonField(),
 });
 
 export type ModelRepFormData = z.infer<typeof modelRepFormSchema>;

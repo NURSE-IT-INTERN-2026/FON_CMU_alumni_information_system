@@ -19,7 +19,24 @@ export const PREFIX_OPTIONS = [
   { value: "อื่นๆ", label: "อื่นๆ" },
 ];
 
-export const NAV_ITEMS = [
+/**
+ * Reason required when editing any record (admin data pages + alumni profile).
+ * No default — forces an explicit choice to keep activity logs accurate.
+ */
+export const EDIT_REASON_VALUES = ["แก้ไขให้ถูกต้อง", "อัปเดตข้อมูล"] as const;
+export const EDIT_REASON_OPTIONS = EDIT_REASON_VALUES.map((value) => ({
+  value,
+  label: value,
+}));
+
+export interface NavItem {
+  href: string;
+  label: string;
+  adminOnly?: boolean;
+  superAdminOnly?: boolean;
+}
+
+export const NAV_ITEMS: NavItem[] = [
   { href: "/management/dashboard", label: "แผงควบคุม" },
   { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
   { href: "/management/awards", label: "รางวัล" },
@@ -27,14 +44,15 @@ export const NAV_ITEMS = [
   { href: "/management/associations", label: "สมาคม/ชมรม" },
   { href: "/management/graduate-committee", label: "กรรมการบัณฑิต" },
   { href: "/management/model-representatives", label: "ผู้แทนรุ่น" },
-  { href: "/management/abroad-alumni", label: "ข้อมูลการทำงานต่างประเทศ" },
+  { href: "/management/alumni-agency", label: "ต้นสังกัดศิษย์เก่า" },
   { href: "/management/news", label: "ข่าวสาร" },
 ];
 
-export const SETTINGS_NAV_ITEMS = [
+export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { href: "/management/settings/profile", label: "ข้อมูลส่วนตัว" },
   { href: "/management/settings/users", label: "จัดการผู้ใช้งาน" },
   { href: "/management/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
+  { href: "/management/settings/trash", label: "รายการที่ถูกลบ", superAdminOnly: true },
 ];
 
 export const PAGE_SIZE = 10;

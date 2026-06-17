@@ -5,6 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
   request: NextRequest,
@@ -67,7 +68,8 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(validated as Record<string, unknown>)) {
-      if (value !== undefined) {
+      // `reason` is a log-only field, not an Alumni column.
+      if (value !== undefined && key !== "reason") {
         updateData[key] = value;
       }
     }
@@ -96,15 +98,18 @@ export async function PUT(
       },
     });
 
+    const changes = computeFieldChanges(existing, alumni, TRACKED_FIELDS.alumni);
     const session = await getSession();
     if (session) {
+      await recordFieldChanges({ resourceType: "alumni", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason });
       await logActivity(
         { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "UPDATE",
         "alumni",
         id,
-        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}` },
-        getIp(request)
+        { changes },
+        getIp(request),
+        validated.reason
       );
     }
 

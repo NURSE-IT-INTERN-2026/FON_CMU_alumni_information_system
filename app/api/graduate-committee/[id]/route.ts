@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, committeeUpdateSchema } from "@/lib/validations";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function PUT(
   request: NextRequest,
@@ -15,6 +18,8 @@ export async function PUT(
     const body = await request.json();
     const validated = committeeUpdateSchema.parse(body);
 
+    const old = await prisma.graduateCommittee.findUnique({ where: { id } });
+
     const committee = await prisma.graduateCommittee.update({
       where: { id },
       data: {
@@ -26,6 +31,21 @@ export async function PUT(
         remarks: validated.remarks?.trim() || null,
       },
     });
+
+    const changes = computeFieldChanges(old, committee, TRACKED_FIELDS.graduate_committee);
+    const session = await getSession();
+    if (session) {
+      await recordFieldChanges({ resourceType: "graduate_committee", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason });
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "UPDATE",
+        "graduate_committee",
+        id,
+        { changes },
+        getIp(request),
+        validated.reason
+      );
+    }
 
     return NextResponse.json(committee);
   } catch (error) {
@@ -46,7 +66,7 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
-    await prisma.graduateCommittee.delete({ where: { id } });
+    await prisma.graduateCommittee.update({ where: { id }, data: { deletedAt: new Date() } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete graduate committee:", error);

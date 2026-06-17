@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS } from "@/lib/constants";
-import { useCanWrite, useIsAdmin } from "@/lib/role-context";
+import { useCanWrite, useIsAdmin, useRole } from "@/lib/role-context";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const canWrite = useCanWrite();
   const isAdmin = useIsAdmin();
+  const role = useRole();
+  const isSuperAdmin = role === "superadmin";
   const showSettings = pathname.startsWith("/management/settings");
 
   const items = showSettings
     ? SETTINGS_NAV_ITEMS.filter((item) => {
+        if (item.superAdminOnly && !isSuperAdmin) return false;
         if (item.adminOnly && !isAdmin) return false;
         if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
         return true;

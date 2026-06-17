@@ -47,6 +47,7 @@ interface DashboardData {
     total: number;
     latestYear: number | null;
     latestYearCount: number;
+    byType: Record<string, number>;
   };
   potentials: {
     total: number;
@@ -66,7 +67,7 @@ interface DashboardData {
     total: number;
     distinctCohorts: number;
   };
-  abroadAlumni: {
+  alumniAgency: {
     total: number;
     distinctCountries: number;
   };
@@ -121,19 +122,14 @@ const DEGREE_MINI_CARDS = [
   { key: "DOCTORAL", label: "ปริญญาเอก", color: "#c62828" },
 ];
 
+// PRD §3.2: awards summary on the dashboard, grouped by type (in this order).
+const AWARD_TYPE_MINI_CARDS = [
+  { key: "LOCAL", label: "ระดับท้องถิ่น", color: "#38a169" },
+  { key: "NATIONAL", label: "ระดับชาติ", color: "#f57f17" },
+  { key: "INTERNATIONAL", label: "ระดับนานาชาติ", color: "#1565c0" },
+];
+
 const CARDS: CardConfig[] = [
-  {
-    label: "รางวัล",
-    href: "/management/awards",
-    color: "#e8a838",
-    icon: (
-      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-4.5A3.375 3.375 0 0 0 13.125 10.875h-2.25A3.375 3.375 0 0 0 7.5 14.25v4.5m6-15a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-      </svg>
-    ),
-    getCount: (d) => d.awards.total,
-    getSubStat: () => "",
-  },
   {
     label: "ศักยภาพ",
     href: "/management/potentials",
@@ -186,16 +182,16 @@ const CARDS: CardConfig[] = [
     getSubStat: (d) => `${d.modelRepresentatives.distinctCohorts.toLocaleString()} รุ่น`,
   },
   {
-    label: "ข้อมูลการทำงานต่างประเทศ",
-    href: "/management/abroad-alumni",
+    label: "ต้นสังกัดศิษย์เก่า",
+    href: "/management/alumni-agency",
     color: "#1565c0",
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5a17.92 17.92 0 0 1-8.716-2.247m0 0A8.966 8.966 0 0 1 3 12c0-1.264.26-2.466.732-3.558" />
       </svg>
     ),
-    getCount: (d) => d.abroadAlumni.total,
-    getSubStat: (d) => `${d.abroadAlumni.distinctCountries.toLocaleString()} ประเทศ`,
+    getCount: (d) => d.alumniAgency.total,
+    getSubStat: (d) => `${d.alumniAgency.distinctCountries.toLocaleString()} ประเทศ`,
   },
 ];
 
@@ -406,6 +402,41 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+      </Link>
+
+      {/* Awards summary grouped by type (PRD §3.2) */}
+      <Link
+        href="/management/awards"
+        className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
+        style={{ borderLeftColor: "#e8a838" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg p-2.5" style={{ backgroundColor: "#e8a83810", color: "#e8a838" }}>
+            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-4.5A3.375 3.375 0 0 0 13.125 10.875h-2.25A3.375 3.375 0 0 0 7.5 14.25v4.5m6-15a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--muted)]">รางวัลทั้งหมด</p>
+            <p className="text-3xl font-bold text-[#e8a838] sm:text-4xl">
+              {data.awards.total.toLocaleString()} <span className="text-base font-normal text-[var(--muted)]">รายการ</span>
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {AWARD_TYPE_MINI_CARDS.map((t) => (
+            <div
+              key={t.key}
+              className="rounded-lg p-3"
+              style={{ backgroundColor: `${t.color}08`, borderTop: `3px solid ${t.color}` }}
+            >
+              <p className="text-xs text-[var(--muted)]">{t.label}</p>
+              <p className="mt-0.5 text-lg font-bold" style={{ color: t.color }}>
+                {(data.awards.byType[t.key] ?? 0).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
       </Link>
 
       {/* Dashboard Cards Grid */}

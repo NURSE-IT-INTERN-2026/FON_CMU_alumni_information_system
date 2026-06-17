@@ -7,9 +7,13 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import { useCanWrite } from "@/lib/role-context";
-import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, EDIT_REASON_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import { awardFormSchema, type AwardFormData } from "@/lib/validations";
 
 interface Award {
@@ -20,6 +24,7 @@ interface Award {
   awardType: string;
   year: number;
   description: string | null;
+  major?: string | null;
   alumni: {
     prefix: string;
     firstName: string;
@@ -41,7 +46,7 @@ const AWARD_COLORS: Record<string, string> = {
   LOCAL: "#38a169",
 };
 
-type SortField = "name" | "award" | "type" | "year";
+type SortField = "name" | "award" | "type" | "year" | "major" | "description";
 type SortDir = "asc" | "desc";
 
 type FormValues = AwardFormData & { studentId: string };
@@ -70,14 +75,16 @@ export default function AwardsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
-  const [awardTypeFilter, setAwardTypeFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("year");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(awardFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
@@ -105,6 +112,7 @@ export default function AwardsPage() {
   const [nameSearch, setNameSearch] = useState("");
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
+  const hot = useHotFields("award", awards.map((a) => a.id));
 
   const fetchAwards = useCallback(async () => {
     setLoading(true);
@@ -113,11 +121,11 @@ export default function AwardsPage() {
         page: String(page),
         pageSize: String(PAGE_SIZE),
         search,
-        awardType: awardTypeFilter,
         sortField,
         sortDir,
         searchField,
       });
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
       const res = await fetch(`${BASE_PATH}/api/awards?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
@@ -129,7 +137,7 @@ export default function AwardsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, searchField, awardTypeFilter, sortField, sortDir]);
+  }, [page, search, searchField, sortField, sortDir, filtersKey]);
 
   const fetchTypeCounts = useCallback(async () => {
     try {
@@ -148,7 +156,8 @@ export default function AwardsPage() {
   useEffect(() => { fetchAwards(); }, [fetchAwards]);
 
   const handleSearch = (value: string) => { setSearch(value); setPage(1); };
-  const handleFilter = (value: string) => { setAwardTypeFilter(value); setPage(1); };
+
+  const setFilter = (field: string, vals: string[]) => { setFilters((prev) => ({ ...prev, [field]: vals })); setPage(1); };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
@@ -162,7 +171,6 @@ export default function AwardsPage() {
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
-  const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -192,6 +200,7 @@ export default function AwardsPage() {
     setNameSearch("");
     setFormSearchField(null);
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
@@ -205,12 +214,14 @@ export default function AwardsPage() {
     });
     setNameSearch(alumniDisplayName(a.alumni, a.recipientName));
     setEditingId(a.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setFormSearchField(null);
@@ -219,8 +230,12 @@ export default function AwardsPage() {
 
   const onSave = async (data: AwardFormData) => {
     const studentId = getValues("studentId");
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       if (editingId) {
         // Edit mode
@@ -231,6 +246,7 @@ export default function AwardsPage() {
           awardType: data.awardType,
           year: Number(data.year),
           description: data.description.trim() || null,
+          reason: editReason,
         };
         const res = await fetch(`${BASE_PATH}/api/awards/${editingId}`, {
           method: "PUT",
@@ -337,7 +353,6 @@ export default function AwardsPage() {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     if (searchField !== "all") params.set("searchField", searchField);
-    if (awardTypeFilter) params.set("awardType", awardTypeFilter);
     params.set("sortField", sortField);
     params.set("sortDir", sortDir);
     window.location.href = `${BASE_PATH}/api/awards/export?${params}`;
@@ -469,6 +484,20 @@ export default function AwardsPage() {
             <FormField label="รายละเอียด" required error={errors.description?.message} className="sm:col-span-2">
               <FormInput registration={register("description")} error={errors.description?.message} type="text" />
             </FormField>
+            {editingId && (
+              <FormField label="เหตุผลในการแก้ไข" required className="sm:col-span-2">
+                <select
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                >
+                  <option value="">— กรุณาเลือก —</option>
+                  {EDIT_REASON_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </FormField>
+            )}
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
@@ -546,16 +575,12 @@ export default function AwardsPage() {
           onChange={(e) => handleSearch(e.target.value)}
           className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         />
-        <select
-          value={awardTypeFilter}
-          onChange={(e) => handleFilter(e.target.value)}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          <option value="">ทุกประเภท</option>
-          {Object.entries(AWARD_TYPE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
+      </div>
+
+      {/* Facet filters */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FacetFilter entity="awards" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+        <FacetFilter entity="awards" field="awardType" label="ประเภท" selected={filters.awardType ?? []} onChange={(v) => setFilter("awardType", v)} valueLabels={AWARD_TYPE_LABELS} />
       </div>
 
       {manageMode && !showForm && (
@@ -613,8 +638,8 @@ export default function AwardsPage() {
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                  ลำดับ
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
+                  สาขาวิชา <SortIcon field="major" />
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                   ชื่อ-นามสกุล <SortIcon field="name" />
@@ -628,8 +653,8 @@ export default function AwardsPage() {
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
                   ปีที่ได้รับ <SortIcon field="year" />
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                  รายละเอียด
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("description")}>
+                  รายละเอียด <SortIcon field="description" />
                 </th>
                 {manageMode && (
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
@@ -650,7 +675,7 @@ export default function AwardsPage() {
                   <td colSpan={manageMode ? 8 : 6} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
-                awards.map((award, i) => (
+                awards.map((award) => (
                   <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
@@ -662,16 +687,16 @@ export default function AwardsPage() {
                         />
                       </td>
                     )}
-                    <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
+                    <td className="px-4 py-3">{award.major || "-"}</td>
                     <td className="px-4 py-3">{alumniDisplayName(award.alumni, award.recipientName)}</td>
-                    <td className="px-4 py-3">{award.awardName}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="awardName" value={award.awardName} hotFields={hot[award.id]} /></td>
                     <td className="px-4 py-3">
                       <span className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: AWARD_COLORS[award.awardType] || "#999" }}>
-                        {AWARD_TYPE_LABELS[award.awardType] || award.awardType}
+                        <OrangeCell resourceType="award" recordId={award.id} field="awardType" value={AWARD_TYPE_LABELS[award.awardType] || award.awardType} hotFields={hot[award.id]} />
                       </span>
                     </td>
-                    <td className="px-4 py-3">{award.year}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]">{award.description || "-"}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="year" value={award.year} hotFields={hot[award.id]} /></td>
+                    <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="award" recordId={award.id} field="description" value={award.description || "-"} hotFields={hot[award.id]} /></td>
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">

@@ -13,7 +13,10 @@ export type LogAction =
   | "PASSWORD_RESET_COMPLETE"
   | "APPROVE"
   | "REJECT"
-  | "VERIFY_IDENTITY";
+  | "VERIFY_IDENTITY"
+  | "RESTORE"
+  | "SUSPEND"
+  | "HARD_DELETE";
 
 export type LogResource =
   | "alumni"
@@ -22,7 +25,7 @@ export type LogResource =
   | "graduate_committee"
   | "potential"
   | "model_representative"
-  | "abroad_alumni"
+  | "alumni_agency"
   | "news"
   | "user"
   | "alumni_profile"
@@ -50,7 +53,8 @@ export async function logActivity(
   resource: LogResource,
   resourceId?: string | null,
   details?: Record<string, unknown> | null,
-  ipAddress?: string | null
+  ipAddress?: string | null,
+  reason?: string | null
 ): Promise<void> {
   try {
     if (ctx.actorType === "ADMIN") {
@@ -63,6 +67,7 @@ export async function logActivity(
           action,
           resource,
           resourceId: resourceId ?? null,
+          reason: reason ?? null,
           details: details ? (details as Prisma.InputJsonValue) : undefined,
           ipAddress: ipAddress ?? null,
         },
@@ -76,6 +81,7 @@ export async function logActivity(
           action,
           resource,
           resourceId: resourceId ?? null,
+          reason: reason ?? null,
           details: details ? (details as Prisma.InputJsonValue) : undefined,
           ipAddress: ipAddress ?? null,
         },

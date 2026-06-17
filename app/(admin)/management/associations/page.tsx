@@ -4,9 +4,13 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import { associationFormSchema, type AssociationFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -18,6 +22,7 @@ interface Association {
   associationName: string;
   position: string;
   recordedYear: number;
+  major?: string | null;
 }
 
 interface ApiResponse {
@@ -28,7 +33,7 @@ interface ApiResponse {
   totalPages: number;
 }
 
-type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
+type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear" | "major";
 type SortDir = "asc" | "desc";
 type SearchField = "all" | "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
 
@@ -56,6 +61,8 @@ export default function AssociationsPage() {
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("associationName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
 
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(associationFormSchema) as any,
@@ -64,6 +71,7 @@ export default function AssociationsPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -84,6 +92,7 @@ export default function AssociationsPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "fullName" | null>(null);
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
+  const hot = useHotFields("association", items.map((item) => item.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setValue("studentId", a.studentId);
@@ -113,6 +122,7 @@ export default function AssociationsPage() {
       });
       if (search.trim()) params.set("search", search.trim());
       params.set("searchField", searchField);
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
       const res = await fetch(`${BASE_PATH}/api/associations?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
@@ -124,7 +134,7 @@ export default function AssociationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, searchField, sortField, sortDir]);
+  }, [page, search, searchField, sortField, sortDir, filtersKey]);
 
   useEffect(() => {
     fetchItems();
@@ -132,6 +142,11 @@ export default function AssociationsPage() {
 
   const handleSearch = (value: string) => {
     setSearch(value);
+    setPage(1);
+  };
+
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
     setPage(1);
   };
 
@@ -147,6 +162,7 @@ export default function AssociationsPage() {
   const openCreate = () => {
     formReset(DEFAULT_FORM_VALUES);
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
@@ -159,12 +175,14 @@ export default function AssociationsPage() {
       recordedYear: String(item.recordedYear),
     });
     setEditingId(item.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
     setAlumniSearchField(null);
     clearResults();
@@ -173,10 +191,14 @@ export default function AssociationsPage() {
   const onSave = async (data: AssociationFormData) => {
     const studentId = getValues("studentId");
     const fullName = getValues("fullName");
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
-      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear) };
+      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
         const res = await fetch(`${BASE_PATH}/api/associations/${editingId}`, {
           method: "PUT",
@@ -441,6 +463,20 @@ export default function AssociationsPage() {
               <FormInput registration={register("recordedYear")} error={errors.recordedYear?.message} type="text" placeholder="เช่น 2568" />
             </FormField>
           </div>
+          {editingId && (
+            <FormField label="เหตุผลในการแก้ไข" required>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -508,6 +544,14 @@ export default function AssociationsPage() {
         />
       </div>
 
+      {/* Facet filters */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FacetFilter entity="associations" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+        <FacetFilter entity="associations" field="associationName" label="ชื่อสมาคม/ชมรม" selected={filters.associationName ?? []} onChange={(v) => setFilter("associationName", v)} />
+        <FacetFilter entity="associations" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
+        <FacetFilter entity="associations" field="recordedYear" label="ปีที่บันทึก" selected={filters.recordedYear ?? []} onChange={(v) => setFilter("recordedYear", v)} />
+      </div>
+
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16">
@@ -550,6 +594,9 @@ export default function AssociationsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
                   ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("major")}>
+                  สาขาวิชา {sortField === "major" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
@@ -574,9 +621,10 @@ export default function AssociationsPage() {
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{item.studentId}</td>
                   <td className="px-4 py-3">{item.fullName}</td>
-                  <td className="px-4 py-3">{item.associationName}</td>
-                  <td className="px-4 py-3">{item.position}</td>
-                  <td className="px-4 py-3 text-center">{item.recordedYear}</td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="associationName" value={item.associationName} hotFields={hot[item.id]} /></td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="position" value={item.position} hotFields={hot[item.id]} /></td>
+                  <td className="px-4 py-3">{item.major || "-"}</td>
+                  <td className="px-4 py-3 text-center"><OrangeCell resourceType="association" recordId={item.id} field="recordedYear" value={item.recordedYear} hotFields={hot[item.id]} /></td>
                   {manageMode && (
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">

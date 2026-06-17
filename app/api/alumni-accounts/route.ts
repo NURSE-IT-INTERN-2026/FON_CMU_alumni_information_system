@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
           email: true,
           phone: true,
           lastLoginAt: true,
+          suspendedAt: true,
         },
       }),
       prisma.alumni.count({ where }),

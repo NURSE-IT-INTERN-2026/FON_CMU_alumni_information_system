@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { handleZodError, modelRepCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["model-representatives"]));
 
     if (search) {
       where.OR = [

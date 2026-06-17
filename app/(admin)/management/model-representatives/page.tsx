@@ -5,9 +5,13 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import { modelRepFormSchema, type ModelRepFormData } from "@/lib/validations/model-representative";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -72,6 +76,8 @@ export default function ModelRepresentativesPage() {
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
   const [networkFilter, setNetworkFilter] = useState<string>("all");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
 
   const [viewSortField, setViewSortField] = useState<SortField>("network");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("asc");
@@ -83,6 +89,7 @@ export default function ModelRepresentativesPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(modelRepFormSchema) as any,
     defaultValues: { studentId: "", name: "", cohort: "", generation: "" },
@@ -167,7 +174,9 @@ export default function ModelRepresentativesPage() {
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_PATH}/api/model-representatives`);
+      const params = new URLSearchParams();
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
+      const res = await fetch(`${BASE_PATH}/api/model-representatives${params.toString() ? `?${params}` : ""}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
@@ -176,11 +185,17 @@ export default function ModelRepresentativesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filtersKey]);
 
   useEffect(() => {
     fetchAlumni();
   }, [fetchAlumni]);
+
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
+    setViewPage(1);
+    setManagePage(1);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -257,6 +272,7 @@ export default function ModelRepresentativesPage() {
   const openCreate = () => {
     formReset({ studentId: "", name: "", cohort: "", generation: "" });
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
@@ -268,12 +284,14 @@ export default function ModelRepresentativesPage() {
       generation: String(item.generation),
     });
     setEditingId(item.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     formReset({ studentId: "", name: "", cohort: "", generation: "" });
     setShowCohortDropdown(false);
     setSearchField(null);
@@ -283,14 +301,19 @@ export default function ModelRepresentativesPage() {
   const onSave = async (data: ModelRepFormData) => {
     const studentId = getValues("studentId");
     const name = getValues("name");
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       const payload = {
         studentId: studentId.trim(),
         name: name.trim(),
         cohort: data.cohort.trim(),
         generation: Number(data.generation),
+        ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
         const res = await fetch(`${BASE_PATH}/api/model-representatives/${editingId}`, {
@@ -405,6 +428,7 @@ export default function ModelRepresentativesPage() {
   const currentManagePage = Math.min(managePage, manageTotalPages);
   const manageStart = (currentManagePage - 1) * PAGE_SIZE;
   const managePageItems = mgmtSorted.slice(manageStart, manageStart + PAGE_SIZE);
+  const hot = useHotFields("model_representative", managePageItems.map((a) => a.id));
   const managePageStart = mgmtSorted.length === 0 ? 0 : manageStart + 1;
   const managePageEnd = Math.min(manageStart + PAGE_SIZE, mgmtSorted.length);
 
@@ -689,6 +713,20 @@ export default function ModelRepresentativesPage() {
               <FormInput registration={register("generation")} error={errors.generation?.message} type="number" />
             </FormField>
           </div>
+          {editingId && (
+            <FormField label="เหตุผลในการแก้ไข" required>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <div className="mt-4 flex justify-end gap-3">
             <button
               onClick={closeForm}
@@ -799,6 +837,13 @@ export default function ModelRepresentativesPage() {
         </select>
       </div>
 
+      {/* Facet filters */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <FacetFilter entity="model-representatives" field="name" label="เครือข่าย" selected={filters.name ?? []} onChange={(v) => setFilter("name", v)} />
+        <FacetFilter entity="model-representatives" field="cohort" label="รุ่นที่" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
+        <FacetFilter entity="model-representatives" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
@@ -848,9 +893,9 @@ export default function ModelRepresentativesPage() {
                         className="h-4 w-4 rounded border-gray-300"
                       />
                     </td>
-                    <td className="px-4 py-3">{a.cohort}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="cohort" value={a.cohort} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center text-gray-500">
-                      {a.generation}
+                      <OrangeCell resourceType="model_representative" recordId={a.id} field="generation" value={a.generation} hotFields={hot[a.id]} />
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3">{a.name}</td>

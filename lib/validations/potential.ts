@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buddhistYearField } from "./helpers";
+import { buddhistYearField, editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณาระบุรหัสนักศึกษา",
@@ -32,6 +32,7 @@ export const potentialUpdateSchema = z.object({
   career: z.string().min(1, MSG.careerRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
+  reason: editReasonField(),
 });
 
 export type PotentialFormData = z.infer<typeof potentialFormSchema>;

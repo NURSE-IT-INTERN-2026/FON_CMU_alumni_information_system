@@ -4,15 +4,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
+import { useRole } from "@/lib/role-context";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const role = useRole();
+  const isSuperAdmin = role === "superadmin";
   const showLogout = pathname !== "/login";
   const showSettings = pathname.startsWith("/management/settings");
 
-  const items = showSettings ? SETTINGS_NAV_ITEMS : NAV_ITEMS;
+  const items = showSettings
+    ? SETTINGS_NAV_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
+    : NAV_ITEMS;
 
   const toggleSettings = () => {
     setMobileMenuOpen(false);

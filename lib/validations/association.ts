@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buddhistYearField } from "./helpers";
+import { buddhistYearField, editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณาระบุรหัสนักศึกษา",
@@ -32,6 +32,7 @@ export const associationUpdateSchema = z.object({
   associationName: z.string().min(1, MSG.associationNameRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
+  reason: editReasonField(),
 });
 
 export type AssociationFormData = z.infer<typeof associationFormSchema>;

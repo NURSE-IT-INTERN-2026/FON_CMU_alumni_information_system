@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
-import { Prisma, DegreeLevel } from "@/app/generated/prisma/client";
+import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, alumniCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -18,7 +19,6 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const search = searchParams.get("search") || "";
-    const degreeLevel = searchParams.get("degreeLevel") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
     const includeDeleted = searchParams.get("includeDeleted") === "true";
@@ -29,11 +29,18 @@ export async function GET(request: NextRequest) {
       "firstName",
       "maidenLastName",
       "newLastName",
+      "englishName",
       "studentId",
       "cohort",
       "prefix",
       "degreeLevel",
       "province",
+      "major",
+      "graduationYear",
+      "birthDate",
+      "remarks",
+      "currentWorkplace",
+      "homeAddress",
     ];
     const validSortField = allowedSortFields.includes(sortField) ? sortField : "createdAt";
     const validSortOrder: "asc" | "desc" = sortOrder === "asc" ? "asc" : "desc";
@@ -52,9 +59,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    if (degreeLevel && Object.values(DegreeLevel).includes(degreeLevel as DegreeLevel)) {
-      where.degreeLevel = degreeLevel as DegreeLevel;
-    }
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.alumni));
 
     const [data, total] = await Promise.all([
       prisma.alumni.findMany({

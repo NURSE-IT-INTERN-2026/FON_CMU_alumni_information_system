@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCanWrite } from "@/lib/role-context";
-import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
 
 interface AlumniData {
   id: string;
@@ -86,6 +86,7 @@ export default function AlumniProfilePage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [editReason, setEditReason] = useState("");
 
   // Core alumni form
   const [alumni, setAlumni] = useState({
@@ -203,6 +204,7 @@ export default function AlumniProfilePage() {
     setEditMode(true);
     setErrorMsg("");
     setSuccessMsg("");
+    setEditReason("");
     // Snapshot current state for cancel
     setOriginalAlumni({ ...alumni });
     setOrigSections({ ...sections });
@@ -216,6 +218,7 @@ export default function AlumniProfilePage() {
   const cancelEdit = () => {
     setEditMode(false);
     setErrorMsg("");
+    setEditReason("");
     setAlumni({ ...originalAlumni });
     setSections({ ...origSections });
     setAwardRows(origAwardRows.map((r) => ({ ...r })));
@@ -307,11 +310,16 @@ export default function AlumniProfilePage() {
 
   const handleSave = async () => {
     if (!validate()) return;
+    if (!editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
 
     setSaving(true);
     setErrorMsg("");
 
     const payload: Record<string, unknown> = {
+      reason: editReason,
       prefix: alumni.prefix,
       firstName: alumni.firstName.trim(),
       maidenLastName: alumni.maidenLastName.trim(),
@@ -779,13 +787,29 @@ export default function AlumniProfilePage() {
 
         {/* Action Buttons */}
         {editMode && (
-          <div className="mt-6 flex gap-3 justify-end">
-            <button
-              onClick={cancelEdit}
-              className="px-6 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
-            >
-              ยกเลิก
-            </button>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className={labelClass}>
+                เหตุผลในการแก้ไข <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelEdit}
+                className="px-6 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
+              >
+                ยกเลิก
+              </button>
             {canWrite && (
               <button
                 onClick={handleSave}
@@ -795,6 +819,7 @@ export default function AlumniProfilePage() {
                 {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
               </button>
             )}
+          </div>
           </div>
         )}
       </div>

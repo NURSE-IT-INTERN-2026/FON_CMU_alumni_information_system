@@ -5,9 +5,13 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import { committeeFormSchema, type CommitteeFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -19,6 +23,7 @@ interface Committee {
   fullName: string;
   cohort: string;
   position: string;
+  major?: string | null;
   remarks: string | null;
 }
 
@@ -30,7 +35,7 @@ interface ApiResponse {
   totalPages: number;
 }
 
-type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "remarks";
+type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "major" | "remarks";
 type SortDir = "asc" | "desc";
 type SearchField = "all" | "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
 
@@ -56,16 +61,15 @@ export default function GraduateCommitteePage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
-  const [filterCohort, setFilterCohort] = useState("");
-  const [filterPosition, setFilterPosition] = useState("");
-  const [cohortOptions, setCohortOptions] = useState<string[]>([]);
-  const [positionOptions, setPositionOptions] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>("cohort");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(committeeFormSchema) as any,
     defaultValues: { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" },
@@ -90,6 +94,7 @@ export default function GraduateCommitteePage() {
   const importFileRef = useRef<HTMLInputElement>(null);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "fullName" | null>(null);
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
+  const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setValue("studentId", a.studentId);
@@ -97,19 +102,6 @@ export default function GraduateCommitteePage() {
     setAlumniSearchField(null);
     clearResults();
   };
-
-  const fetchFilterOptions = useCallback(async () => {
-    try {
-      const res = await fetch(`${BASE_PATH}/api/graduate-committee?pageSize=9999`);
-      if (!res.ok) return;
-      const json = await res.json();
-      const all: Committee[] = json.data;
-      setCohortOptions([...new Set(all.map((c) => c.cohort).filter(Boolean))].sort());
-      setPositionOptions([...new Set(all.map((c) => c.position).filter(Boolean))].sort());
-    } catch {}
-  }, []);
-
-  useEffect(() => { fetchFilterOptions(); }, [fetchFilterOptions]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -133,8 +125,7 @@ export default function GraduateCommitteePage() {
       });
       if (search) params.set("search", search);
       params.set("searchField", searchField);
-      if (filterCohort) params.set("cohort", filterCohort);
-      if (filterPosition) params.set("position", filterPosition);
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
 
       const res = await fetch(`${BASE_PATH}/api/graduate-committee?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -147,13 +138,19 @@ export default function GraduateCommitteePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, searchField, filterCohort, filterPosition, sortField, sortDir]);
+  }, [page, search, searchField, sortField, sortDir, filtersKey]);
 
   useEffect(() => { fetchCommittees(); }, [fetchCommittees]);
+
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
+    setPage(1);
+  };
 
   const openCreate = () => {
     formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
@@ -167,12 +164,14 @@ export default function GraduateCommitteePage() {
       remarks: c.remarks || "",
     });
     setEditingId(c.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     setAlumniSearchField(null);
     clearResults();
     formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
@@ -181,11 +180,15 @@ export default function GraduateCommitteePage() {
   const onSave = async (data: CommitteeFormData) => {
     const studentId = getValues("studentId");
     const fullName = getValues("fullName");
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       if (editingId) {
-        const payload = { studentId, fullName, ...data, termYear: Number(data.termYear) };
+        const payload = { studentId, fullName, ...data, termYear: Number(data.termYear), reason: editReason };
         const res = await fetch(`${BASE_PATH}/api/graduate-committee/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -219,7 +222,6 @@ export default function GraduateCommitteePage() {
       }
       closeForm();
       fetchCommittees();
-      fetchFilterOptions();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -234,7 +236,6 @@ export default function GraduateCommitteePage() {
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchCommittees();
-      fetchFilterOptions();
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -258,7 +259,6 @@ export default function GraduateCommitteePage() {
       deselectAll();
       setShowBulkDeleteDialog(false);
       fetchCommittees();
-      fetchFilterOptions();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -293,8 +293,7 @@ export default function GraduateCommitteePage() {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     if (searchField !== "all") params.set("searchField", searchField);
-    if (filterCohort) params.set("cohort", filterCohort);
-    if (filterPosition) params.set("position", filterPosition);
+    facetQueryParams(filters).forEach((v, k) => params.set(k, v));
     params.set("sortBy", sortField);
     params.set("sortOrder", sortDir);
     window.location.href = `${BASE_PATH}/api/graduate-committee/export?${params}`;
@@ -469,6 +468,20 @@ export default function GraduateCommitteePage() {
               <FormInput registration={register("remarks")} error={errors.remarks?.message} type="text" />
             </FormField>
           </div>
+          {editingId && (
+            <FormField label="เหตุผลในการแก้ไข" required>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -534,6 +547,14 @@ export default function GraduateCommitteePage() {
         />
       </div>
 
+      {/* Facet filters */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FacetFilter entity="graduate-committee" field="termYear" label="ปี พ.ศ." selected={filters.termYear ?? []} onChange={(v) => setFilter("termYear", v)} />
+        <FacetFilter entity="graduate-committee" field="cohort" label="รุ่นที่" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
+        <FacetFilter entity="graduate-committee" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
+        <FacetFilter entity="graduate-committee" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+      </div>
+
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16">
@@ -580,8 +601,11 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
                     ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                    หมายเหตุ
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("major")}>
+                    สาขาวิชา {sortField === "major" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("remarks")}>
+                    หมายเหตุ {sortField === "remarks" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   {manageMode && (
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
@@ -602,11 +626,12 @@ export default function GraduateCommitteePage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
-                    <td className="px-4 py-3 text-center">{c.termYear}</td>
+                    <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="termYear" value={c.termYear} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 font-mono">{c.studentId}</td>
                     <td className="px-4 py-3">{c.fullName}</td>
-                    <td className="px-4 py-3 text-center">{c.cohort}</td>
-                    <td className="px-4 py-3">{c.position}</td>
+                    <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="cohort" value={c.cohort} hotFields={hot[c.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="position" value={c.position} hotFields={hot[c.id]} /></td>
+                    <td className="px-4 py-3">{c.major || "-"}</td>
                     <td className="px-4 py-3 text-gray-500">{c.remarks || "-"}</td>
                     {manageMode && (
                       <td className="px-4 py-3 text-center">

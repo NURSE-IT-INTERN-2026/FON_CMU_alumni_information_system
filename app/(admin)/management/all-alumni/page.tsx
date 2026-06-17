@@ -6,14 +6,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 
-type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province";
-type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year";
+/** Thai display labels for degree-level enum values. */
+const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
+  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
+type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort";
 type SortDir = "asc" | "desc";
 
 const DEGREE_COLORS: Record<string, string> = {
@@ -33,6 +42,10 @@ interface Alumni {
   newLastName: string | null;
   cohort: string | null;
   degreeLevel: string | null;
+  major: string | null;
+  graduationYear: number | null;
+  birthDate: string | null;
+  remarks: string | null;
   province: string | null;
   email: string | null;
   phone: string | null;
@@ -114,11 +127,14 @@ export default function AlumniCountPage() {
   const [totalAlumni, setTotalAlumni] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [degreeLevelFilter, setDegreeLevelFilter] = useState("");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
   const [sortField, setSortField] = useState<ManageSortField | ViewSortField>("studentId");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [tableLoading, setTableLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
+  const hot = useHotFields("alumni", alumni.map((a) => a.id));
   const [saving, setSaving] = useState(false);
 
   const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<AlumniEditFormData>({
@@ -159,7 +175,7 @@ export default function AlumniCountPage() {
         sortField: sortField as string,
         sortDir,
       });
-      if (degreeLevelFilter) cmuParams.set("degreeLevel", degreeLevelFilter);
+      facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
       const cmuRes = await fetch(`${BASE_PATH}/api/cmu-alumni?${cmuParams}`);
       let cmuData: CmuAlumni[] = [];
       let cmuTotalCount = 0;
@@ -169,8 +185,11 @@ export default function AlumniCountPage() {
         cmuTotalCount = cmuJson.total || 0;
       }
 
-      // Fetch ALL local alumni (including soft-deleted) to build overlay map
-      const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999&includeDeleted=true`);
+      // Fetch ALL local alumni (including soft-deleted) to build overlay map.
+      // Apply facet filters here too so local-only records respect the active filters.
+      const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
+      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
+      const localRes = await fetch(`${BASE_PATH}/api/alumni?${localParams}`);
       let localMap: Record<string, Alumni> = {};
       let deletedStudentIds = new Set<string>();
       if (localRes.ok) {
@@ -208,8 +227,12 @@ export default function AlumniCountPage() {
             firstName: c.name_th || "",
             maidenLastName: c.surname_th || "",
             newLastName: null,
-            cohort: null,
+            cohort: c.cohort || null,
             degreeLevel: null,
+            major: c.major_name_th || null,
+            graduationYear: c.grad_year ? Number(c.grad_year) : null,
+            birthDate: null,
+            remarks: null,
             province: null,
             email: null,
             phone: null,
@@ -240,7 +263,7 @@ export default function AlumniCountPage() {
     } finally {
       setTableLoading(false);
     }
-  }, [page, search, degreeLevelFilter, sortField, sortDir]);
+  }, [page, search, filtersKey, sortField, sortDir]);
 
   // CMU Registrar data (view mode only)
   const [cmuAlumni, setCmuAlumni] = useState<CmuAlumni[]>([]);
@@ -256,7 +279,7 @@ export default function AlumniCountPage() {
         sortField: sortField as string,
         sortDir,
       });
-      if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
       const res = await fetch(`${BASE_PATH}/api/cmu-alumni?${params}`);
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
@@ -314,7 +337,7 @@ export default function AlumniCountPage() {
     } finally {
       setTableLoading(false);
     }
-  }, [page, search, degreeLevelFilter, sortField, sortDir]);
+  }, [page, search, filtersKey, sortField, sortDir]);
 
   useEffect(() => {
     if (manageMode) {
@@ -352,8 +375,8 @@ export default function AlumniCountPage() {
     setPage(1);
   };
 
-  const handleFilter = (value: string) => {
-    setDegreeLevelFilter(value);
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
     setPage(1);
   };
 
@@ -387,16 +410,23 @@ export default function AlumniCountPage() {
       country: a.country || "",
     });
     setEditingId(a.id);
+    setEditReason("");
   };
 
   const closeForm = () => {
     setEditingId(null);
+    setEditReason("");
     formReset(EMPTY_EDIT_FORM);
   };
 
   const handleSave = async (data: AlumniEditFormData) => {
-    setSaving(true);
     setErrorMsg("");
+    const isLocal = !!editingId && isLocalRecordId(editingId);
+    if (isLocal && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       const payload = {
         studentId: data.studentId.trim(),
@@ -411,11 +441,11 @@ export default function AlumniCountPage() {
         phone: data.phone.trim() || null,
         currentWorkplace: data.currentWorkplace.trim() || null,
         country: data.country.trim() || null,
+        ...(isLocal ? { reason: editReason } : {}),
       };
 
       // CMU-only record (not yet in local DB) → POST to create
       // Local record (already in DB) → PUT to update
-      const isLocal = editingId && isLocalRecordId(editingId);
       const res = await fetch(
         `${BASE_PATH}/api/alumni${isLocal ? `/${editingId}` : ""}`,
         {
@@ -552,7 +582,7 @@ export default function AlumniCountPage() {
     setManageMode(true);
     setPage(1);
     setSearch("");
-    setDegreeLevelFilter("");
+    setFilters({});
     setSortField("studentId");
     setSortDir("asc");
     setEditingId(null);
@@ -569,7 +599,7 @@ export default function AlumniCountPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    if (degreeLevelFilter) params.set("degreeLevel", degreeLevelFilter);
+    facetQueryParams(filters).forEach((v, k) => params.set(k, v));
     window.location.href = `${BASE_PATH}/api/alumni/export?${params}`;
   };
 
@@ -734,6 +764,20 @@ export default function AlumniCountPage() {
                   <FormInput registration={register("country")} type="text" />
                 </FormField>
               </div>
+              {editingId && isLocalRecordId(editingId) && (
+                <FormField label="เหตุผลในการแก้ไข" required className="mt-4">
+                  <select
+                    value={editReason}
+                    onChange={(e) => setEditReason(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                  >
+                    <option value="">— กรุณาเลือก —</option>
+                    {EDIT_REASON_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </FormField>
+              )}
               <div className="mt-4 flex justify-end gap-3">
                 <button
                   onClick={closeForm}
@@ -842,7 +886,7 @@ export default function AlumniCountPage() {
           )}
 
           {/* Search */}
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
             <input
               type="text"
               placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
@@ -850,16 +894,13 @@ export default function AlumniCountPage() {
               onChange={(e) => handleSearch(e.target.value)}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
-            <select
-              value={degreeLevelFilter}
-              onChange={(e) => handleFilter(e.target.value)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-            >
-              <option value="">ทุกระดับการศึกษา</option>
-              {DEGREE_LEVEL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+          </div>
+
+          {/* Facet filters */}
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} />
+            <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+            <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} />
           </div>
 
           {/* Alumni table */}
@@ -903,8 +944,23 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("newLastName")}>
                       นามสกุลใหม่ <SortIcon field="newLastName" />
                     </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
+                      ระดับการศึกษา <SortIcon field="degreeLevel" />
+                    </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
+                      สาขาวิชา <SortIcon field="major" />
+                    </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("graduationYear")}>
+                      ปีสำเร็จการศึกษา <SortIcon field="graduationYear" />
+                    </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
+                      วันเกิด <SortIcon field="birthDate" />
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("province")}>
                       จังหวัด <SortIcon field="province" />
+                    </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
+                      หมายเหตุ <SortIcon field="remarks" />
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       จัดการ
@@ -914,7 +970,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center">
+                      <td colSpan={15} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -923,7 +979,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={15}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -948,16 +1004,31 @@ export default function AlumniCountPage() {
                         </td>
                         <td className="px-4 py-3">{a.studentId}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.cohort || "-"}
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} />
                         </td>
-                        <td className="px-4 py-3">{a.prefix}</td>
-                        <td className="px-4 py-3">{a.firstName}</td>
-                        <td className="px-4 py-3">{a.maidenLastName}</td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="prefix" value={a.prefix} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="firstName" value={a.firstName} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="maidenLastName" value={a.maidenLastName} hotFields={hot[a.id]} /></td>
                         <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.newLastName || "-"}
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="newLastName" value={a.newLastName || "-"} hotFields={hot[a.id]} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="degreeLevel" value={a.degreeLevel ? (DEGREE_LEVEL_LABELS[a.degreeLevel] ?? a.degreeLevel) : "-"} hotFields={hot[a.id]} />
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
-                          {a.province || "-"}
+                          {a.major || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          {a.graduationYear || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
+                          {a.birthDate || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="province" value={a.province || "-"} hotFields={hot[a.id]} />
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -1052,7 +1123,7 @@ export default function AlumniCountPage() {
         /* View mode: read-only alumni table */
         <>
           {/* Search */}
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
             <input
               type="text"
               placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
@@ -1060,16 +1131,13 @@ export default function AlumniCountPage() {
               onChange={(e) => handleSearch(e.target.value)}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
-            <select
-              value={degreeLevelFilter}
-              onChange={(e) => handleFilter(e.target.value)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-            >
-              <option value="">ทุกระดับการศึกษา</option>
-              {DEGREE_LEVEL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+          </div>
+
+          {/* Facet filters */}
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} />
+            <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+            <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} />
           </div>
 
           {/* Alumni table (read-only, CMU Registrar data) */}
@@ -1087,8 +1155,8 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
                       รหัสนักศึกษา <SortIcon field="studentId" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      รุ่น
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
+                      รุ่น <SortIcon field="cohort" />
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                       ชื่อ <SortIcon field="name" />
@@ -1105,12 +1173,18 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
                       ปีที่สำเร็จการศึกษา <SortIcon field="year" />
                     </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      วันเกิด
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      หมายเหตุ
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center">
+                      <td colSpan={10} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -1119,7 +1193,7 @@ export default function AlumniCountPage() {
                   ) : cmuAlumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={10}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -1153,6 +1227,8 @@ export default function AlumniCountPage() {
                           <td className="px-4 py-3 text-[var(--muted)]">
                             {a.grad_year || "-"}
                           </td>
+                          <td className="px-4 py-3 text-[var(--muted)]">-</td>
+                          <td className="px-4 py-3 text-[var(--muted)]">-</td>
                         </tr>
                       );
                     })

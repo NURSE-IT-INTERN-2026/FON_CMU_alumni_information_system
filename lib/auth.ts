@@ -110,6 +110,12 @@ export async function getAlumniSession(): Promise<AlumniSession | null> {
     return null;
   }
 
+  // A suspended account is fully blocked (PRD §3.15): no valid session, so the
+  // (authed) layout redirects to /login and API calls 401.
+  if (session.alumni.suspendedAt) {
+    return null;
+  }
+
   return session as AlumniSession;
 }
 

@@ -38,46 +38,55 @@ enum ActorType {
 }
 
 model Alumni {
-  id                    String    @id @default(uuid())
-  studentId             String    @unique
+  id                    String      @id @default(uuid())
+  studentId             String      @unique
   citizenId             String?
   birthDate             String?
   prefix                String
   firstName             String
   maidenLastName        String
+  englishName           String?
   cohort                String?
   newLastName           String?
   degreeLevel           DegreeLevel
   province              String?
-  email                 String? @unique
+  email                 String?     @unique
   phone                 String?
+  major                 String?
+  graduationYear        Int?
   currentWorkplace      String?
   country               String?
-  isPotential           Boolean   @default(false)
-  isModelRepresentative Boolean   @default(false)
+  homeAddress           String?
+  remarks               String?
+  isPotential           Boolean     @default(false)
+  isModelRepresentative Boolean     @default(false)
   photoUrl              String?
   deletedAt             DateTime?
-  hasLoggedIn           Boolean   @default(false)
+  suspendedAt           DateTime?
+  hasLoggedIn           Boolean     @default(false)
   adminEditedAt         DateTime?
   passwordHash          String?
   lastLoginAt           DateTime?
+  tosAcceptedAt         DateTime?
   cmuEmail              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
 
   awards               Award[]
-  associations          Association[]
-  graduateCommittees    GraduateCommittee[]
-  potentials            Potential[]
-  modelRepresentatives  ModelRepresentative[]
-  abroadAlumni          AbroadAlumni[]
-  passwordResets        PasswordReset[]
+  associations         Association[]
+  graduateCommittees   GraduateCommittee[]
+  potentials           Potential[]
+  modelRepresentatives ModelRepresentative[]
+  alumniAgency         AlumniAgency[]
+  passwordResets       PasswordReset[]
   sessions             Session[]
   activityLogs         ActivityLog[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
   @@index([cohort])
+  @@index([major])
+  @@index([graduationYear])
   @@map("alumni")
 }
 
@@ -88,7 +97,9 @@ model Award {
   awardName     String
   awardType     AwardType
   year          Int
+  major         String?
   description   String?
+  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -96,39 +107,46 @@ model Award {
 
   @@index([awardType])
   @@index([year])
+  @@index([major])
   @@map("awards")
 }
 
 model Association {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   studentId       String
   fullName        String
   associationName String
   position        String
   recordedYear    Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  major           String?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, associationName, position, recordedYear])
+  @@index([major])
   @@map("associations")
 }
 
 model GraduateCommittee {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   termYear  Int
   studentId String
   fullName  String
   cohort    String
   position  String
+  major     String?
   remarks   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, termYear, position])
+  @@index([major])
   @@map("graduate_committees")
 }
 
@@ -147,38 +165,44 @@ model News {
 }
 
 model Potential {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   studentId    String
   fullName     String
   career       String
   position     String
   recordedYear Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  major        String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, recordedYear])
+  @@index([major])
   @@map("potentials")
 }
 
 model ModelRepresentative {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   studentId  String
   name       String
   cohort     String
   generation Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  major      String?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, cohort, generation])
+  @@index([major])
   @@map("model_representatives")
 }
 
-model AbroadAlumni {
-  id          String   @id @default(uuid())
+model AlumniAgency {
+  id          String    @id @default(uuid())
   studentId   String?
   cohort      String?
   prefix      String?
@@ -187,15 +211,18 @@ model AbroadAlumni {
   workplace   String?
   homeAddress String?
   country     String
+  major       String?
   notes       String?
   order       Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@index([studentId])
-  @@map("abroad_alumni")
+  @@index([major])
+  @@map("alumni_agency")
 }
 
 model AdminUser {
@@ -227,6 +254,7 @@ model ActivityLog {
   action     String
   resource   String
   resourceId String?
+  reason     String?
   details    Json?
   ipAddress  String?
   createdAt  DateTime  @default(now())
@@ -243,18 +271,39 @@ model ActivityLog {
 }
 
 model PasswordReset {
-  id          String    @id @default(uuid())
-  alumniId    String
-  token       String    @unique
-  used        Boolean   @default(false)
-  expiresAt   DateTime
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(uuid())
+  alumniId  String
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
-  alumni      Alumni    @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
 
   @@index([alumniId])
   @@index([expiresAt])
   @@map("password_resets")
+}
+
+// Per-field change history — powers the orange "updated value" indicators on
+// the admin data pages and the System Logs old→new details modal (PRD §3.16).
+model FieldChangeHistory {
+  id           String    @id @default(uuid())
+  resourceType String // matches LogResource: alumni | award | association | ...
+  resourceId   String
+  field        String
+  oldValue     String?
+  newValue     String?
+  actorType    ActorType @default(ADMIN)
+  userId       String?
+  alumniId     String?
+  actorName    String?
+  reason       String?
+  createdAt    DateTime  @default(now())
+
+  @@index([resourceType, resourceId, field, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("field_change_history")
 }
 
 model Session {

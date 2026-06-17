@@ -81,17 +81,17 @@ export type {
   ModelRepUpdateInput,
 } from "./model-representative";
 
-// Abroad Alumni
+// Alumni Agency
 export {
-  abroadAlumniFormSchema,
-  abroadAlumniCreateSchema,
-  abroadAlumniUpdateSchema,
-} from "./abroad-alumni";
+  alumniAgencyFormSchema,
+  alumniAgencyCreateSchema,
+  alumniAgencyUpdateSchema,
+} from "./alumni-agency";
 export type {
-  AbroadAlumniFormData,
-  AbroadAlumniCreateInput,
-  AbroadAlumniUpdateInput,
-} from "./abroad-alumni";
+  AlumniAgencyFormData,
+  AlumniAgencyCreateInput,
+  AlumniAgencyUpdateInput,
+} from "./alumni-agency";
 
 // User
 export {

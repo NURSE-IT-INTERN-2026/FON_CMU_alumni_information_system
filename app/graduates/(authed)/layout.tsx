@@ -16,6 +16,13 @@ export default async function AuthedGraduatesLayout({
     redirect("/login");
   }
 
+  // First-login gate: alumni must accept the Terms of Service before they can
+  // use any authenticated page. The TOS page lives outside this group so it is
+  // reachable before acceptance (otherwise this redirect would loop).
+  if (!session.alumni.tosAcceptedAt) {
+    redirect("/graduates/tos");
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
       <AlumniHeader alumni={session.alumni} />

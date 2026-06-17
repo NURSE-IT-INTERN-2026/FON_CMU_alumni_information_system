@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buddhistYearField } from "./helpers";
+import { buddhistYearField, editReasonField } from "./helpers";
 
 const MSG = {
   termYearRequired: "กรุณากรอกปี พ.ศ.",
@@ -37,6 +37,7 @@ export const committeeUpdateSchema = z.object({
   cohort: z.string().min(1, MSG.cohortRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   remarks: z.string().optional().nullable(),
+  reason: editReasonField(),
 });
 
 export type CommitteeFormData = z.infer<typeof committeeFormSchema>;

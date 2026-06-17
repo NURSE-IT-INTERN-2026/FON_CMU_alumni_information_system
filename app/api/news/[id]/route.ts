@@ -114,18 +114,19 @@ export async function DELETE(
       );
     }
 
-    await prisma.news.delete({ where: { id } });
+    // PRD §3.12: news "delete" discontinues the article (sets status), it does not hard-delete.
+    await prisma.news.update({ where: { id }, data: { status: "DISCONTINUED" } });
 
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "DELETE",
       "news",
       id,
-      { title: existing.title },
+      { title: existing.title, status: "DISCONTINUED" },
       getIp(request)
     );
 
-    return NextResponse.json({ message: "ลบข่าวสารสำเร็จ" });
+    return NextResponse.json({ message: "ยุติการเผยแพร่ข่าวสารสำเร็จ" });
   } catch (error) {
     console.error("DELETE /api/news/[id] error:", error);
     return NextResponse.json(

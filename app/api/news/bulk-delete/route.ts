@@ -19,10 +19,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const result = await prisma.news.deleteMany({
+    // PRD §3.12: bulk news "delete" discontinues the articles (sets status), it does not hard-delete.
+    const result = await prisma.news.updateMany({
       where: { id: { in: ids } },
+      data: { status: "DISCONTINUED" },
     });
-    return NextResponse.json({ deleted: result.count });
+    return NextResponse.json({ updated: result.count });
   } catch (error) {
     console.error("Bulk delete error:", error);
     return NextResponse.json(

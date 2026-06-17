@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
+import { EDIT_REASON_VALUES } from "@/lib/constants";
+import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
   _request: Request,
@@ -58,6 +60,17 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    // Admin edits require an explicit reason (PRD §3.15).
+    const reason = EDIT_REASON_VALUES.includes(body?.reason)
+      ? (body.reason as string)
+      : null;
+    if (!reason) {
+      return NextResponse.json(
+        { error: "กรุณาเลือกเหตุผลในการแก้ไข" },
+        { status: 400 }
+      );
+    }
+
     // Admin can edit all alumni fields
     const allowedFields = [
       "prefix", "firstName", "maidenLastName", "newLastName",
@@ -82,12 +95,16 @@ export async function PUT(
     // Set adminEditedAt timestamp to trigger alumni notification
     updateData.adminEditedAt = new Date();
 
+    const old = await prisma.alumni.findUnique({ where: { id } });
+
     const alumni = await prisma.alumni.update({
       where: { id },
       data: updateData,
     });
 
-    // Log admin edit of alumni profile
+    // Log admin edit of alumni profile + field-change history
+    const changes = computeFieldChanges(old, alumni, TRACKED_FIELDS.alumni_profile);
+    await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason });
     const ip = getIp(request);
     await logActivity(
       {
@@ -99,8 +116,9 @@ export async function PUT(
       "UPDATE",
       "alumni_profile",
       alumni.id,
-      { updatedFields: Object.keys(updateData), source: "admin_edit" },
-      ip
+      { changes, source: "admin_edit" },
+      ip,
+      reason
     );
 
     return NextResponse.json(alumni);

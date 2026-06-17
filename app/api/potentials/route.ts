@@ -5,6 +5,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { handleZodError, potentialCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
     const validSearchFields = ["studentId", "fullName", "career", "position", "recordedYear"];
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.potentials));
 
     if (search) {
       if (searchField && validSearchFields.includes(searchField)) {

@@ -40,6 +40,7 @@ export async function GET() {
       cmuGraduates,
       awardsTotal,
       awardsByYear,
+      awardsByType,
       potentialsTotal,
       potentialsByYear,
       associationsTotal,
@@ -48,7 +49,7 @@ export async function GET() {
       graduateCommitteeByTerm,
       modelRepresentativesTotal,
       distinctModelCohorts,
-      abroadAlumniTotal,
+      alumniAgencyTotal,
       distinctAbroadCountries,
       newsTotal,
       newsPublishedCount,
@@ -66,6 +67,12 @@ export async function GET() {
         _count: true,
         orderBy: { year: "desc" },
         take: 1,
+      }),
+
+      // Awards by type (PRD §3.2 dashboard summary)
+      prisma.award.groupBy({
+        by: ["awardType"],
+        _count: true,
       }),
 
       // Potentials total
@@ -109,10 +116,10 @@ export async function GET() {
       }),
 
       // Abroad alumni total
-      prisma.abroadAlumni.count(),
+      prisma.alumniAgency.count(),
 
       // Distinct abroad alumni countries
-      prisma.abroadAlumni.findMany({
+      prisma.alumniAgency.findMany({
         select: { country: true },
         distinct: ["country"],
       }),
@@ -162,6 +169,9 @@ export async function GET() {
         total: awardsTotal,
         latestYear: awardsByYear[0]?.year ?? null,
         latestYearCount: awardsByYear[0]?._count ?? 0,
+        byType: Object.fromEntries(
+          (awardsByType as { awardType: string; _count: number }[]).map((g) => [g.awardType, g._count])
+        ),
       },
       potentials: {
         total: potentialsTotal,
@@ -181,8 +191,8 @@ export async function GET() {
         total: modelRepresentativesTotal,
         distinctCohorts: distinctModelCohorts.length,
       },
-      abroadAlumni: {
-        total: abroadAlumniTotal,
+      alumniAgency: {
+        total: alumniAgencyTotal,
         distinctCountries: distinctAbroadCountries.length,
       },
       news: {

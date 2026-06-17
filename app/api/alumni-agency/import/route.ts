@@ -10,8 +10,8 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
-  type ParsedAbroadAlumniRow,
-} from "@/lib/abroad-alumni-parse";
+  type ParsedAlumniAgencyRow,
+} from "@/lib/alumni-agency-parse";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Read raw rows to detect format
     const rawRows = await readExcelRawRows(buffer);
 
-    let parsed: { data: ParsedAbroadAlumniRow; rowNumber: number }[];
+    let parsed: { data: ParsedAlumniAgencyRow; rowNumber: number }[];
 
     if (isOriginalFormat(rawRows)) {
       parsed = parseOriginalFormat(rawRows);
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await prisma.abroadAlumni.create({ data });
+        await prisma.alumniAgency.create({ data });
         imported++;
       } catch (err) {
         console.error("Import row error:", err);
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ imported, skipped: 0, errors });
   } catch (error) {
-    console.error("POST /api/abroad-alumni/import error:", error);
+    console.error("POST /api/alumni-agency/import error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" },
       { status: 500 }

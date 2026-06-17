@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
+import { EDIT_REASON_VALUES } from "@/lib/constants";
 
 /**
  * Handle ZodError by returning the first validation message as a 400 response.
@@ -29,6 +30,16 @@ export function buddhistYearField(
  */
 export function emailField(msg = "รูปแบบอีเมลไม่ถูกต้อง") {
   return z.string().email(msg);
+}
+
+/**
+ * Required reason field for record edits (admin data pages + alumni profile).
+ * No default value — the user must pick one explicitly.
+ */
+export function editReasonField(
+  msg = "กรุณาเลือกเหตุผลในการแก้ไข",
+) {
+  return z.enum(EDIT_REASON_VALUES, { message: msg });
 }
 
 /**

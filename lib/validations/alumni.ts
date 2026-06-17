@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณากรอกรหัสนักศึกษา",
@@ -72,6 +73,7 @@ export const alumniUpdateSchema = z.object({
   photoUrl: z.string().optional().nullable(),
   isPotential: z.boolean().optional(),
   isModelRepresentative: z.boolean().optional(),
+  reason: editReasonField(),
 });
 
 // --- Profile form schema (no studentId — used by alumni profile page) ---

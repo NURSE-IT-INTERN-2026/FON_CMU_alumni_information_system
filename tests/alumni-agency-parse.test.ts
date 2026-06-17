@@ -4,7 +4,7 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
-} from "@/lib/abroad-alumni-parse";
+} from "@/lib/alumni-agency-parse";
 
 describe("inferCountry", () => {
   it("identifies Australia by city name", () => {

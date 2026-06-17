@@ -51,6 +51,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Suspended accounts cannot log in (PRD §3.15, full block).
+    if (alumni.suspendedAt) {
+      return NextResponse.json(
+        { error: "บัญชีของท่านถูกระงับ กรุณาติดต่อผู้ดูแลระบบ" },
+        { status: 403 }
+      );
+    }
+
     // Check if alumni has set up a password
     if (!alumni.passwordHash) {
       return NextResponse.json(

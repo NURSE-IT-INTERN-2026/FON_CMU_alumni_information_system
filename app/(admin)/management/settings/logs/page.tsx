@@ -18,6 +18,7 @@ interface ActivityLog {
   resourceId: string | null;
   details: Record<string, unknown> | null;
   ipAddress: string | null;
+  reason: string | null;
   createdAt: string;
   user: {
     firstName: string;
@@ -32,6 +33,8 @@ const ACTION_LABELS: Record<string, string> = {
   BULK_DELETE: "ลบหลายรายการ",
   IMPORT: "นำเข้าข้อมูล",
   EXPORT: "ส่งออกข้อมูล",
+  SUSPEND: "ระงับบัญชี",
+  RESTORE: "ยกเลิกการระงับ",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -41,6 +44,8 @@ const ACTION_COLORS: Record<string, string> = {
   BULK_DELETE: "bg-red-100 text-red-700",
   IMPORT: "bg-purple-100 text-purple-700",
   EXPORT: "bg-indigo-100 text-indigo-700",
+  SUSPEND: "bg-amber-100 text-amber-700",
+  RESTORE: "bg-green-100 text-green-700",
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -50,7 +55,8 @@ const RESOURCE_LABELS: Record<string, string> = {
   graduate_committee: "กรรมการบัณฑิต",
   potential: "ศักยภาพ",
   model_representative: "ผู้แทนรุ่น",
-  abroad_alumni: "การทำงานต่างประเทศ",
+  alumni_agency: "ต้นสังกัดศิษย์เก่า",
+  abroad_alumni: "ต้นสังกัดศิษย์เก่า",  // legacy key for pre-rename log rows
   news: "ข่าวสาร",
   user: "ผู้ใช้งาน",
   alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",
@@ -71,6 +77,7 @@ export default function LogsPage() {
   const [actionFilter, setActionFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
 
   useEffect(() => {
     if (role === "executive") {
@@ -128,6 +135,41 @@ export default function LogsPage() {
     return Object.entries(details)
       .map(([k, v]) => `${k}: ${v}`)
       .join(", ");
+  }
+
+  function renderDetails(log: ActivityLog) {
+    const details = log.details;
+    if (!details) return <p className="text-gray-400">ไม่มีรายละเอียด</p>;
+    const changes = Array.isArray(details.changes)
+      ? (details.changes as Array<{ field: string; from: string | null; to: string | null }>)
+      : null;
+    if (changes) {
+      return (
+        <div className="space-y-2">
+          {changes.length === 0 && <p className="text-gray-400">ไม่มีการเปลี่ยนแปลงค่า</p>}
+          {changes.map((c, i) => (
+            <div key={i} className="text-sm">
+              <span className="font-medium text-gray-700">{c.field}: </span>
+              <span className="text-gray-400 line-through">{c.from || "—"}</span>
+              <span className="mx-1.5 font-semibold text-orange-500">→</span>
+              <span className="text-gray-800">{c.to || "—"}</span>
+            </div>
+          ))}
+          {log.reason && <p className="pt-1 text-xs text-gray-500">เหตุผล: {log.reason}</p>}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-1">
+        {Object.entries(details).map(([k, v]) => (
+          <div key={k} className="text-sm">
+            <span className="font-medium text-gray-700">{k}:</span>{" "}
+            <span className="text-gray-600">{String(v)}</span>
+          </div>
+        ))}
+        {log.reason && <p className="pt-1 text-xs text-gray-500">เหตุผล: {log.reason}</p>}
+      </div>
+    );
   }
 
   if (role === "executive") return null;
@@ -229,7 +271,16 @@ export default function LogsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-gray-500">{formatDetails(log.details)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="max-w-xs truncate text-gray-500">{formatDetails(log.details)}</span>
+                        {log.details && (
+                          <button onClick={() => setDetailLog(log)} className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100" title="ดูรายละเอียด">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{log.ipAddress || "-"}</td>
                   </tr>
                 );
@@ -246,6 +297,24 @@ export default function LogsPage() {
           <div className="flex gap-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">ก่อนหน้า</button>
             <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">ถัดไป</button>
+          </div>
+        </div>
+      )}
+
+      {/* Details modal */}
+      {detailLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetailLog(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                รายละเอียด{ACTION_LABELS[detailLog.action] ? ` ${ACTION_LABELS[detailLog.action]}` : ""}
+              </h3>
+              <button onClick={() => setDetailLog(null)} className="text-2xl leading-none text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div className="mb-3 text-sm text-gray-500">
+              {RESOURCE_LABELS[detailLog.resource] || detailLog.resource} • {formatDate(detailLog.createdAt)}
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">{renderDetails(detailLog)}</div>
           </div>
         </div>
       )}

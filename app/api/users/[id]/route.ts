@@ -106,6 +106,22 @@ export async function PUT(
       getIp(request)
     );
 
+    // Suspend/activate: kill the user's sessions on suspend (full block) and
+    // log a dedicated SUSPEND/RESTORE entry (PRD §3.15).
+    if (validated.isActive !== undefined && validated.isActive !== existing.isActive) {
+      if (validated.isActive === false) {
+        await prisma.session.deleteMany({ where: { userId: id } });
+      }
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        validated.isActive ? "RESTORE" : "SUSPEND",
+        "user",
+        id,
+        { email: user.email, role: user.role },
+        getIp(request)
+      );
+    }
+
     return NextResponse.json(user);
   } catch (error) {
     if (error instanceof z.ZodError) return handleZodError(error);

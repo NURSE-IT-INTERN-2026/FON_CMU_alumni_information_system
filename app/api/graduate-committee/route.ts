@@ -5,6 +5,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { handleZodError, committeeCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -16,14 +17,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const search = searchParams.get("search") || "";
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
-    const cohort = searchParams.get("cohort") || "";
-    const position = searchParams.get("position") || "";
     const searchField = searchParams.get("searchField") || "";
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
     const validSearchFields = ["studentId", "fullName", "cohort", "position", "remarks", "termYear"];
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["graduate-committee"]));
 
     const andConditions: Record<string, unknown>[] = [];
 
@@ -44,14 +44,6 @@ export async function GET(request: NextRequest) {
           ],
         });
       }
-    }
-
-    if (cohort) {
-      andConditions.push({ cohort });
-    }
-
-    if (position) {
-      andConditions.push({ position });
     }
 
     if (andConditions.length > 0) {

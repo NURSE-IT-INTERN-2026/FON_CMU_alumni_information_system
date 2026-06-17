@@ -83,7 +83,7 @@ async function main() {
 
   // ── 0. Clean up existing data ──
   console.log("Cleaning up existing data...");
-  await prisma.abroadAlumni.deleteMany();
+  await prisma.alumniAgency.deleteMany();
   await prisma.modelRepresentative.deleteMany();
   await prisma.potential.deleteMany();
   await prisma.graduateCommittee.deleteMany();
@@ -647,7 +647,7 @@ async function main() {
     return "สหรัฐอเมริกา";
   }
 
-  const abroadAlumniData: { cohort: string | null; prefix: string; thaiName: string | null; englishName: string | null; workplace: string | null; country: string; notes: string | null; order: number }[] = [];
+  const alumniAgencyData: { cohort: string | null; prefix: string; thaiName: string | null; englishName: string | null; workplace: string | null; country: string; notes: string | null; order: number }[] = [];
 
   for (let i = 1; i < abroadRows.length; i++) {
     const r = abroadRows[i];
@@ -659,15 +659,15 @@ async function main() {
     const notes = String(r[5] || "").trim() || null;
     const country = inferCountry(workplace || "");
 
-    abroadAlumniData.push({ cohort, prefix, thaiName, englishName, workplace, country, notes, order: i });
+    alumniAgencyData.push({ cohort, prefix, thaiName, englishName, workplace, country, notes, order: i });
   }
 
-  const abroadAlumni = [];
-  for (const data of abroadAlumniData) {
-    const record = await prisma.abroadAlumni.create({ data });
-    abroadAlumni.push(record);
+  const alumniAgency = [];
+  for (const data of alumniAgencyData) {
+    const record = await prisma.alumniAgency.create({ data });
+    alumniAgency.push(record);
   }
-  console.log(`  Created ${abroadAlumni.length} abroad alumni records\n`);
+  console.log(`  Created ${alumniAgency.length} abroad alumni records\n`);
 
   // ── 9. Upsert model representatives (from reference site) ──
   console.log("Upserting model representatives...");
@@ -857,7 +857,7 @@ async function main() {
   console.log(`  Graduate Comm.     : ${committees.length}`);
   console.log(`  News Articles      : ${newsRecords.length}`);
   console.log(`  Potentials         : ${potentials.length}`);
-  console.log(`  Abroad Alumni      : ${abroadAlumni.length}`);
+  console.log(`  Abroad Alumni      : ${alumniAgency.length}`);
   console.log(`  Model Reps         : ${modelReps.length}`);
   console.log("=".repeat(50));
 }

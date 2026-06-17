@@ -3,16 +3,17 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { handleZodError, abroadAlumniCreateSchema } from "@/lib/validations";
+import { handleZodError, alumniAgencyCreateSchema } from "@/lib/validations";
+import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
   try {
     const body = await request.json();
-    const validated = abroadAlumniCreateSchema.parse(body);
+    const validated = alumniAgencyCreateSchema.parse(body);
 
-    const item = await prisma.abroadAlumni.create({
+    const item = await prisma.alumniAgency.create({
       data: {
         cohort: validated.cohort?.trim() || null,
         prefix: validated.prefix?.trim() || null,
@@ -29,9 +30,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return handleZodError(error);
-    console.error("Failed to create abroad alumni:", error);
+    console.error("Failed to create alumni agency:", error);
     return NextResponse.json(
-      { error: "Failed to create abroad alumni" },
+      { error: "Failed to create alumni agency" },
       { status: 500 }
     );
   }
@@ -45,16 +46,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
-    const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
     const validSearchFields = ["thaiName", "englishName", "country", "workplace", "homeAddress", "cohort"];
 
-    const where: Record<string, unknown> = {};
-
-    if (country) {
-      where.country = country;
-    }
+    const where: Record<string, unknown> = { deletedAt: null };
+    Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["alumni-agency"]));
 
     if (search) {
       if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
@@ -72,11 +69,12 @@ export async function GET(request: NextRequest) {
     }
 
     const [alumni, countries] = await Promise.all([
-      prisma.abroadAlumni.findMany({
+      prisma.alumniAgency.findMany({
         where,
         orderBy: [{ country: "asc" }, { order: "asc" }],
       }),
-      prisma.abroadAlumni.findMany({
+      prisma.alumniAgency.findMany({
+        where: { deletedAt: null },
         select: { country: true },
         distinct: ["country"],
         orderBy: { country: "asc" },
@@ -88,9 +86,9 @@ export async function GET(request: NextRequest) {
       countries: countries.map((c) => c.country),
     });
   } catch (error) {
-    console.error("Failed to fetch abroad alumni:", error);
+    console.error("Failed to fetch alumni agency:", error);
     return NextResponse.json(
-      { error: "Failed to fetch abroad alumni" },
+      { error: "Failed to fetch alumni agency" },
       { status: 500 }
     );
   }

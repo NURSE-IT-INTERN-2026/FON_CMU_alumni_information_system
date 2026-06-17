@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const items = await prisma.abroadAlumni.findMany({
+    const items = await prisma.alumniAgency.findMany({
       where,
       orderBy: [{ country: "asc" }, { order: "asc" }],
     });
@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
       "ลำดับ": a.order,
     }));
 
-    return buildExcelResponse(rows, "ข้อมูลการทำงานต่างประเทศ", "abroad_alumni_export");
+    return buildExcelResponse(rows, "ต้นสังกัดศิษย์เก่า", "alumni_agency_export");
   } catch (error) {
-    console.error("GET /api/abroad-alumni/export error:", error);
+    console.error("GET /api/alumni-agency/export error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูล" },
       { status: 500 }
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const items = await prisma.abroadAlumni.findMany({
+    const items = await prisma.alumniAgency.findMany({
       where: { id: { in: ids } },
     });
 
@@ -102,9 +102,9 @@ export async function POST(request: NextRequest) {
       "ลำดับ": a.order,
     }));
 
-    return buildExcelResponse(rows, "ข้อมูลการทำงานต่างประเทศ", "abroad_alumni_export");
+    return buildExcelResponse(rows, "ต้นสังกัดศิษย์เก่า", "alumni_agency_export");
   } catch (error) {
-    console.error("POST /api/abroad-alumni/export error:", error);
+    console.error("POST /api/alumni-agency/export error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการส่งออกข้อมูล" },
       { status: 500 }

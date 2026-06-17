@@ -7,9 +7,13 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import { potentialFormSchema, type PotentialFormData } from "@/lib/validations";
 
 interface Potential {
@@ -19,6 +23,7 @@ interface Potential {
   career: string;
   position: string;
   recordedYear: number;
+  major?: string | null;
 }
 
 interface ApiResponse {
@@ -29,7 +34,7 @@ interface ApiResponse {
   totalPages: number;
 }
 
-type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear";
+type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear" | "major";
 type SortDir = "asc" | "desc";
 type SearchField = "all" | "studentId" | "fullName" | "career" | "position" | "recordedYear";
 
@@ -58,10 +63,13 @@ export default function PotentialsPage() {
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("recordedYear");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(potentialFormSchema) as any,
     defaultValues: FORM_DEFAULTS,
@@ -87,6 +95,7 @@ export default function PotentialsPage() {
 
   const [formSearchField, setFormSearchField] = useState<"studentId" | "fullName" | null>(null);
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
+  const hot = useHotFields("potential", potentials.map((p) => p.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
     setValue("studentId", a.studentId);
@@ -116,6 +125,7 @@ export default function PotentialsPage() {
       });
       if (search.trim()) params.set("search", search.trim());
       params.set("searchField", searchField);
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
       const res = await fetch(`${BASE_PATH}/api/potentials?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
@@ -127,7 +137,7 @@ export default function PotentialsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, searchField, sortField, sortDir]);
+  }, [page, search, searchField, sortField, sortDir, filtersKey]);
 
   useEffect(() => {
     fetchPotentials();
@@ -138,11 +148,17 @@ export default function PotentialsPage() {
     setPage(1);
   };
 
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
+    setPage(1);
+  };
+
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const openCreate = () => {
     formReset(FORM_DEFAULTS);
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
@@ -155,12 +171,14 @@ export default function PotentialsPage() {
       recordedYear: String(p.recordedYear),
     });
     setEditingId(p.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     formReset(FORM_DEFAULTS);
     setFormSearchField(null);
     clearResults();
@@ -169,11 +187,15 @@ export default function PotentialsPage() {
   const onSave = async (data: PotentialFormData) => {
     const studentId = getValues("studentId");
     const fullName = getValues("fullName");
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       if (editingId) {
-        const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear) };
+        const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), reason: editReason };
         const res = await fetch(`${BASE_PATH}/api/potentials/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -443,6 +465,20 @@ export default function PotentialsPage() {
               <FormInput registration={register("recordedYear")} error={errors.recordedYear?.message} type="number" placeholder="เช่น 2568" />
             </FormField>
           </div>
+          {editingId && (
+            <FormField label="เหตุผลในการแก้ไข" required>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -509,6 +545,14 @@ export default function PotentialsPage() {
         />
       </div>
 
+      {/* Facet filters */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FacetFilter entity="potentials" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
+        <FacetFilter entity="potentials" field="career" label="อาชีพ" selected={filters.career ?? []} onChange={(v) => setFilter("career", v)} />
+        <FacetFilter entity="potentials" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
+        <FacetFilter entity="potentials" field="recordedYear" label="ปีที่บันทึก" selected={filters.recordedYear ?? []} onChange={(v) => setFilter("recordedYear", v)} />
+      </div>
+
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16">
@@ -551,6 +595,9 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
                   ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("major")}>
+                  สาขาวิชา {sortField === "major" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
@@ -575,9 +622,10 @@ export default function PotentialsPage() {
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
                   <td className="px-4 py-3">{p.fullName}</td>
-                  <td className="px-4 py-3">{p.career}</td>
-                  <td className="px-4 py-3">{p.position}</td>
-                  <td className="px-4 py-3 text-center">{p.recordedYear}</td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="career" value={p.career} hotFields={hot[p.id]} /></td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="position" value={p.position} hotFields={hot[p.id]} /></td>
+                  <td className="px-4 py-3">{p.major || "-"}</td>
+                  <td className="px-4 py-3 text-center"><OrangeCell resourceType="potential" recordId={p.id} field="recordedYear" value={p.recordedYear} hotFields={hot[p.id]} /></td>
                   {manageMode && (
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">

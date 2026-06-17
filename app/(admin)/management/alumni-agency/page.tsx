@@ -5,13 +5,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import { facetQueryParams } from "@/lib/filter-facets";
+import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
 
-interface AbroadAlumni {
+interface AlumniAgency {
   id: string;
   cohort: string | null;
   prefix: string | null;
@@ -25,9 +29,67 @@ interface AbroadAlumni {
 }
 
 interface ApiResponse {
-  data: AbroadAlumni[];
+  data: AlumniAgency[];
   countries: string[];
 }
+
+// Thailand mode (PRD §3.9) — read-only view sourced from the `alumni` table
+interface ThailandAlumni {
+  id: string;
+  studentId: string | null;
+  cohort: string | null;
+  major: string | null;
+  prefix: string | null;
+  firstName: string | null;
+  maidenLastName: string | null;
+  newLastName: string | null;
+  englishName: string | null;
+  currentWorkplace: string | null;
+  homeAddress: string | null;
+  remarks: string | null;
+}
+
+interface ThailandApiResponse {
+  data: ThailandAlumni[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+type ThailandSortField =
+  | "studentId"
+  | "cohort"
+  | "major"
+  | "prefix"
+  | "firstName"
+  | "newLastName"
+  | "englishName"
+  | "currentWorkplace"
+  | "homeAddress"
+  | "remarks";
+type ThailandSortDir = "asc" | "desc";
+
+const THAILAND_SORT_FIELDS: { field: ThailandSortField; label: string }[] = [
+  { field: "studentId", label: "รหัสนักศึกษา" },
+  { field: "cohort", label: "รุ่น" },
+  { field: "major", label: "สาขาวิชา" },
+  { field: "prefix", label: "คำนำหน้า" },
+  { field: "firstName", label: "ชื่อ" },
+  { field: "newLastName", label: "นามสกุล" },
+  { field: "englishName", label: "ชื่ออังกฤษ" },
+  { field: "currentWorkplace", label: "สถานที่ทำงาน" },
+  { field: "homeAddress", label: "ที่อยู่บ้าน" },
+  { field: "remarks", label: "หมายเหตุ" },
+];
+
+type ThailandSearchField = "all" | "studentId" | "firstName" | "currentWorkplace";
+
+const THAILAND_SEARCH_FIELDS: { value: ThailandSearchField; label: string }[] = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "studentId", label: "รหัสนักศึกษา" },
+  { value: "firstName", label: "ชื่อ" },
+  { value: "currentWorkplace", label: "สถานที่ทำงาน" },
+];
 
 const abroadFormSchema = z.object({
   cohort: z.string(),
@@ -57,7 +119,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "cohort", label: "รุ่น" },
 ];
 
-function displayName(a: AbroadAlumni): string {
+function displayName(a: AlumniAgency): string {
   if (a.thaiName && a.englishName) return `${a.thaiName} (${a.englishName})`;
   return a.thaiName || a.englishName || "-";
 }
@@ -85,7 +147,7 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "notes", label: "หมายเหตุ" },
 ];
 
-function getFieldValue(a: AbroadAlumni, field: SortField): string {
+function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
     case "cohort": return a.cohort || "";
     case "thaiName": return a.thaiName || "";
@@ -130,9 +192,9 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   );
 }
 
-export default function AbroadAlumniPage() {
+export default function AlumniAgencyPage() {
   const canWrite = useCanWrite();
-  const [alumni, setAlumni] = useState<AbroadAlumni[]>([]);
+  const [alumni, setAlumni] = useState<AlumniAgency[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
@@ -144,6 +206,7 @@ export default function AbroadAlumniPage() {
   const [viewPage, setViewPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as any,
     defaultValues: { cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" },
@@ -172,11 +235,79 @@ export default function AbroadAlumniPage() {
   const [viewSortField, setViewSortField] = useState<SortField>("cohort");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("desc");
 
+  // Thailand mode (PRD §3.9) — read-only view sourced from the alumni table
+  const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
+  const [thailandAlumni, setThailandAlumni] = useState<ThailandAlumni[]>([]);
+  const [thailandLoading, setThailandLoading] = useState(true);
+  const [thailandPage, setThailandPage] = useState(1);
+  const [thailandTotalPages, setThailandTotalPages] = useState(1);
+  const [thailandTotal, setThailandTotal] = useState(0);
+  const [thailandSearch, setThailandSearch] = useState("");
+  const [thailandSearchField, setThailandSearchField] = useState<ThailandSearchField>("all");
+  const [thailandSortField, setThailandSortField] = useState<ThailandSortField>("studentId");
+  const [thailandSortDir, setThailandSortDir] = useState<ThailandSortDir>("asc");
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const filtersKey = facetQueryParams(filters).toString();
+
+  const setFilter = (field: string, vals: string[]) => {
+    setFilters((prev) => ({ ...prev, [field]: vals }));
+    setThailandPage(1);
+  };
+
+  const fetchThailand = useCallback(async () => {
+    setThailandLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(thailandPage),
+        pageSize: String(PAGE_SIZE),
+        sortField: thailandSortField,
+        sortOrder: thailandSortDir,
+      });
+      if (thailandSearch.trim()) {
+        params.set("search", thailandSearch.trim());
+        params.set("searchField", thailandSearchField);
+      }
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
+      const res = await fetch(`${BASE_PATH}/api/alumni?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data: ThailandApiResponse = await res.json();
+      setThailandAlumni(data.data);
+      setThailandTotal(data.total);
+      setThailandTotalPages(Math.max(1, Math.ceil(data.total / data.pageSize)));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setThailandLoading(false);
+    }
+  }, [thailandPage, thailandSearch, thailandSearchField, thailandSortField, thailandSortDir, filtersKey]);
+
+  useEffect(() => {
+    if (mode === "thailand") fetchThailand();
+  }, [mode, fetchThailand]);
+
+  const handleThailandSort = (field: ThailandSortField) => {
+    if (thailandSortField === field) {
+      setThailandSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setThailandSortField(field);
+      setThailandSortDir("asc");
+    }
+    setThailandPage(1);
+  };
+
+  const switchMode = (next: "abroad" | "thailand") => {
+    if (next === mode) return;
+    setMode(next);
+    setThailandPage(1);
+    setViewPage(1);
+    setMgmtPage(1);
+  };
+
   const fetchAlumni = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ search, country: countryFilter, searchField });
-      const res = await fetch(`${BASE_PATH}/api/abroad-alumni?${params}`);
+      const res = await fetch(`${BASE_PATH}/api/alumni-agency?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data: ApiResponse = await res.json();
       setAlumni(data.data);
@@ -191,8 +322,10 @@ export default function AbroadAlumniPage() {
   }, [search, searchField, countryFilter, countries.length]);
 
   useEffect(() => {
+    // Only fetch Abroad data in Abroad mode; Thailand mode uses its own fetch
+    if (mode !== "abroad") return;
     fetchAlumni();
-  }, [fetchAlumni]);
+  }, [mode, fetchAlumni]);
 
   // View mode: flat sorted list
   const viewSortedAlumni = useMemo(() =>
@@ -219,28 +352,37 @@ export default function AbroadAlumniPage() {
   );
   const mgmtTotalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
+  const visibleAbroad = manageMode ? pagedAlumni : pagedViewAlumni;
+  const hot = useHotFields("alumni_agency", visibleAbroad.map((a) => a.id));
 
   const openCreate = () => {
     formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
     setEditingId(null);
+    setEditReason("");
     setShowForm(true);
   };
 
-  const openEdit = (a: AbroadAlumni) => {
+  const openEdit = (a: AlumniAgency) => {
     formReset({ cohort: a.cohort || "", prefix: a.prefix || "", thaiName: a.thaiName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
+    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setEditReason("");
     formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
-    setSaving(true);
     setErrorMsg("");
+    if (editingId && !editReason) {
+      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
+      return;
+    }
+    setSaving(true);
     try {
       const payload = {
         cohort: data.cohort.trim() || null,
@@ -252,9 +394,10 @@ export default function AbroadAlumniPage() {
         country: data.country.trim(),
         notes: data.notes.trim() || null,
         order: Number(data.order) || 0,
+        ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
-        const res = await fetch(`${BASE_PATH}/api/abroad-alumni/${editingId}`, {
+        const res = await fetch(`${BASE_PATH}/api/alumni-agency/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -264,7 +407,7 @@ export default function AbroadAlumniPage() {
           throw new Error(d.error || "เกิดข้อผิดพลาด");
         }
       } else {
-        const res = await fetch(`${BASE_PATH}/api/abroad-alumni`, {
+        const res = await fetch(`${BASE_PATH}/api/alumni-agency`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -286,7 +429,7 @@ export default function AbroadAlumniPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`${BASE_PATH}/api/alumni-agency/${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setDeleteId(null);
       fetchAlumni();
@@ -301,7 +444,7 @@ export default function AbroadAlumniPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/bulk-delete`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni-agency/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -324,7 +467,7 @@ export default function AbroadAlumniPage() {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/export`, {
+      const res = await fetch(`${BASE_PATH}/api/alumni-agency/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
@@ -334,7 +477,7 @@ export default function AbroadAlumniPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "abroad_alumni_export.xlsx";
+      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "alumni_agency_export.xlsx";
       a.click();
       URL.revokeObjectURL(url);
       deselectAll();
@@ -345,7 +488,7 @@ export default function AbroadAlumniPage() {
 
   const handleExport = () => {
     const params = new URLSearchParams({ search, country: countryFilter, searchField });
-    window.location.href = `${BASE_PATH}/api/abroad-alumni/export?${params}`;
+    window.location.href = `${BASE_PATH}/api/alumni-agency/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,7 +499,7 @@ export default function AbroadAlumniPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/abroad-alumni/import`, { method: "POST", body: formData });
+      const res = await fetch(`${BASE_PATH}/api/alumni-agency/import`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
       setImportResult(data);
@@ -372,11 +515,11 @@ export default function AbroadAlumniPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          ข้อมูลการทำงานต่างประเทศ
+          ต้นสังกัดศิษย์เก่า
         </h1>
-        {!manageMode ? (
+        {mode === "abroad" && (!manageMode ? (
           canWrite && (<button onClick={() => { setManageMode(true); deselectAll(); }} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             จัดการข้อมูล
           </button>)
@@ -384,9 +527,36 @@ export default function AbroadAlumniPage() {
           <button onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
             กลับหน้าเดิม
           </button>
-        )}
+        ))}
       </div>
 
+      {/* Thailand / Abroad mode toggle (PRD §3.9) */}
+      <div className="mb-8 inline-flex rounded-lg border border-[var(--border)] bg-white p-1">
+        <button
+          type="button"
+          onClick={() => switchMode("thailand")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            mode === "thailand"
+              ? "bg-[var(--primary)] text-white"
+              : "text-[var(--foreground)] hover:bg-gray-100"
+          }`}
+        >
+          ข้อมูลในประเทศ
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("abroad")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            mode === "abroad"
+              ? "bg-[var(--primary)] text-white"
+              : "text-[var(--foreground)] hover:bg-gray-100"
+          }`}
+        >
+          ข้อมูลต่างประเทศ
+        </button>
+      </div>
+
+      {mode === "abroad" && (<>
       {errorMsg && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
           <span>{errorMsg}</span>
@@ -451,6 +621,20 @@ export default function AbroadAlumniPage() {
               <FormInput registration={register("order")} type="number" />
             </FormField>
           </div>
+          {editingId && (
+            <FormField label="เหตุผลในการแก้ไข" required>
+              <select
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              >
+                <option value="">— กรุณาเลือก —</option>
+                {EDIT_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -583,13 +767,13 @@ export default function AbroadAlumniPage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
-                    <td className="px-4 py-3">{a.thaiName || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
-                    <td className="px-4 py-3">{a.country}</td>
-                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.workplace || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.homeAddress || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.notes || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="thaiName" value={a.thaiName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="notes" value={a.notes || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
@@ -646,12 +830,12 @@ export default function AbroadAlumniPage() {
                 {pagedViewAlumni.map((a, idx) => (
                   <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
-                    <td className="px-4 py-3">{a.thaiName || a.englishName || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
-                    <td className="px-4 py-3">{a.country}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.workplace || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]">{a.homeAddress || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="thaiName" value={a.thaiName || a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">
                       {a.notes ? (
                         <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
@@ -706,6 +890,103 @@ export default function AbroadAlumniPage() {
             </div>
           </div>
         </div>
+      )}
+      </>)}
+
+      {/* Thailand mode (PRD §3.9) — read-only alumni view */}
+      {mode === "thailand" && (
+        <>
+          {/* Filters: search + workplace facet */}
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+            <select
+              value={thailandSearchField}
+              onChange={(e) => { setThailandSearchField(e.target.value as ThailandSearchField); setThailandSearch(""); setThailandPage(1); }}
+              className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            >
+              {THAILAND_SEARCH_FIELDS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder={`ค้นหา${THAILAND_SEARCH_FIELDS.find((f) => f.value === thailandSearchField)?.label}...`}
+              value={thailandSearch}
+              onChange={(e) => { setThailandSearch(e.target.value); setThailandPage(1); }}
+              className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            />
+          </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <FacetFilter
+              entity="alumni"
+              field="currentWorkplace"
+              label="สถานที่ทำงาน"
+              selected={filters.currentWorkplace ?? []}
+              onChange={(v) => setFilter("currentWorkplace", v)}
+            />
+          </div>
+
+          {/* Thailand table */}
+          {thailandLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+            </div>
+          ) : thailandAlumni.length === 0 ? (
+            <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
+          ) : (
+            <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[var(--primary)] text-white">
+                      <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                      {THAILAND_SORT_FIELDS.map(({ field, label }) => (
+                        <th
+                          key={field}
+                          onClick={() => handleThailandSort(field)}
+                          className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                        >
+                          {label}
+                          <SortIcon active={thailandSortField === field} dir={thailandSortField === field ? thailandSortDir : "asc"} />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {thailandAlumni.map((a, idx) => (
+                      <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                        <td className="px-4 py-3 text-center">{(thailandPage - 1) * PAGE_SIZE + idx + 1}</td>
+                        <td className="px-4 py-3 font-mono text-gray-700">{a.studentId || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{a.major || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{a.prefix || "-"}</td>
+                        <td className="px-4 py-3">{a.firstName || "-"}</td>
+                        <td className="px-4 py-3">{a.newLastName || a.maidenLastName || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.currentWorkplace || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.homeAddress || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{a.remarks || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {thailandTotalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+                  <span className="text-sm text-gray-500">แสดง {thailandTotal === 0 ? 0 : (thailandPage - 1) * PAGE_SIZE + 1}-{Math.min(thailandPage * PAGE_SIZE, thailandTotal)} จาก {thailandTotal} รายการ</span>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setThailandPage(Math.max(1, thailandPage - 1))} disabled={thailandPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                    {getPageNumbers(thailandPage, thailandTotalPages).map((p, i) => (
+                      p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
+                      <button key={p} onClick={() => setThailandPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${thailandPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                    ))}
+                    <button onClick={() => setThailandPage(Math.min(thailandTotalPages, thailandPage + 1))} disabled={thailandPage === thailandTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
