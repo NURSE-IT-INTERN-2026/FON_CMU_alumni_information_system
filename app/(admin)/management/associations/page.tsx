@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEntityList } from "@/lib/use-entity-list";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -23,14 +27,6 @@ interface Association {
   position: string;
   recordedYear: number;
   major?: string | null;
-}
-
-interface ApiResponse {
-  data: Association[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear" | "major";
@@ -52,17 +48,20 @@ const DEFAULT_FORM_VALUES: FormValues = { studentId: "", fullName: "", associati
 
 export default function AssociationsPage() {
   const canWrite = useCanWrite();
-  const [items, setItems] = useState<Association[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("associationName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+
+  const qc = useQueryClient();
+  const { items, total, totalPages, isPending: loading, isError } = useEntityList<Association>(
+    "associations",
+    "/api/associations",
+    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+  );
 
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(associationFormSchema) as any,
@@ -111,35 +110,6 @@ export default function AssociationsPage() {
     setPage(1);
   };
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        sortField,
-        sortOrder: sortDir,
-      });
-      if (search.trim()) params.set("search", search.trim());
-      params.set("searchField", searchField);
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/associations?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setItems(data.data);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, searchField, sortField, sortDir, filtersKey]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
@@ -151,10 +121,7 @@ export default function AssociationsPage() {
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      setPage(1);
-      fetchItems();
-    }
+    if (e.key === "Enter") setPage(1);
   };
 
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
@@ -200,28 +167,12 @@ export default function AssociationsPage() {
     try {
       const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
-        const res = await fetch(`${BASE_PATH}/api/associations/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/associations/${editingId}`, { method: "PUT", json: payload });
       } else {
-        const res = await fetch(`${BASE_PATH}/api/associations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/associations`, { method: "POST", json: payload });
       }
       closeForm();
-      fetchItems();
+      qc.invalidateQueries({ queryKey: queryKeys.associations.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -232,10 +183,9 @@ export default function AssociationsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/associations/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/associations/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchItems();
+      qc.invalidateQueries({ queryKey: queryKeys.associations.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -247,18 +197,10 @@ export default function AssociationsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/associations/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/associations/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchItems();
+      qc.invalidateQueries({ queryKey: queryKeys.associations.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -309,11 +251,12 @@ export default function AssociationsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/associations/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/associations/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchItems();
+      qc.invalidateQueries({ queryKey: queryKeys.associations.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
@@ -556,6 +499,10 @@ export default function AssociationsPage() {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
