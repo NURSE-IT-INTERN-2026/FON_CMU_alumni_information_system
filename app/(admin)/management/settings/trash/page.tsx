@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { BASE_PATH } from "@/lib/constants";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { useRole } from "@/lib/role-context";
 
 interface TrashRecord {
@@ -35,84 +37,73 @@ const ENTITY_OPTIONS: { value: string; label: string }[] = [
 export default function TrashPage() {
   const role = useRole();
   const isSuperAdmin = role === "superadmin";
+  const queryClient = useQueryClient();
 
   const [entity, setEntity] = useState("alumni");
-  const [records, setRecords] = useState<TrashRecord[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
   const [hardDeleteId, setHardDeleteId] = useState<string | null>(null);
   const [hardDeleteConfirm, setHardDeleteConfirm] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Holds mutation errors for the dismissible banner (list errors render inline).
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const fetchTrash = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
+  // --- List query ----------------------------------------------------------
+  // The query key encodes every variable that changes the request, so the cache
+  // is keyed correctly and invalidateQueries({ queryKey: queryKeys.trash.all })
+  // refetches after every mutation. `enabled` keeps non-superadmins from
+  // fetching (they hit the early-return below instead).
+  const { data, isPending, isError } = useQuery({
+    queryKey: queryKeys.trash.list({ entity, page, search }),
+    queryFn: () => {
       const params = new URLSearchParams({ entity, page: String(page) });
       if (search.trim()) params.set("search", search.trim());
-      const res = await fetch(`${BASE_PATH}/api/trash?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setRecords(data.data);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch {
-      setErrorMsg("เกิดข้อผิดพลาดในการดึงข้อมูล");
-    } finally {
-      setLoading(false);
-    }
-  }, [entity, page, search]);
+      return apiFetch<ApiResponse>(`/api/trash?${params}`);
+    },
+    enabled: isSuperAdmin,
+  });
+  const records = data?.data ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const total = data?.total ?? 0;
 
-  useEffect(() => {
-    if (isSuperAdmin) fetchTrash();
-  }, [fetchTrash, isSuperAdmin]);
-
-  const restore = async (id: string) => {
-    setBusyId(id);
-    try {
-      const res = await fetch(`${BASE_PATH}/api/trash/restore`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity, id }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || "เกิดข้อผิดพลาด");
-      }
+  // --- Mutations -----------------------------------------------------------
+  // Each invalidates the whole trash scope on success so the list refetches
+  // automatically — no manual fetchTrash() call needed.
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch("/api/trash/restore", { method: "POST", json: { entity, id } }),
+    onSuccess: () => {
       setActionId(null);
-      fetchTrash();
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setBusyId(null);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: queryKeys.trash.all });
+    },
+    onError: (e) =>
+      setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด"),
+  });
 
-  const hardDelete = async (id: string) => {
-    setBusyId(id);
-    try {
-      const res = await fetch(`${BASE_PATH}/api/trash/hard-delete`, {
+  const hardDeleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch("/api/trash/hard-delete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity, id, confirm: true }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || "เกิดข้อผิดพลาด");
-      }
+        json: { entity, id, confirm: true },
+      }),
+    onSuccess: () => {
       setHardDeleteId(null);
       setHardDeleteConfirm(null);
-      fetchTrash();
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setBusyId(null);
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.trash.all });
+    },
+    onError: (e) =>
+      setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด"),
+  });
+
+  const restore = (id: string) => {
+    setBusyId(id);
+    restoreMutation.mutate(id, { onSettled: () => setBusyId(null) });
+  };
+
+  const hardDelete = (id: string) => {
+    setBusyId(id);
+    hardDeleteMutation.mutate(id, { onSettled: () => setBusyId(null) });
   };
 
   const fmtDate = (iso: string | null) => {
@@ -174,9 +165,13 @@ export default function TrashPage() {
         />
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : records.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
