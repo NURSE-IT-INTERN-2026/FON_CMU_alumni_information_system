@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -37,40 +40,20 @@ interface ApiResponse {
 }
 
 export default function AlumniNewsPage() {
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
 
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        status: "PUBLISHED",
-      });
+  const { data: newsData, isPending: loading, isError } = useQuery({
+    queryKey: queryKeys.news.list({ page, search, statusFilter: "PUBLISHED", manageMode: false }),
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), status: "PUBLISHED" });
       if (search) params.set("search", search);
-
-      const res = await fetch(`${BASE_PATH}/api/news?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setNews(data.data || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลข่าวสารได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
-
-  useEffect(() => {
-    fetchNews();
-  }, [fetchNews]);
+      return apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(`/api/news?${params}`);
+    },
+  });
+  const news = newsData?.data ?? [];
+  const total = newsData?.total ?? 0;
+  const totalPages = newsData?.totalPages ?? 1;
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
@@ -100,13 +83,6 @@ export default function AlumniNewsPage() {
         </h1>
       </div>
 
-      {errorMsg && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
-          <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg("")} className="ml-4 text-red-500 hover:text-red-700 font-bold">&times;</button>
-        </div>
-      )}
-
       {/* Search */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <input
@@ -121,6 +97,10 @@ export default function AlumniNewsPage() {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : news.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">

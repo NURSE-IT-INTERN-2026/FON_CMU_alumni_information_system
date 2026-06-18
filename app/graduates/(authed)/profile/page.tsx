@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,8 +10,10 @@ import {
   DEGREE_LEVEL_OPTIONS,
   PREFIX_OPTIONS,
   EDIT_REASON_OPTIONS,
-  BASE_PATH,
 } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch, ApiError } from "@/lib/api-client";
 import {
   alumniProfileWithRelatedFormSchema,
   type AlumniProfileWithRelatedFormData,
@@ -214,8 +216,6 @@ function sectionsFromData(data: AlumniData) {
 export default function AlumniProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [alumni, setAlumni] = useState<AlumniData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editReason, setEditReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -249,45 +249,42 @@ export default function AlumniProfilePage() {
     defaultValues: defaultFormValues,
   });
 
-  const fetchProfile = useCallback(async () => {
-    try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-profile`);
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: AlumniData = await res.json();
-      setAlumni(data);
-      formReset(buildFormValues(data));
-      setSections(sectionsFromData(data));
+  const qc = useQueryClient();
+  const { data: alumni, isPending: loading, error } = useQuery({
+    queryKey: queryKeys.alumniProfile.me(),
+    queryFn: () => apiFetch<AlumniData>("/api/alumni-profile"),
+  });
 
-      // Check first-login modal
-      const firstParam = searchParams.get("first");
-      const dismissedFirst = localStorage.getItem(`alumni-first-login-dismissed-${data.id}`);
-      if ((firstParam === "1" || !dismissedFirst) && data.hasLoggedIn) {
-        if (!dismissedFirst) {
-          setShowFirstLoginModal(true);
-        }
-      }
-
-      // Check admin-edit notification
-      if (data.adminEditedAt) {
-        const lastSeen = localStorage.getItem(`alumni-admin-edit-seen-${data.id}`);
-        if (!lastSeen || new Date(data.adminEditedAt) > new Date(lastSeen)) {
-          setShowAdminEditModal(true);
-        }
-      }
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [searchParams, formReset]);
-
+  // 401 (expired/missing session) -> back to login.
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (error instanceof ApiError && error.status === 401) router.push("/login");
+  }, [error, router]);
+
+  // Populate form + modal state whenever the fetched profile changes (initial
+  // load + post-save). Skipped while editing so in-progress edits aren't
+  // clobbered by a background refetch.
+  /* eslint-disable react-hooks/set-state-in-effect -- populating react-hook-form + section state from the fetched profile is inherently a data->state sync */
+  useEffect(() => {
+    if (!alumni || editMode) return;
+    formReset(buildFormValues(alumni));
+    setSections(sectionsFromData(alumni));
+
+    // Check first-login modal
+    const firstParam = searchParams.get("first");
+    const dismissedFirst = localStorage.getItem(`alumni-first-login-dismissed-${alumni.id}`);
+    if ((firstParam === "1" || !dismissedFirst) && alumni.hasLoggedIn) {
+      if (!dismissedFirst) setShowFirstLoginModal(true);
+    }
+
+    // Check admin-edit notification
+    if (alumni.adminEditedAt) {
+      const lastSeen = localStorage.getItem(`alumni-admin-edit-seen-${alumni.id}`);
+      if (!lastSeen || new Date(alumni.adminEditedAt) > new Date(lastSeen)) {
+        setShowAdminEditModal(true);
+      }
+    }
+  }, [alumni, editMode, formReset, searchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function dismissFirstLoginModal() {
     if (alumni) {
@@ -371,27 +368,13 @@ export default function AlumniProfilePage() {
     };
 
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-profile`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        setErrorMsg(errData.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-        return;
-      }
-
-      const updated: AlumniData = await res.json();
-      setAlumni(updated);
-      formReset(buildFormValues(updated));
-      setSections(sectionsFromData(updated));
+      const updated = await apiFetch<AlumniData>("/api/alumni-profile", { method: "PUT", json: payload });
+      qc.setQueryData(queryKeys.alumniProfile.me(), updated);
       setEditMode(false);
       setSuccessMsg("บันทึกข้อมูลเรียบร้อยแล้ว");
       setTimeout(() => setSuccessMsg(""), 3000);
-    } catch {
-      setErrorMsg("ไม่สามารถบันทึกข้อมูลได้");
+    } catch (e) {
+      setErrorMsg(e instanceof ApiError ? e.message : "ไม่สามารถบันทึกข้อมูลได้");
     } finally {
       setSaving(false);
     }
@@ -411,24 +394,15 @@ export default function AlumniProfilePage() {
     setDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-profile`, {
-        method: "DELETE",
-      });
-      if (res.status === 401) {
+      await apiFetch("/api/alumni-profile", { method: "DELETE" });
+      // Record tombstoned + sessions cleared server-side — leave the app.
+      router.push("/login");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
         router.push("/login");
         return;
       }
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        setErrorMsg(errData.error || "ไม่สามารถลบข้อมูลได้");
-        setDeleting(false);
-        setShowDeleteDialog(false);
-        return;
-      }
-      // Record tombstoned + sessions cleared server-side — leave the app.
-      router.push("/login");
-    } catch {
-      setErrorMsg("ไม่สามารถลบข้อมูลได้");
+      setErrorMsg(e instanceof Error ? e.message : "ไม่สามารถลบข้อมูลได้");
       setDeleting(false);
       setShowDeleteDialog(false);
     }
