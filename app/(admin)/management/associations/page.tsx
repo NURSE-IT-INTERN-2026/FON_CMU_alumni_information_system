@@ -42,9 +42,9 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "recordedYear", label: "ปีที่บันทึก" },
 ];
 
-type FormValues = AssociationFormData & { studentId: string; fullName: string };
+type FormValues = AssociationFormData & { studentId: string; fullName: string; major: string };
 
-const DEFAULT_FORM_VALUES: FormValues = { studentId: "", fullName: "", associationName: "", position: "", recordedYear: "" };
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", fullName: "", major: "", associationName: "", position: "", recordedYear: "" };
 
 export default function AssociationsPage() {
   const canWrite = useCanWrite();
@@ -93,9 +93,10 @@ export default function AssociationsPage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("association", items.map((item) => item.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("fullName", displayName(a));
+    setValue("major", a.major ?? "");
     setAlumniSearchField(null);
     clearResults();
   };
@@ -137,6 +138,7 @@ export default function AssociationsPage() {
     formReset({
       studentId: item.studentId,
       fullName: item.fullName,
+      major: item.major || "",
       associationName: item.associationName,
       position: item.position,
       recordedYear: String(item.recordedYear),
@@ -165,7 +167,7 @@ export default function AssociationsPage() {
     }
     setSaving(true);
     try {
-      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
+      const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
         await apiFetch(`/api/associations/${editingId}`, { method: "PUT", json: payload });
       } else {
@@ -396,6 +398,9 @@ export default function AssociationsPage() {
     </div>
   </>
 )}
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
+            </FormField>
             <FormField label="ชื่อสมาคม/ชมรม" required error={errors.associationName?.message}>
               <FormInput registration={register("associationName")} error={errors.associationName?.message} type="text" />
             </FormField>

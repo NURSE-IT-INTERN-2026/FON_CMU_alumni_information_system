@@ -45,7 +45,7 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "termYear", label: "ปี พ.ศ." },
 ];
 
-type FormValues = CommitteeFormData & { studentId: string; fullName: string };
+type FormValues = CommitteeFormData & { studentId: string; fullName: string; major: string };
 
 export default function GraduateCommitteePage() {
   const canWrite = useCanWrite();
@@ -72,7 +72,7 @@ export default function GraduateCommitteePage() {
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(committeeFormSchema) as any,
-    defaultValues: { termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" },
+    defaultValues: { termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" },
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -96,9 +96,10 @@ export default function GraduateCommitteePage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("fullName", displayName(a));
+    setValue("major", a.major ?? "");
     setAlumniSearchField(null);
     clearResults();
   };
@@ -119,7 +120,7 @@ export default function GraduateCommitteePage() {
   };
 
   const openCreate = () => {
-    formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
+    formReset({ termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" });
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -130,6 +131,7 @@ export default function GraduateCommitteePage() {
       termYear: String(c.termYear),
       studentId: c.studentId,
       fullName: c.fullName,
+      major: c.major || "",
       cohort: c.cohort,
       position: c.position,
       remarks: c.remarks || "",
@@ -145,7 +147,7 @@ export default function GraduateCommitteePage() {
     setEditReason("");
     setAlumniSearchField(null);
     clearResults();
-    formReset({ termYear: "", studentId: "", fullName: "", cohort: "", position: "", remarks: "" });
+    formReset({ termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" });
   };
 
   const onSave = async (data: CommitteeFormData) => {
@@ -159,11 +161,11 @@ export default function GraduateCommitteePage() {
     setSaving(true);
     try {
       if (editingId) {
-        const payload = { studentId, fullName, ...data, termYear: Number(data.termYear), reason: editReason };
+        const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear), reason: editReason };
         await apiFetch(`/api/graduate-committee/${editingId}`, { method: "PUT", json: payload });
       } else {
         if (studentId) {
-          const payload = { studentId, fullName, ...data, termYear: Number(data.termYear) };
+          const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear) };
           await apiFetch(`/api/graduate-committee`, { method: "POST", json: payload });
         } else {
           const params = new URLSearchParams({ section: "committees", nameSearch: fullName });
@@ -339,6 +341,9 @@ export default function GraduateCommitteePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="ปี พ.ศ." required error={errors.termYear?.message}>
               <FormInput registration={register("termYear")} error={errors.termYear?.message} type="number" placeholder="เช่น 2568" />
+            </FormField>
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
             </FormField>
             {editingId ? (
               <>

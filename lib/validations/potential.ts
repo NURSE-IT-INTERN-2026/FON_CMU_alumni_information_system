@@ -24,6 +24,7 @@ export const potentialCreateSchema = z.object({
   career: z.string().min(1, MSG.careerRequired).trim(),
   position: z.string().min(1, MSG.positionRequired).trim(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
+  major: z.string().optional().nullable(),
 });
 
 export const potentialUpdateSchema = z.object({
@@ -32,6 +33,7 @@ export const potentialUpdateSchema = z.object({
   career: z.string().min(1, MSG.careerRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
+  major: z.string().optional().nullable(),
   reason: editReasonField(),
 });
 

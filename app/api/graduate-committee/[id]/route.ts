@@ -29,6 +29,7 @@ export async function PUT(
         cohort: validated.cohort!.trim(),
         position: validated.position!.trim(),
         remarks: validated.remarks?.trim() || null,
+        major: validated.major?.trim() || null,
       },
     });
 

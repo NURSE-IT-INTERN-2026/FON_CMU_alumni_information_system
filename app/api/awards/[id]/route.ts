@@ -25,6 +25,7 @@ export async function PUT(
     if (validated.awardType !== undefined) updateData.awardType = validated.awardType;
     if (validated.year !== undefined) updateData.year = validated.year;
     if (validated.description !== undefined) updateData.description = validated.description?.trim() || null;
+    if (validated.major !== undefined) updateData.major = validated.major?.trim() || null;
 
     const old = await prisma.award.findUnique({ where: { id } });
 

@@ -32,6 +32,7 @@ export const awardCreateSchema = z.object({
   }),
   year: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
   description: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
 });
 
 export const awardUpdateSchema = z.object({
@@ -41,6 +42,7 @@ export const awardUpdateSchema = z.object({
   awardType: z.enum(AWARD_TYPE_VALUES).optional(),
   year: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
   description: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
   reason: editReasonField(),
 });
 

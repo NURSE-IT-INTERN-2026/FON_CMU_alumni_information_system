@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
         career: validated.career.trim(),
         position: validated.position.trim(),
         recordedYear: Number(validated.recordedYear),
+        major: validated.major?.trim() || null,
       },
     });
 

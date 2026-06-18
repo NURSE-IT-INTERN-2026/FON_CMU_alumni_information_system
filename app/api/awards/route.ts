@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
         awardType: validated.awardType,
         year: Number(validated.year),
         description: validated.description?.trim() || null,
+        major: validated.major?.trim() || null,
       },
       include: {
         alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },

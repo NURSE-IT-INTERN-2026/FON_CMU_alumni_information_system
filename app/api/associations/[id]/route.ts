@@ -28,6 +28,7 @@ export async function PUT(
         associationName: validated.associationName!.trim(),
         position: validated.position!.trim(),
         recordedYear: Number(validated.recordedYear),
+        major: validated.major?.trim() || null,
       },
     });
 

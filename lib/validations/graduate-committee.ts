@@ -28,6 +28,7 @@ export const committeeCreateSchema = z.object({
   cohort: z.string().min(1, MSG.cohortRequired).trim(),
   position: z.string().min(1, MSG.positionRequired).trim(),
   remarks: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
 });
 
 export const committeeUpdateSchema = z.object({
@@ -37,6 +38,7 @@ export const committeeUpdateSchema = z.object({
   cohort: z.string().min(1, MSG.cohortRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   remarks: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
   reason: editReasonField(),
 });
 

@@ -29,6 +29,8 @@ export const alumniAgencyCreateSchema = z
     homeAddress: z.string().optional().nullable(),
     country: z.string().min(1, MSG.countryRequired).trim(),
     notes: z.string().optional().nullable(),
+    major: z.string().optional().nullable(),
+    studentId: z.string().optional().nullable(),
     order: z.coerce.number().int().optional().default(0),
   })
   .refine((data) => data.thaiName || data.englishName, {
@@ -45,6 +47,8 @@ export const alumniAgencyUpdateSchema = z.object({
   homeAddress: z.string().optional().nullable(),
   country: z.string().min(1, MSG.countryRequired).trim().optional(),
   notes: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
+  studentId: z.string().optional().nullable(),
   order: z.coerce.number().int().optional(),
   reason: editReasonField(),
 });

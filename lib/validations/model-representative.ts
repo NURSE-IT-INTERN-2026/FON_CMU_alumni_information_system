@@ -26,6 +26,7 @@ export const modelRepCreateSchema = z.object({
   name: z.string().min(1, MSG.nameRequired).trim(),
   cohort: z.string().min(1, MSG.cohortRequired).trim(),
   generation: z.coerce.number().int(MSG.generationInvalid),
+  major: z.string().optional().nullable(),
 });
 
 export const modelRepUpdateSchema = z.object({
@@ -33,6 +34,7 @@ export const modelRepUpdateSchema = z.object({
   name: z.string().min(1, MSG.nameRequired).trim().optional(),
   cohort: z.string().min(1, MSG.cohortRequired).trim().optional(),
   generation: z.coerce.number().int(MSG.generationInvalid).optional(),
+  major: z.string().optional().nullable(),
   reason: editReasonField(),
 });
 

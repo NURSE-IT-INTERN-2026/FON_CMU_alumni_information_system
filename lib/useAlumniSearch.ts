@@ -13,12 +13,16 @@ export interface AlumniSearchResult {
   prefix: string;
   firstName: string;
   maidenLastName: string;
+  // CMU `major_name_th` (or local alumni `major`) — surfaced so entity forms can
+  // auto-fill the `major` (สาขาวิชา) field when a record is linked to this alumni.
+  major?: string;
 }
 
 interface CmuAlumni {
   student_id: string;
   name_th: string;
   surname_th: string;
+  major_name_th?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +62,7 @@ export function useAlumniSearch() {
             prefix: a.prefix ?? "",
             firstName: a.firstName ?? "",
             maidenLastName: a.maidenLastName ?? "",
+            major: a.major ?? "",
           });
         }
       }
@@ -73,6 +78,7 @@ export function useAlumniSearch() {
             prefix: "",
             firstName: c.name_th || "",
             maidenLastName: c.surname_th || "",
+            major: c.major_name_th || "",
           });
         }
       }

@@ -25,6 +25,7 @@ interface ModelRepresentative {
   name: string;
   cohort: string;
   generation: number;
+  major?: string | null;
 }
 
 const NETWORK_ORDER = [
@@ -38,7 +39,7 @@ const NETWORK_ORDER = [
 type SortField = "network" | "generation" | "studentId" | "name";
 type SortDir = "asc" | "desc";
 
-type FormValues = ModelRepFormData & { studentId: string; name: string };
+type FormValues = ModelRepFormData & { studentId: string; name: string; major: string };
 
 function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; className?: string }) {
   const color = className ?? "text-white";
@@ -100,7 +101,7 @@ export default function ModelRepresentativesPage() {
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(modelRepFormSchema) as any,
-    defaultValues: { studentId: "", name: "", cohort: "", generation: "" },
+    defaultValues: { studentId: "", name: "", major: "", cohort: "", generation: "" },
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -127,9 +128,10 @@ export default function ModelRepresentativesPage() {
   const [showCohortDropdown, setShowCohortDropdown] = useState(false);
   const cohortDropdownRef = useRef<HTMLDivElement>(null);
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("name", displayName(a));
+    setValue("major", a.major ?? "");
     clearResults();
     setSearchField(null);
   };
@@ -258,7 +260,7 @@ export default function ModelRepresentativesPage() {
   }, [allCohorts, cohortValue]);
 
   const openCreate = () => {
-    formReset({ studentId: "", name: "", cohort: "", generation: "" });
+    formReset({ studentId: "", name: "", major: "", cohort: "", generation: "" });
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -268,6 +270,7 @@ export default function ModelRepresentativesPage() {
     formReset({
       studentId: item.studentId,
       name: item.name,
+      major: item.major || "",
       cohort: item.cohort,
       generation: String(item.generation),
     });
@@ -280,7 +283,7 @@ export default function ModelRepresentativesPage() {
     setShowForm(false);
     setEditingId(null);
     setEditReason("");
-    formReset({ studentId: "", name: "", cohort: "", generation: "" });
+    formReset({ studentId: "", name: "", major: "", cohort: "", generation: "" });
     setShowCohortDropdown(false);
     setSearchField(null);
     clearResults();
@@ -299,6 +302,7 @@ export default function ModelRepresentativesPage() {
       const payload = {
         studentId: studentId.trim(),
         name: name.trim(),
+        major: getValues("major")?.trim() || null,
         cohort: data.cohort.trim(),
         generation: Number(data.generation),
         ...(editingId ? { reason: editReason } : {}),
@@ -643,6 +647,9 @@ export default function ModelRepresentativesPage() {
                 </div>
               </>
             )}
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
+            </FormField>
             <div className="relative" ref={cohortDropdownRef}>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 เครือข่าย *

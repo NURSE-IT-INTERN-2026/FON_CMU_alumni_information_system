@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
         name: validated.name.trim(),
         cohort: validated.cohort.trim(),
         generation: Number(validated.generation),
+        major: validated.major?.trim() || null,
       },
     });
 

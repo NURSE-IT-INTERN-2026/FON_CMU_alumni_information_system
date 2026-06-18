@@ -27,6 +27,7 @@ export async function PUT(
         name: validated.name!.trim(),
         cohort: validated.cohort!.trim(),
         generation: Number(validated.generation),
+        major: validated.major?.trim() || null,
       },
     });
 

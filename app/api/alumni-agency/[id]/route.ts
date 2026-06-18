@@ -28,6 +28,8 @@ export async function PUT(
     if (validated.country !== undefined) updateData.country = validated.country;
     if (validated.notes !== undefined) updateData.notes = validated.notes?.trim() || null;
     if (validated.order !== undefined) updateData.order = validated.order;
+    if (validated.major !== undefined) updateData.major = validated.major?.trim() || null;
+    if (validated.studentId !== undefined) updateData.studentId = validated.studentId?.trim() || null;
 
     const old = await prisma.alumniAgency.findUnique({ where: { id } });
 

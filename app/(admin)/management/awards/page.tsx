@@ -45,9 +45,9 @@ const AWARD_COLORS: Record<string, string> = {
 type SortField = "name" | "award" | "type" | "year" | "major" | "description";
 type SortDir = "asc" | "desc";
 
-type FormValues = AwardFormData & { studentId: string };
+type FormValues = AwardFormData & { studentId: string; major: string };
 
-const DEFAULT_FORM_VALUES: FormValues = { studentId: "", awardName: "", awardType: "INTERNATIONAL" as const, year: "", description: "" };
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", awardName: "", awardType: "INTERNATIONAL" as const, year: "", description: "" };
 
 type SearchField = "all" | "awardName" | "recipientName" | "description" | "name" | "year";
 
@@ -158,8 +158,9 @@ export default function AwardsPage() {
     return pages;
   })();
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
+    setValue("major", a.major ?? "");
     setNameSearch(displayName(a));
     clearResults();
     setFormSearchField(null);
@@ -177,6 +178,7 @@ export default function AwardsPage() {
   const openEdit = (a: Award) => {
     formReset({
       studentId: a.studentId || "",
+      major: a.major || "",
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
       year: String(a.year),
@@ -210,6 +212,7 @@ export default function AwardsPage() {
       const payload = {
         studentId: studentId || null,
         recipientName: studentId ? null : (nameSearch.trim() || null),
+        major: getValues("major")?.trim() || null,
         awardName: data.awardName.trim(),
         awardType: data.awardType,
         year: Number(data.year),
@@ -400,6 +403,9 @@ export default function AwardsPage() {
                 </div>
               )}
             </div>
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
+            </FormField>
             <FormField label="ชื่อรางวัล" required error={errors.awardName?.message}>
               <FormInput registration={register("awardName")} error={errors.awardName?.message} type="text" />
             </FormField>

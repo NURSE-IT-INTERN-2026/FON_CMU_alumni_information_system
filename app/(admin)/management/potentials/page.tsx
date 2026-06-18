@@ -43,9 +43,9 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "recordedYear", label: "ปีที่บันตึก" },
 ];
 
-type FormValues = PotentialFormData & { studentId: string; fullName: string };
+type FormValues = PotentialFormData & { studentId: string; fullName: string; major: string };
 
-const FORM_DEFAULTS: FormValues = { studentId: "", fullName: "", career: "", position: "", recordedYear: "" };
+const FORM_DEFAULTS: FormValues = { studentId: "", fullName: "", major: "", career: "", position: "", recordedYear: "" };
 
 export default function PotentialsPage() {
   const canWrite = useCanWrite();
@@ -97,9 +97,10 @@ export default function PotentialsPage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("potential", potentials.map((p) => p.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("fullName", displayName(a));
+    setValue("major", a.major ?? "");
     setFormSearchField(null);
     clearResults();
   };
@@ -137,6 +138,7 @@ export default function PotentialsPage() {
     formReset({
       studentId: p.studentId,
       fullName: p.fullName,
+      major: p.major || "",
       career: p.career,
       position: p.position,
       recordedYear: String(p.recordedYear),
@@ -165,7 +167,7 @@ export default function PotentialsPage() {
     }
     setSaving(true);
     try {
-      const payload = { studentId, fullName, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
+      const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
         await apiFetch(`/api/potentials/${editingId}`, { method: "PUT", json: payload });
       } else {
@@ -401,6 +403,9 @@ export default function PotentialsPage() {
                 </div>
               </>
             )}
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
+            </FormField>
             <FormField label="อาชีพ" required error={errors.career?.message}>
               <FormInput registration={register("career")} error={errors.career?.message} type="text" />
             </FormField>

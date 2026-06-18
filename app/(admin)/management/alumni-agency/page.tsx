@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCanWrite } from "@/lib/role-context";
@@ -12,6 +12,7 @@ import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
@@ -20,6 +21,7 @@ import FormTextarea from "@/components/form/FormTextarea";
 
 interface AlumniAgency {
   id: string;
+  studentId: string | null;
   cohort: string | null;
   prefix: string | null;
   thaiName: string | null;
@@ -27,6 +29,7 @@ interface AlumniAgency {
   workplace: string | null;
   homeAddress: string | null;
   country: string;
+  major: string | null;
   notes: string | null;
   order: number;
 }
@@ -95,6 +98,7 @@ const THAILAND_SEARCH_FIELDS: { value: ThailandSearchField; label: string }[] = 
 ];
 
 const abroadFormSchema = z.object({
+  studentId: z.string(),
   cohort: z.string(),
   prefix: z.string(),
   thaiName: z.string(),
@@ -102,6 +106,7 @@ const abroadFormSchema = z.object({
   workplace: z.string(),
   homeAddress: z.string(),
   country: z.string().min(1, "กรุณากรอกประเทศ"),
+  major: z.string(),
   notes: z.string(),
   order: z.string(),
 }).refine((data) => data.thaiName.trim() || data.englishName.trim(), {
@@ -207,10 +212,22 @@ export default function AlumniAgencyPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
-  const { register, handleSubmit, formState: { errors }, reset: formReset } = useForm<AbroadFormValues>({
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as any,
-    defaultValues: { cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" },
+    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
   });
+  const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
+  const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
+
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
+    setValue("studentId", a.studentId);
+    setValue("major", a.major ?? "");
+    setValue("thaiName", displayName(a));
+    setNameSearch("");
+    clearResults();
+    setFormSearchField(null);
+  };
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -324,14 +341,14 @@ export default function AlumniAgencyPage() {
   const hot = useHotFields("alumni_agency", visibleAbroad.map((a) => a.id));
 
   const openCreate = () => {
-    formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
   };
 
   const openEdit = (a: AlumniAgency) => {
-    formReset({ cohort: a.cohort || "", prefix: a.prefix || "", thaiName: a.thaiName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, notes: a.notes || "", order: String(a.order) });
+    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", thaiName: a.thaiName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
     setEditReason("");
     setShowForm(true);
@@ -341,7 +358,7 @@ export default function AlumniAgencyPage() {
     setShowForm(false);
     setEditingId(null);
     setEditReason("");
-    formReset({ cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
@@ -353,6 +370,7 @@ export default function AlumniAgencyPage() {
     setSaving(true);
     try {
       const payload = {
+        studentId: data.studentId.trim() || null,
         cohort: data.cohort.trim() || null,
         prefix: data.prefix.trim() || null,
         thaiName: data.thaiName.trim() || null,
@@ -360,6 +378,7 @@ export default function AlumniAgencyPage() {
         workplace: data.workplace.trim() || null,
         homeAddress: data.homeAddress.trim() || null,
         country: data.country.trim(),
+        major: data.major.trim() || null,
         notes: data.notes.trim() || null,
         order: Number(data.order) || 0,
         ...(editingId ? { reason: editReason } : {}),
@@ -534,6 +553,49 @@ export default function AlumniAgencyPage() {
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="relative">
+              <label className="mb-1 block text-sm font-medium text-gray-700">รหัสนักศึกษา</label>
+              <Controller name="studentId" control={control} render={({ field }) => (
+                <input
+                  type="text"
+                  value={field.value}
+                  onChange={(e) => { field.onChange(e.target.value); searchAlumni(e.target.value); setFormSearchField("studentId"); setNameSearch(""); }}
+                  placeholder="พิมพ์รหัสนักศึกษา..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              )} />
+              {showAlumniDropdown && formSearchField === "studentId" && alumniResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {alumniResults.map((a) => (
+                    <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                      {a.studentId} - {displayName(a)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <label className="mb-1 block text-sm font-medium text-gray-700">ค้นหาชื่อศิษย์เก่า</label>
+              <input
+                type="text"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); searchAlumni(e.target.value); setFormSearchField("name"); setValue("studentId", ""); }}
+                placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+              {showAlumniDropdown && formSearchField === "name" && alumniResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {alumniResults.map((a) => (
+                    <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                      {a.studentId} - {displayName(a)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
+            </FormField>
             <FormField label="รุ่น">
               <FormInput registration={register("cohort")} type="text" />
             </FormField>

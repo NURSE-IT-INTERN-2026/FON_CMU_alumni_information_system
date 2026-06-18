@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
         homeAddress: validated.homeAddress?.trim() || null,
         country: validated.country,
         notes: validated.notes?.trim() || null,
+        major: validated.major?.trim() || null,
+        studentId: validated.studentId?.trim() || null,
         order: validated.order,
       },
     });

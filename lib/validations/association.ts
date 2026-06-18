@@ -24,6 +24,7 @@ export const associationCreateSchema = z.object({
   associationName: z.string().min(1, MSG.associationNameRequired).trim(),
   position: z.string().min(1, MSG.positionRequired).trim(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
+  major: z.string().optional().nullable(),
 });
 
 export const associationUpdateSchema = z.object({
@@ -32,6 +33,7 @@ export const associationUpdateSchema = z.object({
   associationName: z.string().min(1, MSG.associationNameRequired).trim().optional(),
   position: z.string().min(1, MSG.positionRequired).trim().optional(),
   recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข").optional(),
+  major: z.string().optional().nullable(),
   reason: editReasonField(),
 });
 
