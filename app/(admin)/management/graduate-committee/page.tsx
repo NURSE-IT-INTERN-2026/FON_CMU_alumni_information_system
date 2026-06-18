@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEntityList } from "@/lib/use-entity-list";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -27,14 +31,6 @@ interface Committee {
   remarks: string | null;
 }
 
-interface ApiResponse {
-  data: Committee[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
 type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "major" | "remarks";
 type SortDir = "asc" | "desc";
 type SearchField = "all" | "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
@@ -54,17 +50,21 @@ type FormValues = CommitteeFormData & { studentId: string; fullName: string };
 export default function GraduateCommitteePage() {
   const canWrite = useCanWrite();
   const router = useRouter();
-  const [committees, setCommittees] = useState<Committee[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("cohort");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+
+  const qc = useQueryClient();
+  const { items: committees, total, totalPages, isPending: loading, isError } = useEntityList<Committee>(
+    "graduateCommittee",
+    "/api/graduate-committee",
+    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { sortKey: "sortBy" },
+  );
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -113,35 +113,6 @@ export default function GraduateCommitteePage() {
     setPage(1);
   };
 
-  const fetchCommittees = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        sortBy: sortField,
-        sortOrder: sortDir,
-      });
-      if (search) params.set("search", search);
-      params.set("searchField", searchField);
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-
-      const res = await fetch(`${BASE_PATH}/api/graduate-committee?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setCommittees(data.data);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, searchField, sortField, sortDir, filtersKey]);
-
-  useEffect(() => { fetchCommittees(); }, [fetchCommittees]);
-
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
     setPage(1);
@@ -189,27 +160,11 @@ export default function GraduateCommitteePage() {
     try {
       if (editingId) {
         const payload = { studentId, fullName, ...data, termYear: Number(data.termYear), reason: editReason };
-        const res = await fetch(`${BASE_PATH}/api/graduate-committee/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/graduate-committee/${editingId}`, { method: "PUT", json: payload });
       } else {
         if (studentId) {
           const payload = { studentId, fullName, ...data, termYear: Number(data.termYear) };
-          const res = await fetch(`${BASE_PATH}/api/graduate-committee`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const d = await res.json();
-            throw new Error(d.error || "เกิดข้อผิดพลาด");
-          }
+          await apiFetch(`/api/graduate-committee`, { method: "POST", json: payload });
         } else {
           const params = new URLSearchParams({ section: "committees", nameSearch: fullName });
           if (data.termYear) params.set("termYear", data.termYear);
@@ -221,7 +176,7 @@ export default function GraduateCommitteePage() {
         }
       }
       closeForm();
-      fetchCommittees();
+      qc.invalidateQueries({ queryKey: queryKeys.graduateCommittee.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -232,10 +187,9 @@ export default function GraduateCommitteePage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/graduate-committee/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/graduate-committee/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchCommittees();
+      qc.invalidateQueries({ queryKey: queryKeys.graduateCommittee.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -247,18 +201,10 @@ export default function GraduateCommitteePage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/graduate-committee/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/graduate-committee/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchCommittees();
+      qc.invalidateQueries({ queryKey: queryKeys.graduateCommittee.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -307,11 +253,12 @@ export default function GraduateCommitteePage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/graduate-committee/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/graduate-committee/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchCommittees();
+      qc.invalidateQueries({ queryKey: queryKeys.graduateCommittee.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
@@ -559,6 +506,10 @@ export default function GraduateCommitteePage() {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : committees.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
