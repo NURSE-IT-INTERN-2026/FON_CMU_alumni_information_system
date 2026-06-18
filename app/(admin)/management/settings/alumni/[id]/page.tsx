@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCanWrite } from "@/lib/role-context";
-import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 
 interface AlumniData {
   id: string;
@@ -81,7 +84,6 @@ export default function AlumniProfilePage() {
   const canWrite = useCanWrite();
   const id = params.id as string;
 
-  const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -125,80 +127,76 @@ export default function AlumniProfilePage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const fetchAlumni = useCallback(async () => {
-    try {
-      const res = await fetch(`${BASE_PATH}/api/alumni/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: AlumniData = await res.json();
+  const qc = useQueryClient();
+  const { data, isPending: loading, isError } = useQuery({
+    queryKey: queryKeys.alumniProfile.admin(id),
+    queryFn: () => apiFetch<AlumniData>(`/api/alumni/${id}`),
+  });
 
-      const coreForm = {
-        prefix: data.prefix || "",
-        firstName: data.firstName || "",
-        maidenLastName: data.maidenLastName || "",
-        newLastName: data.newLastName || "",
-        cohort: data.cohort || "",
-        degreeLevel: data.degreeLevel || "",
-        province: data.province || "",
-      };
-      setAlumni(coreForm);
-      setOriginalAlumni(coreForm);
+  // Populate form state whenever the fetched record changes (initial load +
+  // post-save refetch). `data` is reference-stable between refetches, so this
+  // does not clobber in-progress edits.
+  useEffect(() => {
+    if (!data) return;
+    const coreForm = {
+      prefix: data.prefix || "",
+      firstName: data.firstName || "",
+      maidenLastName: data.maidenLastName || "",
+      newLastName: data.newLastName || "",
+      cohort: data.cohort || "",
+      degreeLevel: data.degreeLevel || "",
+      province: data.province || "",
+    };
+    setAlumni(coreForm);
+    setOriginalAlumni(coreForm);
 
-      // Map related data to form rows
-      const aRows: AwardRow[] = (data.awards || []).map((a) => ({
-        awardName: a.awardName,
-        awardType: a.awardType,
-        year: String(a.year),
-        description: a.description || "",
-      }));
-      const asRows: AssociationRow[] = (data.associations || []).map((a) => ({
-        associationName: a.associationName,
-        position: a.position,
-        recordedYear: String(a.recordedYear),
-      }));
-      const cRows: CommitteeRow[] = (data.graduateCommittees || []).map(
-        (c) => ({
-          termYear: String(c.termYear),
-          cohort: c.cohort,
-          position: c.position,
-          remarks: c.remarks || "",
-        })
-      );
-      const pRows: PotentialRow[] = (data.potentials || []).map((p) => ({
-        career: p.career,
-        position: p.position,
-        recordedYear: String(p.recordedYear),
-      }));
-      const mRows: ModelRepRow[] = (data.modelRepresentatives || []).map(
-        (m) => ({
-          cohort: m.cohort,
-          generation: String(m.generation),
-        })
-      );
+    // Map related data to form rows
+    const aRows: AwardRow[] = (data.awards || []).map((a) => ({
+      awardName: a.awardName,
+      awardType: a.awardType,
+      year: String(a.year),
+      description: a.description || "",
+    }));
+    const asRows: AssociationRow[] = (data.associations || []).map((a) => ({
+      associationName: a.associationName,
+      position: a.position,
+      recordedYear: String(a.recordedYear),
+    }));
+    const cRows: CommitteeRow[] = (data.graduateCommittees || []).map((c) => ({
+      termYear: String(c.termYear),
+      cohort: c.cohort,
+      position: c.position,
+      remarks: c.remarks || "",
+    }));
+    const pRows: PotentialRow[] = (data.potentials || []).map((p) => ({
+      career: p.career,
+      position: p.position,
+      recordedYear: String(p.recordedYear),
+    }));
+    const mRows: ModelRepRow[] = (data.modelRepresentatives || []).map((m) => ({
+      cohort: m.cohort,
+      generation: String(m.generation),
+    }));
 
-      setAwardRows(aRows);
-      setAssociationRows(asRows);
-      setCommitteeRows(cRows);
-      setPotentialRows(pRows);
-      setModelRepRows(mRows);
+    setAwardRows(aRows);
+    setAssociationRows(asRows);
+    setCommitteeRows(cRows);
+    setPotentialRows(pRows);
+    setModelRepRows(mRows);
 
-      // Auto-expand sections that have data
-      setSections({
-        awards: aRows.length > 0,
-        associations: asRows.length > 0,
-        committees: cRows.length > 0,
-        potentials: pRows.length > 0,
-        modelReps: mRows.length > 0,
-      });
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+    // Auto-expand sections that have data
+    setSections({
+      awards: aRows.length > 0,
+      associations: asRows.length > 0,
+      committees: cRows.length > 0,
+      potentials: pRows.length > 0,
+      modelReps: mRows.length > 0,
+    });
+  }, [data]);
 
   useEffect(() => {
-    fetchAlumni();
-  }, [fetchAlumni]);
+    if (isError) setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
+  }, [isError]);
 
   const enterEditMode = () => {
     setEditMode(true);
@@ -367,22 +365,13 @@ export default function AlumniProfilePage() {
     }
 
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni/update-with-related/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/alumni/update-with-related/${id}`, { method: "PUT", json: payload });
 
       setSuccessMsg("บันทึกข้อมูลเรียบร้อยแล้ว");
       setEditMode(false);
       setErrors({});
-      // Re-fetch to get fresh data
-      await fetchAlumni();
+      // Invalidate so the record refetches and the form re-populates with fresh data.
+      qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.admin(id) });
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
       setErrorMsg(
