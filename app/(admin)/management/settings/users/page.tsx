@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite, useRole } from "@/lib/role-context";
-import { DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import { userCreateSchema, type UserCreateInput } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -104,8 +107,6 @@ export default function UsersPage() {
    Admin Accounts Tab (existing members logic)
    ═══════════════════════════════════════════ */
 function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
-  const [members, setMembers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -118,21 +119,12 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
     defaultValues: EMPTY_FORM as any,
   });
 
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE_PATH}/api/users`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setMembers(data);
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+  const qc = useQueryClient();
+  const { data: membersData, isPending: loading } = useQuery({
+    queryKey: queryKeys.users.all,
+    queryFn: () => apiFetch<AdminUser[]>("/api/users"),
+  });
+  const members = membersData ?? [];
 
   const openCreate = () => { formReset(EMPTY_FORM as any); setEditingId(null); setShowForm(true); };
   const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role } as any); setEditingId(m.id); setShowForm(true); };
@@ -140,34 +132,29 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
 
   const toggleSuspend = async (m: AdminUser) => {
     try {
-      const res = await fetch(`${BASE_PATH}/api/users/${m.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !m.isActive }),
-      });
-      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); return; }
-      fetchMembers();
-    } catch { setErrorMsg("เกิดข้อผิดพลาดในการดำเนินการ"); }
+      await apiFetch(`/api/users/${m.id}`, { method: "PUT", json: { isActive: !m.isActive } });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all });
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการดำเนินการ"); }
   };
 
   const handleSave = async (data: UserCreateInput) => {
     setSaving(true); setErrorMsg("");
     try {
       const payload = { firstName: data.firstName.trim(), lastName: data.lastName.trim(), email: data.email.trim(), role: data.role };
-      const res = editingId
-        ? await fetch(`${BASE_PATH}/api/users/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-        : await fetch(`${BASE_PATH}/api/users`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!res.ok) { const resData = await res.json(); throw new Error(resData.error || "เกิดข้อผิดพลาด"); }
-      closeForm(); fetchMembers();
+      if (editingId) {
+        await apiFetch(`/api/users/${editingId}`, { method: "PUT", json: payload });
+      } else {
+        await apiFetch(`/api/users`, { method: "POST", json: payload });
+      }
+      closeForm(); qc.invalidateQueries({ queryKey: queryKeys.users.all });
     } catch (err) { setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด"); } finally { setSaving(false); }
   };
 
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/users/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      setDeleteId(null); fetchMembers();
+      await apiFetch(`/api/users/${deleteId}`, { method: "DELETE" });
+      setDeleteId(null); qc.invalidateQueries({ queryKey: queryKeys.users.all });
     } catch { setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล"); }
   };
 
@@ -294,10 +281,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
    Alumni Accounts Tab
    ═══════════════════════════════════════════ */
 function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: ReturnType<typeof useRouter> }) {
-  const [alumni, setAlumni] = useState<AlumniAccount[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [emailEdit, setEmailEdit] = useState<AlumniAccount | null>(null);
@@ -307,38 +291,26 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
 
   const pageSize = 10;
 
-  const fetchAlumni = useCallback(async () => {
-    setLoading(true);
-    try {
+  const qc = useQueryClient();
+  const { data: alumniData, isPending: loading } = useQuery({
+    queryKey: ["alumniAccounts", "list", { page, search }],
+    queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (search) params.set("search", search);
-      const res = await fetch(`${BASE_PATH}/api/alumni-accounts?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setAlumni(data.data);
-      setTotal(data.total);
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
-
-  useEffect(() => { fetchAlumni(); }, [fetchAlumni]);
+      return apiFetch<{ data: AlumniAccount[]; total: number }>(`/api/alumni-accounts?${params}`);
+    },
+  });
+  const alumni = alumniData?.data ?? [];
+  const total = alumniData?.total ?? 0;
 
   const totalPages = Math.ceil(total / pageSize);
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
   const toggleSuspend = async (a: AlumniAccount) => {
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-accounts/${a.id}/suspend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suspend: !a.suspendedAt }),
-      });
-      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); return; }
-      fetchAlumni();
-    } catch { setErrorMsg("เกิดข้อผิดพลาดในการดำเนินการ"); }
+      await apiFetch(`/api/alumni-accounts/${a.id}/suspend`, { method: "POST", json: { suspend: !a.suspendedAt } });
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAccounts.all });
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการดำเนินการ"); }
   };
 
   const openEmailEdit = (a: AlumniAccount) => {
@@ -354,15 +326,10 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
     setEmailSaving(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-accounts/${emailEdit.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailValue.trim(), reason: emailReason }),
-      });
-      if (!res.ok) { const d = await res.json(); setErrorMsg(d.error || "เกิดข้อผิดพลาด"); setEmailSaving(false); return; }
+      await apiFetch(`/api/alumni-accounts/${emailEdit.id}`, { method: "PUT", json: { email: emailValue.trim(), reason: emailReason } });
       setEmailEdit(null);
-      fetchAlumni();
-    } catch { setErrorMsg("เกิดข้อผิดพลาด"); } finally { setEmailSaving(false); }
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAccounts.all });
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด"); } finally { setEmailSaving(false); }
   };
 
   return (
