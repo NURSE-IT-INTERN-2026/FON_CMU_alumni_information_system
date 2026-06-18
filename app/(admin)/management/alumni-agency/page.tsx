@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -194,12 +197,9 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export default function AlumniAgencyPage() {
   const canWrite = useCanWrite();
-  const [alumni, setAlumni] = useState<AlumniAgency[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState("");
-  const [countries, setCountries] = useState<string[]>([]);
 
   const [manageMode, setManageMode] = useState(false);
   const [mgmtPage, setMgmtPage] = useState(1);
@@ -237,11 +237,7 @@ export default function AlumniAgencyPage() {
 
   // Thailand mode (PRD §3.9) — read-only view sourced from the alumni table
   const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
-  const [thailandAlumni, setThailandAlumni] = useState<ThailandAlumni[]>([]);
-  const [thailandLoading, setThailandLoading] = useState(true);
   const [thailandPage, setThailandPage] = useState(1);
-  const [thailandTotalPages, setThailandTotalPages] = useState(1);
-  const [thailandTotal, setThailandTotal] = useState(0);
   const [thailandSearch, setThailandSearch] = useState("");
   const [thailandSearchField, setThailandSearchField] = useState<ThailandSearchField>("all");
   const [thailandSortField, setThailandSortField] = useState<ThailandSortField>("studentId");
@@ -254,36 +250,22 @@ export default function AlumniAgencyPage() {
     setThailandPage(1);
   };
 
-  const fetchThailand = useCallback(async () => {
-    setThailandLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(thailandPage),
-        pageSize: String(PAGE_SIZE),
-        sortField: thailandSortField,
-        sortOrder: thailandSortDir,
-      });
+  const { data: thailandData, isPending: thailandLoading } = useQuery({
+    queryKey: ["alumniAgency", "thailand", { thailandPage, thailandSearch, thailandSearchField, thailandSortField, thailandSortDir, filtersKey }],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(thailandPage), pageSize: String(PAGE_SIZE), sortField: thailandSortField, sortOrder: thailandSortDir });
       if (thailandSearch.trim()) {
         params.set("search", thailandSearch.trim());
         params.set("searchField", thailandSearchField);
       }
       facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/alumni?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ThailandApiResponse = await res.json();
-      setThailandAlumni(data.data);
-      setThailandTotal(data.total);
-      setThailandTotalPages(Math.max(1, Math.ceil(data.total / data.pageSize)));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setThailandLoading(false);
-    }
-  }, [thailandPage, thailandSearch, thailandSearchField, thailandSortField, thailandSortDir, filtersKey]);
-
-  useEffect(() => {
-    if (mode === "thailand") fetchThailand();
-  }, [mode, fetchThailand]);
+      return apiFetch<ThailandApiResponse>(`/api/alumni?${params}`);
+    },
+    enabled: mode === "thailand",
+  });
+  const thailandAlumni = thailandData?.data ?? [];
+  const thailandTotal = thailandData?.total ?? 0;
+  const thailandTotalPages = Math.max(1, Math.ceil(thailandTotal / (thailandData?.pageSize ?? PAGE_SIZE)));
 
   const handleThailandSort = (field: ThailandSortField) => {
     if (thailandSortField === field) {
@@ -303,29 +285,15 @@ export default function AlumniAgencyPage() {
     setMgmtPage(1);
   };
 
-  const fetchAlumni = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ search, country: countryFilter, searchField });
-      const res = await fetch(`${BASE_PATH}/api/alumni-agency?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setAlumni(data.data);
-      if (data.countries.length > 0 && countries.length === 0) {
-        setCountries(data.countries);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, searchField, countryFilter, countries.length]);
-
-  useEffect(() => {
-    // Only fetch Abroad data in Abroad mode; Thailand mode uses its own fetch
-    if (mode !== "abroad") return;
-    fetchAlumni();
-  }, [mode, fetchAlumni]);
+  const qc = useQueryClient();
+  const { data: abroadData, isPending: loading } = useQuery({
+    queryKey: ["alumniAgency", "abroad", { search, searchField, countryFilter }],
+    queryFn: () =>
+      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ search, country: countryFilter, searchField })}`),
+    enabled: mode === "abroad",
+  });
+  const alumni = abroadData?.data ?? [];
+  const countries = abroadData?.countries ?? [];
 
   // View mode: flat sorted list
   const viewSortedAlumni = useMemo(() =>
@@ -397,28 +365,12 @@ export default function AlumniAgencyPage() {
         ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
-        const res = await fetch(`${BASE_PATH}/api/alumni-agency/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/alumni-agency/${editingId}`, { method: "PUT", json: payload });
       } else {
-        const res = await fetch(`${BASE_PATH}/api/alumni-agency`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/alumni-agency`, { method: "POST", json: payload });
       }
       closeForm();
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAgency.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -429,10 +381,9 @@ export default function AlumniAgencyPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-agency/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/alumni-agency/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAgency.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -444,18 +395,10 @@ export default function AlumniAgencyPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/alumni-agency/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/alumni-agency/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAgency.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -499,11 +442,12 @@ export default function AlumniAgencyPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/alumni-agency/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/alumni-agency/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumniAgency.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
