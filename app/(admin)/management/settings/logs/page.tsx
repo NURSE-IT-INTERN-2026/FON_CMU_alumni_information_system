@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRole } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { BASE_PATH } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 
 interface ActivityLog {
   id: string;
@@ -68,15 +70,10 @@ export default function LogsPage() {
   const role = useRole();
   const router = useRouter();
 
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [resourceFilter, setResourceFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
   const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
 
   useEffect(() => {
@@ -85,34 +82,19 @@ export default function LogsPage() {
     }
   }, [role, router]);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-      });
+  const { data: logsData, isPending: loading, isError } = useQuery({
+    queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, source: sourceFilter }),
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
       if (resourceFilter) params.set("resource", resourceFilter);
       if (actionFilter) params.set("action", actionFilter);
       if (sourceFilter) params.set("source", sourceFilter);
-
-      const res = await fetch(`${BASE_PATH}/api/logs?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setLogs(data.data);
-      setTotal(data.total);
-      setTotalPages(Math.max(1, Math.ceil(data.total / PAGE_SIZE)));
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, resourceFilter, actionFilter, sourceFilter]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+      return apiFetch<{ data: ActivityLog[]; total: number }>(`/api/logs?${params}`);
+    },
+  });
+  const logs = logsData?.data ?? [];
+  const total = logsData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleFilterChange = () => {
     setPage(1);
@@ -183,13 +165,6 @@ export default function LogsPage() {
         <span className="text-sm text-gray-500">ทั้งหมด {total.toLocaleString()} รายการ</span>
       </div>
 
-      {errorMsg && (
-        <div className="mb-6 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg("")} className="ml-4 font-bold text-red-500 hover:text-red-700">&times;</button>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-3">
         <select
@@ -229,6 +204,8 @@ export default function LogsPage() {
       <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">กำลังโหลด...</div>
+        ) : isError ? (
+          <div className="flex items-center justify-center py-16 text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
         ) : logs.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-gray-400">ไม่มีข้อมูลบันทึกกิจกรรม</div>
         ) : (
