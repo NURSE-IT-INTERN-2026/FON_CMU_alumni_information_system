@@ -13,6 +13,9 @@ import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
 import { modelRepFormSchema, type ModelRepFormData } from "@/lib/validations/model-representative";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 
@@ -22,10 +25,6 @@ interface ModelRepresentative {
   name: string;
   cohort: string;
   generation: number;
-}
-
-interface ApiResponse {
-  data: ModelRepresentative[];
 }
 
 const NETWORK_ORDER = [
@@ -71,13 +70,22 @@ function compareNetwork(a: string, b: string): number {
 export default function ModelRepresentativesPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
-  const [alumni, setAlumni] = useState<ModelRepresentative[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
   const [networkFilter, setNetworkFilter] = useState<string>("all");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+
+  const qc = useQueryClient();
+  const { data: alumniData, isPending: loading, isError } = useQuery({
+    queryKey: ["modelRepresentatives", "list", { filtersKey }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
+      return apiFetch<{ data: ModelRepresentative[] }>(`/api/model-representatives${params.toString() ? `?${params}` : ""}`);
+    },
+  });
+  const alumni = alumniData?.data ?? [];
 
   const [viewSortField, setViewSortField] = useState<SortField>("network");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("asc");
@@ -170,26 +178,6 @@ export default function ModelRepresentativesPage() {
       return dir === "asc" ? cmp : -cmp;
     });
   }, []);
-
-  const fetchAlumni = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/model-representatives${params.toString() ? `?${params}` : ""}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setAlumni(data.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filtersKey]);
-
-  useEffect(() => {
-    fetchAlumni();
-  }, [fetchAlumni]);
 
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
@@ -316,26 +304,10 @@ export default function ModelRepresentativesPage() {
         ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
-        const res = await fetch(`${BASE_PATH}/api/model-representatives/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/model-representatives/${editingId}`, { method: "PUT", json: payload });
       } else {
         if (studentId) {
-          const res = await fetch(`${BASE_PATH}/api/model-representatives`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const d = await res.json();
-            throw new Error(d.error || "เกิดข้อผิดพลาด");
-          }
+          await apiFetch(`/api/model-representatives`, { method: "POST", json: payload });
         } else {
           const params = new URLSearchParams({ section: "modelReps", nameSearch: name });
           if (data.cohort) params.set("cohort", data.cohort);
@@ -345,7 +317,7 @@ export default function ModelRepresentativesPage() {
         }
       }
       closeForm();
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.modelRepresentatives.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -356,12 +328,9 @@ export default function ModelRepresentativesPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/model-representatives/${deleteId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/model-representatives/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.modelRepresentatives.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -373,18 +342,10 @@ export default function ModelRepresentativesPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/model-representatives/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/model-representatives/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.modelRepresentatives.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -446,11 +407,12 @@ export default function ModelRepresentativesPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/model-representatives/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/model-representatives/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.modelRepresentatives.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
@@ -848,6 +810,8 @@ export default function ModelRepresentativesPage() {
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
+      ) : isError ? (
+        <div className="flex justify-center py-16 text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
       ) : manageMode ? (
         /* ===== MANAGE MODE: flat table ===== */
         filteredAlumni.length === 0 ? (
