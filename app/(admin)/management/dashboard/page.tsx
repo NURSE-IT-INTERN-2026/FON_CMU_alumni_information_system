@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { BASE_PATH } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import {
   LineChart,
   Line,
@@ -200,31 +202,20 @@ const CARDS: CardConfig[] = [
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [chartReady, setChartReady] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      fetch(`${BASE_PATH}/api/dashboard`).then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch dashboard data");
-        return res.json();
-      }),
-      fetch(`${BASE_PATH}/api/alumni-count`).then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch chart data");
-        return res.json();
-      }),
-    ])
-      .then(([d, c]: [DashboardData, ChartData]) => {
-        setData(d);
-        setChartData(c);
-        setError(null);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const statsQuery = useQuery({
+    queryKey: queryKeys.dashboard.stats(),
+    queryFn: () => apiFetch<DashboardData>("/api/dashboard"),
+  });
+  const chartQuery = useQuery({
+    queryKey: queryKeys.dashboard.chart(),
+    queryFn: () => apiFetch<ChartData>("/api/alumni-count"),
+  });
+  const data = statsQuery.data ?? null;
+  const chartData = chartQuery.data ?? null;
+  const loading = statsQuery.isPending || chartQuery.isPending;
+  const error = statsQuery.error?.message || chartQuery.error?.message || null;
 
   // Defer chart render by one frame so the container has real dimensions
   // before ResponsiveContainer tries to measure it. This avoids the
