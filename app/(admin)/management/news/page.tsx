@@ -7,6 +7,9 @@ import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import { newsFormSchema, type NewsFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -40,14 +43,6 @@ interface NewsItem {
   createdAt: string;
 }
 
-interface ApiResponse {
-  data: NewsItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "ฉบับร่าง",
   PUBLISHED: "เผยแพร่",
@@ -68,11 +63,7 @@ const EMPTY_FORM: {
 
 export default function NewsListPage() {
   const canWrite = useCanWrite();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -198,33 +189,20 @@ export default function NewsListPage() {
     };
   }, [formBody]);
 
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(NEWS_PAGE_SIZE),
-      });
+  const qc = useQueryClient();
+  const { data: newsData, isPending: loading, isError } = useQuery({
+    queryKey: queryKeys.news.list({ page, search, statusFilter, manageMode }),
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(NEWS_PAGE_SIZE) });
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
       if (!manageMode) params.set("status", "PUBLISHED");
-
-      const res = await fetch(`${BASE_PATH}/api/news?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setNews(data.data || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลข่าวสารได้");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, statusFilter, manageMode]);
-
-  useEffect(() => {
-    fetchNews();
-  }, [fetchNews]);
+      return apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(`/api/news?${params}`);
+    },
+  });
+  const news = newsData?.data ?? [];
+  const total = newsData?.total ?? 0;
+  const totalPages = newsData?.totalPages ?? 1;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -277,23 +255,13 @@ export default function NewsListPage() {
         coverImageUrl: data.coverImageUrl?.trim() || null,
         status: data.status,
       };
-      const res = editingId
-        ? await fetch(`${BASE_PATH}/api/news/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch(`${BASE_PATH}/api/news`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      if (editingId) {
+        await apiFetch(`/api/news/${editingId}`, { method: "PUT", json: payload });
+      } else {
+        await apiFetch(`/api/news`, { method: "POST", json: payload });
       }
       closeForm();
-      fetchNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -304,10 +272,9 @@ export default function NewsListPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/news/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/news/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข่าวสาร");
     }
@@ -319,18 +286,10 @@ export default function NewsListPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/news/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/news/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -731,6 +690,10 @@ export default function NewsListPage() {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : news.length === 0 ? (
         <div className="rounded-lg bg-white py-16 text-center shadow-sm">
