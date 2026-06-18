@@ -293,9 +293,13 @@ export default function AlumniCountPage() {
     return pages;
   })();
 
+  // Clamp `page` back into range when the result set shrinks (e.g. after a
+  // search/filter). Guard on `!tableLoading` because while a page query is
+  // pending, `totalPages` is transiently 1 (no data yet) and clamping would
+  // snap the user back to page 1 on the first visit to any new page.
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [totalPages, page]);
+    if (!tableLoading && page > totalPages) setPage(totalPages);
+  }, [totalPages, page, tableLoading]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
