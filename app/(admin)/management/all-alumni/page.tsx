@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
@@ -123,15 +126,75 @@ export default function AlumniCountPage() {
 
   // State
   const [manageMode, setManageMode] = useState(false);
-  const [alumni, setAlumni] = useState<Alumni[]>([]);
-  const [totalAlumni, setTotalAlumni] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
   const [sortField, setSortField] = useState<ManageSortField | ViewSortField>("studentId");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [tableLoading, setTableLoading] = useState(true);
+  const qc = useQueryClient();
+  // Manage mode: merge CMU Registrar + local DB (with soft-delete overlay).
+  // The merge logic now lives in the queryFn and returns { merged, total }.
+  const manageQuery = useQuery({
+    queryKey: ["alumni", "manage", { page, search, filtersKey, sortField, sortDir }],
+    enabled: manageMode,
+    queryFn: async () => {
+      const cmuParams = new URLSearchParams({
+        page: String(page), pageSize: String(PAGE_SIZE), search,
+        sortField: sortField as string, sortDir,
+      });
+      facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
+      let cmuData: CmuAlumni[] = [];
+      let cmuTotalCount = 0;
+      try {
+        const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${cmuParams}`);
+        cmuData = cmuJson.data || [];
+        cmuTotalCount = cmuJson.total || 0;
+      } catch {}
+
+      const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
+      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
+      let localMap: Record<string, Alumni> = {};
+      const deletedStudentIds = new Set<string>();
+      try {
+        const localJson = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
+        for (const a of localJson.data) {
+          if (a.studentId) {
+            localMap[a.studentId] = a;
+            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) deletedStudentIds.add(a.studentId);
+          }
+        }
+      } catch {}
+
+      const merged: Alumni[] = [];
+      const localStudentIdsUsed = new Set<string>();
+      for (const c of cmuData) {
+        if (deletedStudentIds.has(c.student_id)) continue;
+        const local = localMap[c.student_id];
+        localStudentIdsUsed.add(c.student_id);
+        if (local) {
+          merged.push(local);
+        } else {
+          merged.push({
+            id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
+            maidenLastName: c.surname_th || "", newLastName: null, cohort: c.cohort || null,
+            degreeLevel: null, major: c.major_name_th || null,
+            graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: null, remarks: null,
+            province: null, email: null, phone: null, currentWorkplace: null, country: null,
+            isPotential: false, isModelRepresentative: false, photoUrl: null,
+          });
+        }
+      }
+      for (const a of Object.values(localMap)) {
+        if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) merged.push(a);
+      }
+      const adjustedTotal = cmuTotalCount - deletedStudentIds.size +
+        Object.values(localMap).filter(a => !localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)).length;
+      return { merged, total: Math.max(0, adjustedTotal) };
+    },
+  });
+  const alumni = manageQuery.data?.merged ?? [];
+  const totalAlumni = manageQuery.data?.total ?? 0;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const hot = useHotFields("alumni", alumni.map((a) => a.id));
@@ -163,157 +226,37 @@ export default function AlumniCountPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Fetch alumni table data (local DB + CMU — used in manage mode)
-  const fetchAlumni = useCallback(async () => {
-    setTableLoading(true);
-    try {
-      // Fetch CMU alumni data
-      const cmuParams = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        search,
-        sortField: sortField as string,
-        sortDir,
-      });
-      facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
-      const cmuRes = await fetch(`${BASE_PATH}/api/cmu-alumni?${cmuParams}`);
-      let cmuData: CmuAlumni[] = [];
-      let cmuTotalCount = 0;
-      if (cmuRes.ok) {
-        const cmuJson = await cmuRes.json();
-        cmuData = cmuJson.data || [];
-        cmuTotalCount = cmuJson.total || 0;
-      }
-
-      // Fetch ALL local alumni (including soft-deleted) to build overlay map.
-      // Apply facet filters here too so local-only records respect the active filters.
-      const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
-      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      const localRes = await fetch(`${BASE_PATH}/api/alumni?${localParams}`);
-      let localMap: Record<string, Alumni> = {};
-      let deletedStudentIds = new Set<string>();
-      if (localRes.ok) {
-        const localJson: AlumniApiResponse = await localRes.json();
-        for (const a of localJson.data) {
-          if (a.studentId) {
-            localMap[a.studentId] = a;
-            // Track soft-deleted records
-            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) {
-              deletedStudentIds.add(a.studentId);
-            }
-          }
-        }
-      }
-
-      // Map CMU records to Alumni shape, overlaying local data where available.
-      // Skip records that have been soft-deleted locally.
-      const merged: Alumni[] = [];
-      const localStudentIdsUsed = new Set<string>();
-
-      for (const c of cmuData) {
-        // Skip CMU records that were soft-deleted locally
-        if (deletedStudentIds.has(c.student_id)) continue;
-
-        const local = localMap[c.student_id];
-        localStudentIdsUsed.add(c.student_id);
-
-        if (local) {
-          merged.push(local);
-        } else {
-          merged.push({
-            id: c.student_id,
-            studentId: c.student_id,
-            prefix: "",
-            firstName: c.name_th || "",
-            maidenLastName: c.surname_th || "",
-            newLastName: null,
-            cohort: c.cohort || null,
-            degreeLevel: null,
-            major: c.major_name_th || null,
-            graduationYear: c.grad_year ? Number(c.grad_year) : null,
-            birthDate: null,
-            remarks: null,
-            province: null,
-            email: null,
-            phone: null,
-            currentWorkplace: null,
-            country: null,
-            isPotential: false,
-            isModelRepresentative: false,
-            photoUrl: null,
-          });
-        }
-      }
-
-      // Append local-only records (not in CMU data) that are not soft-deleted
-      for (const a of Object.values(localMap)) {
-        if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) {
-          merged.push(a);
-        }
-      }
-
-      // Adjust total: start from CMU total, subtract soft-deleted, add local-only
-      const adjustedTotal = cmuTotalCount - deletedStudentIds.size +
-        Object.values(localMap).filter(a => !localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)).length;
-
-      setAlumni(merged);
-      setTotalAlumni(Math.max(0, adjustedTotal));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTableLoading(false);
-    }
-  }, [page, search, filtersKey, sortField, sortDir]);
-
-  // CMU Registrar data (view mode only)
-  const [cmuAlumni, setCmuAlumni] = useState<CmuAlumni[]>([]);
-  const [cmuTotal, setCmuTotal] = useState(0);
-
-  const fetchCmuAlumni = useCallback(async () => {
-    setTableLoading(true);
-    try {
+  // CMU Registrar data (view mode only) — merge CMU + local overlay.
+  const viewQuery = useQuery({
+    queryKey: ["alumni", "view", { page, search, filtersKey, sortField, sortDir }],
+    enabled: !manageMode,
+    queryFn: async () => {
       const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        search,
-        sortField: sortField as string,
-        sortDir,
+        page: String(page), pageSize: String(PAGE_SIZE), search,
+        sortField: sortField as string, sortDir,
       });
       facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/cmu-alumni?${params}`);
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => null);
-        throw new Error(errBody?.error || "Failed to fetch CMU data");
-      }
-      const data = await res.json();
+      const data = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${params}`);
 
       // Fetch local alumni (including soft-deleted) for overlay and filtering
-      let localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
-      let deletedStudentIds = new Set<string>();
+      const localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
+      const deletedStudentIds = new Set<string>();
       try {
-        const localRes = await fetch(`${BASE_PATH}/api/alumni?pageSize=9999&includeDeleted=true`);
-        if (localRes.ok) {
-          const localData = await localRes.json();
-          for (const a of localData.data) {
-            if (a.studentId) {
-              localMap[a.studentId] = a;
-              if (a.deletedAt) {
-                deletedStudentIds.add(a.studentId);
-              }
-            }
+        const localData = await apiFetch<AlumniApiResponse>(`/api/alumni?pageSize=9999&includeDeleted=true`);
+        for (const a of localData.data) {
+          if (a.studentId) {
+            localMap[a.studentId] = a;
+            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) deletedStudentIds.add(a.studentId);
           }
         }
       } catch {}
 
       // Merge: overlay local data on CMU records, skip soft-deleted
       const merged: CmuAlumni[] = [];
-      for (const a of data.data as CmuAlumni[]) {
-        // Skip soft-deleted records
+      for (const a of data.data) {
         if (deletedStudentIds.has(a.student_id)) continue;
-
         const local = localMap[a.student_id];
         if (local) {
-          // Local record overrides — use local firstName/lastName if available
           merged.push({
             ...a,
             name_th: local.firstName || a.name_th,
@@ -321,31 +264,15 @@ export default function AlumniCountPage() {
             cohort: local.cohort || null,
           });
         } else {
-          merged.push({
-            ...a,
-            cohort: null,
-          });
+          merged.push({ ...a, cohort: null });
         }
       }
-
-      // Adjust total by subtracting soft-deleted count
-      const adjustedTotal = data.total - deletedStudentIds.size;
-      setCmuAlumni(merged);
-      setCmuTotal(Math.max(0, adjustedTotal));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTableLoading(false);
-    }
-  }, [page, search, filtersKey, sortField, sortDir]);
-
-  useEffect(() => {
-    if (manageMode) {
-      fetchAlumni();
-    } else {
-      fetchCmuAlumni();
-    }
-  }, [manageMode, fetchAlumni, fetchCmuAlumni]);
+      return { merged, total: Math.max(0, data.total - deletedStudentIds.size) };
+    },
+  });
+  const cmuAlumni = viewQuery.data?.merged ?? [];
+  const cmuTotal = viewQuery.data?.total ?? 0;
+  const tableLoading = manageMode ? manageQuery.isPending : viewQuery.isPending;
 
   const activeTotal = manageMode ? totalAlumni : cmuTotal;
   const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE));
@@ -446,20 +373,12 @@ export default function AlumniCountPage() {
 
       // CMU-only record (not yet in local DB) → POST to create
       // Local record (already in DB) → PUT to update
-      const res = await fetch(
-        `${BASE_PATH}/api/alumni${isLocal ? `/${editingId}` : ""}`,
-        {
-          method: isLocal ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
-      if (!res.ok) {
-        const errBody = await res.json();
-        throw new Error(errBody.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/alumni${isLocal ? `/${editingId}` : ""}`, {
+        method: isLocal ? "PUT" : "POST",
+        json: payload,
+      });
       closeForm();
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumni.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -472,18 +391,14 @@ export default function AlumniCountPage() {
     try {
       if (isLocalRecordId(deleteId)) {
         // Local record → soft delete via DELETE endpoint
-        const res = await fetch(`${BASE_PATH}/api/alumni/${deleteId}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error();
+        await apiFetch(`/api/alumni/${deleteId}`, { method: "DELETE" });
       } else {
         // CMU-only record → create a soft-deleted local record to hide it
         const alumniRecord = alumni.find((a) => a.id === deleteId);
         if (alumniRecord) {
-          await fetch(`${BASE_PATH}/api/alumni`, {
+          await apiFetch(`/api/alumni`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            json: {
               studentId: alumniRecord.studentId,
               prefix: alumniRecord.prefix || "นางสาว",
               firstName: alumniRecord.firstName,
@@ -491,12 +406,12 @@ export default function AlumniCountPage() {
               cohort: alumniRecord.cohort || null,
               degreeLevel: alumniRecord.degreeLevel || null,
               softDelete: true,
-            }),
+            },
           });
         }
       }
       setDeleteId(null);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumni.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -514,25 +429,16 @@ export default function AlumniCountPage() {
 
       // Soft delete local records via bulk-delete endpoint
       if (localIds.length > 0) {
-        const res = await fetch(`${BASE_PATH}/api/alumni/bulk-delete`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: localIds }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/alumni/bulk-delete`, { method: "POST", json: { ids: localIds } });
       }
 
       // For CMU-only records, create soft-deleted local records to hide them
       for (const cmuId of cmuIds) {
         const record = alumni.find((a) => a.id === cmuId);
         if (record) {
-          await fetch(`${BASE_PATH}/api/alumni`, {
+          await apiFetch(`/api/alumni`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            json: {
               studentId: record.studentId,
               prefix: record.prefix || "นางสาว",
               firstName: record.firstName,
@@ -540,14 +446,14 @@ export default function AlumniCountPage() {
               cohort: record.cohort || null,
               degreeLevel: record.degreeLevel || null,
               softDelete: true,
-            }),
+            },
           });
         }
       }
 
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumni.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -611,14 +517,12 @@ export default function AlumniCountPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/alumni/import`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/alumni/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchAlumni();
+      qc.invalidateQueries({ queryKey: queryKeys.alumni.all });
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า"
