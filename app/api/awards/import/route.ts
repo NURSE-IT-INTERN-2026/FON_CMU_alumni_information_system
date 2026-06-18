@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
+    let updated = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const rowNumber = i + 2;
@@ -51,26 +52,46 @@ export async function POST(request: NextRequest) {
       try {
         // Sync with CMU by studentId; copy the resolved major onto the row.
         let major: string | null = null;
-        if (data!.studentId) {
+        let studentId = data!.studentId;
+        if (studentId) {
           const alumni = await ensureAlumni(
-            data!.studentId,
-            data!.recipientName ?? data!.studentId,
+            studentId,
+            data!.recipientName ?? studentId,
           );
+          studentId = alumni.studentId;
           major = alumni.major;
         }
 
-        await prisma.award.create({
-          data: {
-            studentId: data!.studentId,
-            recipientName: data!.recipientName,
+        const payload = {
+          studentId,
+          recipientName: data!.recipientName,
+          awardName: data!.awardName,
+          awardType: data!.awardType as AwardType,
+          year: data!.year,
+          description: data!.description,
+          major,
+        };
+
+        // Awards have no DB unique — match by natural key (studentId, or
+        // recipientName when unlinked, + awardName + year) among active rows so
+        // re-importing updates instead of duplicating.
+        const existing = await prisma.award.findFirst({
+          where: {
             awardName: data!.awardName,
-            awardType: data!.awardType as AwardType,
             year: data!.year,
-            description: data!.description,
-            major,
+            deletedAt: null,
+            ...(studentId
+              ? { studentId }
+              : { recipientName: data!.recipientName ?? null }),
           },
         });
-        imported++;
+        if (existing) {
+          await prisma.award.update({ where: { id: existing.id }, data: payload });
+          updated++;
+        } else {
+          await prisma.award.create({ data: payload });
+          imported++;
+        }
       } catch {
         errors.push({
           row: rowNumber,
@@ -79,7 +100,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ imported, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/awards/import error:", error);
     return NextResponse.json(

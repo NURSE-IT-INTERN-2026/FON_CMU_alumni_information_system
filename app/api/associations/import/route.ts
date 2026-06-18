@@ -61,22 +61,52 @@ export async function POST(request: NextRequest) {
     }
 
     let imported = 0;
+    let updated = 0;
     for (const record of records) {
       try {
         // Sync with CMU: ensureAlumni backfills the alumni record from the
         // Registrar API and returns it so we can copy `major` onto this row.
         const alumni = await ensureAlumni(record.studentId, record.fullName);
-        await prisma.association.create({
-          data: { ...record, major: alumni.major ?? null },
+        const studentId = alumni.studentId;
+        const major = alumni.major ?? null;
+        // Upsert on the natural key (studentId + association + position + year)
+        // so re-importing updates existing rows instead of creating duplicates.
+        const existing = await prisma.association.findUnique({
+          where: {
+            studentId_associationName_position_recordedYear: {
+              studentId,
+              associationName: record.associationName,
+              position: record.position,
+              recordedYear: record.recordedYear,
+            },
+          },
         });
-        imported++;
+        if (existing) {
+          await prisma.association.update({
+            where: { id: existing.id },
+            data: { fullName: record.fullName, major },
+          });
+          updated++;
+        } else {
+          await prisma.association.create({
+            data: {
+              studentId,
+              fullName: record.fullName,
+              associationName: record.associationName,
+              position: record.position,
+              recordedYear: record.recordedYear,
+              major,
+            },
+          });
+          imported++;
+        }
       } catch (err) {
         console.error("Import row error:", err);
         errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.fullName}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
       }
     }
 
-    return NextResponse.json({ imported, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/associations/import error:", error);
     return NextResponse.json(

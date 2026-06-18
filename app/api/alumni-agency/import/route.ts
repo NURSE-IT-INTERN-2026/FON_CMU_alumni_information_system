@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
 
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
+    let updated = 0;
 
     // Read raw rows to detect format
     const rawRows = await readExcelRawRows(buffer);
@@ -71,8 +72,23 @@ export async function POST(request: NextRequest) {
           data.studentId = alumni.studentId;
           if (!data.major) data.major = alumni.major;
         }
-        await prisma.alumniAgency.create({ data });
-        imported++;
+        // No DB unique — match by studentId (or thaiName when unlinked) among
+        // active rows so re-importing updates an existing entry, not duplicates.
+        const existing = await prisma.alumniAgency.findFirst({
+          where: {
+            deletedAt: null,
+            ...(data.studentId
+              ? { studentId: data.studentId }
+              : { thaiName: data.thaiName ?? null }),
+          },
+        });
+        if (existing) {
+          await prisma.alumniAgency.update({ where: { id: existing.id }, data });
+          updated++;
+        } else {
+          await prisma.alumniAgency.create({ data });
+          imported++;
+        }
       } catch (err) {
         console.error("Import row error:", err);
         errors.push({
@@ -82,7 +98,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ imported, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/alumni-agency/import error:", error);
     return NextResponse.json(

@@ -60,20 +60,48 @@ export async function POST(request: NextRequest) {
     }
 
     let imported = 0;
+    let updated = 0;
     for (const record of records) {
       try {
         const alumni = await ensureAlumni(record.studentId, record.name);
-        await prisma.modelRepresentative.create({
-          data: { ...record, major: alumni.major ?? null },
+        const studentId = alumni.studentId;
+        const major = alumni.major ?? null;
+        // Upsert on (studentId + cohort + generation) so re-importing updates
+        // existing rows instead of creating duplicates.
+        const existing = await prisma.modelRepresentative.findUnique({
+          where: {
+            studentId_cohort_generation: {
+              studentId,
+              cohort: record.cohort,
+              generation: record.generation,
+            },
+          },
         });
-        imported++;
+        if (existing) {
+          await prisma.modelRepresentative.update({
+            where: { id: existing.id },
+            data: { name: record.name, major },
+          });
+          updated++;
+        } else {
+          await prisma.modelRepresentative.create({
+            data: {
+              studentId,
+              name: record.name,
+              cohort: record.cohort,
+              generation: record.generation,
+              major,
+            },
+          });
+          imported++;
+        }
       } catch (err) {
         console.error("Import row error:", err);
         errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.name}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
       }
     }
 
-    return NextResponse.json({ imported, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/model-representatives/import error:", error);
     return NextResponse.json(

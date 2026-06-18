@@ -62,20 +62,50 @@ export async function POST(request: NextRequest) {
     }
 
     let imported = 0;
+    let updated = 0;
     for (const record of records) {
       try {
         const alumni = await ensureAlumni(record.studentId, record.fullName);
-        await prisma.graduateCommittee.create({
-          data: { ...record, major: alumni.major ?? null },
+        const studentId = alumni.studentId;
+        const major = alumni.major ?? null;
+        // Upsert on (studentId + termYear + position) so re-importing updates
+        // existing rows instead of creating duplicates.
+        const existing = await prisma.graduateCommittee.findUnique({
+          where: {
+            studentId_termYear_position: {
+              studentId,
+              termYear: record.termYear,
+              position: record.position,
+            },
+          },
         });
-        imported++;
+        if (existing) {
+          await prisma.graduateCommittee.update({
+            where: { id: existing.id },
+            data: { fullName: record.fullName, cohort: record.cohort, remarks: record.remarks ?? null, major },
+          });
+          updated++;
+        } else {
+          await prisma.graduateCommittee.create({
+            data: {
+              termYear: record.termYear,
+              studentId,
+              fullName: record.fullName,
+              cohort: record.cohort,
+              position: record.position,
+              remarks: record.remarks ?? null,
+              major,
+            },
+          });
+          imported++;
+        }
       } catch (err) {
         console.error("Import row error:", err);
         errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.fullName}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
       }
     }
 
-    return NextResponse.json({ imported, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/graduate-committee/import error:", error);
     return NextResponse.json(
