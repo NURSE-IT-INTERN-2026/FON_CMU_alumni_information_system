@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { ensureAlumni } from "@/lib/ensure-alumni";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows, readExcelRawRows } from "@/lib/excel-import";
 
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Sync with CMU when a studentId is provided: link the alumni record
+        // and auto-fill major from the Registrar API (backfill only).
+        if (data.studentId) {
+          const alumni = await ensureAlumni(
+            data.studentId,
+            data.thaiName || data.englishName || "",
+          );
+          data.studentId = alumni.studentId;
+          if (!data.major) data.major = alumni.major;
+        }
         await prisma.alumniAgency.create({ data });
         imported++;
       } catch (err) {

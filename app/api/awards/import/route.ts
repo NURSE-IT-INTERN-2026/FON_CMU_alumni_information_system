@@ -49,8 +49,14 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Sync with CMU by studentId; copy the resolved major onto the row.
+        let major: string | null = null;
         if (data!.studentId) {
-          await ensureAlumni(data!.studentId, data!.studentId);
+          const alumni = await ensureAlumni(
+            data!.studentId,
+            data!.recipientName ?? data!.studentId,
+          );
+          major = alumni.major;
         }
 
         await prisma.award.create({
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
             awardType: data!.awardType as AwardType,
             year: data!.year,
             description: data!.description,
+            major,
           },
         });
         imported++;

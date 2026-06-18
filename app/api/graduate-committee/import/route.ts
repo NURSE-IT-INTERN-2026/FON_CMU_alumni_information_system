@@ -64,8 +64,10 @@ export async function POST(request: NextRequest) {
     let imported = 0;
     for (const record of records) {
       try {
-        await ensureAlumni(record.studentId, record.fullName);
-        await prisma.graduateCommittee.create({ data: record });
+        const alumni = await ensureAlumni(record.studentId, record.fullName);
+        await prisma.graduateCommittee.create({
+          data: { ...record, major: alumni.major ?? null },
+        });
         imported++;
       } catch (err) {
         console.error("Import row error:", err);

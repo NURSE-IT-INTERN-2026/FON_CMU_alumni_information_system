@@ -8,6 +8,10 @@ export interface ParsedAlumniAgencyRow {
   country: string;
   notes: string | null;
   order: number;
+  /** Optional studentId — when present, the import links the row to an alumni
+   *  record and auto-fills `major` from the CMU Registrar API. */
+  studentId: string | null;
+  major: string | null;
 }
 
 export function inferCountry(wp: string): string {
@@ -62,7 +66,7 @@ export function parseOriginalFormat(
     const notes = String(r[6] || "").trim() || null;
     const country = inferCountry(workplace || "");
     result.push({
-      data: { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order: i },
+      data: { cohort, prefix, thaiName, englishName, workplace, homeAddress, country, notes, order: i, studentId: null, major: null },
       rowNumber: i + 1,
     });
   }
@@ -96,6 +100,8 @@ export function parseExportFormat(
         country,
         notes: row["หมายเหตุ"]?.toString().trim() || null,
         order: isNaN(order) ? 0 : order,
+        studentId: row["รหัสนักศึกษา"]?.toString().trim() || null,
+        major: row["สาขาวิชา"]?.toString().trim() || null,
       },
       rowNumber: i + 2,
     });
