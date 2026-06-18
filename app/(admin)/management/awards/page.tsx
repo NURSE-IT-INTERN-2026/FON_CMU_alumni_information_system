@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
@@ -8,6 +8,10 @@ import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import { useCanWrite } from "@/lib/role-context";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, EDIT_REASON_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEntityList } from "@/lib/use-entity-list";
+import { queryKeys } from "@/lib/query-keys";
+import { apiFetch } from "@/lib/api-client";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -30,14 +34,6 @@ interface Award {
     firstName: string;
     maidenLastName: string;
   } | null;
-}
-
-interface ApiResponse {
-  data: Award[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 const AWARD_COLORS: Record<string, string> = {
@@ -68,18 +64,33 @@ const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastNam
 
 export default function AwardsPage() {
   const canWrite = useCanWrite();
-  const [awards, setAwards] = useState<Award[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("year");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+
+  const qc = useQueryClient();
+  const { items: awards, total, totalPages, isPending: loading, isError } = useEntityList<Award>(
+    "awards",
+    "/api/awards",
+    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { sortOrderKey: "sortDir" },
+  );
+  const { data: typeCountsData } = useQuery<Record<string, number>>({
+    queryKey: ["awards", "counts"],
+    queryFn: async () => {
+      const [international, national, local] = await Promise.all([
+        apiFetch<{ total: number }>("/api/awards?pageSize=1&awardType=INTERNATIONAL"),
+        apiFetch<{ total: number }>("/api/awards?pageSize=1&awardType=NATIONAL"),
+        apiFetch<{ total: number }>("/api/awards?pageSize=1&awardType=LOCAL"),
+      ]);
+      return { INTERNATIONAL: international.total, NATIONAL: national.total, LOCAL: local.total };
+    },
+  });
+  const typeCounts = typeCountsData ?? {};
 
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -113,47 +124,6 @@ export default function AwardsPage() {
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("award", awards.map((a) => a.id));
-
-  const fetchAwards = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        search,
-        sortField,
-        sortDir,
-        searchField,
-      });
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const res = await fetch(`${BASE_PATH}/api/awards?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: ApiResponse = await res.json();
-      setAwards(data.data);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, searchField, sortField, sortDir, filtersKey]);
-
-  const fetchTypeCounts = useCallback(async () => {
-    try {
-      const [international, national, local] = await Promise.all([
-        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=INTERNATIONAL`).then((r) => r.json()),
-        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=NATIONAL`).then((r) => r.json()),
-        fetch(`${BASE_PATH}/api/awards?pageSize=1&awardType=LOCAL`).then((r) => r.json()),
-      ]);
-      setTypeCounts({ INTERNATIONAL: international.total, NATIONAL: national.total, LOCAL: local.total });
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  useEffect(() => { fetchTypeCounts(); }, [fetchTypeCounts]);
-  useEffect(() => { fetchAwards(); }, [fetchAwards]);
 
   const handleSearch = (value: string) => { setSearch(value); setPage(1); };
 
@@ -237,49 +207,22 @@ export default function AwardsPage() {
     }
     setSaving(true);
     try {
+      const payload = {
+        studentId: studentId || null,
+        recipientName: studentId ? null : (nameSearch.trim() || null),
+        awardName: data.awardName.trim(),
+        awardType: data.awardType,
+        year: Number(data.year),
+        description: data.description.trim() || null,
+        ...(editingId ? { reason: editReason } : {}),
+      };
       if (editingId) {
-        // Edit mode
-        const payload = {
-          studentId: studentId || null,
-          recipientName: studentId ? null : (nameSearch.trim() || null),
-          awardName: data.awardName.trim(),
-          awardType: data.awardType,
-          year: Number(data.year),
-          description: data.description.trim() || null,
-          reason: editReason,
-        };
-        const res = await fetch(`${BASE_PATH}/api/awards/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/awards/${editingId}`, { method: "PUT", json: payload });
       } else {
-        // Create mode
-        const payload = {
-          studentId: studentId || null,
-          recipientName: studentId ? null : (nameSearch.trim() || null),
-          awardName: data.awardName.trim(),
-          awardType: data.awardType,
-          year: Number(data.year),
-          description: data.description.trim() || null,
-        };
-        const res = await fetch(`${BASE_PATH}/api/awards`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error || "เกิดข้อผิดพลาด");
-        }
+        await apiFetch(`/api/awards`, { method: "POST", json: payload });
       }
       closeForm();
-      fetchAwards();
-      fetchTypeCounts();
+      qc.invalidateQueries({ queryKey: queryKeys.awards.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -290,11 +233,9 @@ export default function AwardsPage() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${BASE_PATH}/api/awards/${deleteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      await apiFetch(`/api/awards/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchAwards();
-      fetchTypeCounts();
+      qc.invalidateQueries({ queryKey: queryKeys.awards.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข้อมูล");
     }
@@ -306,19 +247,10 @@ export default function AwardsPage() {
     setBulkDeleting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_PATH}/api/awards/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await apiFetch(`/api/awards/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      fetchAwards();
-      fetchTypeCounts();
+      qc.invalidateQueries({ queryKey: queryKeys.awards.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
@@ -366,12 +298,12 @@ export default function AwardsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${BASE_PATH}/api/awards/import`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      const data = await apiFetch<{ imported: number; skipped: number; errors: { row: number; message: string }[] }>(
+        `/api/awards/import`,
+        { method: "POST", body: formData },
+      );
       setImportResult(data);
-      fetchAwards();
-      fetchTypeCounts();
+      qc.invalidateQueries({ queryKey: queryKeys.awards.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการนำเข้า");
     } finally {
@@ -669,6 +601,10 @@ export default function AwardsPage() {
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
                   </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={manageMode ? 8 : 6} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
                 </tr>
               ) : awards.length === 0 ? (
                 <tr>
