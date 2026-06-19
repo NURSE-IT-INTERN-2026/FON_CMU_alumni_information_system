@@ -75,19 +75,30 @@ const NATIONAL_KEYWORDS = [
   "นางสาวไทย", // Miss Thailand
 ];
 
+// Directional regional CHAPTER markers — checked BEFORE national: a regional
+// chapter of a body (e.g. "สมาคมพยาบาลแห่งประเทศไทย ภาคเหนือ") is LOCAL even
+// though the parent body's name contains "แห่งประเทศไทย". Note: "ส่วนภูมิภาค" /
+// "ภาครัฐ" are category descriptors, NOT chapter markers, so they stay in the
+// post-national LOCAL list below (a national award won in a regional category
+// stays NATIONAL).
+const REGIONAL_CHAPTER_KEYWORDS = [
+  "ภาคเหนือ", "ภาคใต้", "ภาคกลาง", "ภาคอีสาน", "ภาคตะวันออก", "ภาคตะวันตก",
+];
+
 const LOCAL_KEYWORDS = [
   "มหาวิทยาลัย", "คณะพยาบาลศาสตร์", "คณะครุศาสตร์", "คณะวิทยาศาสตร์", "คณะแพทยศาสตร์",
   "วิทยาลัย",
   "สมาคมศิษย์เก่า", "สมาคมนักศึกษาเก่า", "สมาคมศิย์เก่า", // incl. typo ศิย์
   "นิสิตเก่า", "ศิษย์เก่าพยาบาล",
   "โรงเรียน", "โรตารี", "สโมสรโรตารี",
-  "ภาคเหนือ", "ภาคใต้", "ภาคกลาง", "ภาคอีสาน", "ส่วนภูมิภาค", "จังหวัด",
+  "ส่วนภูมิภาค", "จังหวัด",
 ];
 // bare "คณะ" would also match "คณะกรรมการ" (committee) — use faculty names above.
 
 function classifyAwardType(rawName: string): AwardType {
   const n = rawName.toUpperCase();
   if (INTL_KEYWORDS.some((k) => n.includes(k.toUpperCase()))) return "INTERNATIONAL";
+  if (REGIONAL_CHAPTER_KEYWORDS.some((k) => n.includes(k))) return "LOCAL";
   if (NATIONAL_KEYWORDS.some((k) => n.includes(k))) return "NATIONAL";
   if (LOCAL_KEYWORDS.some((k) => n.includes(k))) return "LOCAL";
   return "NATIONAL";
