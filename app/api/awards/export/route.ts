@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get("sortField") || "year";
     const sortDir = searchParams.get("sortDir") || "desc";
 
-    const validSearchFields = ["awardName", "recipientName", "description", "name", "year"];
+    const validSearchFields = ["awardName", "firstName", "lastName", "description", "name", "year"];
 
     const where: Record<string, unknown> = {};
     const andConditions: Record<string, unknown>[] = [];
@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
         } else if (searchFieldParam === "name") {
           andConditions.push({
             OR: [
-              { recipientName: { contains: search, mode: "insensitive" } },
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
               { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { maidenLastName: { contains: search, mode: "insensitive" } }] } },
             ],
           });
@@ -44,7 +45,8 @@ export async function GET(request: NextRequest) {
           OR: [
             { awardName: { contains: search, mode: "insensitive" } },
             { description: { contains: search, mode: "insensitive" } },
-            { recipientName: { contains: search, mode: "insensitive" } },
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
             { alumni: { firstName: { contains: search, mode: "insensitive" } } },
             { alumni: { maidenLastName: { contains: search, mode: "insensitive" } } },
           ],
@@ -60,25 +62,26 @@ export async function GET(request: NextRequest) {
       where.AND = andConditions;
     }
 
-    const sortFieldMap: Record<string, string> = { name: "recipientName", award: "awardName", type: "awardType", year: "year" };
+    const sortFieldMap: Record<string, string> = { name: "firstName", award: "awardName", type: "awardType", year: "year" };
     const orderKey = sortFieldMap[sortField] || "year";
     const dir = sortDir === "asc" ? "asc" : "desc";
 
     const items = await prisma.award.findMany({
       where,
-      include: { alumni: { select: { studentId: true, prefix: true, firstName: true, maidenLastName: true } } },
       orderBy: { [orderKey]: dir },
     });
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.alumni?.studentId ?? "",
-      "คำนำหน้า": a.alumni?.prefix ?? "",
-      "ชื่อ": a.alumni?.firstName ?? a.recipientName ?? "",
-      "นามสกุลเดิม": a.alumni?.maidenLastName ?? "",
+      "รหัสนักศึกษา": a.studentId ?? "",
+      "คำนำหน้า": a.prefix ?? "",
+      "ชื่อ": a.firstName ?? "",
+      "นามสกุล": a.lastName ?? "",
       "สาขาวิชา": a.major || "",
       "ชื่อรางวัล": a.awardName,
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,
+      "ลิงค์": a.link || "",
+      "รูปภาพ": a.imageUrl || "",
       "รายละเอียด": a.description || "",
     }));
 
@@ -115,18 +118,19 @@ export async function POST(request: NextRequest) {
 
     const items = await prisma.award.findMany({
       where: { id: { in: ids } },
-      include: { alumni: { select: { studentId: true, prefix: true, firstName: true, maidenLastName: true } } },
     });
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.alumni?.studentId ?? "",
-      "คำนำหน้า": a.alumni?.prefix ?? "",
-      "ชื่อ": a.alumni?.firstName ?? a.recipientName ?? "",
-      "นามสกุลเดิม": a.alumni?.maidenLastName ?? "",
+      "รหัสนักศึกษา": a.studentId ?? "",
+      "คำนำหน้า": a.prefix ?? "",
+      "ชื่อ": a.firstName ?? "",
+      "นามสกุล": a.lastName ?? "",
       "สาขาวิชา": a.major || "",
       "ชื่อรางวัล": a.awardName,
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,
+      "ลิงค์": a.link || "",
+      "รูปภาพ": a.imageUrl || "",
       "รายละเอียด": a.description || "",
     }));
 

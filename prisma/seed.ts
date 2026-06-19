@@ -304,7 +304,7 @@ async function main() {
     alumniByName.set(`${a.firstName.trim()} ${a.maidenLastName.trim()}`.toLowerCase(), a.studentId);
   }
 
-  interface AwardRow { studentId: string | null; recipientName: string | null; awardName: string; awardType: "INTERNATIONAL" | "NATIONAL" | "LOCAL"; year: number; description: string | null; }
+  interface AwardRow { studentId: string | null; prefix: string | null; firstName: string; lastName: string; awardName: string; awardType: "INTERNATIONAL" | "NATIONAL" | "LOCAL"; year: number; description: string | null; }
 
   const awardRows: AwardRow[] = [];
   const seenAwards = new Set<string>();
@@ -324,8 +324,8 @@ async function main() {
     if (!awardName || !year) continue;
 
     // Create alumni stub if needed
+    const parsed = parseThaiName(fullName);
     if (studentId) {
-      const parsed = parseThaiName(fullName);
       await prisma.alumni.upsert({
         where: { studentId },
         update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
@@ -338,7 +338,7 @@ async function main() {
     if (seenAwards.has(key)) continue;
     seenAwards.add(key);
 
-    awardRows.push({ studentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
   }
 
   // --- File 2: ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx ---
@@ -351,8 +351,8 @@ async function main() {
     const year = Number(row[5]);
     if (!awardName || !year) continue;
 
+    const parsed = parseThaiName(fullName);
     if (studentId) {
-      const parsed = parseThaiName(fullName);
       await prisma.alumni.upsert({
         where: { studentId },
         update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
@@ -365,7 +365,7 @@ async function main() {
     if (seenAwards.has(key)) continue;
     seenAwards.add(key);
 
-    awardRows.push({ studentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
   }
 
   // --- File 3: รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx — ศิษย์เก่า sheet ---
@@ -377,7 +377,6 @@ async function main() {
     // Skip header rows repeated in the sheet
     if (String(row[0]) === "ปีที่รับ") { currentYear3a = 0; continue; }
 
-    const prefix = String(row[1] || "").trim();
     const fullName = String(row[2] || "").trim();
     const awardName = String(row[3] || "").trim();
     const year = currentYear3a;
@@ -393,10 +392,10 @@ async function main() {
     seenAwards.add(key);
 
     if (matchedStudentId) {
-      awardRows.push({ studentId: matchedStudentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     } else {
-      console.log(`  ⚠ No alumni match for: ${fullName} — storing with recipientName`);
-      awardRows.push({ studentId: null, recipientName: `${prefix}${fullName}`.trim(), awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      console.log(`  ⚠ No alumni match for: ${fullName} — storing without alumni link`);
+      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     }
   }
 
@@ -421,10 +420,10 @@ async function main() {
     seenAwards.add(key);
 
     if (matchedStudentId) {
-      awardRows.push({ studentId: matchedStudentId, recipientName: null, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     } else {
-      console.log(`  ⚠ No alumni match for: ${fullName} — storing with recipientName`);
-      awardRows.push({ studentId: null, recipientName: fullName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      console.log(`  ⚠ No alumni match for: ${fullName} — storing without alumni link`);
+      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     }
   }
 

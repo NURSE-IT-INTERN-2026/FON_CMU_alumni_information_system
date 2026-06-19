@@ -54,35 +54,37 @@ export async function POST(request: NextRequest) {
         let major: string | null = null;
         let studentId = data!.studentId;
         if (studentId) {
-          const alumni = await ensureAlumni(
-            studentId,
-            data!.recipientName ?? studentId,
-          );
+          const displayName = [data!.prefix, data!.firstName, data!.lastName]
+            .filter(Boolean)
+            .join(" ");
+          const alumni = await ensureAlumni(studentId, displayName || studentId);
           studentId = alumni.studentId;
           major = alumni.major;
         }
 
         const payload = {
           studentId,
-          recipientName: data!.recipientName,
+          prefix: data!.prefix,
+          firstName: data!.firstName,
+          lastName: data!.lastName,
           awardName: data!.awardName,
           awardType: data!.awardType as AwardType,
           year: data!.year,
+          link: data!.link,
+          imageUrl: data!.imageUrl,
           description: data!.description,
           major,
         };
 
-        // Awards have no DB unique — match by natural key (studentId, or
-        // recipientName when unlinked, + awardName + year) among active rows so
-        // re-importing updates instead of duplicating.
+        // Awards have no DB unique — match by natural key (studentId +
+        // awardName + year) among active rows so re-importing updates instead
+        // of duplicating.
         const existing = await prisma.award.findFirst({
           where: {
             awardName: data!.awardName,
             year: data!.year,
             deletedAt: null,
-            ...(studentId
-              ? { studentId }
-              : { recipientName: data!.recipientName ?? null }),
+            studentId: studentId ?? null,
           },
         });
         if (existing) {

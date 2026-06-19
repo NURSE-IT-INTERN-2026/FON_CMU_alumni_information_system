@@ -23,12 +23,14 @@ export type {
 // Award
 export {
   awardFormSchema,
+  awardPageFormSchema,
   awardCreateSchema,
   awardUpdateSchema,
   AWARD_TYPE_VALUES,
 } from "./award";
 export type {
   AwardFormData,
+  AwardPageFormData,
   AwardCreateInput,
   AwardUpdateInput,
 } from "./award";

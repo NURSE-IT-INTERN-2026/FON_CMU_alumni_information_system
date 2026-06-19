@@ -18,17 +18,21 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
-import { awardFormSchema, type AwardFormData } from "@/lib/validations";
+import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 
 interface Award {
   id: string;
   studentId: string | null;
-  recipientName: string | null;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
   awardName: string;
   awardType: string;
   year: number;
-  description: string | null;
   major?: string | null;
+  link: string | null;
+  imageUrl: string | null;
+  description: string | null;
   alumni: {
     prefix: string;
     firstName: string;
@@ -45,11 +49,23 @@ const AWARD_COLORS: Record<string, string> = {
 type SortField = "name" | "award" | "type" | "year" | "major" | "description";
 type SortDir = "asc" | "desc";
 
-type FormValues = AwardFormData & { studentId: string; major: string };
+type FormValues = AwardPageFormData & { studentId: string; major: string };
 
-const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", awardName: "", awardType: "INTERNATIONAL" as const, year: "", description: "" };
+const DEFAULT_FORM_VALUES: FormValues = {
+  studentId: "",
+  major: "",
+  prefix: "",
+  firstName: "",
+  lastName: "",
+  awardName: "",
+  awardType: "INTERNATIONAL" as const,
+  year: "",
+  link: "",
+  imageUrl: "",
+  description: "",
+};
 
-type SearchField = "all" | "awardName" | "recipientName" | "description" | "name" | "year";
+type SearchField = "all" | "awardName" | "description" | "name" | "year";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
@@ -59,8 +75,8 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "year", label: "ปี พ.ศ." },
 ];
 
-const alumniDisplayName = (a: { prefix: string; firstName: string; maidenLastName: string } | null, fallback?: string | null) =>
-  a ? `${a.prefix}${a.firstName} ${a.maidenLastName}` : (fallback || "ไม่ระบุชื่อ");
+const recipientDisplay = (a: { prefix: string | null; firstName: string; lastName: string }) =>
+  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "ไม่ระบุชื่อ";
 
 export default function AwardsPage() {
   const canWrite = useCanWrite();
@@ -97,7 +113,7 @@ export default function AwardsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(awardFormSchema) as any,
+    resolver: zodResolver(awardPageFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
   });
   const [saving, setSaving] = useState(false);
@@ -160,6 +176,9 @@ export default function AwardsPage() {
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
     setValue("major", a.major ?? "");
     setNameSearch(displayName(a));
     clearResults();
@@ -179,12 +198,17 @@ export default function AwardsPage() {
     formReset({
       studentId: a.studentId || "",
       major: a.major || "",
+      prefix: a.prefix || "",
+      firstName: a.firstName,
+      lastName: a.lastName,
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
       year: String(a.year),
+      link: a.link || "",
+      imageUrl: a.imageUrl || "",
       description: a.description || "",
     });
-    setNameSearch(alumniDisplayName(a.alumni, a.recipientName));
+    setNameSearch(recipientDisplay(a));
     setEditingId(a.id);
     setEditReason("");
     setShowForm(true);
@@ -200,7 +224,7 @@ export default function AwardsPage() {
     clearResults();
   };
 
-  const onSave = async (data: AwardFormData) => {
+  const onSave = async (data: AwardPageFormData) => {
     const studentId = getValues("studentId");
     setErrorMsg("");
     if (editingId && !editReason) {
@@ -211,12 +235,16 @@ export default function AwardsPage() {
     try {
       const payload = {
         studentId: studentId || null,
-        recipientName: studentId ? null : (nameSearch.trim() || null),
+        prefix: data.prefix?.trim() || null,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
         major: getValues("major")?.trim() || null,
         awardName: data.awardName.trim(),
         awardType: data.awardType,
         year: Number(data.year),
-        description: data.description.trim() || null,
+        link: data.link?.trim() || null,
+        imageUrl: data.imageUrl?.trim() || null,
+        description: data.description?.trim() || null,
         ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
@@ -403,6 +431,15 @@ export default function AwardsPage() {
                 </div>
               )}
             </div>
+            <FormField label="คำนำหน้า">
+              <FormInput registration={register("prefix")} type="text" placeholder="เช่น นาย, นางสาว, ดร." />
+            </FormField>
+            <FormField label="ชื่อ" required error={errors.firstName?.message}>
+              <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+            </FormField>
+            <FormField label="นามสกุล" required error={errors.lastName?.message}>
+              <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" />
+            </FormField>
             <FormField label="สาขาวิชา">
               <FormInput registration={register("major")} type="text" />
             </FormField>
@@ -419,8 +456,14 @@ export default function AwardsPage() {
             <FormField label="ปี (พ.ศ.)" required error={errors.year?.message}>
               <FormInput registration={register("year")} error={errors.year?.message} type="text" placeholder="เช่น 2568" />
             </FormField>
-            <FormField label="รายละเอียด" required error={errors.description?.message} className="sm:col-span-2">
-              <FormInput registration={register("description")} error={errors.description?.message} type="text" />
+            <FormField label="ลิงค์">
+              <FormInput registration={register("link")} type="text" placeholder="https://..." />
+            </FormField>
+            <FormField label="รูปภาพ">
+              <FormInput registration={register("imageUrl")} type="text" placeholder="https://..." />
+            </FormField>
+            <FormField label="รายละเอียด" className="sm:col-span-2">
+              <FormInput registration={register("description")} type="text" />
             </FormField>
             {editingId && (
               <FormField label="เหตุผลในการแก้ไข" required className="sm:col-span-2">
@@ -576,12 +619,15 @@ export default function AwardsPage() {
                     />
                   </th>
                 )}
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
                   สาขาวิชา <SortIcon field="major" />
                 </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">คำนำหน้า</th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
-                  ชื่อ-นามสกุล <SortIcon field="name" />
+                  ชื่อ <SortIcon field="name" />
                 </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">นามสกุล</th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("award")}>
                   ชื่อรางวัล <SortIcon field="award" />
                 </th>
@@ -591,6 +637,8 @@ export default function AwardsPage() {
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
                   ปีที่ได้รับ <SortIcon field="year" />
                 </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลิงค์</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รูปภาพ</th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("description")}>
                   รายละเอียด <SortIcon field="description" />
                 </th>
@@ -602,7 +650,7 @@ export default function AwardsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={manageMode ? 8 : 6} className="px-4 py-12 text-center">
+                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -610,11 +658,11 @@ export default function AwardsPage() {
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={manageMode ? 8 : 6} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
+                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
                 </tr>
               ) : awards.length === 0 ? (
                 <tr>
-                  <td colSpan={manageMode ? 8 : 6} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
+                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
                 awards.map((award) => (
@@ -629,8 +677,11 @@ export default function AwardsPage() {
                         />
                       </td>
                     )}
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{award.studentId || "-"}</td>
                     <td className="px-4 py-3">{award.major || "-"}</td>
-                    <td className="px-4 py-3">{alumniDisplayName(award.alumni, award.recipientName)}</td>
+                    <td className="px-4 py-3">{award.prefix || "-"}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="firstName" value={award.firstName} hotFields={hot[award.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="lastName" value={award.lastName} hotFields={hot[award.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="awardName" value={award.awardName} hotFields={hot[award.id]} /></td>
                     <td className="px-4 py-3">
                       <span className="inline-block rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: AWARD_COLORS[award.awardType] || "#999" }}>
@@ -638,6 +689,20 @@ export default function AwardsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="year" value={award.year} hotFields={hot[award.id]} /></td>
+                    <td className="px-4 py-3">
+                      {award.link ? (
+                        <a href={award.link} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                          <svg className="inline h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                        </a>
+                      ) : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {award.imageUrl ? (
+                        <a href={award.imageUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={award.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
+                        </a>
+                      ) : "-"}
+                    </td>
                     <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="award" recordId={award.id} field="description" value={award.description || "-"} hotFields={hot[award.id]} /></td>
                     {manageMode && (
                       <td className="px-4 py-3 text-center">

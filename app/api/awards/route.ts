@@ -18,10 +18,14 @@ export async function POST(request: NextRequest) {
     const award = await prisma.award.create({
       data: {
         studentId: validated.studentId || null,
-        recipientName: validated.recipientName?.trim() || null,
+        prefix: validated.prefix?.trim() || null,
+        firstName: validated.firstName.trim(),
+        lastName: validated.lastName.trim(),
         awardName: validated.awardName.trim(),
         awardType: validated.awardType,
         year: Number(validated.year),
+        link: validated.link?.trim() || null,
+        imageUrl: validated.imageUrl?.trim() || null,
         description: validated.description?.trim() || null,
         major: validated.major?.trim() || null,
       },
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
     const sortDir = searchParams.get("sortDir") || "desc";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["awardName", "recipientName", "description", "name", "year"];
+    const validSearchFields = ["awardName", "firstName", "lastName", "description", "name", "year"];
 
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.awards));
@@ -78,7 +82,8 @@ export async function GET(request: NextRequest) {
           where.year = Number(search) || undefined;
         } else if (searchFieldParam === "name") {
           where.OR = [
-            { recipientName: { contains: search, mode: "insensitive" } },
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
             { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { maidenLastName: { contains: search, mode: "insensitive" } }] } },
           ];
         } else {
@@ -88,7 +93,8 @@ export async function GET(request: NextRequest) {
         where.OR = [
           { awardName: { contains: search, mode: "insensitive" } },
           { description: { contains: search, mode: "insensitive" } },
-          { recipientName: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
           {
             alumni: {
               OR: [
@@ -101,7 +107,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sortFieldMap: Record<string, string> = { name: "recipientName", award: "awardName", type: "awardType", year: "year", major: "major", description: "description" };
+    const sortFieldMap: Record<string, string> = { name: "firstName", award: "awardName", type: "awardType", year: "year", major: "major", description: "description" };
     const orderKey = sortFieldMap[sortField] || "year";
     const dir = sortDir === "asc" ? "asc" : "desc";
 

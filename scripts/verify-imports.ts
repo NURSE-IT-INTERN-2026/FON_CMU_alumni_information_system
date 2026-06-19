@@ -44,8 +44,8 @@ async function main() {
   );
   await report(
     "Awards",
-    await prisma.award.findMany({ where: { deletedAt: null }, select: { studentId: true, recipientName: true, awardName: true, major: true } }),
-    (r) => `${r.studentId ?? "(none)"} ${r.recipientName ?? ""} — ${r.awardName}`,
+    await prisma.award.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, awardName: true, major: true } }),
+    (r) => `${r.studentId ?? "(none)"} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")} — ${r.awardName}`,
   );
   await report(
     "Graduate Committee",

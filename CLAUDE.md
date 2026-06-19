@@ -49,7 +49,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | Model | Table | Purpose |
 |---|---|---|
 | `Alumni` | `alumni` | Core alumni records (studentId unique, degreeLevel, cohort) |
-| `Award` | `awards` | Awards linked to alumni (awardType enum, Buddhist year) |
+| `Award` | `awards` | Awards linked to alumni — split name (`prefix`/`firstName`/`lastName`), `awardType` enum, Buddhist `year`, `link`/`imageUrl` (no legacy `recipientName`) |
 | `Association` | `associations` | Professional associations/positions |
 | `GraduateCommittee` | `graduate_committees` | Committee memberships |
 | `Potential` | `potentials` | Notable alumni potentials |
@@ -317,3 +317,9 @@ Template for a ledger entry:
 - **Symptom:** FacetFilters showed wrong data — เครือข่าย filter listed names, รุ่นที่ filter listed เครือข่าย values.
 - **Root cause:** PRD names the fields `network` (เครือข่าย) + `cohort` (รุ่นที่), but the `ModelRepresentative` schema stores เครือข่าย in **`cohort`** and รุ่นที่ in **`generation`** — the opposite of sibling entities (graduate-committee etc.), where `cohort` = รุ่นที่. Filters/columns copied from siblings land on the wrong field.
 - **Prevention:** On model-representatives, map **เครือข่าย→`cohort`**, **รุ่นที่→`generation`**, **สาขาวิชา→`major`**. Don't assume `cohort` means รุ่นที่ here. Facet fields must also be in `FACET_FIELDS["model-representatives"]` (`lib/filter-facets.ts`); `generation` is numeric (already in `YEAR_FIELDS`).
+
+### awards `awardType` is derived by granting body; `recipientName` was split into prefix/firstName/lastName
+- **Symptom:** Award rows need a type (LOCAL/NATIONAL/INTERNATIONAL) but the scrape (`imports/scrapped/alumni-awards.json`) carries none; the model previously had one `recipientName` instead of the PRD's prefix/firstName/lastName.
+- **Root cause:** The schema field was `recipientName`; PRD (`PRD.md` Award) wants `prefix`/`firstName`/`lastName` + `link`/`imageUrl` on the Award itself. The source has only รางวัล/รายชื่อ/รุ่น/ปี — no type, link, image, or description.
+- **Prevention:** `recipientName` is gone — store `prefix` (nullable) + `firstName`/`lastName` (required) on the Award; the page form (`awardPageFormSchema`) enforces required names while the shared `awardFormSchema` (used by the alumni full-form) leaves them optional (routes auto-fill from the parent alumni). Classify type by granting body in `scripts/rebuild-awards.ts`: **single-institution** (มหาวิทยาลัย/คณะ/วิทยาลัย/สมาคมศิษย์เก่า) **or regional/provincial/school/Rotary → LOCAL**; **foreign/international body → INTERNATIONAL**; **Thai national body (กระทรวง, สมาคมพยาบาลแห่งประเทศไทย, สภาการพยาบาล, ปอมท./ทคพย./ปขมท., ศรีสังวาลย์, วันมหิดล, แห่งชาติ) → NATIONAL** (default). Do NOT reuse `seed.ts:classifyAwardTier` (it misclassifies EACC→INTL and defaults unmatched→LOCAL). Rebuild real data: `node --env-file=.env --import tsx scripts/rebuild-awards.ts` (`DRY_RUN=1` previews the type distribution + unmatched). `link`/`imageUrl`/`description` are null — the scrape has no source for them.
+

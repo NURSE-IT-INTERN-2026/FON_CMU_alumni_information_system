@@ -103,6 +103,9 @@ export async function PUT(request: NextRequest) {
           await tx.award.createMany({
             data: validated.awards.map((a) => ({
               studentId,
+              prefix: validated.prefix,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               awardName: a.awardName,
               awardType: a.awardType as AwardType,
               year: a.year,

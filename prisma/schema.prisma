@@ -93,11 +93,15 @@ model Alumni {
 model Award {
   id            String    @id @default(uuid())
   studentId     String?
-  recipientName String?
+  prefix        String?
+  firstName     String
+  lastName      String
   awardName     String
   awardType     AwardType
   year          Int
   major         String?
+  link          String?
+  imageUrl      String?
   description   String?
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())

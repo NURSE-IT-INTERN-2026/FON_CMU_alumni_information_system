@@ -6,10 +6,15 @@ export const AWARD_TYPE_THAI_TO_ENUM: Record<string, string> = Object.fromEntrie
 
 export interface ParsedAwardRow {
   studentId: string | null;
-  recipientName: string | null;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
+  major: string | null;
   awardName: string;
   awardType: string;
   year: number;
+  link: string | null;
+  imageUrl: string | null;
   description: string | null;
 }
 
@@ -25,13 +30,18 @@ export function parseAwardRow(
   rowNumber: number
 ): AwardRowResult {
   const studentId = row["รหัสนักศึกษา"]?.toString().trim() || null;
-  const recipientName = row["ชื่อ-นามสกุล"]?.toString().trim() || null;
+  const prefix = row["คำนำหน้า"]?.toString().trim() || null;
+  const firstName = row["ชื่อ"]?.toString().trim();
+  const lastName = row["นามสกุล"]?.toString().trim();
+  const major = row["สาขาวิชา"]?.toString().trim() || null;
   const awardName = row["ชื่อรางวัล"]?.toString().trim();
   const awardTypeThai = row["ประเภทรางวัล"]?.toString().trim();
   const yearStr = row["ปี (พ.ศ.)"]?.toString().trim();
+  const link = row["ลิงค์"]?.toString().trim() || null;
+  const imageUrl = row["รูปภาพ"]?.toString().trim() || null;
   const description = row["รายละเอียด"]?.toString().trim() || null;
 
-  if (!awardName || !awardTypeThai || !yearStr) {
+  if (!firstName || !lastName || !awardName || !awardTypeThai || !yearStr) {
     return { data: null, error: { row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" } };
   }
 
@@ -49,7 +59,19 @@ export function parseAwardRow(
   }
 
   return {
-    data: { studentId: studentId || null, recipientName, awardName, awardType, year, description },
+    data: {
+      studentId,
+      prefix,
+      firstName,
+      lastName,
+      major,
+      awardName,
+      awardType,
+      year,
+      link,
+      imageUrl,
+      description,
+    },
     error: null,
   };
 }

@@ -20,7 +20,11 @@ export async function PUT(
 
     const updateData: Record<string, unknown> = {};
     if (validated.studentId !== undefined) updateData.studentId = validated.studentId || null;
-    if (validated.recipientName !== undefined) updateData.recipientName = validated.recipientName?.trim() || null;
+    if (validated.prefix !== undefined) updateData.prefix = validated.prefix?.trim() || null;
+    if (validated.firstName !== undefined) updateData.firstName = validated.firstName;
+    if (validated.lastName !== undefined) updateData.lastName = validated.lastName;
+    if (validated.link !== undefined) updateData.link = validated.link?.trim() || null;
+    if (validated.imageUrl !== undefined) updateData.imageUrl = validated.imageUrl?.trim() || null;
     if (validated.awardName !== undefined) updateData.awardName = validated.awardName;
     if (validated.awardType !== undefined) updateData.awardType = validated.awardType;
     if (validated.year !== undefined) updateData.year = validated.year;

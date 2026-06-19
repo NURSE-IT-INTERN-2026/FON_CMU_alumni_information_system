@@ -15,7 +15,7 @@ export type FieldChange = {
 
 /** Editable scalar fields tracked per resource (must match the model columns). */
 export const TRACKED_FIELDS: Record<string, string[]> = {
-  award: ["awardName", "awardType", "year", "description", "major"],
+  award: ["awardName", "awardType", "year", "description", "major", "prefix", "firstName", "lastName", "link", "imageUrl"],
   association: ["associationName", "position", "recordedYear", "major"],
   graduate_committee: ["termYear", "cohort", "position", "remarks", "major"],
   potential: ["career", "position", "recordedYear", "major"],

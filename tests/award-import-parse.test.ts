@@ -12,7 +12,9 @@ describe("AWARD_TYPE_THAI_TO_ENUM", () => {
 describe("parseAwardRow", () => {
   const validRow: Record<string, string> = {
     "รหัสนักศึกษา": "640612001",
-    "ชื่อ-นามสกุล": "สมหญิง ดี",
+    "คำนำหน้า": "นางสาว",
+    "ชื่อ": "สมหญิง",
+    "นามสกุล": "ดี",
     "ชื่อรางวัล": "รางวัลพยาบาลดีเด่น",
     "ประเภทรางวัล": "รางวัลระดับชาติ",
     "ปี (พ.ศ.)": "2566",
@@ -24,7 +26,9 @@ describe("parseAwardRow", () => {
     expect(error).toBeNull();
     expect(data).toMatchObject({
       studentId: "640612001",
-      recipientName: "สมหญิง ดี",
+      prefix: "นางสาว",
+      firstName: "สมหญิง",
+      lastName: "ดี",
       awardName: "รางวัลพยาบาลดีเด่น",
       awardType: "NATIONAL",
       year: 2566,
@@ -39,11 +43,26 @@ describe("parseAwardRow", () => {
     expect(data!.studentId).toBeNull();
   });
 
-  it("returns null description when cell is empty", () => {
-    const row = { ...validRow, "รายละเอียด": "" };
+  it("returns null prefix and description when cells are empty", () => {
+    const row = { ...validRow, "คำนำหน้า": "", "รายละเอียด": "" };
     const { data, error } = parseAwardRow(row, 2);
     expect(error).toBeNull();
+    expect(data!.prefix).toBeNull();
     expect(data!.description).toBeNull();
+  });
+
+  it("error when firstName is missing", () => {
+    const row = { ...validRow, "ชื่อ": "" };
+    const { data, error } = parseAwardRow(row, 3);
+    expect(data).toBeNull();
+    expect(error).toMatchObject({ row: 3, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
+  });
+
+  it("error when lastName is missing", () => {
+    const row = { ...validRow, "นามสกุล": "" };
+    const { data, error } = parseAwardRow(row, 3);
+    expect(data).toBeNull();
+    expect(error).toMatchObject({ row: 3, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
   });
 
   it("error when awardName is missing", () => {
@@ -98,7 +117,9 @@ describe("parseAwardRow", () => {
   it("trims whitespace from all fields", () => {
     const row: Record<string, string> = {
       "รหัสนักศึกษา": "  640612001  ",
-      "ชื่อ-นามสกุล": "  สมหญิง ดี  ",
+      "คำนำหน้า": "  นางสาว  ",
+      "ชื่อ": "  สมหญิง  ",
+      "นามสกุล": "  ดี  ",
       "ชื่อรางวัล": "  รางวัลดีเด่น  ",
       "ประเภทรางวัล": "  รางวัลระดับชาติ  ",
       "ปี (พ.ศ.)": "  2566  ",
@@ -107,6 +128,9 @@ describe("parseAwardRow", () => {
     const { data, error } = parseAwardRow(row, 2);
     expect(error).toBeNull();
     expect(data!.studentId).toBe("640612001");
+    expect(data!.prefix).toBe("นางสาว");
+    expect(data!.firstName).toBe("สมหญิง");
+    expect(data!.lastName).toBe("ดี");
     expect(data!.awardName).toBe("รางวัลดีเด่น");
     expect(data!.year).toBe(2566);
   });
