@@ -36,7 +36,7 @@ const NETWORK_ORDER = [
   "ปริญญาเอก",
 ];
 
-type SortField = "network" | "generation" | "studentId" | "name";
+type SortField = "network" | "generation" | "studentId" | "name" | "major";
 type SortDir = "asc" | "desc";
 
 type FormValues = ModelRepFormData & { studentId: string; name: string; major: string };
@@ -73,7 +73,6 @@ export default function ModelRepresentativesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
-  const [networkFilter, setNetworkFilter] = useState<string>("all");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
 
@@ -174,6 +173,9 @@ export default function ModelRepresentativesPage() {
         case "name":
           cmp = a.name.localeCompare(b.name, "th");
           break;
+        case "major":
+          cmp = (a.major ?? "").localeCompare(b.major ?? "", "th");
+          break;
         default:
           cmp = 0;
       }
@@ -220,12 +222,8 @@ export default function ModelRepresentativesPage() {
   }, [filterField]);
 
   const filteredAlumni = useMemo(() => {
-    let filtered = search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
-    if (networkFilter !== "all") {
-      filtered = filtered.filter((a) => a.cohort === networkFilter);
-    }
-    return filtered;
-  }, [alumni, search, matchesSearch, networkFilter]);
+    return search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
+  }, [alumni, search, matchesSearch]);
 
   const viewSorted = useMemo(() => {
     return sortItems(filteredAlumni, viewSortField, viewSortDir);
@@ -790,26 +788,12 @@ export default function ModelRepresentativesPage() {
           }}
           className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
         />
-        <select
-          value={networkFilter}
-          onChange={(e) => {
-            setNetworkFilter(e.target.value);
-            if (manageMode) setManagePage(1);
-            else setViewPage(1);
-          }}
-          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          <option value="all">เครือข่ายทั้งหมด</option>
-          {allCohorts.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
       </div>
 
       {/* Facet filters */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <FacetFilter entity="model-representatives" field="name" label="เครือข่าย" selected={filters.name ?? []} onChange={(v) => setFilter("name", v)} />
-        <FacetFilter entity="model-representatives" field="cohort" label="รุ่นที่" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
+        <FacetFilter entity="model-representatives" field="cohort" label="เครือข่าย" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
+        <FacetFilter entity="model-representatives" field="generation" label="รุ่นที่" selected={filters.generation ?? []} onChange={(v) => setFilter("generation", v)} />
         <FacetFilter entity="model-representatives" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
       </div>
 
@@ -844,6 +828,7 @@ export default function ModelRepresentativesPage() {
                   {tableHeader("network", "เครือข่าย", true)}
                   {tableHeader("generation", "รุ่นที่", true, "center")}
                   {tableHeader("studentId", "รหัสนักศึกษา", true)}
+                  {tableHeader("major", "สาขาวิชา", true)}
                   {tableHeader("name", "ชื่อ-นามสกุล", true)}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
@@ -869,6 +854,7 @@ export default function ModelRepresentativesPage() {
                       <OrangeCell resourceType="model_representative" recordId={a.id} field="generation" value={a.generation} hotFields={hot[a.id]} />
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.name}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -933,6 +919,7 @@ export default function ModelRepresentativesPage() {
                 {tableHeader("network", "เครือข่าย", false)}
                 {tableHeader("generation", "รุ่นที่", false, "center")}
                 {tableHeader("studentId", "รหัสนักศึกษา", false)}
+                {tableHeader("major", "สาขาวิชา", false)}
                 {tableHeader("name", "ชื่อ - นามสกุล", false)}
               </tr>
             </thead>
@@ -947,6 +934,7 @@ export default function ModelRepresentativesPage() {
                     {a.generation}
                   </td>
                   <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
+                  <td className="px-4 py-3">{a.major || "-"}</td>
                   <td className="px-4 py-3">{a.name}</td>
                 </tr>
               ))}
