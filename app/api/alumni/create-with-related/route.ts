@@ -27,9 +27,6 @@ export async function POST(request: NextRequest) {
     const hasModelReps =
       (validated.modelRepresentatives?.length ?? 0) > 0;
 
-    // Auto-filled identity for related rows that carry a name.
-    const fullName = `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`;
-
     const alumni = await prisma.$transaction(async (tx) => {
       const created = await tx.alumni.create({
         data: {
@@ -70,9 +67,9 @@ export async function POST(request: NextRequest) {
         await tx.association.createMany({
           data: validated.associations.map((a) => ({
             studentId: validated.studentId,
-            fullName:
-              a.fullName ||
-              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             associationName: a.associationName,
             position: a.position,
             recordedYear: a.recordedYear,
@@ -85,9 +82,9 @@ export async function POST(request: NextRequest) {
           data: validated.graduateCommittees.map((g) => ({
             studentId: validated.studentId,
             termYear: g.termYear,
-            fullName:
-              g.fullName ||
-              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             cohort: g.cohort,
             position: g.position,
             remarks: g.remarks || null,
@@ -99,9 +96,9 @@ export async function POST(request: NextRequest) {
         await tx.potential.createMany({
           data: validated.potentials!.map((p) => ({
             studentId: validated.studentId,
-            fullName:
-              p.fullName ||
-              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             career: p.career,
             position: p.position,
             recordedYear: p.recordedYear,
@@ -113,9 +110,9 @@ export async function POST(request: NextRequest) {
         await tx.modelRepresentative.createMany({
           data: validated.modelRepresentatives!.map((m) => ({
             studentId: validated.studentId,
-            name:
-              m.name ||
-              `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             cohort: m.cohort,
             generation: m.generation,
           })),
@@ -129,7 +126,8 @@ export async function POST(request: NextRequest) {
             // the record (the form only collects the alumni-owned fields).
             studentId: validated.studentId,
             prefix: validated.prefix,
-            thaiName: fullName,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             cohort: validated.cohort || null,
             workplace: a.workplace || null,
             homeAddress: a.homeAddress || null,

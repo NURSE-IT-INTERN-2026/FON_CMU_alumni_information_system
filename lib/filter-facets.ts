@@ -38,7 +38,7 @@ export const FACET_FIELDS: Record<string, string[]> = {
   awards: ["major", "awardType"],
   associations: ["major", "associationName", "position", "recordedYear"],
   "graduate-committee": ["major", "termYear", "cohort", "position"],
-  "model-representatives": ["major", "name", "cohort", "generation"],
+  "model-representatives": ["major", "lastName", "cohort", "generation"],
   potentials: ["major", "career", "position", "recordedYear"],
   "alumni-agency": ["major", "country", "workplace"],
 };

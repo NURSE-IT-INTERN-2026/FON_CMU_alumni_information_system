@@ -312,8 +312,6 @@ export default function AlumniProfilePage() {
     }
     setSaving(true);
 
-    const fullName = `${data.prefix}${data.firstName} ${data.maidenLastName}`;
-
     const payload: Record<string, unknown> = {
       reason: editReason,
       prefix: data.prefix,
@@ -336,26 +334,22 @@ export default function AlumniProfilePage() {
         description: a.description,
       })),
       associations: (data.associations || []).map((a) => ({
-        fullName,
         associationName: a.associationName,
         position: a.position,
         recordedYear: Number(a.recordedYear),
       })),
       graduateCommittees: (data.graduateCommittees || []).map((g) => ({
         termYear: Number(g.termYear),
-        fullName,
         cohort: g.cohort,
         position: g.position,
         remarks: g.remarks,
       })),
       potentials: (data.potentials || []).map((p) => ({
-        fullName,
         career: p.career,
         position: p.position,
         recordedYear: Number(p.recordedYear),
       })),
       modelRepresentatives: (data.modelRepresentatives || []).map((m) => ({
-        name: fullName,
         cohort: m.cohort,
         generation: Number(m.generation),
       })),

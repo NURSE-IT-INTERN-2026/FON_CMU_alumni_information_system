@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
-    const validSearchFields = ["studentId", "fullName", "associationName", "position", "recordedYear"];
+    const validSearchFields = ["studentId", "name", "firstName", "lastName", "associationName", "position", "recordedYear"];
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.associations));
 
@@ -29,13 +29,19 @@ export async function GET(request: NextRequest) {
       if (searchField && validSearchFields.includes(searchField)) {
         if (searchField === "recordedYear") {
           where[searchField] = Number(search) || undefined;
+        } else if (searchField === "name") {
+          where.OR = [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+          ];
         } else {
           where[searchField] = { contains: search, mode: "insensitive" };
         }
       } else {
         where.OR = [
           { studentId: { contains: search, mode: "insensitive" } },
-          { fullName: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
           { associationName: { contains: search, mode: "insensitive" } },
           { position: { contains: search, mode: "insensitive" } },
         ];
@@ -78,7 +84,9 @@ export async function POST(request: NextRequest) {
     const item = await prisma.association.create({
       data: {
         studentId: validated.studentId.trim(),
-        fullName: validated.fullName.trim(),
+        prefix: validated.prefix?.trim() || null,
+        firstName: validated.firstName.trim(),
+        lastName: validated.lastName.trim(),
         associationName: validated.associationName.trim(),
         position: validated.position.trim(),
         recordedYear: Number(validated.recordedYear),

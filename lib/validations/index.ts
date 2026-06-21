@@ -38,11 +38,13 @@ export type {
 // Association
 export {
   associationFormSchema,
+  associationPageFormSchema,
   associationCreateSchema,
   associationUpdateSchema,
 } from "./association";
 export type {
   AssociationFormData,
+  AssociationPageFormData,
   AssociationCreateInput,
   AssociationUpdateInput,
 } from "./association";
@@ -50,11 +52,13 @@ export type {
 // Graduate Committee
 export {
   committeeFormSchema,
+  committeePageFormSchema,
   committeeCreateSchema,
   committeeUpdateSchema,
 } from "./graduate-committee";
 export type {
   CommitteeFormData,
+  CommitteePageFormData,
   CommitteeCreateInput,
   CommitteeUpdateInput,
 } from "./graduate-committee";
@@ -62,11 +66,13 @@ export type {
 // Potential
 export {
   potentialFormSchema,
+  potentialPageFormSchema,
   potentialCreateSchema,
   potentialUpdateSchema,
 } from "./potential";
 export type {
   PotentialFormData,
+  PotentialPageFormData,
   PotentialCreateInput,
   PotentialUpdateInput,
 } from "./potential";
@@ -74,11 +80,13 @@ export type {
 // Model Representative
 export {
   modelRepFormSchema,
+  modelRepPageFormSchema,
   modelRepCreateSchema,
   modelRepUpdateSchema,
 } from "./model-representative";
 export type {
   ModelRepFormData,
+  ModelRepPageFormData,
   ModelRepCreateInput,
   ModelRepUpdateInput,
 } from "./model-representative";

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
-    const validSearchFields = ["studentId", "fullName", "cohort", "position", "remarks", "termYear"];
+    const validSearchFields = ["studentId", "name", "firstName", "lastName", "cohort", "position", "remarks", "termYear"];
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["graduate-committee"]));
 
@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
       if (searchField && validSearchFields.includes(searchField)) {
         if (searchField === "termYear") {
           andConditions.push({ [searchField]: Number(search) || undefined });
+        } else if (searchField === "name") {
+          andConditions.push({
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+            ],
+          });
         } else {
           andConditions.push({ [searchField]: { contains: search, mode: "insensitive" } });
         }
@@ -38,7 +45,8 @@ export async function GET(request: NextRequest) {
         andConditions.push({
           OR: [
             { studentId: { contains: search, mode: "insensitive" } },
-            { fullName: { contains: search, mode: "insensitive" } },
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
             { position: { contains: search, mode: "insensitive" } },
             { remarks: { contains: search, mode: "insensitive" } },
           ],
@@ -87,7 +95,9 @@ export async function POST(request: NextRequest) {
       data: {
         termYear: Number(validated.termYear),
         studentId: validated.studentId.trim(),
-        fullName: validated.fullName.trim(),
+        prefix: validated.prefix?.trim() || null,
+        firstName: validated.firstName.trim(),
+        lastName: validated.lastName.trim(),
         cohort: validated.cohort.trim(),
         position: validated.position.trim(),
         remarks: validated.remarks?.trim() || null,

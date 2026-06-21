@@ -24,7 +24,8 @@ interface AlumniAgency {
   studentId: string | null;
   cohort: string | null;
   prefix: string | null;
-  thaiName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   englishName: string | null;
   workplace: string | null;
   homeAddress: string | null;
@@ -101,7 +102,8 @@ const abroadFormSchema = z.object({
   studentId: z.string(),
   cohort: z.string(),
   prefix: z.string(),
-  thaiName: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
   englishName: z.string(),
   workplace: z.string(),
   homeAddress: z.string(),
@@ -109,17 +111,18 @@ const abroadFormSchema = z.object({
   major: z.string(),
   notes: z.string(),
   order: z.string(),
-}).refine((data) => data.thaiName.trim() || data.englishName.trim(), {
-  message: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ",
-  path: ["thaiName"],
+}).refine((data) => data.firstName.trim() || data.lastName.trim() || data.englishName.trim(), {
+  message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ",
+  path: ["firstName"],
 });
 type AbroadFormValues = z.infer<typeof abroadFormSchema>;
 
-type SearchField = "all" | "thaiName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
+type SearchField = "all" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
-  { value: "thaiName", label: "ชื่อไทย" },
+  { value: "firstName", label: "ชื่อ" },
+  { value: "lastName", label: "นามสกุล" },
   { value: "englishName", label: "ชื่ออังกฤษ" },
   { value: "country", label: "ประเทศ" },
   { value: "workplace", label: "สถานที่ทำงาน" },
@@ -128,16 +131,17 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 ];
 
 function displayName(a: AlumniAgency): string {
-  if (a.thaiName && a.englishName) return `${a.thaiName} (${a.englishName})`;
-  return a.thaiName || a.englishName || "-";
+  const thai = [a.firstName, a.lastName].filter(Boolean).join(" ").trim();
+  if (thai && a.englishName) return `${thai} (${a.englishName})`;
+  return thai || a.englishName || "-";
 }
 
-type SortField = "cohort" | "thaiName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
+type SortField = "cohort" | "firstName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
 const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
-  { field: "thaiName", label: "ชื่อ - นามสกุล" },
+  { field: "firstName", label: "ชื่อ - นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
@@ -147,7 +151,7 @@ const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
 
 const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
-  { field: "thaiName", label: "ชื่อ - นามสกุล" },
+  { field: "firstName", label: "ชื่อ - นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
@@ -158,7 +162,7 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
     case "cohort": return a.cohort || "";
-    case "thaiName": return a.thaiName || "";
+    case "firstName": return a.firstName || "";
     case "englishName": return a.englishName || "";
     case "country": return a.country;
     case "workplace": return a.workplace || "";
@@ -214,7 +218,7 @@ export default function AlumniAgencyPage() {
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as any,
-    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
+    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
@@ -223,7 +227,9 @@ export default function AlumniAgencyPage() {
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("major", a.major ?? "");
-    setValue("thaiName", displayName(a));
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
     setNameSearch("");
     clearResults();
     setFormSearchField(null);
@@ -341,14 +347,14 @@ export default function AlumniAgencyPage() {
   const hot = useHotFields("alumni_agency", visibleAbroad.map((a) => a.id));
 
   const openCreate = () => {
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
   };
 
   const openEdit = (a: AlumniAgency) => {
-    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", thaiName: a.thaiName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
+    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
     setEditReason("");
     setShowForm(true);
@@ -358,7 +364,7 @@ export default function AlumniAgencyPage() {
     setShowForm(false);
     setEditingId(null);
     setEditReason("");
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", thaiName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
@@ -373,7 +379,8 @@ export default function AlumniAgencyPage() {
         studentId: data.studentId.trim() || null,
         cohort: data.cohort.trim() || null,
         prefix: data.prefix.trim() || null,
-        thaiName: data.thaiName.trim() || null,
+        firstName: data.firstName.trim() || null,
+        lastName: data.lastName.trim() || null,
         englishName: data.englishName.trim() || null,
         workplace: data.workplace.trim() || null,
         homeAddress: data.homeAddress.trim() || null,
@@ -602,8 +609,11 @@ export default function AlumniAgencyPage() {
             <FormField label="คำนำหน้า">
               <FormInput registration={register("prefix")} type="text" />
             </FormField>
-            <FormField label="ชื่อไทย" required error={errors.thaiName?.message}>
-              <FormInput registration={register("thaiName")} error={errors.thaiName?.message} type="text" />
+            <FormField label="ชื่อ" required error={errors.firstName?.message}>
+              <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+            </FormField>
+            <FormField label="นามสกุล">
+              <FormInput registration={register("lastName")} type="text" />
             </FormField>
             <FormField label="ชื่ออังกฤษ">
               <FormInput registration={register("englishName")} type="text" />
@@ -774,7 +784,7 @@ export default function AlumniAgencyPage() {
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="thaiName" value={a.thaiName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={[a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
@@ -837,7 +847,7 @@ export default function AlumniAgencyPage() {
                   <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="thaiName" value={a.thaiName || a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={[a.firstName, a.lastName].filter(Boolean).join(" ").trim() || a.englishName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>

@@ -4,8 +4,24 @@ import { getSession } from "@/lib/auth";
 import { ensureAlumni } from "@/lib/ensure-alumni";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
+import { splitFullName } from "@/lib/parse-name";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+type NameRow = { studentId: string; prefix: string; firstName: string; lastName: string };
+
+/** Read ชื่อ/นามสกุล/คำนำหน้า columns; fall back to a legacy combined ชื่อ-สกุล column. */
+function readName(row: Record<string, unknown>): NameRow {
+  const prefixCol = row["คำนำหน้า"]?.toString().trim() || "";
+  const firstNameCol = row["ชื่อ"]?.toString().trim() || "";
+  const lastNameCol = row["นามสกุล"]?.toString().trim() || "";
+  const legacyFull = row["ชื่อ-สกุล"]?.toString().trim() || "";
+  if (!firstNameCol && !lastNameCol && legacyFull) {
+    const parsed = splitFullName(legacyFull);
+    return { studentId: "", prefix: parsed.prefix || "", firstName: parsed.firstName, lastName: parsed.lastName };
+  }
+  return { studentId: "", prefix: prefixCol, firstName: firstNameCol, lastName: lastNameCol };
+}
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -34,19 +50,19 @@ export async function POST(request: NextRequest) {
     const rows = await readExcelRows(buffer);
 
     const errors: { row: number; message: string }[] = [];
-    const records: { studentId: string; fullName: string; associationName: string; position: string; recordedYear: number }[] = [];
+    const records: { studentId: string; prefix: string; firstName: string; lastName: string; associationName: string; position: string; recordedYear: number }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNumber = i + 2;
 
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
-      const fullName = row["ชื่อ-สกุล"]?.toString().trim();
+      const name = readName(row);
       const associationName = row["ชื่อสมาคม/ชมรม"]?.toString().trim();
       const position = row["ตำแหน่ง"]?.toString().trim();
       const recordedYearStr = row["ปีที่บันทึก (พ.ศ.)"]?.toString().trim();
 
-      if (!studentId || !fullName || !associationName || !position || !recordedYearStr) {
+      if (!studentId || !name.firstName || !name.lastName || !associationName || !position || !recordedYearStr) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -57,7 +73,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      records.push({ studentId, fullName, associationName, position, recordedYear });
+      records.push({ studentId, prefix: name.prefix, firstName: name.firstName, lastName: name.lastName, associationName, position, recordedYear });
     }
 
     let imported = 0;
@@ -66,7 +82,8 @@ export async function POST(request: NextRequest) {
       try {
         // Sync with CMU: ensureAlumni backfills the alumni record from the
         // Registrar API and returns it so we can copy `major` onto this row.
-        const alumni = await ensureAlumni(record.studentId, record.fullName);
+        const displayName = [record.prefix, record.firstName, record.lastName].filter(Boolean).join(" ");
+        const alumni = await ensureAlumni(record.studentId, displayName || record.studentId);
         const studentId = alumni.studentId;
         const major = alumni.major ?? null;
         // Upsert on the natural key (studentId + association + position + year)
@@ -84,14 +101,21 @@ export async function POST(request: NextRequest) {
         if (existing) {
           await prisma.association.update({
             where: { id: existing.id },
-            data: { fullName: record.fullName, major },
+            data: {
+              prefix: record.prefix || null,
+              firstName: record.firstName,
+              lastName: record.lastName,
+              major,
+            },
           });
           updated++;
         } else {
           await prisma.association.create({
             data: {
               studentId,
-              fullName: record.fullName,
+              prefix: record.prefix || null,
+              firstName: record.firstName,
+              lastName: record.lastName,
               associationName: record.associationName,
               position: record.position,
               recordedYear: record.recordedYear,
@@ -102,7 +126,8 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         console.error("Import row error:", err);
-        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${record.fullName}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
+        const who = [record.firstName, record.lastName].filter(Boolean).join(" ") || record.studentId;
+        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${who}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
       }
     }
 

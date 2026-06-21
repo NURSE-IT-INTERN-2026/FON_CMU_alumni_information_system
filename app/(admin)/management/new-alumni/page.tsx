@@ -170,8 +170,6 @@ export default function NewAlumniPage() {
     setSaving(true);
     setErrorMsg("");
 
-    const fullName = `${data.prefix}${data.firstName} ${data.maidenLastName}`;
-
     const payload: Record<string, unknown> = {
       studentId: data.studentId.trim(),
       prefix: data.prefix,
@@ -193,7 +191,6 @@ export default function NewAlumniPage() {
     }
     if (data.associations && data.associations.length > 0) {
       payload.associations = data.associations.map((r) => ({
-        fullName,
         associationName: r.associationName,
         position: r.position,
         recordedYear: Number(r.recordedYear),
@@ -202,7 +199,6 @@ export default function NewAlumniPage() {
     if (data.graduateCommittees && data.graduateCommittees.length > 0) {
       payload.graduateCommittees = data.graduateCommittees.map((r) => ({
         termYear: Number(r.termYear),
-        fullName,
         cohort: r.cohort,
         position: r.position,
         remarks: r.remarks,
@@ -210,7 +206,6 @@ export default function NewAlumniPage() {
     }
     if (data.potentials && data.potentials.length > 0) {
       payload.potentials = data.potentials.map((r) => ({
-        fullName,
         career: r.career,
         position: r.position,
         recordedYear: Number(r.recordedYear),
@@ -218,7 +213,6 @@ export default function NewAlumniPage() {
     }
     if (data.modelRepresentatives && data.modelRepresentatives.length > 0) {
       payload.modelRepresentatives = data.modelRepresentatives.map((r) => ({
-        name: fullName,
         cohort: r.cohort,
         generation: Number(r.generation),
       }));

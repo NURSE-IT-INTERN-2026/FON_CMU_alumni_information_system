@@ -32,8 +32,6 @@ export async function PUT(
     const hasModelReps =
       (validated.modelRepresentatives?.length ?? 0) > 0;
 
-    const fullName = `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`;
-
     const alumni = await prisma.$transaction(async (tx) => {
       // Update core alumni fields
       const updated = await tx.alumni.update({
@@ -85,7 +83,9 @@ export async function PUT(
         await tx.association.createMany({
           data: validated.associations.map((a) => ({
             studentId: existing.studentId,
-            fullName,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             associationName: a.associationName,
             position: a.position,
             recordedYear: a.recordedYear,
@@ -102,7 +102,9 @@ export async function PUT(
           data: validated.graduateCommittees.map((g) => ({
             studentId: existing.studentId,
             termYear: g.termYear,
-            fullName,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             cohort: g.cohort,
             position: g.position,
             remarks: g.remarks || null,
@@ -118,7 +120,9 @@ export async function PUT(
         await tx.potential.createMany({
           data: validated.potentials!.map((p) => ({
             studentId: existing.studentId,
-            fullName,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             career: p.career,
             position: p.position,
             recordedYear: p.recordedYear,
@@ -134,7 +138,9 @@ export async function PUT(
         await tx.modelRepresentative.createMany({
           data: validated.modelRepresentatives!.map((m) => ({
             studentId: existing.studentId,
-            name: fullName,
+            prefix: validated.prefix,
+            firstName: validated.firstName,
+            lastName: validated.maidenLastName,
             cohort: m.cohort,
             generation: m.generation,
           })),

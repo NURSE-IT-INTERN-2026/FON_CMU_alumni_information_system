@@ -16,7 +16,9 @@ export async function POST(request: NextRequest) {
     const item = await prisma.modelRepresentative.create({
       data: {
         studentId: validated.studentId.trim(),
-        name: validated.name.trim(),
+        prefix: validated.prefix?.trim() || null,
+        firstName: validated.firstName.trim(),
+        lastName: validated.lastName.trim(),
         cohort: validated.cohort.trim(),
         generation: Number(validated.generation),
         major: validated.major?.trim() || null,
@@ -42,16 +44,30 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const searchField = searchParams.get("searchField") || "";
 
+    const validSearchFields = ["studentId", "name", "firstName", "lastName", "cohort"];
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["model-representatives"]));
 
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { name: { contains: search, mode: "insensitive" } },
-        { cohort: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "name") {
+          where.OR = [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+          ];
+        } else {
+          where[searchField] = { contains: search, mode: "insensitive" };
+        }
+      } else {
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { cohort: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const alumni = await prisma.modelRepresentative.findMany({

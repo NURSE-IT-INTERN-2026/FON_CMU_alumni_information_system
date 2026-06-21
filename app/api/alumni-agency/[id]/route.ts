@@ -21,7 +21,8 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
     if (validated.cohort !== undefined) updateData.cohort = validated.cohort?.trim() || null;
     if (validated.prefix !== undefined) updateData.prefix = validated.prefix?.trim() || null;
-    if (validated.thaiName !== undefined) updateData.thaiName = validated.thaiName?.trim() || null;
+    if (validated.firstName !== undefined) updateData.firstName = validated.firstName?.trim() || null;
+    if (validated.lastName !== undefined) updateData.lastName = validated.lastName?.trim() || null;
     if (validated.englishName !== undefined) updateData.englishName = validated.englishName?.trim() || null;
     if (validated.workplace !== undefined) updateData.workplace = validated.workplace?.trim() || null;
     if (validated.homeAddress !== undefined) updateData.homeAddress = validated.homeAddress?.trim() || null;

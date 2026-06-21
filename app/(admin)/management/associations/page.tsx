@@ -15,36 +15,41 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
-import { associationFormSchema, type AssociationFormData } from "@/lib/validations";
+import { associationPageFormSchema, type AssociationPageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 
 interface Association {
   id: string;
   studentId: string;
-  fullName: string;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
   associationName: string;
   position: string;
   recordedYear: number;
   major?: string | null;
 }
 
-type SortField = "studentId" | "fullName" | "associationName" | "position" | "recordedYear" | "major";
+type SortField = "studentId" | "prefix" | "firstName" | "lastName" | "associationName" | "position" | "recordedYear" | "major";
 type SortDir = "asc" | "desc";
-type SearchField = "all" | "studentId" | "fullName" | "associationName" | "position" | "recordedYear";
+type SearchField = "all" | "studentId" | "name" | "associationName" | "position" | "recordedYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "fullName", label: "ชื่อ-สกุล" },
+  { value: "name", label: "ชื่อ" },
   { value: "associationName", label: "สมาคม/ชมรม" },
   { value: "position", label: "ตำแหน่ง" },
   { value: "recordedYear", label: "ปีที่บันทึก" },
 ];
 
-type FormValues = AssociationFormData & { studentId: string; fullName: string; major: string };
+const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
+  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
 
-const DEFAULT_FORM_VALUES: FormValues = { studentId: "", fullName: "", major: "", associationName: "", position: "", recordedYear: "" };
+type FormValues = AssociationPageFormData & { studentId: string; major: string };
+
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", associationName: "", position: "", recordedYear: "" };
 
 export default function AssociationsPage() {
   const canWrite = useCanWrite();
@@ -64,7 +69,7 @@ export default function AssociationsPage() {
   );
 
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(associationFormSchema) as any,
+    resolver: zodResolver(associationPageFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
   });
   const [manageMode, setManageMode] = useState(false);
@@ -89,14 +94,18 @@ export default function AssociationsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "fullName" | null>(null);
+  const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "name" | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("association", items.map((item) => item.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
-    setValue("fullName", displayName(a));
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
     setValue("major", a.major ?? "");
+    setNameSearch(displayName(a));
     setAlumniSearchField(null);
     clearResults();
   };
@@ -129,6 +138,7 @@ export default function AssociationsPage() {
 
   const openCreate = () => {
     formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -137,12 +147,15 @@ export default function AssociationsPage() {
   const openEdit = (item: Association) => {
     formReset({
       studentId: item.studentId,
-      fullName: item.fullName,
+      prefix: item.prefix ?? "",
+      firstName: item.firstName,
+      lastName: item.lastName,
       major: item.major || "",
       associationName: item.associationName,
       position: item.position,
       recordedYear: String(item.recordedYear),
     });
+    setNameSearch("");
     setEditingId(item.id);
     setEditReason("");
     setShowForm(true);
@@ -153,13 +166,13 @@ export default function AssociationsPage() {
     setEditingId(null);
     setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
     setAlumniSearchField(null);
     clearResults();
   };
 
-  const onSave = async (data: AssociationFormData) => {
+  const onSave = async (data: AssociationPageFormData) => {
     const studentId = getValues("studentId");
-    const fullName = getValues("fullName");
     setErrorMsg("");
     if (editingId && !editReason) {
       setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
@@ -167,7 +180,7 @@ export default function AssociationsPage() {
     }
     setSaving(true);
     try {
-      const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
+      const payload = { studentId, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
         await apiFetch(`/api/associations/${editingId}`, { method: "PUT", json: payload });
       } else {
@@ -348,8 +361,14 @@ export default function AssociationsPage() {
                 <FormField label="รหัสนักศึกษา" required>
                   <FormInput registration={register("studentId")} type="text" />
                 </FormField>
-                <FormField label="ชื่อ-สกุล" required>
-                  <FormInput registration={register("fullName")} type="text" />
+                <FormField label="คำนำหน้า">
+                  <FormInput registration={register("prefix")} type="text" placeholder="เช่น นาย, นางสาว, ดร." />
+                </FormField>
+                <FormField label="ชื่อ" required error={errors.firstName?.message}>
+                  <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุล" required error={errors.lastName?.message}>
+                  <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" />
                 </FormField>
               </>
             ) : (
@@ -360,7 +379,7 @@ export default function AssociationsPage() {
         <input
           type="text"
           value={field.value}
-          onChange={(e) => { field.onChange(e.target.value); setValue("fullName", ""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
+          onChange={(e) => { field.onChange(e.target.value); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); setNameSearch(""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
           placeholder="พิมพ์รหัสนักศึกษา..."
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
@@ -377,16 +396,14 @@ export default function AssociationsPage() {
     </div>
     <div className="relative">
       <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-      <Controller name="fullName" control={control} render={({ field }) => (
-        <input
-          type="text"
-          value={field.value}
-          onChange={(e) => { field.onChange(e.target.value); setValue("studentId", ""); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
-          placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-        />
-      )} />
-      {showAlumniDropdown && alumniSearchField === "fullName" && alumniResults.length > 0 && (
+      <input
+        type="text"
+        value={nameSearch}
+        onChange={(e) => { setNameSearch(e.target.value); setValue("studentId", ""); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); searchAlumni(e.target.value); setAlumniSearchField("name"); }}
+        placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+      />
+      {showAlumniDropdown && alumniSearchField === "name" && alumniResults.length > 0 && (
         <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
           {alumniResults.map((a) => (
             <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
@@ -537,8 +554,8 @@ export default function AssociationsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                   รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
-                  ชื่อ-สกุล {sortField === "fullName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
+                  ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("associationName")}>
                   ชื่อสมาคม/ชมรม {sortField === "associationName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -572,7 +589,7 @@ export default function AssociationsPage() {
                   )}
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{item.studentId}</td>
-                  <td className="px-4 py-3">{item.fullName}</td>
+                  <td className="px-4 py-3">{nameDisplay(item)}</td>
                   <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="associationName" value={item.associationName} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="position" value={item.position} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3">{item.major || "-"}</td>

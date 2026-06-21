@@ -2,6 +2,23 @@ import "dotenv/config";
 import prisma from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
 import { readExcelFileRawRows } from "../lib/excel-import";
+import { splitFullName } from "../lib/parse-name";
+
+/** Split a combined full name into prefix/firstName/lastName for the DB payload. */
+function splitNameForDb(fullName: string) {
+  const { prefix, firstName, lastName } = splitFullName(fullName);
+  return { prefix, firstName, lastName };
+}
+
+/** Split a nullable thaiName by whitespace: first token = firstName, rest = lastName (no title stripping; prefix is separate). */
+function splitThaiNameForDb(thaiName: string | null) {
+  if (!thaiName) return { firstName: null as string | null, lastName: null as string | null };
+  const parts = thaiName.replace(/\s+/g, " ").trim().split(/\s+/);
+  if (parts.length === 0) return { firstName: null as string | null, lastName: null as string | null };
+  const firstName = parts[0] || null;
+  const lastName = parts.slice(1).join(" ") || null;
+  return { firstName, lastName };
+}
 
 const ALL_DEGREE_LEVELS = ["BACHELOR", "MASTER", "DOCTORAL", "NURSING_ASSISTANT"] as const;
 
@@ -455,6 +472,9 @@ async function main() {
 
   const associations = [];
   for (const data of associationSeedData) {
+    const { prefix, firstName, lastName } = splitNameForDb(data.fullName);
+    const { fullName: _fullName, ...rest } = data;
+    const payload = { ...rest, prefix, firstName, lastName };
     const record = await prisma.association.upsert({
       where: {
         studentId_associationName_position_recordedYear: {
@@ -464,8 +484,8 @@ async function main() {
           recordedYear: data.recordedYear,
         },
       },
-      update: data,
-      create: data,
+      update: payload,
+      create: payload,
     });
     associations.push(record);
   }
@@ -494,6 +514,9 @@ async function main() {
 
   const committees = [];
   for (const data of committeeData) {
+    const { prefix, firstName, lastName } = splitNameForDb(data.fullName);
+    const { fullName: _fullName, ...rest } = data;
+    const payload = { ...rest, prefix, firstName, lastName };
     const record = await prisma.graduateCommittee.upsert({
       where: {
         studentId_termYear_position: {
@@ -502,8 +525,8 @@ async function main() {
           position: data.position,
         },
       },
-      update: data,
-      create: data,
+      update: payload,
+      create: payload,
     });
     committees.push(record);
   }
@@ -616,6 +639,9 @@ async function main() {
 
   const potentials = [];
   for (const data of potentialData) {
+    const { prefix, firstName, lastName } = splitNameForDb(data.fullName);
+    const { fullName: _fullName, ...rest } = data;
+    const payload = { ...rest, prefix, firstName, lastName };
     const record = await prisma.potential.upsert({
       where: {
         studentId_recordedYear: {
@@ -623,8 +649,8 @@ async function main() {
           recordedYear: data.recordedYear,
         },
       },
-      update: data,
-      create: data,
+      update: payload,
+      create: payload,
     });
     potentials.push(record);
   }
@@ -663,7 +689,10 @@ async function main() {
 
   const alumniAgency = [];
   for (const data of alumniAgencyData) {
-    const record = await prisma.alumniAgency.create({ data });
+    const { firstName, lastName } = splitThaiNameForDb(data.thaiName);
+    const { thaiName: _thaiName, ...rest } = data;
+    const payload = { ...rest, firstName, lastName };
+    const record = await prisma.alumniAgency.create({ data: payload });
     alumniAgency.push(record);
   }
   console.log(`  Created ${alumniAgency.length} abroad alumni records\n`);
@@ -827,10 +856,8 @@ async function main() {
         },
       });
     }
-    const modelDisplayName = parseThaiName(data.name);
-    const displayName = modelDisplayName.newLastName
-      ? `${modelDisplayName.prefix}${modelDisplayName.firstName} (${modelDisplayName.maidenLastName}) ${modelDisplayName.newLastName}`
-      : `${modelDisplayName.prefix}${modelDisplayName.firstName} ${modelDisplayName.maidenLastName}`;
+    const { prefix, firstName, lastName } = splitNameForDb(data.name);
+    const { name: _name, ...rest } = data;
     const record = await prisma.modelRepresentative.upsert({
       where: {
         studentId_cohort_generation: {
@@ -839,8 +866,8 @@ async function main() {
           generation: data.generation,
         },
       },
-      update: { ...data, studentId, name: displayName },
-      create: { ...data, studentId, name: displayName },
+      update: { ...rest, studentId, prefix, firstName, lastName },
+      create: { ...rest, studentId, prefix, firstName, lastName },
     });
     modelReps.push(record);
   }

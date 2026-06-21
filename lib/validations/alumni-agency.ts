@@ -3,7 +3,7 @@ import { editReasonField } from "./helpers";
 
 const MSG = {
   countryRequired: "กรุณากรอกประเทศ",
-  nameRequired: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ",
+  nameRequired: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ",
   addressRequired: "กรุณากรอกที่อยู่",
   universityRequired: "กรุณากรอกมหาวิทยาลัย",
 };
@@ -23,7 +23,8 @@ export const alumniAgencyCreateSchema = z
   .object({
     cohort: z.string().optional().nullable(),
     prefix: z.string().optional().nullable(),
-    thaiName: z.string().optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
     englishName: z.string().optional().nullable(),
     workplace: z.string().optional().nullable(),
     homeAddress: z.string().optional().nullable(),
@@ -33,15 +34,16 @@ export const alumniAgencyCreateSchema = z
     studentId: z.string().optional().nullable(),
     order: z.coerce.number().int().optional().default(0),
   })
-  .refine((data) => data.thaiName || data.englishName, {
+  .refine((data) => data.firstName || data.lastName || data.englishName, {
     message: MSG.nameRequired,
-    path: ["thaiName"],
+    path: ["firstName"],
   });
 
 export const alumniAgencyUpdateSchema = z.object({
   cohort: z.string().optional().nullable(),
   prefix: z.string().optional().nullable(),
-  thaiName: z.string().optional().nullable(),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
   englishName: z.string().optional().nullable(),
   workplace: z.string().optional().nullable(),
   homeAddress: z.string().optional().nullable(),

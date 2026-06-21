@@ -3,15 +3,20 @@ import { editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณาระบุรหัสนักศึกษา",
-  nameRequired: "กรุณากรอกชื่อ",
   cohortRequired: "กรุณากรอกรุ่น",
   generationRequired: "กรุณากรอกลำดับรุ่น",
   generationInvalid: "ลำดับรุ่นต้องเป็นตัวเลข",
+  firstNameRequired: "กรุณากรอกชื่อ",
+  lastNameRequired: "กรุณากรอกนามสกุล",
 };
 
-// --- Form schema (all strings) ---
-
+// --- Form schema (shared with the alumni full-form via alumni-with-related) ---
+// Name fields are OPTIONAL here so the full-form (which derives the name from
+// the parent alumni) can omit them; the route auto-fills them.
 export const modelRepFormSchema = z.object({
+  prefix: z.string().trim().optional().nullable(),
+  firstName: z.string().trim().optional().nullable(),
+  lastName: z.string().trim().optional().nullable(),
   cohort: z.string().min(1, MSG.cohortRequired),
   generation: z
     .string()
@@ -19,11 +24,19 @@ export const modelRepFormSchema = z.object({
     .refine((v) => /^\d+$/.test(v), MSG.generationInvalid),
 });
 
+// Standalone management-page form — name is required on this form.
+export const modelRepPageFormSchema = modelRepFormSchema.extend({
+  firstName: z.string().trim().min(1, MSG.firstNameRequired),
+  lastName: z.string().trim().min(1, MSG.lastNameRequired),
+});
+
 // --- API schemas ---
 
 export const modelRepCreateSchema = z.object({
   studentId: z.string().min(1, MSG.studentIdRequired).trim(),
-  name: z.string().min(1, MSG.nameRequired).trim(),
+  prefix: z.string().trim().optional().nullable(),
+  firstName: z.string().trim().min(1, MSG.firstNameRequired),
+  lastName: z.string().trim().min(1, MSG.lastNameRequired),
   cohort: z.string().min(1, MSG.cohortRequired).trim(),
   generation: z.coerce.number().int(MSG.generationInvalid),
   major: z.string().optional().nullable(),
@@ -31,7 +44,9 @@ export const modelRepCreateSchema = z.object({
 
 export const modelRepUpdateSchema = z.object({
   studentId: z.string().min(1, MSG.studentIdRequired).trim().optional(),
-  name: z.string().min(1, MSG.nameRequired).trim().optional(),
+  prefix: z.string().trim().optional().nullable(),
+  firstName: z.string().trim().min(1, MSG.firstNameRequired).optional(),
+  lastName: z.string().trim().min(1, MSG.lastNameRequired).optional(),
   cohort: z.string().min(1, MSG.cohortRequired).trim().optional(),
   generation: z.coerce.number().int(MSG.generationInvalid).optional(),
   major: z.string().optional().nullable(),
@@ -39,5 +54,6 @@ export const modelRepUpdateSchema = z.object({
 });
 
 export type ModelRepFormData = z.infer<typeof modelRepFormSchema>;
+export type ModelRepPageFormData = z.infer<typeof modelRepPageFormSchema>;
 export type ModelRepCreateInput = z.infer<typeof modelRepCreateSchema>;
 export type ModelRepUpdateInput = z.infer<typeof modelRepUpdateSchema>;

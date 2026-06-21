@@ -18,34 +18,39 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
-import { potentialFormSchema, type PotentialFormData } from "@/lib/validations";
+import { potentialPageFormSchema, type PotentialPageFormData } from "@/lib/validations";
 
 interface Potential {
   id: string;
   studentId: string;
-  fullName: string;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
   career: string;
   position: string;
   recordedYear: number;
   major?: string | null;
 }
 
-type SortField = "studentId" | "fullName" | "career" | "position" | "recordedYear" | "major";
+type SortField = "studentId" | "prefix" | "firstName" | "lastName" | "career" | "position" | "recordedYear" | "major";
 type SortDir = "asc" | "desc";
-type SearchField = "all" | "studentId" | "fullName" | "career" | "position" | "recordedYear";
+type SearchField = "all" | "studentId" | "name" | "career" | "position" | "recordedYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "fullName", label: "ชื่อ-สกุล" },
+  { value: "name", label: "ชื่อ" },
   { value: "career", label: "อาชีพ" },
   { value: "position", label: "ตำแหน่ง" },
   { value: "recordedYear", label: "ปีที่บันตึก" },
 ];
 
-type FormValues = PotentialFormData & { studentId: string; fullName: string; major: string };
+const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
+  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
 
-const FORM_DEFAULTS: FormValues = { studentId: "", fullName: "", major: "", career: "", position: "", recordedYear: "" };
+type FormValues = PotentialPageFormData & { studentId: string; major: string };
+
+const FORM_DEFAULTS: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", career: "", position: "", recordedYear: "" };
 
 export default function PotentialsPage() {
   const canWrite = useCanWrite();
@@ -71,7 +76,7 @@ export default function PotentialsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(potentialFormSchema) as any,
+    resolver: zodResolver(potentialPageFormSchema) as any,
     defaultValues: FORM_DEFAULTS,
   });
   const [saving, setSaving] = useState(false);
@@ -93,13 +98,17 @@ export default function PotentialsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  const [formSearchField, setFormSearchField] = useState<"studentId" | "fullName" | null>(null);
+  const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("potential", potentials.map((p) => p.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
-    setValue("fullName", displayName(a));
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
+    setNameSearch(displayName(a));
     setValue("major", a.major ?? "");
     setFormSearchField(null);
     clearResults();
@@ -129,6 +138,7 @@ export default function PotentialsPage() {
 
   const openCreate = () => {
     formReset(FORM_DEFAULTS);
+    setNameSearch("");
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -137,12 +147,15 @@ export default function PotentialsPage() {
   const openEdit = (p: Potential) => {
     formReset({
       studentId: p.studentId,
-      fullName: p.fullName,
+      prefix: p.prefix ?? "",
+      firstName: p.firstName,
+      lastName: p.lastName,
       major: p.major || "",
       career: p.career,
       position: p.position,
       recordedYear: String(p.recordedYear),
     });
+    setNameSearch("");
     setEditingId(p.id);
     setEditReason("");
     setShowForm(true);
@@ -153,13 +166,13 @@ export default function PotentialsPage() {
     setEditingId(null);
     setEditReason("");
     formReset(FORM_DEFAULTS);
+    setNameSearch("");
     setFormSearchField(null);
     clearResults();
   };
 
-  const onSave = async (data: PotentialFormData) => {
+  const onSave = async (data: PotentialPageFormData) => {
     const studentId = getValues("studentId");
-    const fullName = getValues("fullName");
     setErrorMsg("");
     if (editingId && !editReason) {
       setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
@@ -167,7 +180,7 @@ export default function PotentialsPage() {
     }
     setSaving(true);
     try {
-      const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
+      const payload = { studentId, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
       if (editingId) {
         await apiFetch(`/api/potentials/${editingId}`, { method: "PUT", json: payload });
       } else {
@@ -345,8 +358,14 @@ export default function PotentialsPage() {
                 <FormField label="รหัสนักศึกษา" required>
                   <FormInput registration={register("studentId")} type="text" />
                 </FormField>
-                <FormField label="ชื่อ-สกุล" required>
-                  <FormInput registration={register("fullName")} type="text" />
+                <FormField label="คำนำหน้า">
+                  <FormInput registration={register("prefix")} type="text" placeholder="เช่น นาย, นางสาว, ดร." />
+                </FormField>
+                <FormField label="ชื่อ" required error={errors.firstName?.message}>
+                  <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุล" required error={errors.lastName?.message}>
+                  <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" />
                 </FormField>
               </>
             ) : (
@@ -360,7 +379,7 @@ export default function PotentialsPage() {
                       <input
                         type="text"
                         value={field.value}
-                        onChange={(e) => { field.onChange(e.target.value); setValue("fullName", ""); searchAlumni(e.target.value); setFormSearchField("studentId"); }}
+                        onChange={(e) => { field.onChange(e.target.value); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); searchAlumni(e.target.value); setFormSearchField("studentId"); }}
                         placeholder="พิมพ์รหัสนักศึกษา..."
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                       />
@@ -378,20 +397,14 @@ export default function PotentialsPage() {
                 </div>
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-                  <Controller
-                    name="fullName"
-                    control={control}
-                    render={({ field }) => (
-                      <input
-                        type="text"
-                        value={field.value}
-                        onChange={(e) => { field.onChange(e.target.value); setValue("studentId", ""); searchAlumni(e.target.value); setFormSearchField("fullName"); }}
-                        placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      />
-                    )}
+                  <input
+                    type="text"
+                    value={nameSearch}
+                    onChange={(e) => { setNameSearch(e.target.value); setValue("studentId", ""); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); searchAlumni(e.target.value); setFormSearchField("name"); }}
+                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
-                  {showAlumniDropdown && formSearchField === "fullName" && alumniResults.length > 0 && (
+                  {showAlumniDropdown && formSearchField === "name" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
                         <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
@@ -541,8 +554,8 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                   รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
-                  ชื่อ-สกุล {sortField === "fullName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
+                  ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("career")}>
                   อาชีพ {sortField === "career" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -576,7 +589,7 @@ export default function PotentialsPage() {
                   )}
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
-                  <td className="px-4 py-3">{p.fullName}</td>
+                  <td className="px-4 py-3">{nameDisplay(p)}</td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="career" value={p.career} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="position" value={p.position} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3">{p.major || "-"}</td>

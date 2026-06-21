@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "cohort"];
+    const validSearchFields = ["firstName", "lastName", "englishName", "country", "workplace", "cohort"];
     const where: Record<string, unknown> = {};
 
     if (country) {
@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
         where[searchFieldParam] = { contains: search, mode: "insensitive" };
       } else {
         where.OR = [
-          { thaiName: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
           { englishName: { contains: search, mode: "insensitive" } },
           { country: { contains: search, mode: "insensitive" } },
           { workplace: { contains: search, mode: "insensitive" } },
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
     const rows = items.map((a) => ({
       "รุ่น": a.cohort || "",
       "คำนำหน้า": a.prefix || "",
-      "ชื่อไทย": a.thaiName || "",
+      "ชื่อ": a.firstName || "",
+      "นามสกุล": a.lastName || "",
       "ชื่ออังกฤษ": a.englishName || "",
       "สาขาวิชา": a.major || "",
       "สถานที่ทำงาน": a.workplace || "",
@@ -94,7 +96,8 @@ export async function POST(request: NextRequest) {
     const rows = items.map((a) => ({
       "รุ่น": a.cohort || "",
       "คำนำหน้า": a.prefix || "",
-      "ชื่อไทย": a.thaiName || "",
+      "ชื่อ": a.firstName || "",
+      "นามสกุล": a.lastName || "",
       "ชื่ออังกฤษ": a.englishName || "",
       "สาขาวิชา": a.major || "",
       "สถานที่ทำงาน": a.workplace || "",

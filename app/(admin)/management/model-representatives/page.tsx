@@ -12,7 +12,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
-import { modelRepFormSchema, type ModelRepFormData } from "@/lib/validations/model-representative";
+import { modelRepPageFormSchema, type ModelRepPageFormData } from "@/lib/validations";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -22,7 +22,9 @@ import FormInput from "@/components/form/FormInput";
 interface ModelRepresentative {
   id: string;
   studentId: string;
-  name: string;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
   cohort: string;
   generation: number;
   major?: string | null;
@@ -36,10 +38,15 @@ const NETWORK_ORDER = [
   "ปริญญาเอก",
 ];
 
-type SortField = "network" | "generation" | "studentId" | "name" | "major";
+type SortField = "network" | "generation" | "studentId" | "prefix" | "firstName" | "lastName" | "major";
 type SortDir = "asc" | "desc";
 
-type FormValues = ModelRepFormData & { studentId: string; name: string; major: string };
+type FormValues = ModelRepPageFormData & { studentId: string; major: string };
+
+const nameDisplay = (a: { prefix?: string | null; firstName?: string | null; lastName?: string | null }) =>
+  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
+
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", cohort: "", generation: "" };
 
 function SortIcon({ active, dir, className }: { active: boolean; dir: SortDir; className?: string }) {
   const color = className ?? "text-white";
@@ -99,8 +106,8 @@ export default function ModelRepresentativesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
-    resolver: zodResolver(modelRepFormSchema) as any,
-    defaultValues: { studentId: "", name: "", major: "", cohort: "", generation: "" },
+    resolver: zodResolver(modelRepPageFormSchema) as any,
+    defaultValues: DEFAULT_FORM_VALUES,
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -124,13 +131,17 @@ export default function ModelRepresentativesPage() {
 
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const [searchField, setSearchField] = useState<"studentId" | "name" | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
   const [showCohortDropdown, setShowCohortDropdown] = useState(false);
   const cohortDropdownRef = useRef<HTMLDivElement>(null);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
-    setValue("name", displayName(a));
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
     setValue("major", a.major ?? "");
+    setNameSearch(displayName(a));
     clearResults();
     setSearchField(null);
   };
@@ -170,8 +181,14 @@ export default function ModelRepresentativesPage() {
         case "studentId":
           cmp = a.studentId.localeCompare(b.studentId, "th");
           break;
-        case "name":
-          cmp = a.name.localeCompare(b.name, "th");
+        case "prefix":
+          cmp = (a.prefix ?? "").localeCompare(b.prefix ?? "", "th");
+          break;
+        case "firstName":
+          cmp = a.firstName.localeCompare(b.firstName, "th");
+          break;
+        case "lastName":
+          cmp = a.lastName.localeCompare(b.lastName, "th");
           break;
         case "major":
           cmp = (a.major ?? "").localeCompare(b.major ?? "", "th");
@@ -202,9 +219,10 @@ export default function ModelRepresentativesPage() {
   const matchesSearch = useCallback((a: ModelRepresentative, term: string) => {
     if (!term) return true;
     const t = term.toLowerCase();
+    const fullName = [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").toLowerCase();
     switch (filterField) {
       case "name":
-        return a.name.toLowerCase().includes(t);
+        return fullName.includes(t);
       case "studentId":
         return a.studentId.toLowerCase().includes(t);
       case "generation":
@@ -213,7 +231,7 @@ export default function ModelRepresentativesPage() {
         return a.cohort.toLowerCase().includes(t);
       default:
         return (
-          a.name.toLowerCase().includes(t) ||
+          fullName.includes(t) ||
           a.studentId.toLowerCase().includes(t) ||
           String(a.generation).includes(t) ||
           a.cohort.toLowerCase().includes(t)
@@ -258,7 +276,8 @@ export default function ModelRepresentativesPage() {
   }, [allCohorts, cohortValue]);
 
   const openCreate = () => {
-    formReset({ studentId: "", name: "", major: "", cohort: "", generation: "" });
+    formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -267,11 +286,14 @@ export default function ModelRepresentativesPage() {
   const openEdit = (item: ModelRepresentative) => {
     formReset({
       studentId: item.studentId,
-      name: item.name,
+      prefix: item.prefix ?? "",
+      firstName: item.firstName,
+      lastName: item.lastName,
       major: item.major || "",
       cohort: item.cohort,
       generation: String(item.generation),
     });
+    setNameSearch("");
     setEditingId(item.id);
     setEditReason("");
     setShowForm(true);
@@ -281,15 +303,15 @@ export default function ModelRepresentativesPage() {
     setShowForm(false);
     setEditingId(null);
     setEditReason("");
-    formReset({ studentId: "", name: "", major: "", cohort: "", generation: "" });
+    formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
     setShowCohortDropdown(false);
     setSearchField(null);
     clearResults();
   };
 
-  const onSave = async (data: ModelRepFormData) => {
+  const onSave = async (data: ModelRepPageFormData) => {
     const studentId = getValues("studentId");
-    const name = getValues("name");
     setErrorMsg("");
     if (editingId && !editReason) {
       setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
@@ -299,8 +321,8 @@ export default function ModelRepresentativesPage() {
     try {
       const payload = {
         studentId: studentId.trim(),
-        name: name.trim(),
         major: getValues("major")?.trim() || null,
+        ...data,
         cohort: data.cohort.trim(),
         generation: Number(data.generation),
         ...(editingId ? { reason: editReason } : {}),
@@ -311,7 +333,7 @@ export default function ModelRepresentativesPage() {
         if (studentId) {
           await apiFetch(`/api/model-representatives`, { method: "POST", json: payload });
         } else {
-          const params = new URLSearchParams({ section: "modelReps", nameSearch: name });
+          const params = new URLSearchParams({ section: "modelReps", nameSearch: nameDisplay(data) });
           if (data.cohort) params.set("cohort", data.cohort);
           if (data.generation) params.set("generation", data.generation);
           router.push(`/management/new-alumni?${params.toString()}`);
@@ -579,8 +601,14 @@ export default function ModelRepresentativesPage() {
                 <FormField label="รหัสนักศึกษา" required>
                   <FormInput registration={register("studentId")} type="text" className="font-mono" />
                 </FormField>
-                <FormField label="ชื่อ-นามสกุล" required>
-                  <FormInput registration={register("name")} type="text" />
+                <FormField label="คำนำหน้า">
+                  <FormInput registration={register("prefix")} type="text" placeholder="เช่น นาย, นางสาว, ดร." />
+                </FormField>
+                <FormField label="ชื่อ" required error={errors.firstName?.message}>
+                  <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุล" required error={errors.lastName?.message}>
+                  <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" />
                 </FormField>
               </>
             ) : (
@@ -597,7 +625,7 @@ export default function ModelRepresentativesPage() {
                         <input
                           type="text"
                           value={field.value}
-                          onChange={(e) => { field.onChange(e.target.value); setValue("name", ""); searchAlumni(e.target.value); setSearchField("studentId"); }}
+                          onChange={(e) => { field.onChange(e.target.value); setValue("prefix", ""); setValue("firstName", ""); setValue("lastName", ""); setNameSearch(""); searchAlumni(e.target.value); setSearchField("studentId"); }}
                           placeholder="พิมพ์รหัสนักศึกษา..."
                           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                         />
@@ -618,30 +646,22 @@ export default function ModelRepresentativesPage() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     ชื่อ-นามสกุล *
                   </label>
-                  <Controller
-                    name="name"
-                    control={control}
-                    render={({ field }) => (
-                      <>
-                        <input
-                          type="text"
-                          value={field.value}
-                          onChange={(e) => { field.onChange(e.target.value); setValue("studentId", ""); searchAlumni(e.target.value); setSearchField("name"); }}
-                          placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                        />
-                        {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
-                          <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                            {alumniResults.map((a) => (
-                              <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
-                                {a.studentId} - {displayName(a)}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
+                  <input
+                    type="text"
+                    value={nameSearch}
+                    onChange={(e) => { setNameSearch(e.target.value); setValue("studentId", ""); setValue("prefix", ""); setValue("firstName", ""); setValue("lastName", ""); searchAlumni(e.target.value); setSearchField("name"); }}
+                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
+                  {showAlumniDropdown && searchField === "name" && alumniResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      {alumniResults.map((a) => (
+                        <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                          {a.studentId} - {displayName(a)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -829,7 +849,7 @@ export default function ModelRepresentativesPage() {
                   {tableHeader("generation", "รุ่นที่", true, "center")}
                   {tableHeader("studentId", "รหัสนักศึกษา", true)}
                   {tableHeader("major", "สาขาวิชา", true)}
-                  {tableHeader("name", "ชื่อ-นามสกุล", true)}
+                  {tableHeader("firstName", "ชื่อ-นามสกุล", true)}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
                   </th>
@@ -855,7 +875,7 @@ export default function ModelRepresentativesPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3">{a.name}</td>
+                    <td className="px-4 py-3">{nameDisplay(a)}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
@@ -920,7 +940,7 @@ export default function ModelRepresentativesPage() {
                 {tableHeader("generation", "รุ่นที่", false, "center")}
                 {tableHeader("studentId", "รหัสนักศึกษา", false)}
                 {tableHeader("major", "สาขาวิชา", false)}
-                {tableHeader("name", "ชื่อ - นามสกุล", false)}
+                {tableHeader("firstName", "ชื่อ - นามสกุล", false)}
               </tr>
             </thead>
             <tbody>
@@ -935,7 +955,7 @@ export default function ModelRepresentativesPage() {
                   </td>
                   <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                   <td className="px-4 py-3">{a.major || "-"}</td>
-                  <td className="px-4 py-3">{a.name}</td>
+                  <td className="px-4 py-3">{nameDisplay(a)}</td>
                 </tr>
               ))}
             </tbody>

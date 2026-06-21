@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       data: {
         cohort: validated.cohort?.trim() || null,
         prefix: validated.prefix?.trim() || null,
-        thaiName: validated.thaiName?.trim() || null,
+        firstName: validated.firstName?.trim() || null,
+        lastName: validated.lastName?.trim() || null,
         englishName: validated.englishName?.trim() || null,
         workplace: validated.workplace?.trim() || null,
         homeAddress: validated.homeAddress?.trim() || null,
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["thaiName", "englishName", "country", "workplace", "homeAddress", "cohort"];
+    const validSearchFields = ["firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort"];
 
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["alumni-agency"]));
@@ -60,7 +61,8 @@ export async function GET(request: NextRequest) {
         where[searchFieldParam] = { contains: search, mode: "insensitive" };
       } else {
         where.OR = [
-          { thaiName: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
           { englishName: { contains: search, mode: "insensitive" } },
           { workplace: { contains: search, mode: "insensitive" } },
           { country: { contains: search, mode: "insensitive" } },

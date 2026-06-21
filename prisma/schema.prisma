@@ -118,7 +118,9 @@ model Award {
 model Association {
   id              String    @id @default(uuid())
   studentId       String
-  fullName        String
+  prefix          String?
+  firstName       String
+  lastName        String
   associationName String
   position        String
   recordedYear    Int
@@ -138,7 +140,9 @@ model GraduateCommittee {
   id        String    @id @default(uuid())
   termYear  Int
   studentId String
-  fullName  String
+  prefix    String?
+  firstName String
+  lastName  String
   cohort    String
   position  String
   major     String?
@@ -171,7 +175,9 @@ model News {
 model Potential {
   id           String    @id @default(uuid())
   studentId    String
-  fullName     String
+  prefix       String?
+  firstName    String
+  lastName     String
   career       String
   position     String
   recordedYear Int
@@ -190,7 +196,9 @@ model Potential {
 model ModelRepresentative {
   id         String    @id @default(uuid())
   studentId  String
-  name       String
+  prefix     String?
+  firstName  String
+  lastName   String
   cohort     String
   generation Int
   major      String?
@@ -210,7 +218,8 @@ model AlumniAgency {
   studentId   String?
   cohort      String?
   prefix      String?
-  thaiName    String?
+  firstName   String?
+  lastName    String?
   englishName String?
   workplace   String?
   homeAddress String?

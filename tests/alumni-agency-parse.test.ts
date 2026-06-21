@@ -85,7 +85,8 @@ describe("parseOriginalFormat", () => {
     expect(result[0].rowNumber).toBe(2);
     expect(result[0].data.cohort).toBe("1");
     expect(result[0].data.prefix).toBe("นางสาว");
-    expect(result[0].data.thaiName).toBe("สมหญิง ดี");
+    expect(result[0].data.firstName).toBe("สมหญิง");
+    expect(result[0].data.lastName).toBe("ดี");
     expect(result[0].data.englishName).toBe("Somying Dee");
     expect(result[0].data.workplace).toBe("Australia National Hospital");
     expect(result[0].data.country).toBe("ออสเตรเลีย");
@@ -101,7 +102,8 @@ describe("parseOriginalFormat", () => {
     const result = parseOriginalFormat(rows);
     expect(result[0].data.cohort).toBeNull();
     expect(result[0].data.prefix).toBeNull();
-    expect(result[0].data.thaiName).toBeNull();
+    expect(result[0].data.firstName).toBeNull();
+    expect(result[0].data.lastName).toBeNull();
     expect(result[0].data.englishName).toBeNull();
     expect(result[0].data.notes).toBeNull();
   });
@@ -141,7 +143,8 @@ describe("parseExportFormat", () => {
     expect(result[0].data.order).toBe(1);
     expect(result[0].data.cohort).toBe("10");
     expect(result[0].data.prefix).toBe("นาง");
-    expect(result[0].data.thaiName).toBe("สมหญิง");
+    expect(result[0].data.firstName).toBe("สมหญิง");
+    expect(result[0].data.lastName).toBeNull();
     expect(result[0].data.englishName).toBe("Somying");
     expect(result[0].data.workplace).toBe("Japan Hospital");
     expect(result[0].data.country).toBe("ญี่ปุ่น");
@@ -169,7 +172,8 @@ describe("parseExportFormat", () => {
     const rows = [{ ประเทศ: "ญี่ปุ่น", ชื่อไทย: "", ชื่ออังกฤษ: "Somying" }];
     const result = parseExportFormat(rows);
     expect(result).toHaveLength(1);
-    expect(result[0].data.thaiName).toBeNull();
+    expect(result[0].data.firstName).toBeNull();
+    expect(result[0].data.lastName).toBeNull();
   });
 
   it("defaults order to 0 for non-numeric ลำดับ", () => {

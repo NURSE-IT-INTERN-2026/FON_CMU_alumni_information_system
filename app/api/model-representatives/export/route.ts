@@ -5,6 +5,12 @@ import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
+const NAME_ROW = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) => ({
+  "คำนำหน้า": a.prefix ?? "",
+  "ชื่อ": a.firstName ?? "",
+  "นามสกุล": a.lastName ?? "",
+});
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -14,14 +20,28 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
+    const searchField = searchParams.get("searchField") || "";
 
+    const validSearchFields = ["studentId", "name", "firstName", "lastName", "cohort"];
     const where: Record<string, unknown> = {};
     if (search) {
-      where.OR = [
-        { studentId: { contains: search, mode: "insensitive" } },
-        { name: { contains: search, mode: "insensitive" } },
-        { cohort: { contains: search, mode: "insensitive" } },
-      ];
+      if (searchField && validSearchFields.includes(searchField)) {
+        if (searchField === "name") {
+          where.OR = [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+          ];
+        } else {
+          where[searchField] = { contains: search, mode: "insensitive" };
+        }
+      } else {
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { cohort: { contains: search, mode: "insensitive" } },
+        ];
+      }
     }
 
     const items = await prisma.modelRepresentative.findMany({
@@ -31,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     const rows = items.map((a) => ({
       "รหัสนักศึกษา": a.studentId,
-      "ชื่อ-นามสกุล": a.name,
+      ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "เครือข่าย": a.cohort,
       "ลำดับรุ่น": a.generation,
@@ -74,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     const rows = items.map((a) => ({
       "รหัสนักศึกษา": a.studentId,
-      "ชื่อ-นามสกุล": a.name,
+      ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "เครือข่าย": a.cohort,
       "ลำดับรุ่น": a.generation,

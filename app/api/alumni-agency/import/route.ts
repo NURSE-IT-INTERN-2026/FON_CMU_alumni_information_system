@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     for (const { data, rowNumber } of parsed) {
-      if (!data.thaiName && !data.englishName) {
-        errors.push({ row: rowNumber, message: "กรุณากรอกชื่อไทยหรือชื่ออังกฤษ" });
+      if (!data.firstName && !data.lastName && !data.englishName) {
+        errors.push({ row: rowNumber, message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ" });
         continue;
       }
 
@@ -65,21 +65,19 @@ export async function POST(request: NextRequest) {
         // Sync with CMU when a studentId is provided: link the alumni record
         // and auto-fill major from the Registrar API (backfill only).
         if (data.studentId) {
-          const alumni = await ensureAlumni(
-            data.studentId,
-            data.thaiName || data.englishName || "",
-          );
+          const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || data.englishName || "";
+          const alumni = await ensureAlumni(data.studentId, displayName);
           data.studentId = alumni.studentId;
           if (!data.major) data.major = alumni.major;
         }
-        // No DB unique — match by studentId (or thaiName when unlinked) among
-        // active rows so re-importing updates an existing entry, not duplicates.
+        // No DB unique — match by studentId (or firstName+lastName when unlinked)
+        // among active rows so re-importing updates an existing entry, not duplicates.
         const existing = await prisma.alumniAgency.findFirst({
           where: {
             deletedAt: null,
             ...(data.studentId
               ? { studentId: data.studentId }
-              : { thaiName: data.thaiName ?? null }),
+              : { firstName: data.firstName ?? null, lastName: data.lastName ?? null }),
           },
         });
         if (existing) {

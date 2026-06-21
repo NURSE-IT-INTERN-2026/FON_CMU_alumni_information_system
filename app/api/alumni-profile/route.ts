@@ -63,10 +63,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const validated = alumniProfileUpdateSchema.parse(body);
 
-    // Full name derived from the (possibly updated) core fields — used to
-    // auto-fill fullName/name on related rows, mirroring update-with-related.
-    const fullName = `${validated.prefix}${validated.firstName} ${validated.maidenLastName}`;
-
     const hasPotentials = (validated.potentials?.length ?? 0) > 0;
     const hasModelReps = (validated.modelRepresentatives?.length ?? 0) > 0;
     const hasAbroad = (validated.alumniAgency?.length ?? 0) > 0;
@@ -120,7 +116,9 @@ export async function PUT(request: NextRequest) {
           await tx.association.createMany({
             data: validated.associations.map((a) => ({
               studentId,
-              fullName,
+              prefix: validated.prefix,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               associationName: a.associationName,
               position: a.position,
               recordedYear: a.recordedYear,
@@ -138,7 +136,9 @@ export async function PUT(request: NextRequest) {
             data: validated.graduateCommittees.map((g) => ({
               studentId,
               termYear: g.termYear,
-              fullName,
+              prefix: validated.prefix,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               cohort: g.cohort,
               position: g.position,
               remarks: g.remarks || null,
@@ -152,7 +152,9 @@ export async function PUT(request: NextRequest) {
           await tx.potential.createMany({
             data: validated.potentials!.map((p) => ({
               studentId,
-              fullName,
+              prefix: validated.prefix,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               career: p.career,
               position: p.position,
               recordedYear: p.recordedYear,
@@ -166,7 +168,9 @@ export async function PUT(request: NextRequest) {
           await tx.modelRepresentative.createMany({
             data: validated.modelRepresentatives!.map((m) => ({
               studentId,
-              name: fullName,
+              prefix: validated.prefix,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               cohort: m.cohort,
               generation: m.generation,
             })),
@@ -182,7 +186,8 @@ export async function PUT(request: NextRequest) {
               studentId,
               // Identity fields are auto-filled from the alumni record:
               prefix: validated.prefix,
-              thaiName: fullName,
+              firstName: validated.firstName,
+              lastName: validated.maidenLastName,
               cohort: validated.cohort || null,
               // Alumni-owned fields:
               workplace: a.workplace || null,

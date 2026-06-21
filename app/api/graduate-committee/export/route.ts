@@ -5,6 +5,12 @@ import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
+const NAME_ROW = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) => ({
+  "คำนำหน้า": a.prefix ?? "",
+  "ชื่อ": a.firstName ?? "",
+  "นามสกุล": a.lastName ?? "",
+});
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -20,10 +26,10 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
 
-    const validSortFields = ["termYear", "createdAt", "studentId", "fullName", "cohort", "position"];
+    const validSortFields = ["termYear", "createdAt", "studentId", "prefix", "firstName", "lastName", "cohort", "position"];
     const validSortField = validSortFields.includes(sortBy) ? sortBy : "termYear";
 
-    const validSearchFields = ["studentId", "fullName", "cohort", "position", "remarks", "termYear"];
+    const validSearchFields = ["studentId", "name", "firstName", "lastName", "cohort", "position", "remarks", "termYear"];
     const where: Record<string, unknown> = {};
     const andConditions: Record<string, unknown>[] = [];
 
@@ -31,6 +37,13 @@ export async function GET(request: NextRequest) {
       if (searchField && validSearchFields.includes(searchField)) {
         if (searchField === "termYear") {
           andConditions.push({ [searchField]: Number(search) || undefined });
+        } else if (searchField === "name") {
+          andConditions.push({
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+            ],
+          });
         } else {
           andConditions.push({ [searchField]: { contains: search, mode: "insensitive" } });
         }
@@ -38,7 +51,8 @@ export async function GET(request: NextRequest) {
         andConditions.push({
           OR: [
             { studentId: { contains: search, mode: "insensitive" } },
-            { fullName: { contains: search, mode: "insensitive" } },
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
             { remarks: { contains: search, mode: "insensitive" } },
           ],
         });
@@ -60,7 +74,7 @@ export async function GET(request: NextRequest) {
     const rows = items.map((a) => ({
       "ปี พ.ศ.": a.termYear,
       "รหัสนักศึกษา": a.studentId,
-      "ชื่อ-สกุล": a.fullName,
+      ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "รุ่นที่": a.cohort,
       "ตำแหน่ง": a.position,
@@ -105,7 +119,7 @@ export async function POST(request: NextRequest) {
     const rows = items.map((a) => ({
       "ปี พ.ศ.": a.termYear,
       "รหัสนักศึกษา": a.studentId,
-      "ชื่อ-สกุล": a.fullName,
+      ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "รุ่นที่": a.cohort,
       "ตำแหน่ง": a.position,

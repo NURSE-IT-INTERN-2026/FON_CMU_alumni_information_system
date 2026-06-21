@@ -23,6 +23,7 @@ import path from "node:path";
 import ExcelJS from "exceljs";
 import prisma from "@/lib/prisma";
 import { ensureAlumni } from "@/lib/ensure-alumni";
+import { splitFullName } from "@/lib/parse-name";
 
 const NETWORK_JSON = "imports/scrapped/alumni-network.json";
 const ALUMNI_JSON = "imports/scrapped/alumni-data.json";
@@ -193,10 +194,13 @@ async function main() {
   let imported = 0;
   for (const m of matched) {
     const a = await ensureAlumni(m.studentId, m.name); // backfills major/degree from CMU
+    const { prefix, firstName, lastName } = splitFullName(m.name);
     await prisma.modelRepresentative.create({
       data: {
         studentId: a.studentId,
-        name: m.name,
+        prefix,
+        firstName,
+        lastName,
         cohort: m.cohort,
         generation: m.generation,
         major: a.major ?? null,

@@ -24,7 +24,9 @@ export async function PUT(
       where: { id },
       data: {
         studentId: validated.studentId!.trim(),
-        fullName: validated.fullName!.trim(),
+        prefix: validated.prefix?.trim() || null,
+        firstName: validated.firstName!.trim(),
+        lastName: validated.lastName!.trim(),
         career: validated.career!.trim(),
         position: validated.position!.trim(),
         recordedYear: Number(validated.recordedYear),

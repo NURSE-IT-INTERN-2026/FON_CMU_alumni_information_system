@@ -58,9 +58,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
     .optional(),
   associations: z
     .array(
-      z.object({
-        fullName: z.string().optional(),
-        associationName: z.string().min(1, "กรุณากรอกชื่อสมาคม/ชมรม"),
+      z.object({        associationName: z.string().min(1, "กรุณากรอกชื่อสมาคม/ชมรม"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
       }),
@@ -69,9 +67,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
   graduateCommittees: z
     .array(
       z.object({
-        termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข"),
-        fullName: z.string().optional(),
-        cohort: z.string().min(1, "กรุณากรอกรุ่นที่"),
+        termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข"),        cohort: z.string().min(1, "กรุณากรอกรุ่นที่"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         remarks: z.string().optional().default(""),
       }),
@@ -79,9 +75,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
     .optional(),
   potentials: z
     .array(
-      z.object({
-        fullName: z.string().optional(),
-        career: z.string().min(1, "กรุณากรอกอาชีพ"),
+      z.object({        career: z.string().min(1, "กรุณากรอกอาชีพ"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
       }),
@@ -89,9 +83,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
     .optional(),
   modelRepresentatives: z
     .array(
-      z.object({
-        name: z.string().optional(),
-        cohort: z.string().min(1, "กรุณากรอกรุ่น"),
+      z.object({        cohort: z.string().min(1, "กรุณากรอกรุ่น"),
         generation: z.coerce.number().int("ลำดับรุ่นต้องเป็นตัวเลข"),
       }),
     )
@@ -107,7 +99,6 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
         // kept optional so callers that supply them still validate.
         cohort: z.string().optional().nullable(),
         prefix: z.string().optional().nullable(),
-        thaiName: z.string().optional().nullable(),
       }),
     )
     .optional(),
@@ -140,9 +131,7 @@ export const alumniWithRelatedUpdateSchema = z.object({
     .default([]),
   associations: z
     .array(
-      z.object({
-        fullName: z.string().optional(),
-        associationName: z.string().min(1, "กรุณากรอกชื่อสมาคม/ชมรม"),
+      z.object({        associationName: z.string().min(1, "กรุณากรอกชื่อสมาคม/ชมรม"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
       }),
@@ -152,9 +141,7 @@ export const alumniWithRelatedUpdateSchema = z.object({
   graduateCommittees: z
     .array(
       z.object({
-        termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข"),
-        fullName: z.string().optional(),
-        cohort: z.string().min(1, "กรุณากรอกรุ่นที่"),
+        termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข"),        cohort: z.string().min(1, "กรุณากรอกรุ่นที่"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         remarks: z.string().optional().default(""),
       }),
@@ -163,9 +150,7 @@ export const alumniWithRelatedUpdateSchema = z.object({
     .default([]),
   potentials: z
     .array(
-      z.object({
-        fullName: z.string().optional(),
-        career: z.string().min(1, "กรุณากรอกอาชีพ"),
+      z.object({        career: z.string().min(1, "กรุณากรอกอาชีพ"),
         position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
         recordedYear: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
       }),
@@ -174,9 +159,7 @@ export const alumniWithRelatedUpdateSchema = z.object({
     .default([]),
   modelRepresentatives: z
     .array(
-      z.object({
-        name: z.string().optional(),
-        cohort: z.string().min(1, "กรุณากรอกรุ่น"),
+      z.object({        cohort: z.string().min(1, "กรุณากรอกรุ่น"),
         generation: z.coerce.number().int("ลำดับรุ่นต้องเป็นตัวเลข"),
       }),
     )

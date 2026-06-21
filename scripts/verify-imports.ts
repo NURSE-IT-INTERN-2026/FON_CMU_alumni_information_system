@@ -39,8 +39,8 @@ async function main() {
 
   await report(
     "Associations",
-    await prisma.association.findMany({ where: { deletedAt: null }, select: { studentId: true, fullName: true, major: true } }),
-    (r) => `${r.studentId} ${r.fullName}`,
+    await prisma.association.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, major: true } }),
+    (r) => `${r.studentId} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")}`,
   );
   await report(
     "Awards",
@@ -49,23 +49,23 @@ async function main() {
   );
   await report(
     "Graduate Committee",
-    await prisma.graduateCommittee.findMany({ where: { deletedAt: null }, select: { studentId: true, fullName: true, major: true } }),
-    (r) => `${r.studentId} ${r.fullName}`,
+    await prisma.graduateCommittee.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, major: true } }),
+    (r) => `${r.studentId} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")}`,
   );
   await report(
     "Model Representatives",
-    await prisma.modelRepresentative.findMany({ where: { deletedAt: null }, select: { studentId: true, name: true, major: true } }),
-    (r) => `${r.studentId} ${r.name}`,
+    await prisma.modelRepresentative.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, major: true } }),
+    (r) => `${r.studentId} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")}`,
   );
   await report(
     "Potentials",
-    await prisma.potential.findMany({ where: { deletedAt: null }, select: { studentId: true, fullName: true, major: true } }),
-    (r) => `${r.studentId} ${r.fullName}`,
+    await prisma.potential.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, major: true } }),
+    (r) => `${r.studentId} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")}`,
   );
   await report(
     "Alumni Agency",
-    await prisma.alumniAgency.findMany({ where: { deletedAt: null }, select: { studentId: true, thaiName: true, major: true } }),
-    (r) => `${r.studentId ?? "(none)"} ${r.thaiName ?? ""}`,
+    await prisma.alumniAgency.findMany({ where: { deletedAt: null }, select: { studentId: true, prefix: true, firstName: true, lastName: true, major: true } }),
+    (r) => `${r.studentId ?? "(none)"} ${[r.prefix, r.firstName, r.lastName].filter(Boolean).join(" ")}`,
   );
 
   console.log("");

@@ -16,7 +16,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
-import { committeeFormSchema, type CommitteeFormData } from "@/lib/validations";
+import { committeePageFormSchema, type CommitteePageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 
@@ -24,28 +24,35 @@ interface Committee {
   id: string;
   termYear: number;
   studentId: string;
-  fullName: string;
+  prefix: string | null;
+  firstName: string;
+  lastName: string;
   cohort: string;
   position: string;
   major?: string | null;
   remarks: string | null;
 }
 
-type SortField = "termYear" | "studentId" | "fullName" | "cohort" | "position" | "major" | "remarks";
+type SortField = "termYear" | "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "position" | "major" | "remarks";
 type SortDir = "asc" | "desc";
-type SearchField = "all" | "studentId" | "fullName" | "cohort" | "position" | "remarks" | "termYear";
+type SearchField = "all" | "studentId" | "name" | "cohort" | "position" | "remarks" | "termYear";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "fullName", label: "ชื่อ-สกุล" },
+  { value: "name", label: "ชื่อ" },
   { value: "cohort", label: "รุ่นที่" },
   { value: "position", label: "ตำแหน่ง" },
   { value: "remarks", label: "หมายเหตุ" },
   { value: "termYear", label: "ปี พ.ศ." },
 ];
 
-type FormValues = CommitteeFormData & { studentId: string; fullName: string; major: string };
+const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
+  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
+
+type FormValues = CommitteePageFormData & { studentId: string; major: string };
+
+const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", termYear: "", cohort: "", position: "", remarks: "" };
 
 export default function GraduateCommitteePage() {
   const canWrite = useCanWrite();
@@ -71,8 +78,8 @@ export default function GraduateCommitteePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(committeeFormSchema) as any,
-    defaultValues: { termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" },
+    resolver: zodResolver(committeePageFormSchema) as any,
+    defaultValues: DEFAULT_FORM_VALUES,
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -92,14 +99,18 @@ export default function GraduateCommitteePage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "fullName" | null>(null);
+  const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "name" | null>(null);
+  const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
-    setValue("fullName", displayName(a));
+    setValue("prefix", a.prefix ?? "");
+    setValue("firstName", a.firstName ?? "");
+    setValue("lastName", a.maidenLastName ?? "");
     setValue("major", a.major ?? "");
+    setNameSearch(displayName(a));
     setAlumniSearchField(null);
     clearResults();
   };
@@ -120,7 +131,8 @@ export default function GraduateCommitteePage() {
   };
 
   const openCreate = () => {
-    formReset({ termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" });
+    formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
     setEditingId(null);
     setEditReason("");
     setShowForm(true);
@@ -130,12 +142,15 @@ export default function GraduateCommitteePage() {
     formReset({
       termYear: String(c.termYear),
       studentId: c.studentId,
-      fullName: c.fullName,
+      prefix: c.prefix ?? "",
+      firstName: c.firstName,
+      lastName: c.lastName,
       major: c.major || "",
       cohort: c.cohort,
       position: c.position,
       remarks: c.remarks || "",
     });
+    setNameSearch("");
     setEditingId(c.id);
     setEditReason("");
     setShowForm(true);
@@ -147,12 +162,12 @@ export default function GraduateCommitteePage() {
     setEditReason("");
     setAlumniSearchField(null);
     clearResults();
-    formReset({ termYear: "", studentId: "", fullName: "", major: "", cohort: "", position: "", remarks: "" });
+    formReset(DEFAULT_FORM_VALUES);
+    setNameSearch("");
   };
 
-  const onSave = async (data: CommitteeFormData) => {
+  const onSave = async (data: CommitteePageFormData) => {
     const studentId = getValues("studentId");
-    const fullName = getValues("fullName");
     setErrorMsg("");
     if (editingId && !editReason) {
       setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
@@ -161,13 +176,14 @@ export default function GraduateCommitteePage() {
     setSaving(true);
     try {
       if (editingId) {
-        const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear), reason: editReason };
+        const payload = { studentId, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear), reason: editReason };
         await apiFetch(`/api/graduate-committee/${editingId}`, { method: "PUT", json: payload });
       } else {
         if (studentId) {
-          const payload = { studentId, fullName, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear) };
+          const payload = { studentId, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear) };
           await apiFetch(`/api/graduate-committee`, { method: "POST", json: payload });
         } else {
+          const fullName = [data.prefix, data.firstName, data.lastName].filter(Boolean).join(" ").trim();
           const params = new URLSearchParams({ section: "committees", nameSearch: fullName });
           if (data.termYear) params.set("termYear", data.termYear);
           if (data.cohort) params.set("cohort", data.cohort);
@@ -350,8 +366,14 @@ export default function GraduateCommitteePage() {
                 <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
                   <FormInput registration={register("studentId")} error={errors.studentId?.message} type="text" />
                 </FormField>
-                <FormField label="ชื่อ-สกุล (ขณะกำลังศึกษา)" required error={errors.fullName?.message}>
-                  <FormInput registration={register("fullName")} error={errors.fullName?.message} type="text" />
+                <FormField label="คำนำหน้า">
+                  <FormInput registration={register("prefix")} type="text" placeholder="เช่น นาย, นางสาว, ดร." />
+                </FormField>
+                <FormField label="ชื่อ" required error={errors.firstName?.message}>
+                  <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" />
+                </FormField>
+                <FormField label="นามสกุล" required error={errors.lastName?.message}>
+                  <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" />
                 </FormField>
               </>
             ) : (
@@ -365,7 +387,7 @@ export default function GraduateCommitteePage() {
                       <input
                         type="text"
                         {...field}
-                        onChange={(e) => { field.onChange(e); setValue("fullName", ""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
+                        onChange={(e) => { field.onChange(e); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); setNameSearch(""); searchAlumni(e.target.value); setAlumniSearchField("studentId"); }}
                         placeholder="พิมพ์รหัสนักศึกษา..."
                         className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.studentId ? "border-red-400" : "border-gray-300"}`}
                       />
@@ -384,21 +406,15 @@ export default function GraduateCommitteePage() {
                 </div>
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ-นามสกุล *</label>
-                  <Controller
-                    name="fullName"
-                    control={control}
-                    render={({ field }) => (
-                      <input
-                        type="text"
-                        {...field}
-                        onChange={(e) => { field.onChange(e); setValue("studentId", ""); searchAlumni(e.target.value); setAlumniSearchField("fullName"); }}
-                        placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
-                        className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.fullName ? "border-red-400" : "border-gray-300"}`}
-                      />
-                    )}
+                  <input
+                    type="text"
+                    value={nameSearch}
+                    onChange={(e) => { setNameSearch(e.target.value); setValue("studentId", ""); setValue("firstName", ""); setValue("lastName", ""); setValue("prefix", ""); searchAlumni(e.target.value); setAlumniSearchField("name"); }}
+                    placeholder="พิมพ์ชื่อเพื่อค้นหาศิษย์เก่า..."
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] ${errors.firstName || errors.lastName ? "border-red-400" : "border-gray-300"}`}
                   />
-                  {errors.fullName && <p className="mt-1 text-xs text-red-500">{errors.fullName.message}</p>}
-                  {showAlumniDropdown && alumniSearchField === "fullName" && alumniResults.length > 0 && (
+                  {(errors.firstName || errors.lastName) && <p className="mt-1 text-xs text-red-500">{errors.firstName?.message ?? errors.lastName?.message}</p>}
+                  {showAlumniDropdown && alumniSearchField === "name" && alumniResults.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                       {alumniResults.map((a) => (
                         <button key={a.id} type="button" onClick={() => selectAlumni(a)} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
@@ -548,8 +564,8 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                     รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("fullName")}>
-                    ชื่อ-สกุล {sortField === "fullName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
+                    ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
                     รุ่นที่ {sortField === "cohort" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -584,7 +600,7 @@ export default function GraduateCommitteePage() {
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="termYear" value={c.termYear} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 font-mono">{c.studentId}</td>
-                    <td className="px-4 py-3">{c.fullName}</td>
+                    <td className="px-4 py-3">{nameDisplay(c)}</td>
                     <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="cohort" value={c.cohort} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="position" value={c.position} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3">{c.major || "-"}</td>
