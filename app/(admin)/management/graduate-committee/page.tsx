@@ -47,9 +47,6 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "termYear", label: "ปี พ.ศ." },
 ];
 
-const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
-  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
-
 type FormValues = CommitteePageFormData & { studentId: string; major: string };
 
 const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", termYear: "", cohort: "", position: "", remarks: "" };
@@ -564,8 +561,14 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                     รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("prefix")}>
+                    คำนำหน้า {sortField === "prefix" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                    ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                    ชื่อ {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("lastName")}>
+                    นามสกุล {sortField === "lastName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
                     รุ่นที่ {sortField === "cohort" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -600,7 +603,9 @@ export default function GraduateCommitteePage() {
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="termYear" value={c.termYear} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 font-mono">{c.studentId}</td>
-                    <td className="px-4 py-3">{nameDisplay(c)}</td>
+                    <td className="px-4 py-3">{c.prefix || "-"}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="firstName" value={c.firstName} hotFields={hot[c.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="lastName" value={c.lastName} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="cohort" value={c.cohort} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="position" value={c.position} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3">{c.major || "-"}</td>

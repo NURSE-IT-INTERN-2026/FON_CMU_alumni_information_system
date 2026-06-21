@@ -45,9 +45,6 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "recordedYear", label: "ปีที่บันตึก" },
 ];
 
-const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
-  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
-
 type FormValues = PotentialPageFormData & { studentId: string; major: string };
 
 const FORM_DEFAULTS: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", career: "", position: "", recordedYear: "" };
@@ -554,8 +551,14 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                   รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("prefix")}>
+                  คำนำหน้า {sortField === "prefix" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                  ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  ชื่อ {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("lastName")}>
+                  นามสกุล {sortField === "lastName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("career")}>
                   อาชีพ {sortField === "career" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -589,7 +592,9 @@ export default function PotentialsPage() {
                   )}
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
-                  <td className="px-4 py-3">{nameDisplay(p)}</td>
+                  <td className="px-4 py-3">{p.prefix || "-"}</td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="firstName" value={p.firstName} hotFields={hot[p.id]} /></td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="lastName" value={p.lastName} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="career" value={p.career} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="position" value={p.position} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3">{p.major || "-"}</td>

@@ -849,7 +849,9 @@ export default function ModelRepresentativesPage() {
                   {tableHeader("generation", "รุ่นที่", true, "center")}
                   {tableHeader("studentId", "รหัสนักศึกษา", true)}
                   {tableHeader("major", "สาขาวิชา", true)}
-                  {tableHeader("firstName", "ชื่อ-นามสกุล", true)}
+                  {tableHeader("prefix", "คำนำหน้า", true)}
+                  {tableHeader("firstName", "ชื่อ", true)}
+                  {tableHeader("lastName", "นามสกุล", true)}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
                   </th>
@@ -875,7 +877,9 @@ export default function ModelRepresentativesPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3">{nameDisplay(a)}</td>
+                    <td className="px-4 py-3">{a.prefix || "-"}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="firstName" value={a.firstName} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="lastName" value={a.lastName} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
@@ -940,7 +944,9 @@ export default function ModelRepresentativesPage() {
                 {tableHeader("generation", "รุ่นที่", false, "center")}
                 {tableHeader("studentId", "รหัสนักศึกษา", false)}
                 {tableHeader("major", "สาขาวิชา", false)}
-                {tableHeader("firstName", "ชื่อ - นามสกุล", false)}
+                {tableHeader("prefix", "คำนำหน้า", false)}
+                {tableHeader("firstName", "ชื่อ", false)}
+                {tableHeader("lastName", "นามสกุล", false)}
               </tr>
             </thead>
             <tbody>
@@ -955,7 +961,9 @@ export default function ModelRepresentativesPage() {
                   </td>
                   <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
                   <td className="px-4 py-3">{a.major || "-"}</td>
-                  <td className="px-4 py-3">{nameDisplay(a)}</td>
+                  <td className="px-4 py-3">{a.prefix || "-"}</td>
+                  <td className="px-4 py-3">{a.firstName}</td>
+                  <td className="px-4 py-3">{a.lastName}</td>
                 </tr>
               ))}
             </tbody>

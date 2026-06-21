@@ -44,9 +44,6 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "recordedYear", label: "ปีที่บันทึก" },
 ];
 
-const nameDisplay = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) =>
-  [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-";
-
 type FormValues = AssociationPageFormData & { studentId: string; major: string };
 
 const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", associationName: "", position: "", recordedYear: "" };
@@ -554,8 +551,14 @@ export default function AssociationsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                   รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("prefix")}>
+                  คำนำหน้า {sortField === "prefix" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                  ชื่อ - นามสกุล {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  ชื่อ {sortField === "firstName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("lastName")}>
+                  นามสกุล {sortField === "lastName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("associationName")}>
                   ชื่อสมาคม/ชมรม {sortField === "associationName" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -589,7 +592,9 @@ export default function AssociationsPage() {
                   )}
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{item.studentId}</td>
-                  <td className="px-4 py-3">{nameDisplay(item)}</td>
+                  <td className="px-4 py-3">{item.prefix || "-"}</td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="firstName" value={item.firstName} hotFields={hot[item.id]} /></td>
+                  <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="lastName" value={item.lastName} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="associationName" value={item.associationName} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="position" value={item.position} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3">{item.major || "-"}</td>

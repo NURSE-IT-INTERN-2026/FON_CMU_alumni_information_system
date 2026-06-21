@@ -136,12 +136,14 @@ function displayName(a: AlumniAgency): string {
   return thai || a.englishName || "-";
 }
 
-type SortField = "cohort" | "firstName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
+type SortField = "cohort" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
 const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
-  { field: "firstName", label: "ชื่อ - นามสกุล" },
+  { field: "prefix", label: "คำนำหน้า" },
+  { field: "firstName", label: "ชื่อ" },
+  { field: "lastName", label: "นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
@@ -151,7 +153,9 @@ const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
 
 const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "cohort", label: "รุ่น" },
-  { field: "firstName", label: "ชื่อ - นามสกุล" },
+  { field: "prefix", label: "คำนำหน้า" },
+  { field: "firstName", label: "ชื่อ" },
+  { field: "lastName", label: "นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
@@ -162,7 +166,9 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
     case "cohort": return a.cohort || "";
+    case "prefix": return a.prefix || "";
     case "firstName": return a.firstName || "";
+    case "lastName": return a.lastName || "";
     case "englishName": return a.englishName || "";
     case "country": return a.country;
     case "workplace": return a.workplace || "";
@@ -784,7 +790,9 @@ export default function AlumniAgencyPage() {
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={[a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3">{a.prefix || "-"}</td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
@@ -847,7 +855,9 @@ export default function AlumniAgencyPage() {
                   <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={[a.firstName, a.lastName].filter(Boolean).join(" ").trim() || a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3">{a.prefix || "-"}</td>
+                    <td className="px-4 py-3">{a.firstName || "-"}</td>
+                    <td className="px-4 py-3">{a.lastName || "-"}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
