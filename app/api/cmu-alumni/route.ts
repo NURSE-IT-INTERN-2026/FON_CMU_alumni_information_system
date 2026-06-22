@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getIp } from "@/lib/activity-log";
 import { fetchCmuGraduates, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
+import { normalizeCmuBirthday } from "@/lib/alumni-verify";
 import { PAGE_SIZE } from "@/lib/constants";
 
 const RATE_LIMIT_MAX = 300;
@@ -98,10 +99,18 @@ export async function GET(request: NextRequest) {
       degreeLevel: "level_id",
       major: "major_name_th",
       year: "grad_year",
+      birthDate: "birthday",
     };
     const orderKey = sortFieldMap[sortField] || "student_id";
     const dir = sortDir === "desc" ? -1 : 1;
     filtered.sort((a: CmuGraduate, b: CmuGraduate) => {
+      // CMU "birthday" is MM-DD-YYYY — sort by the normalized YYYY-MM-DD so the
+      // order is chronological, not lexicographic on the raw string.
+      if (orderKey === "birthday") {
+        const da = normalizeCmuBirthday(a.birthday) ?? "";
+        const db = normalizeCmuBirthday(b.birthday) ?? "";
+        return da.localeCompare(db) * dir;
+      }
       const va = String((a as unknown as Record<string, string>)[orderKey] || "");
       const vb = String((b as unknown as Record<string, string>)[orderKey] || "");
       return va.localeCompare(vb, "th") * dir;

@@ -5,7 +5,7 @@
  * Identity fields (5): studentId, cohort (= graduation year), firstName,
  * maidenLastName, birthDate (form collects Buddhist-era DDMMYYYY).
  *
- * CMU mapping: student_id, grad_year, name_th, surname_th, birthday (MM-DD-YYYY
+ * CMU mapping: student_id, grad_year, name_th, surname_th, birthday (DD-MM-YYYY
  * Gregorian).
  */
 
@@ -54,9 +54,9 @@ export function normalizeFormBirthDate(
 }
 
 /**
- * Parse the CMU Registrar "birthday" field (MM-DD-YYYY Gregorian, e.g.
- * "12-01-1997") into the same canonical "YYYY-MM-DD". Defensive: accepts
- * - / . / separators and digit-only MMDDYYYY. Returns null if unparseable.
+ * Parse the CMU Registrar "birthday" field (DD-MM-YYYY Gregorian, e.g.
+ * "01-12-1997" → 1 Dec 1997) into the same canonical "YYYY-MM-DD". Defensive:
+ * accepts - / . / separators and digit-only DDMMYYYY. Returns null if unparseable.
  */
 export function normalizeCmuBirthday(
   input: string | null | undefined,
@@ -67,7 +67,7 @@ export function normalizeCmuBirthday(
 
   const parts = s.split(/[-/.]/).map((p) => p.trim()).filter(Boolean);
   if (parts.length === 3) {
-    const [mm, dd, yyyy] = parts;
+    const [dd, mm, yyyy] = parts;
     const y = parseInt(yyyy, 10);
     if (Number.isNaN(y)) return null;
     return `${y}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
@@ -75,14 +75,30 @@ export function normalizeCmuBirthday(
 
   const digits = s.replace(/\D/g, "");
   if (digits.length === 8) {
-    const mm = digits.slice(0, 2);
-    const dd = digits.slice(2, 4);
+    const dd = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
     const y = parseInt(digits.slice(4, 8), 10);
     if (Number.isNaN(y)) return null;
     return `${y}-${mm}-${dd}`;
   }
 
   return null;
+}
+
+/**
+ * Format a canonical Gregorian "YYYY-MM-DD" birthday as Thai "DD-MM-YYYY"
+ * (Buddhist era; year + 543), e.g. "1997-12-01" → "01-12-2540". Returns null
+ * if the input is missing or doesn't start with a YYYY-MM-DD date.
+ */
+export function formatBirthDateThai(
+  input: string | null | undefined,
+): string | null {
+  if (!input) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(input).trim());
+  if (!m) return null;
+  const [, yyyy, mm, dd] = m;
+  const be = parseInt(yyyy, 10) + 543;
+  return `${dd}-${mm}-${be}`;
 }
 
 /** True when the form birthDate and CMU birthday refer to the same Gregorian day. */

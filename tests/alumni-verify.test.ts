@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeFormBirthDate,
   normalizeCmuBirthday,
+  formatBirthDateThai,
   birthDatesMatch,
   normalizeName,
   normalizeYear,
@@ -29,18 +30,18 @@ describe("normalizeFormBirthDate", () => {
 });
 
 describe("normalizeCmuBirthday", () => {
-  it("parses MM-DD-YYYY Gregorian", () => {
-    expect(normalizeCmuBirthday("12-01-1997")).toBe("1997-12-01");
+  it("parses DD-MM-YYYY Gregorian", () => {
+    expect(normalizeCmuBirthday("01-12-1997")).toBe("1997-12-01");
   });
   it("accepts slash and dot separators", () => {
-    expect(normalizeCmuBirthday("12/01/1997")).toBe("1997-12-01");
-    expect(normalizeCmuBirthday("12.01.1997")).toBe("1997-12-01");
+    expect(normalizeCmuBirthday("01/12/1997")).toBe("1997-12-01");
+    expect(normalizeCmuBirthday("01.12.1997")).toBe("1997-12-01");
   });
-  it("accepts digit-only MMDDYYYY", () => {
-    expect(normalizeCmuBirthday("12011997")).toBe("1997-12-01");
+  it("accepts digit-only DDMMYYYY", () => {
+    expect(normalizeCmuBirthday("01121997")).toBe("1997-12-01");
   });
-  it("pads single-digit month/day", () => {
-    expect(normalizeCmuBirthday("1-5-1997")).toBe("1997-01-05");
+  it("pads single-digit day/month", () => {
+    expect(normalizeCmuBirthday("5-1-1997")).toBe("1997-01-05");
   });
   it("returns null for invalid input", () => {
     expect(normalizeCmuBirthday("")).toBeNull();
@@ -49,13 +50,28 @@ describe("normalizeCmuBirthday", () => {
   });
 });
 
+describe("formatBirthDateThai", () => {
+  it("formats YYYY-MM-DD as DD-MM-YYYY Buddhist (+543)", () => {
+    expect(formatBirthDateThai("1997-12-01")).toBe("01-12-2540");
+    expect(formatBirthDateThai("1952-07-11")).toBe("11-07-2495");
+  });
+  it("ignores a trailing time component", () => {
+    expect(formatBirthDateThai("1997-12-01T00:00:00.000Z")).toBe("01-12-2540");
+  });
+  it("returns null for missing or non-date input", () => {
+    expect(formatBirthDateThai(null)).toBeNull();
+    expect(formatBirthDateThai("")).toBeNull();
+    expect(formatBirthDateThai("not-a-date")).toBeNull();
+  });
+});
+
 describe("birthDatesMatch", () => {
-  it("matches form Buddhist DDMMYYYY with CMU MM-DD-YYYY", () => {
-    expect(birthDatesMatch("01122540", "12-01-1997")).toBe(true);
+  it("matches form Buddhist DDMMYYYY with CMU DD-MM-YYYY", () => {
+    expect(birthDatesMatch("01122540", "01-12-1997")).toBe(true);
   });
   it("rejects mismatches", () => {
-    expect(birthDatesMatch("01122540", "12-02-1997")).toBe(false);
-    expect(birthDatesMatch("02122540", "12-01-1997")).toBe(false);
+    expect(birthDatesMatch("01122540", "02-12-1997")).toBe(false);
+    expect(birthDatesMatch("02122540", "01-12-1997")).toBe(false);
   });
 });
 
@@ -89,7 +105,7 @@ describe("cmuLevelToDegree", () => {
 describe("matchCmuGraduate", () => {
   const grad: CmuGraduate = {
     student_id: "512045001",
-    birthday: "12-01-1997",
+    birthday: "01-12-1997",
     cmuitaccount: "",
     sex_id: "",
     name_th: "สมหญิง",

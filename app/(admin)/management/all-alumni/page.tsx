@@ -14,6 +14,8 @@ import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
+import { sortAlumni } from "@/lib/alumni-sort";
+import { normalizeCmuBirthday, formatBirthDateThai } from "@/lib/alumni-verify";
 import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -25,7 +27,7 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
-type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort";
+type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort" | "birthDate";
 type SortDir = "asc" | "desc";
 
 const DEGREE_COLORS: Record<string, string> = {
@@ -80,6 +82,10 @@ interface CmuAlumni {
   std_mobile: string;
   adm_type: string;
   cohort?: string | null;
+  // CMU Registrar birthday, raw "MM-DD-YYYY" (passed through by /api/cmu-alumni).
+  birthday?: string | null;
+  // Normalized "YYYY-MM-DD" for display + chronological sort.
+  birthDate?: string | null;
 }
 
 // Map CMU registrar level_id to Thai degree labels
@@ -173,13 +179,13 @@ export default function AlumniCountPage() {
         const local = localMap[c.student_id];
         localStudentIdsUsed.add(c.student_id);
         if (local) {
-          merged.push(local);
+          merged.push({ ...local, birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate });
         } else {
           merged.push({
             id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
             maidenLastName: c.surname_th || "", newLastName: null, cohort: c.cohort || null,
             degreeLevel: null, major: c.major_name_th || null,
-            graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: null, remarks: null,
+            graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
             province: null, email: null, phone: null, currentWorkplace: null, country: null,
             isPotential: false, isModelRepresentative: false, photoUrl: null,
           });
@@ -190,7 +196,9 @@ export default function AlumniCountPage() {
       }
       const adjustedTotal = cmuTotalCount - deletedStudentIds.size +
         Object.values(localMap).filter(a => !localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)).length;
-      return { merged, total: Math.max(0, adjustedTotal) };
+      // Sort the merged CMU+local result client-side so local-only fields
+      // (birthDate, prefix, …) reorder correctly; the CMU proxy can't sort them.
+      return { merged: sortAlumni(merged, sortField, sortDir), total: Math.max(0, adjustedTotal) };
     },
   });
   const alumni = manageQuery.data?.merged ?? [];
@@ -262,9 +270,10 @@ export default function AlumniCountPage() {
             name_th: local.firstName || a.name_th,
             surname_th: local.maidenLastName || a.surname_th,
             cohort: local.cohort || null,
+            birthDate: normalizeCmuBirthday(a.birthday) ?? local.birthDate,
           });
         } else {
-          merged.push({ ...a, cohort: null });
+          merged.push({ ...a, cohort: null, birthDate: normalizeCmuBirthday(a.birthday) });
         }
       }
       return { merged, total: Math.max(0, data.total - deletedStudentIds.size) };
@@ -930,7 +939,7 @@ export default function AlumniCountPage() {
                           {a.graduationYear || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
-                          {a.birthDate || "-"}
+                          {formatBirthDateThai(a.birthDate) || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="province" value={a.province || "-"} hotFields={hot[a.id]} />
@@ -1081,8 +1090,8 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
                       ปีที่สำเร็จการศึกษา <SortIcon field="year" />
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      วันเกิด
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
+                      วันเกิด <SortIcon field="birthDate" />
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       หมายเหตุ
@@ -1135,7 +1144,7 @@ export default function AlumniCountPage() {
                           <td className="px-4 py-3 text-[var(--muted)]">
                             {a.grad_year || "-"}
                           </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">-</td>
+                          <td className="px-4 py-3 text-[var(--muted)]">{formatBirthDateThai(a.birthDate) || "-"}</td>
                           <td className="px-4 py-3 text-[var(--muted)]">-</td>
                         </tr>
                       );
