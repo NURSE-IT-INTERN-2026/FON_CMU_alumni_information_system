@@ -46,7 +46,7 @@ const AWARD_COLORS: Record<string, string> = {
   LOCAL: "#38a169",
 };
 
-type SortField = "name" | "award" | "type" | "year" | "major" | "description";
+type SortField = "name" | "award" | "type" | "year" | "major" | "description" | "studentId" | "prefix" | "lastName";
 type SortDir = "asc" | "desc";
 
 type FormValues = AwardPageFormData & { studentId: string; major: string };
@@ -619,15 +619,21 @@ export default function AwardsPage() {
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
+                  รหัสนักศึกษา <SortIcon field="studentId" />
+                </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
                   สาขาวิชา <SortIcon field="major" />
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">คำนำหน้า</th>
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
+                  คำนำหน้า <SortIcon field="prefix" />
+                </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                   ชื่อ <SortIcon field="name" />
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">นามสกุล</th>
+                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
+                  นามสกุล <SortIcon field="lastName" />
+                </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("award")}>
                   ชื่อรางวัล <SortIcon field="award" />
                 </th>

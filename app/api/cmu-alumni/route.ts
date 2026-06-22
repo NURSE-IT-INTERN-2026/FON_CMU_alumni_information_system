@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { getIp } from "@/lib/activity-log";
 import { fetchCmuGraduates, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -111,16 +111,6 @@ export async function GET(request: NextRequest) {
     const total = filtered.length;
     const start = (page - 1) * pageSize;
     const data = filtered.slice(start, start + pageSize);
-
-    // 7. Log activity
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "cmu_alumni",
-      null,
-      { action: "list", resultCount: total, search: search || undefined },
-      ip,
-    );
 
     return NextResponse.json({ data, total, page, pageSize });
   } catch (error) {

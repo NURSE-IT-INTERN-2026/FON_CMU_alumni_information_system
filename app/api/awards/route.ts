@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sortFieldMap: Record<string, string> = { name: "firstName", award: "awardName", type: "awardType", year: "year", major: "major", description: "description" };
+    const sortFieldMap: Record<string, string> = { name: "firstName", award: "awardName", type: "awardType", year: "year", major: "major", description: "description", studentId: "studentId", prefix: "prefix", lastName: "lastName" };
     const orderKey = sortFieldMap[sortField] || "year";
     const dir = sortDir === "asc" ? "asc" : "desc";
 

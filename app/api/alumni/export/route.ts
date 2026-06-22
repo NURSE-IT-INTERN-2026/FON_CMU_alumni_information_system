@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -59,7 +60,17 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return buildExcelResponse(mapRows(alumni), "ศิษย์เก่า", "alumni_export");
+    const rows = mapRows(alumni);
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "alumni",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined },
+      getIp(request),
+    );
+
+    return buildExcelResponse(rows, "ศิษย์เก่า", "alumni_export");
   } catch (error) {
     console.error("GET /api/alumni/export error:", error);
     return NextResponse.json(
@@ -94,7 +105,17 @@ export async function POST(request: NextRequest) {
       where: { id: { in: ids } },
     });
 
-    return buildExcelResponse(mapRows(alumni), "ศิษย์เก่า", "alumni_export");
+    const rows = mapRows(alumni);
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "alumni",
+      null,
+      { count: rows.length, mode: "selected" },
+      getIp(request),
+    );
+
+    return buildExcelResponse(rows, "ศิษย์เก่า", "alumni_export");
   } catch (error) {
     console.error("POST /api/alumni/export error:", error);
     return NextResponse.json(

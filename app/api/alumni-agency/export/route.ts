@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { logActivity, getIp } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -43,6 +44,14 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: [{ country: "asc" }, { order: "asc" }],
     });
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "alumni_agency",
+      null,
+      { count: items.length, mode: "filtered", search: search || undefined },
+      getIp(request),
+    );
 
     const rows = items.map((a) => ({
       "รุ่น": a.cohort || "",
@@ -92,6 +101,14 @@ export async function POST(request: NextRequest) {
     const items = await prisma.alumniAgency.findMany({
       where: { id: { in: ids } },
     });
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "alumni_agency",
+      null,
+      { count: items.length, mode: "selected" },
+      getIp(request),
+    );
 
     const rows = items.map((a) => ({
       "รุ่น": a.cohort || "",
