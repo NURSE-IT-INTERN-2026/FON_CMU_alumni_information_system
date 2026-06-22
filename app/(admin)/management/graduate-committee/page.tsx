@@ -42,9 +42,9 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "studentId", label: "รหัสนักศึกษา" },
   { value: "name", label: "ชื่อ" },
   { value: "cohort", label: "รุ่นที่" },
+  { value: "termYear", label: "ปี พ.ศ." },
   { value: "position", label: "ตำแหน่ง" },
   { value: "remarks", label: "หมายเหตุ" },
-  { value: "termYear", label: "ปี พ.ศ." },
 ];
 
 type FormValues = CommitteePageFormData & { studentId: string; major: string };
@@ -352,12 +352,6 @@ export default function GraduateCommitteePage() {
             {editingId ? "แก้ไขข้อมูลกรรมการบัณฑิต" : "เพิ่มข้อมูลกรรมการบัณฑิต"}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="ปี พ.ศ." required error={errors.termYear?.message}>
-              <FormInput registration={register("termYear")} error={errors.termYear?.message} type="number" placeholder="เช่น 2568" />
-            </FormField>
-            <FormField label="สาขาวิชา">
-              <FormInput registration={register("major")} type="text" />
-            </FormField>
             {editingId ? (
               <>
                 <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
@@ -425,6 +419,12 @@ export default function GraduateCommitteePage() {
             )}
             <FormField label="รุ่นที่" required error={errors.cohort?.message}>
               <FormInput registration={register("cohort")} error={errors.cohort?.message} type="text" />
+            </FormField>
+            <FormField label="ปี พ.ศ." required error={errors.termYear?.message}>
+              <FormInput registration={register("termYear")} error={errors.termYear?.message} type="number" placeholder="เช่น 2568" />
+            </FormField>
+            <FormField label="สาขาวิชา">
+              <FormInput registration={register("major")} type="text" />
             </FormField>
             <FormField label="ตำแหน่ง" required error={errors.position?.message}>
               <FormInput registration={register("position")} error={errors.position?.message} type="text" />
@@ -514,8 +514,8 @@ export default function GraduateCommitteePage() {
 
       {/* Facet filters */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <FacetFilter entity="graduate-committee" field="termYear" label="ปี พ.ศ." selected={filters.termYear ?? []} onChange={(v) => setFilter("termYear", v)} />
         <FacetFilter entity="graduate-committee" field="cohort" label="รุ่นที่" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
+        <FacetFilter entity="graduate-committee" field="termYear" label="ปี พ.ศ." selected={filters.termYear ?? []} onChange={(v) => setFilter("termYear", v)} />
         <FacetFilter entity="graduate-committee" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
         <FacetFilter entity="graduate-committee" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
       </div>
@@ -555,9 +555,6 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
-                    ปี พ.ศ. {sortField === "termYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
-                  </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("studentId")}>
                     รหัสนักศึกษา {sortField === "studentId" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
@@ -572,6 +569,9 @@ export default function GraduateCommitteePage() {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("cohort")}>
                     รุ่นที่ {sortField === "cohort" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("termYear")}>
+                    ปี พ.ศ. {sortField === "termYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("position")}>
                     ตำแหน่ง {sortField === "position" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
@@ -601,12 +601,12 @@ export default function GraduateCommitteePage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
-                    <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="termYear" value={c.termYear} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 font-mono">{c.studentId}</td>
                     <td className="px-4 py-3">{c.prefix || "-"}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="firstName" value={c.firstName} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="lastName" value={c.lastName} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="cohort" value={c.cohort} hotFields={hot[c.id]} /></td>
+                    <td className="px-4 py-3 text-center"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="termYear" value={c.termYear} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="position" value={c.position} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3">{c.major || "-"}</td>
                     <td className="px-4 py-3 text-gray-500">{c.remarks || "-"}</td>
