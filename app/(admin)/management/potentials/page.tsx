@@ -100,11 +100,11 @@ export default function PotentialsPage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("potential", potentials.map((p) => p.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("prefix", a.prefix ?? "");
     setValue("firstName", a.firstName ?? "");
-    setValue("lastName", a.maidenLastName ?? "");
+    setValue("lastName", a.lastName ?? "");
     setNameSearch(displayName(a));
     setValue("major", a.major ?? "");
     setFormSearchField(null);

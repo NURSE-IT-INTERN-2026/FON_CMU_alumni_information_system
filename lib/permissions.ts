@@ -35,7 +35,7 @@ export async function checkSuperAdminPermission(): Promise<NextResponse | null> 
   return null;
 }
 
-export async function checkAlumniSession(): Promise<{ alumni: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; newLastName: string | null } } | { error: NextResponse }> {
+export async function checkAlumniSession(): Promise<{ alumni: { id: string; studentId: string; prefix: string; firstName: string; lastName: string } } | { error: NextResponse }> {
   const session = await getAlumniSession();
   if (!session || !session.alumni) {
     return { error: NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 }) };

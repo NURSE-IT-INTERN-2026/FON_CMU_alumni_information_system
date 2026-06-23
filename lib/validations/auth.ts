@@ -24,9 +24,10 @@ export const alumniLoginSchema = z.object({
 export const alumniSignupSchema = z
   .object({
     studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
+    degreeLevel: z.string().min(1, "กรุณาเลือกระดับการศึกษา"),
     cohort: z.string().min(1, "กรุณากรอกปีที่จบ"),
     firstName: z.string().min(1, "กรุณากรอกชื่อ"),
-    maidenLastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
+    lastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
     birthDate: z
       .string()
       .min(1, "กรุณากรอกวันเกิด")

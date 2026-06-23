@@ -76,15 +76,12 @@ export async function PUT(request: NextRequest) {
           data: {
             prefix: validated.prefix,
             firstName: validated.firstName,
-            maidenLastName: validated.maidenLastName,
-            newLastName: validated.newLastName || null,
+            lastName: validated.lastName,
             cohort: validated.cohort || null,
             degreeLevel: (validated.degreeLevel as DegreeLevel) || undefined,
-            province: validated.province || null,
             email: validated.email || null,
             phone: validated.phone || null,
-            currentWorkplace: validated.currentWorkplace || null,
-            country: validated.country || null,
+            homeAddress: validated.homeAddress?.trim() || null,
             isPotential: hasPotentials,
             isModelRepresentative: hasModelReps,
           },
@@ -101,7 +98,7 @@ export async function PUT(request: NextRequest) {
               studentId,
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               awardName: a.awardName,
               awardType: a.awardType as AwardType,
               year: a.year,
@@ -118,7 +115,7 @@ export async function PUT(request: NextRequest) {
               studentId,
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               associationName: a.associationName,
               position: a.position,
               recordedYear: a.recordedYear,
@@ -138,7 +135,7 @@ export async function PUT(request: NextRequest) {
               termYear: g.termYear,
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               cohort: g.cohort,
               position: g.position,
               remarks: g.remarks || null,
@@ -154,7 +151,7 @@ export async function PUT(request: NextRequest) {
               studentId,
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               career: p.career,
               position: p.position,
               recordedYear: p.recordedYear,
@@ -170,7 +167,7 @@ export async function PUT(request: NextRequest) {
               studentId,
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               cohort: m.cohort,
               generation: m.generation,
             })),
@@ -187,7 +184,7 @@ export async function PUT(request: NextRequest) {
               // Identity fields are auto-filled from the alumni record:
               prefix: validated.prefix,
               firstName: validated.firstName,
-              lastName: validated.maidenLastName,
+              lastName: validated.lastName,
               cohort: validated.cohort || null,
               // Alumni-owned fields:
               workplace: a.workplace || null,
@@ -204,13 +201,13 @@ export async function PUT(request: NextRequest) {
 
       // Log alumni profile edit + field-change history
       const changes = computeFieldChanges(oldCore, alumni, TRACKED_FIELDS.alumni_profile);
-      await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}` }, reason: validated.reason });
+      await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` }, reason: validated.reason });
       const ip = getIp(request);
       await logActivity(
         {
           actorType: "ALUMNI",
           alumniId: alumni.id,
-          alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+          alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`,
         },
         "UPDATE",
         "alumni_profile",
@@ -286,7 +283,7 @@ export async function DELETE(request: NextRequest) {
       {
         actorType: "ALUMNI",
         alumniId,
-        alumniName: `${session.alumni.prefix}${session.alumni.firstName} ${session.alumni.maidenLastName}`,
+        alumniName: `${session.alumni.prefix}${session.alumni.firstName} ${session.alumni.lastName}`,
       },
       "DELETE",
       "alumni_profile",

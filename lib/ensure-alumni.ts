@@ -57,7 +57,7 @@ function prefixFromSex(sexId: string | null | undefined): string {
 export interface CmuAlumniFields {
   prefix: string;
   firstName: string;
-  maidenLastName: string;
+  lastName: string;
   englishName: string | null;
   degreeLevel: DegreeLevelValue;
   major: string | null;
@@ -79,7 +79,7 @@ export function cmuToAlumniFields(g: CmuGraduate): CmuAlumniFields {
   return {
     prefix: prefixFromSex(g.sex_id),
     firstName: (g.name_th ?? "").trim(),
-    maidenLastName: (g.surname_th ?? "").trim(),
+    lastName: (g.surname_th ?? "").trim(),
     englishName: englishName || null,
     degreeLevel: cmuLevelToDegree(g.level_id, g.major_name_th),
     major,
@@ -93,11 +93,11 @@ export function cmuToAlumniFields(g: CmuGraduate): CmuAlumniFields {
 /** Fall-back name split when there is no CMU record to derive names from. */
 function splitFullName(
   fullName: string,
-): { firstName: string; maidenLastName: string } {
+): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/);
   return {
     firstName: parts[0] || "ไม่ทราบ",
-    maidenLastName: parts.slice(1).join(" ") || "ไม่ทราบ",
+    lastName: parts.slice(1).join(" ") || "ไม่ทราบ",
   };
 }
 
@@ -139,7 +139,7 @@ export async function ensureAlumni(studentId: string, fullName: string) {
     if (isEmpty(existing.cmuEmail) && f.cmuEmail) update.cmuEmail = f.cmuEmail;
     if (isEmpty(existing.prefix) && f.prefix) update.prefix = f.prefix;
     if (isEmpty(existing.firstName) && f.firstName) update.firstName = f.firstName;
-    if (isEmpty(existing.maidenLastName) && f.maidenLastName) update.maidenLastName = f.maidenLastName;
+    if (isEmpty(existing.lastName) && f.lastName) update.lastName = f.lastName;
     if (Object.keys(update).length === 0) return existing;
     return prisma.alumni.update({ where: { id: existing.id }, data: update });
   }
@@ -153,7 +153,7 @@ export async function ensureAlumni(studentId: string, fullName: string) {
         studentId: sid,
         prefix: f.prefix || "นางสาว",
         firstName: f.firstName || fallback.firstName,
-        maidenLastName: f.maidenLastName || fallback.maidenLastName,
+        lastName: f.lastName || fallback.lastName,
         englishName: f.englishName,
         degreeLevel: f.degreeLevel,
         major: f.major,
@@ -172,7 +172,7 @@ export async function ensureAlumni(studentId: string, fullName: string) {
       studentId: sid,
       prefix: "นางสาว",
       firstName: fallback.firstName,
-      maidenLastName: fallback.maidenLastName,
+      lastName: fallback.lastName,
       degreeLevel: "BACHELOR",
     },
   });

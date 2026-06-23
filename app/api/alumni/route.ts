@@ -27,19 +27,16 @@ export async function GET(request: NextRequest) {
       "createdAt",
       "updatedAt",
       "firstName",
-      "maidenLastName",
-      "newLastName",
+      "lastName",
       "englishName",
       "studentId",
       "cohort",
       "prefix",
       "degreeLevel",
-      "province",
       "major",
       "graduationYear",
       "birthDate",
       "remarks",
-      "currentWorkplace",
       "homeAddress",
     ];
     const validSortField = allowedSortFields.includes(sortField) ? sortField : "createdAt";
@@ -52,10 +49,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: "insensitive" } },
-        { maidenLastName: { contains: search, mode: "insensitive" } },
-        { newLastName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
         { studentId: { contains: search, mode: "insensitive" } },
-        { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -112,15 +107,12 @@ export async function POST(request: NextRequest) {
         studentId: validated.studentId,
         prefix: validated.prefix,
         firstName: validated.firstName,
-        maidenLastName: validated.maidenLastName,
+        lastName: validated.lastName,
         cohort: validated.cohort || null,
         degreeLevel: validated.degreeLevel,
-        newLastName: validated.newLastName || null,
-        province: validated.province || null,
         email: validated.email || null,
         phone: validated.phone || null,
-        currentWorkplace: validated.currentWorkplace || null,
-        country: validated.country || null,
+        homeAddress: validated.homeAddress?.trim() || null,
         isPotential: validated.isPotential,
         isModelRepresentative: validated.isModelRepresentative,
         photoUrl: validated.photoUrl || null,
@@ -142,7 +134,7 @@ export async function POST(request: NextRequest) {
         "CREATE",
         "alumni",
         alumni.id,
-        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}` },
+        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
         getIp(request)
       );
     }

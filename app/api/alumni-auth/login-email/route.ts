@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       {
         actorType: "ALUMNI",
         alumniId: alumni.id,
-        alumniName: `${alumni.firstName} ${alumni.maidenLastName}`,
+        alumniName: `${alumni.firstName} ${alumni.lastName}`,
       },
       "CREATE",
       "alumni_auth",
@@ -117,8 +117,7 @@ export async function POST(request: Request) {
         id: alumni.id,
         prefix: alumni.prefix,
         firstName: alumni.firstName,
-        maidenLastName: alumni.maidenLastName,
-        newLastName: alumni.newLastName,
+        lastName: alumni.lastName,
       },
     });
   } catch (error) {

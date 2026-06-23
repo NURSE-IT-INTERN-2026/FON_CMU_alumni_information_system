@@ -47,7 +47,7 @@ export async function POST(
       "alumni",
       id,
       {
-        alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.maidenLastName}`,
+        alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`,
       },
       getIp(request)
     );

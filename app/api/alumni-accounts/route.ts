@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { studentId: { contains: search, mode: "insensitive" } },
         { firstName: { contains: search, mode: "insensitive" } },
-        { maidenLastName: { contains: search, mode: "insensitive" } },
-        { newLastName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
       ];
     }
@@ -43,8 +42,7 @@ export async function GET(request: NextRequest) {
           studentId: true,
           prefix: true,
           firstName: true,
-          maidenLastName: true,
-          newLastName: true,
+          lastName: true,
           cohort: true,
           degreeLevel: true,
           email: true,

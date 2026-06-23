@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       {
         actorType: "ALUMNI",
         alumniId: alumni.id,
-        alumniName: `${alumni.firstName} ${alumni.maidenLastName}`,
+        alumniName: `${alumni.firstName} ${alumni.lastName}`,
       },
       "PASSWORD_RESET_REQUEST",
       "alumni_auth",

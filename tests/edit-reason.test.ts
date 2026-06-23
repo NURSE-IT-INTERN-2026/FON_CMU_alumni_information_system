@@ -35,7 +35,7 @@ describe("edit reason is required on update schemas", () => {
   });
 
   it("alumniProfileUpdateSchema (self-edit) requires a reason", () => {
-    const core = { prefix: "นาย", firstName: "สมชาย", maidenLastName: "ใจดี" };
+    const core = { prefix: "นาย", firstName: "สมชาย", lastName: "ใจดี" };
     expect(() => alumniProfileUpdateSchema.parse(core)).toThrow();
     expect(() =>
       alumniProfileUpdateSchema.parse({ ...core, reason: "แก้ไขให้ถูกต้อง" }),

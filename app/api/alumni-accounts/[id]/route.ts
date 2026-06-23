@@ -73,7 +73,7 @@ export async function PUT(
 
     // Admin can edit all alumni fields
     const allowedFields = [
-      "prefix", "firstName", "maidenLastName", "newLastName",
+      "prefix", "firstName", "lastName", "newLastName",
       "cohort", "degreeLevel", "province", "email", "phone",
       "currentWorkplace", "country", "citizenId", "birthDate",
     ];

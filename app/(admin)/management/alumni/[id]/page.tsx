@@ -25,7 +25,9 @@ import FormSelect from "@/components/form/FormSelect";
 import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
 import OrangeCell from "@/components/OrangeCell";
+import EducationSection from "@/components/EducationSection";
 import { useHotFields } from "@/lib/use-hot-fields";
+import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 import AlumniActivityTimeline from "@/components/AlumniActivityTimeline";
 
 // Admin alumni profile view (PRD §3.18). Mirrors the alumni-portal profile
@@ -80,15 +82,12 @@ interface AlumniData {
   birthDate: string | null;
   prefix: string;
   firstName: string;
-  maidenLastName: string;
-  newLastName: string | null;
+  lastName: string;
   cohort: string | null;
   degreeLevel: string;
-  province: string | null;
   email: string | null;
   phone: string | null;
-  currentWorkplace: string | null;
-  country: string | null;
+  homeAddress: string | null;
   awards?: AwardData[];
   associations?: AssociationData[];
   graduateCommittees?: CommitteeData[];
@@ -96,10 +95,6 @@ interface AlumniData {
   modelRepresentatives?: ModelRepData[];
   alumniAgency?: AgencyData[];
 }
-
-const DEGREE_LABELS: Record<string, string> = Object.fromEntries(
-  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label])
-);
 
 const AUTH_INPUT_CLASS = "px-4 py-2.5 text-[var(--foreground)] border-[var(--border)]";
 const AUTH_LABEL_CLASS = "mb-1.5 block text-sm font-medium text-[var(--foreground)]";
@@ -140,15 +135,12 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
   return {
     prefix: data.prefix || "",
     firstName: data.firstName || "",
-    maidenLastName: data.maidenLastName || "",
-    newLastName: data.newLastName || "",
+    lastName: data.lastName || "",
     cohort: data.cohort || "",
     degreeLevel: data.degreeLevel || "",
-    province: data.province || "",
     email: data.email || "",
     phone: data.phone || "",
-    currentWorkplace: data.currentWorkplace || "",
-    country: data.country || "",
+    homeAddress: data.homeAddress || "",
     awards: (data.awards || []).map((a) => ({
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
@@ -219,9 +211,9 @@ export default function AdminAlumniProfilePage() {
   } = useForm<AlumniProfileWithRelatedFormData>({
     resolver: zodResolver(alumniProfileWithRelatedFormSchema) as unknown as Resolver<AlumniProfileWithRelatedFormData>,
     defaultValues: {
-      prefix: "", firstName: "", maidenLastName: "", newLastName: "", cohort: "",
-      degreeLevel: "", province: "", email: "", phone: "", currentWorkplace: "",
-      country: "", awards: [], associations: [], graduateCommittees: [],
+      prefix: "", firstName: "", lastName: "", cohort: "",
+      degreeLevel: "", email: "", phone: "", homeAddress: "",
+      awards: [], associations: [], graduateCommittees: [],
       potentials: [], modelRepresentatives: [], alumniAgency: [],
     },
   });
@@ -269,15 +261,12 @@ export default function AdminAlumniProfilePage() {
       reason: editReason,
       prefix: data.prefix,
       firstName: data.firstName.trim(),
-      maidenLastName: data.maidenLastName.trim(),
-      newLastName: data.newLastName?.trim() || "",
+      lastName: data.lastName.trim(),
       cohort: data.cohort?.trim() || "",
       degreeLevel: data.degreeLevel,
-      province: data.province?.trim() || "",
       email: data.email?.trim() || "",
       phone: data.phone?.trim() || "",
-      currentWorkplace: data.currentWorkplace?.trim() || "",
-      country: data.country?.trim() || "",
+      homeAddress: data.homeAddress?.trim() || "",
       awards: (data.awards || []).map((a) => ({
         awardName: a.awardName,
         awardType: a.awardType,
@@ -458,11 +447,8 @@ export default function AdminAlumniProfilePage() {
                 <FormField label="ชื่อ" required error={errors.firstName?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("firstName")} error={errors.firstName?.message} type="text" className={AUTH_INPUT_CLASS} />
                 </FormField>
-                <FormField label="นามสกุลเดิม" required error={errors.maidenLastName?.message} labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("maidenLastName")} error={errors.maidenLastName?.message} type="text" className={AUTH_INPUT_CLASS} />
-                </FormField>
-                <FormField label="นามสกุลใหม่ (หลังแต่งงาน)" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("newLastName")} type="text" className={AUTH_INPUT_CLASS} />
+                <FormField label="นามสกุล" required error={errors.lastName?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput registration={register("lastName")} error={errors.lastName?.message} type="text" className={AUTH_INPUT_CLASS} />
                 </FormField>
                 <FormField label="รุ่นที่" labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("cohort")} type="text" className={AUTH_INPUT_CLASS} />
@@ -475,20 +461,14 @@ export default function AdminAlumniProfilePage() {
                     ))}
                   </FormSelect>
                 </FormField>
-                <FormField label="จังหวัด" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("province")} type="text" className={AUTH_INPUT_CLASS} />
-                </FormField>
                 <FormField label="อีเมล" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("email")} error={errors.email?.message} type="email" className={AUTH_INPUT_CLASS} />
                 </FormField>
                 <FormField label="เบอร์โทรศัพท์" labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("phone")} type="text" className={AUTH_INPUT_CLASS} />
                 </FormField>
-                <FormField label="สถานที่ทำงานปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("currentWorkplace")} type="text" className={AUTH_INPUT_CLASS} />
-                </FormField>
-                <FormField label="ประเทศ" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("country")} type="text" className={AUTH_INPUT_CLASS} />
+                <FormField label="ที่อยู่ปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput registration={register("homeAddress")} type="text" className={AUTH_INPUT_CLASS} />
                 </FormField>
               </div>
 
@@ -542,18 +522,21 @@ export default function AdminAlumniProfilePage() {
             /* View mode */
             <div className="space-y-6">
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลพื้นฐาน</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลส่วนตัว</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="รหัสนักศึกษา" value={alumni.studentId} />
                   <HotInfoField label="คำนำหน้า" value={alumni.prefix} field="prefix" alumniId={alumni.id} hot={hot} />
                   <HotInfoField label="ชื่อ" value={alumni.firstName} field="firstName" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="นามสกุลเดิม" value={alumni.maidenLastName} field="maidenLastName" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="นามสกุลใหม่" value={alumni.newLastName} field="newLastName" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="รุ่นที่" value={alumni.cohort} field="cohort" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="ระดับปริญญา" value={DEGREE_LABELS[alumni.degreeLevel] || alumni.degreeLevel} field="degreeLevel" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="จังหวัด" value={alumni.province} field="province" alumniId={alumni.id} hot={hot} />
+                  <HotInfoField label="นามสกุล" value={alumni.lastName} field="lastName" alumniId={alumni.id} hot={hot} />
+                  <InfoField label="วันเกิด (วว/ดด/ปปปป)" value={formatBirthDateThaiSlash(alumni.birthDate)} />
                 </div>
               </div>
+
+              <EducationSection
+                alumniId={alumni.id}
+                listPath={`/api/alumni/${alumni.id}/educations`}
+                canWrite={canWrite}
+                onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.admin(id) })}
+              />
 
               <div className="h-px bg-[var(--border)]" />
 
@@ -562,16 +545,7 @@ export default function AdminAlumniProfilePage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <HotInfoField label="อีเมล" value={alumni.email} field="email" alumniId={alumni.id} hot={hot} />
                   <HotInfoField label="เบอร์โทรศัพท์" value={alumni.phone} field="phone" alumniId={alumni.id} hot={hot} />
-                </div>
-              </div>
-
-              <div className="h-px bg-[var(--border)]" />
-
-              <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลการทำงาน</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <HotInfoField label="สถานที่ทำงานปัจจุบัน" value={alumni.currentWorkplace} field="currentWorkplace" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="ประเทศ" value={alumni.country} field="country" alumniId={alumni.id} hot={hot} />
+                  <HotInfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} field="homeAddress" alumniId={alumni.id} hot={hot} />
                 </div>
               </div>
 

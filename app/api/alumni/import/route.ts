@@ -61,18 +61,15 @@ export async function POST(request: NextRequest) {
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
       const prefix = row["คำนำหน้า"]?.toString().trim();
       const firstName = row["ชื่อ"]?.toString().trim();
-      const maidenLastName = row["นามสกุลเดิม"]?.toString().trim();
+      const lastName = row["นามสกุล"]?.toString().trim();
       const cohort = row["รุ่น/สาขา"]?.toString().trim() || null;
       const degreeLevelRaw = row["ระดับการศึกษา"]?.toString().trim();
       const degreeLevel = degreeLevelRaw ? (DEGREE_LEVEL_MAP[degreeLevelRaw] || "BACHELOR") : "BACHELOR";
-      const newLastName = row["นามสกุลใหม่"]?.toString().trim() || null;
-      const province = row["จังหวัด"]?.toString().trim() || null;
       const email = row["อีเมล"]?.toString().trim() || null;
       const phone = row["เบอร์โทร"]?.toString().trim() || null;
-      const currentWorkplace = row["สถานที่ทำงาน"]?.toString().trim() || null;
-      const country = row["ประเทศ"]?.toString().trim() || null;
+      const homeAddress = row["ที่อยู่ปัจจุบัน"]?.toString().trim() || null;
 
-      if (!studentId || !prefix || !firstName || !maidenLastName) {
+      if (!studentId || !prefix || !firstName || !lastName) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -86,15 +83,12 @@ export async function POST(request: NextRequest) {
         studentId,
         prefix,
         firstName,
-        maidenLastName,
+        lastName,
         cohort,
         degreeLevel,
-        newLastName,
-        province,
         email,
         phone,
-        currentWorkplace,
-        country,
+        homeAddress,
       });
     }
 
@@ -104,15 +98,12 @@ export async function POST(request: NextRequest) {
         update: {
           prefix: record.prefix,
           firstName: record.firstName,
-          maidenLastName: record.maidenLastName,
+          lastName: record.lastName,
           cohort: record.cohort,
           degreeLevel: record.degreeLevel,
-          newLastName: record.newLastName,
-          province: record.province,
           email: record.email,
           phone: record.phone,
-          currentWorkplace: record.currentWorkplace,
-          country: record.country,
+          homeAddress: record.homeAddress,
         },
         create: record,
       });

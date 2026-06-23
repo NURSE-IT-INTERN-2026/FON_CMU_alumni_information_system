@@ -6,7 +6,7 @@ const MSG = {
   studentIdNumeric: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น",
   prefixRequired: "กรุณากรอกคำนำหน้า",
   firstNameRequired: "กรุณากรอกชื่อ",
-  maidenLastNameRequired: "กรุณากรอกนามสกุลเดิม",
+  lastNameRequired: "กรุณากรอกนามสกุล",
   degreeLevelRequired: "กรุณาเลือกระดับการศึกษา",
   degreeLevelInvalid: "ระดับการศึกษาไม่ถูกต้อง",
 };
@@ -28,13 +28,12 @@ export const alumniFormSchema = z.object({
     .regex(/^\d+$/, MSG.studentIdNumeric),
   prefix: z.string().min(1, MSG.prefixRequired),
   firstName: z.string().min(1, MSG.firstNameRequired),
-  maidenLastName: z.string().min(1, MSG.maidenLastNameRequired),
+  lastName: z.string().min(1, MSG.lastNameRequired),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES, {
     message: MSG.degreeLevelRequired,
   }),
   cohort: z.string().optional().default(""),
-  newLastName: z.string().optional().default(""),
-  province: z.string().optional().default(""),
+  homeAddress: z.string().optional().default(""),
 });
 
 // --- API schemas ---
@@ -43,15 +42,12 @@ export const alumniCreateSchema = z.object({
   studentId: z.string().min(1, MSG.studentIdRequired).regex(/^\d+$/, MSG.studentIdNumeric),
   prefix: z.string().min(1, MSG.prefixRequired),
   firstName: z.string().min(1, MSG.firstNameRequired),
-  maidenLastName: z.string().min(1, MSG.maidenLastNameRequired),
+  lastName: z.string().min(1, MSG.lastNameRequired),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional().default("BACHELOR"),
   cohort: z.string().optional().nullable(),
-  newLastName: z.string().optional().nullable(),
-  province: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
-  currentWorkplace: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
+  homeAddress: z.string().optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   isPotential: z.boolean().optional().default(false),
   isModelRepresentative: z.boolean().optional().default(false),
@@ -70,15 +66,12 @@ export const alumniUpdateSchema = z.object({
     .optional(),
   prefix: z.string().min(1, MSG.prefixRequired).optional(),
   firstName: z.string().min(1, MSG.firstNameRequired).optional(),
-  maidenLastName: z.string().min(1, MSG.maidenLastNameRequired).optional(),
+  lastName: z.string().min(1, MSG.lastNameRequired).optional(),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional(),
   cohort: z.string().optional().nullable(),
-  newLastName: z.string().optional().nullable(),
-  province: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
-  currentWorkplace: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
+  homeAddress: z.string().optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   isPotential: z.boolean().optional(),
   isModelRepresentative: z.boolean().optional(),
@@ -90,11 +83,9 @@ export const alumniUpdateSchema = z.object({
 export const profileFormSchema = z.object({
   prefix: z.string().min(1, MSG.prefixRequired),
   firstName: z.string().min(1, MSG.firstNameRequired),
-  maidenLastName: z.string().min(1, MSG.maidenLastNameRequired),
-  newLastName: z.string().optional().default(""),
+  lastName: z.string().min(1, MSG.lastNameRequired),
   cohort: z.string().optional().default(""),
   degreeLevel: z.string().min(1, MSG.degreeLevelRequired),
-  province: z.string().optional().default(""),
   email: z
     .string()
     .optional()
@@ -103,8 +94,7 @@ export const profileFormSchema = z.object({
       message: "รูปแบบอีเมลไม่ถูกต้อง",
     }),
   phone: z.string().optional().default(""),
-  currentWorkplace: z.string().optional().default(""),
-  country: z.string().optional().default(""),
+  homeAddress: z.string().optional().default(""),
 });
 
 // --- All-alumni edit form schema (includes studentId, relaxed degreeLevel) ---

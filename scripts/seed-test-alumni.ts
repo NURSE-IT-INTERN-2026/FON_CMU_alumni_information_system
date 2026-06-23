@@ -13,7 +13,7 @@ const TEST = {
   studentId: "1234567890",
   prefix: "นาย",
   firstName: "สมชาย",
-  maidenLastName: "ใจดี",
+  lastName: "ใจดี",
   cohort: "2560", // graduation year (Buddhist)
   birthDate: "01012540", // 1 Jan 2540 BE → 1997-01-01 (DDMMYYYY, Buddhist)
   degreeLevel: "BACHELOR" as const,
@@ -30,7 +30,7 @@ async function main() {
     update: {
       prefix: TEST.prefix,
       firstName: TEST.firstName,
-      maidenLastName: TEST.maidenLastName,
+      lastName: TEST.lastName,
       cohort: TEST.cohort,
       birthDate: TEST.birthDate,
       degreeLevel: TEST.degreeLevel,
@@ -45,7 +45,7 @@ async function main() {
       studentId: true,
       prefix: true,
       firstName: true,
-      maidenLastName: true,
+      lastName: true,
       cohort: true,
       birthDate: true,
       degreeLevel: true,

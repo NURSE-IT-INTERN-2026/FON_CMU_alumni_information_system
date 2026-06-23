@@ -24,6 +24,8 @@ import FormSelect from "@/components/form/FormSelect";
 import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import EducationSection from "@/components/EducationSection";
+import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 
 interface AwardData {
   id: string;
@@ -71,15 +73,12 @@ interface AlumniData {
   birthDate: string | null;
   prefix: string;
   firstName: string;
-  maidenLastName: string;
-  newLastName: string | null;
+  lastName: string;
   cohort: string | null;
   degreeLevel: string;
-  province: string | null;
   email: string | null;
   phone: string | null;
-  currentWorkplace: string | null;
-  country: string | null;
+  homeAddress: string | null;
   hasLoggedIn: boolean;
   adminEditedAt: string | null;
   lastLoginAt: string | null;
@@ -91,25 +90,18 @@ interface AlumniData {
   alumniAgency?: AbroadData[];
 }
 
-const DEGREE_LABELS: Record<string, string> = Object.fromEntries(
-  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label])
-);
-
 const AUTH_INPUT_CLASS = "px-4 py-2.5 text-[var(--foreground)] border-[var(--border)]";
 const AUTH_LABEL_CLASS = "mb-1.5 block text-sm font-medium text-[var(--foreground)]";
 
 const defaultFormValues: AlumniProfileWithRelatedFormData = {
   prefix: "",
   firstName: "",
-  maidenLastName: "",
-  newLastName: "",
+  lastName: "",
   cohort: "",
   degreeLevel: "",
-  province: "",
   email: "",
   phone: "",
-  currentWorkplace: "",
-  country: "",
+  homeAddress: "",
   awards: [],
   associations: [],
   graduateCommittees: [],
@@ -158,15 +150,12 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
   return {
     prefix: data.prefix || "",
     firstName: data.firstName || "",
-    maidenLastName: data.maidenLastName || "",
-    newLastName: data.newLastName || "",
+    lastName: data.lastName || "",
     cohort: data.cohort || "",
     degreeLevel: data.degreeLevel || "",
-    province: data.province || "",
     email: data.email || "",
     phone: data.phone || "",
-    currentWorkplace: data.currentWorkplace || "",
-    country: data.country || "",
+    homeAddress: data.homeAddress || "",
     awards: (data.awards || []).map((a) => ({
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
@@ -316,15 +305,12 @@ export default function AlumniProfilePage() {
       reason: editReason,
       prefix: data.prefix,
       firstName: data.firstName.trim(),
-      maidenLastName: data.maidenLastName.trim(),
-      newLastName: data.newLastName?.trim() || "",
+      lastName: data.lastName.trim(),
       cohort: data.cohort?.trim() || "",
       degreeLevel: data.degreeLevel,
-      province: data.province?.trim() || "",
       email: data.email?.trim() || "",
       phone: data.phone?.trim() || "",
-      currentWorkplace: data.currentWorkplace?.trim() || "",
-      country: data.country?.trim() || "",
+      homeAddress: data.homeAddress?.trim() || "",
       // Send every section so the server can apply replace-all semantics
       // (empty array = clear existing entries for that section).
       awards: (data.awards || []).map((a) => ({
@@ -546,18 +532,10 @@ export default function AlumniProfilePage() {
                   />
                 </FormField>
 
-                <FormField label="นามสกุลเดิม" required error={errors.maidenLastName?.message} labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="นามสกุล" required error={errors.lastName?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput
-                    registration={register("maidenLastName")}
-                    error={errors.maidenLastName?.message}
-                    type="text"
-                    className={AUTH_INPUT_CLASS}
-                  />
-                </FormField>
-
-                <FormField label="นามสกุลใหม่ (หลังแต่งงาน)" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput
-                    registration={register("newLastName")}
+                    registration={register("lastName")}
+                    error={errors.lastName?.message}
                     type="text"
                     className={AUTH_INPUT_CLASS}
                   />
@@ -584,14 +562,6 @@ export default function AlumniProfilePage() {
                   </FormSelect>
                 </FormField>
 
-                <FormField label="จังหวัด" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput
-                    registration={register("province")}
-                    type="text"
-                    className={AUTH_INPUT_CLASS}
-                  />
-                </FormField>
-
                 <FormField label="อีเมล" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput
                     registration={register("email")}
@@ -609,17 +579,9 @@ export default function AlumniProfilePage() {
                   />
                 </FormField>
 
-                <FormField label="สถานที่ทำงานปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="ที่อยู่ปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput
-                    registration={register("currentWorkplace")}
-                    type="text"
-                    className={AUTH_INPUT_CLASS}
-                  />
-                </FormField>
-
-                <FormField label="ประเทศ" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput
-                    registration={register("country")}
+                    registration={register("homeAddress")}
                     type="text"
                     className={AUTH_INPUT_CLASS}
                   />
@@ -735,20 +697,23 @@ export default function AlumniProfilePage() {
           ) : (
             /* View mode */
             <div className="space-y-6">
-              {/* Read-only identity section */}
+              {/* ข้อมูลส่วนตัว */}
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลพื้นฐาน</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลส่วนตัว</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="รหัสนักศึกษา" value={alumni.studentId} />
                   <InfoField label="คำนำหน้า" value={alumni.prefix} />
                   <InfoField label="ชื่อ" value={alumni.firstName} />
-                  <InfoField label="นามสกุลเดิม" value={alumni.maidenLastName} />
-                  <InfoField label="นามสกุลใหม่" value={alumni.newLastName} />
-                  <InfoField label="รุ่นที่" value={alumni.cohort} />
-                  <InfoField label="ระดับปริญญา" value={DEGREE_LABELS[alumni.degreeLevel] || alumni.degreeLevel} />
-                  <InfoField label="จังหวัด" value={alumni.province} />
+                  <InfoField label="นามสกุล" value={alumni.lastName} />
+                  <InfoField label="วันเกิด (วว/ดด/ปปปป)" value={formatBirthDateThaiSlash(alumni.birthDate)} />
                 </div>
               </div>
+
+              <EducationSection
+                alumniId={alumni.id}
+                listPath="/api/alumni-profile/educations"
+                canWrite
+                onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.me() })}
+              />
 
               <div className="h-px bg-[var(--border)]" />
 
@@ -758,17 +723,7 @@ export default function AlumniProfilePage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InfoField label="อีเมล" value={alumni.email} />
                   <InfoField label="เบอร์โทรศัพท์" value={alumni.phone} />
-                </div>
-              </div>
-
-              <div className="h-px bg-[var(--border)]" />
-
-              {/* Work section */}
-              <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลการทำงาน</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <InfoField label="สถานที่ทำงานปัจจุบัน" value={alumni.currentWorkplace} />
-                  <InfoField label="ประเทศ" value={alumni.country} />
+                  <InfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} />
                 </div>
               </div>
 

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
             OR: [
               { firstName: { contains: search, mode: "insensitive" } },
               { lastName: { contains: search, mode: "insensitive" } },
-              { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { maidenLastName: { contains: search, mode: "insensitive" } }] } },
+              { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
             ],
           });
         } else {
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
             { firstName: { contains: search, mode: "insensitive" } },
             { lastName: { contains: search, mode: "insensitive" } },
             { alumni: { firstName: { contains: search, mode: "insensitive" } } },
-            { alumni: { maidenLastName: { contains: search, mode: "insensitive" } } },
+            { alumni: { lastName: { contains: search, mode: "insensitive" } } },
           ],
         });
       }

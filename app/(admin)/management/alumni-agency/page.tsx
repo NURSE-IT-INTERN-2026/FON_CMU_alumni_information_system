@@ -49,10 +49,8 @@ interface ThailandAlumni {
   major: string | null;
   prefix: string | null;
   firstName: string | null;
-  maidenLastName: string | null;
-  newLastName: string | null;
+  lastName: string | null;
   englishName: string | null;
-  currentWorkplace: string | null;
   homeAddress: string | null;
   remarks: string | null;
 }
@@ -70,9 +68,8 @@ type ThailandSortField =
   | "major"
   | "prefix"
   | "firstName"
-  | "newLastName"
+  | "lastName"
   | "englishName"
-  | "currentWorkplace"
   | "homeAddress"
   | "remarks";
 type ThailandSortDir = "asc" | "desc";
@@ -83,20 +80,18 @@ const THAILAND_SORT_FIELDS: { field: ThailandSortField; label: string }[] = [
   { field: "major", label: "สาขาวิชา" },
   { field: "prefix", label: "คำนำหน้า" },
   { field: "firstName", label: "ชื่อ" },
-  { field: "newLastName", label: "นามสกุล" },
+  { field: "lastName", label: "นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
-  { field: "currentWorkplace", label: "สถานที่ทำงาน" },
   { field: "homeAddress", label: "ที่อยู่บ้าน" },
   { field: "remarks", label: "หมายเหตุ" },
 ];
 
-type ThailandSearchField = "all" | "studentId" | "firstName" | "currentWorkplace";
+type ThailandSearchField = "all" | "studentId" | "firstName";
 
 const THAILAND_SEARCH_FIELDS: { value: ThailandSearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "studentId", label: "รหัสนักศึกษา" },
   { value: "firstName", label: "ชื่อ" },
-  { value: "currentWorkplace", label: "สถานที่ทำงาน" },
 ];
 
 const abroadFormSchema = z.object({
@@ -232,12 +227,12 @@ export default function AlumniAgencyPage() {
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("major", a.major ?? "");
     setValue("prefix", a.prefix ?? "");
     setValue("firstName", a.firstName ?? "");
-    setValue("lastName", a.maidenLastName ?? "");
+    setValue("lastName", a.lastName ?? "");
     setNameSearch("");
     clearResults();
     setFormSearchField(null);
@@ -942,15 +937,6 @@ export default function AlumniAgencyPage() {
               onChange={(e) => { setThailandSearch(e.target.value); setThailandPage(1); }}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
-            <div className="w-full shrink-0 sm:w-64">
-              <FacetFilter
-                entity="alumni"
-                field="currentWorkplace"
-                label="สถานที่ทำงาน"
-                selected={filters.currentWorkplace ?? []}
-                onChange={(v) => setFilter("currentWorkplace", v)}
-              />
-            </div>
           </div>
 
           {/* Thailand table */}
@@ -988,9 +974,8 @@ export default function AlumniAgencyPage() {
                         <td className="px-4 py-3 text-[var(--muted)]">{a.major || "-"}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">{a.prefix || "-"}</td>
                         <td className="px-4 py-3">{a.firstName || "-"}</td>
-                        <td className="px-4 py-3">{a.newLastName || a.maidenLastName || "-"}</td>
+                        <td className="px-4 py-3">{a.lastName || "-"}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.currentWorkplace || "-"}</td>
                         <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.homeAddress || "-"}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">{a.remarks || "-"}</td>
                       </tr>

@@ -34,7 +34,7 @@ export const YEAR_FIELDS = new Set([
 
 /** Allowed facet fields per entity (PRD §3.3–3.9 filter requirements). */
 export const FACET_FIELDS: Record<string, string[]> = {
-  alumni: ["degreeLevel", "major", "graduationYear", "currentWorkplace"],
+  alumni: ["degreeLevel", "major", "graduationYear"],
   awards: ["major", "awardType"],
   associations: ["major", "associationName", "position", "recordedYear"],
   "graduate-committee": ["major", "termYear", "cohort", "position"],

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         major: validated.major?.trim() || null,
       },
       include: {
-        alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
+        alumni: { select: { prefix: true, firstName: true, lastName: true } },
       },
     });
 
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
           where.OR = [
             { firstName: { contains: search, mode: "insensitive" } },
             { lastName: { contains: search, mode: "insensitive" } },
-            { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { maidenLastName: { contains: search, mode: "insensitive" } }] } },
+            { alumni: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
           ];
         } else {
           where[searchFieldParam] = { contains: search, mode: "insensitive" };
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
             alumni: {
               OR: [
                 { firstName: { contains: search, mode: "insensitive" } },
-                { maidenLastName: { contains: search, mode: "insensitive" } },
+                { lastName: { contains: search, mode: "insensitive" } },
               ],
             },
           },
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             select: {
               prefix: true,
               firstName: true,
-              maidenLastName: true,
+              lastName: true,
             },
           },
         },

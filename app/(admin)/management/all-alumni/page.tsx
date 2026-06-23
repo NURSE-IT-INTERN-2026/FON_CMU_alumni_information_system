@@ -26,7 +26,7 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
   DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-type ManageSortField = "studentId" | "prefix" | "firstName" | "maidenLastName" | "newLastName" | "cohort" | "province" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
+type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
 type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort" | "birthDate";
 type SortDir = "asc" | "desc";
 
@@ -43,19 +43,16 @@ interface Alumni {
   studentId: string;
   prefix: string;
   firstName: string;
-  maidenLastName: string;
-  newLastName: string | null;
+  lastName: string;
   cohort: string | null;
   degreeLevel: string | null;
   major: string | null;
   graduationYear: number | null;
   birthDate: string | null;
   remarks: string | null;
-  province: string | null;
   email: string | null;
   phone: string | null;
-  currentWorkplace: string | null;
-  country: string | null;
+  homeAddress: string | null;
   isPotential: boolean;
   isModelRepresentative: boolean;
   photoUrl: string | null;
@@ -110,15 +107,12 @@ const EMPTY_EDIT_FORM: AlumniEditFormData = {
   studentId: "",
   prefix: "",
   firstName: "",
-  maidenLastName: "",
+  lastName: "",
   cohort: "",
   degreeLevel: "",
-  newLastName: "",
-  province: "",
   email: "",
   phone: "",
-  currentWorkplace: "",
-  country: "",
+  homeAddress: "",
 };
 
 /** Check if an id looks like a UUID (local DB record) vs a student_id (CMU-only record). */
@@ -188,10 +182,10 @@ export default function AlumniCountPage() {
         } else {
           merged.push({
             id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
-            maidenLastName: c.surname_th || "", newLastName: null, cohort: c.cohort || null,
+            lastName: c.surname_th || "", cohort: c.cohort || null,
             degreeLevel: null, major: c.major_name_th || null,
             graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
-            province: null, email: null, phone: null, currentWorkplace: null, country: null,
+            email: null, phone: null, homeAddress: null,
             isPotential: false, isModelRepresentative: false, photoUrl: null,
           });
         }
@@ -282,7 +276,7 @@ export default function AlumniCountPage() {
           merged.push({
             ...a,
             name_th: local.firstName || a.name_th,
-            surname_th: local.maidenLastName || a.surname_th,
+            surname_th: local.lastName || a.surname_th,
             cohort: local.cohort || null,
             birthDate: normalizeCmuBirthday(a.birthday) ?? local.birthDate,
           });
@@ -353,15 +347,12 @@ export default function AlumniCountPage() {
       studentId: a.studentId,
       prefix: a.prefix,
       firstName: a.firstName,
-      maidenLastName: a.maidenLastName,
+      lastName: a.lastName,
       cohort: a.cohort || "",
       degreeLevel: a.degreeLevel || "",
-      newLastName: a.newLastName || "",
-      province: a.province || "",
       email: a.email || "",
       phone: a.phone || "",
-      currentWorkplace: a.currentWorkplace || "",
-      country: a.country || "",
+      homeAddress: a.homeAddress || "",
     });
     setEditingId(a.id);
     setEditReason("");
@@ -401,15 +392,12 @@ export default function AlumniCountPage() {
         studentId: data.studentId.trim(),
         prefix: data.prefix,
         firstName: data.firstName.trim(),
-        maidenLastName: data.maidenLastName.trim(),
+        lastName: data.lastName.trim(),
         cohort: data.cohort.trim() || null,
         degreeLevel: data.degreeLevel || null,
-        newLastName: data.newLastName.trim() || null,
-        province: data.province.trim() || null,
         email: data.email.trim() || null,
         phone: data.phone.trim() || null,
-        currentWorkplace: data.currentWorkplace.trim() || null,
-        country: data.country.trim() || null,
+        homeAddress: data.homeAddress.trim() || null,
         ...(isLocal ? { reason: editReason } : {}),
       };
 
@@ -446,7 +434,7 @@ export default function AlumniCountPage() {
               studentId: alumniRecord.studentId,
               prefix: alumniRecord.prefix || "นางสาว",
               firstName: alumniRecord.firstName,
-              maidenLastName: alumniRecord.maidenLastName,
+              lastName: alumniRecord.lastName,
               cohort: alumniRecord.cohort || null,
               degreeLevel: alumniRecord.degreeLevel || null,
               softDelete: true,
@@ -488,7 +476,7 @@ export default function AlumniCountPage() {
               studentId: record.studentId,
               prefix: record.prefix || "นางสาว",
               firstName: record.firstName,
-              maidenLastName: record.maidenLastName,
+              lastName: record.lastName,
               cohort: record.cohort || null,
               degreeLevel: record.degreeLevel || null,
               softDelete: true,
@@ -691,11 +679,8 @@ export default function AlumniCountPage() {
                 <FormField label="ชื่อ" required error={formErrors.firstName?.message}>
                   <FormInput registration={register("firstName")} error={formErrors.firstName?.message} type="text" />
                 </FormField>
-                <FormField label="นามสกุลเดิม" required error={formErrors.maidenLastName?.message}>
-                  <FormInput registration={register("maidenLastName")} error={formErrors.maidenLastName?.message} type="text" />
-                </FormField>
-                <FormField label="นามสกุลใหม่">
-                  <FormInput registration={register("newLastName")} type="text" />
+                <FormField label="นามสกุล" required error={formErrors.lastName?.message}>
+                  <FormInput registration={register("lastName")} error={formErrors.lastName?.message} type="text" />
                 </FormField>
                 <FormField label="รุ่น/สาขา">
                   <FormInput registration={register("cohort")} type="text" />
@@ -710,20 +695,14 @@ export default function AlumniCountPage() {
                     ))}
                   </FormSelect>
                 </FormField>
-                <FormField label="จังหวัด">
-                  <FormInput registration={register("province")} type="text" />
-                </FormField>
                 <FormField label="อีเมล">
                   <FormInput registration={register("email")} type="email" />
                 </FormField>
                 <FormField label="เบอร์โทร">
                   <FormInput registration={register("phone")} type="text" />
                 </FormField>
-                <FormField label="สถานที่ทำงาน">
-                  <FormInput registration={register("currentWorkplace")} type="text" />
-                </FormField>
-                <FormField label="ประเทศ">
-                  <FormInput registration={register("country")} type="text" />
+                <FormField label="ที่อยู่ปัจจุบัน">
+                  <FormInput registration={register("homeAddress")} type="text" />
                 </FormField>
               </div>
               {editingId && isLocalRecordId(editingId) && (
@@ -900,11 +879,8 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("firstName")}>
                       ชื่อ <SortIcon field="firstName" />
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("maidenLastName")}>
-                      นามสกุลเดิม <SortIcon field="maidenLastName" />
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("newLastName")}>
-                      นามสกุลใหม่ <SortIcon field="newLastName" />
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
+                      นามสกุล <SortIcon field="lastName" />
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
                       ระดับการศึกษา <SortIcon field="degreeLevel" />
@@ -918,9 +894,6 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
                       วันเกิด <SortIcon field="birthDate" />
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("province")}>
-                      จังหวัด <SortIcon field="province" />
-                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
                       หมายเหตุ <SortIcon field="remarks" />
                     </th>
@@ -932,7 +905,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={15} className="px-4 py-12 text-center">
+                      <td colSpan={13} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -941,7 +914,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={15}
+                        colSpan={13}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -971,10 +944,7 @@ export default function AlumniCountPage() {
                         </td>
                         <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="prefix" value={a.prefix} hotFields={hot[a.id]} /></td>
                         <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="firstName" value={a.firstName} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="maidenLastName" value={a.maidenLastName} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3 text-[var(--muted)]">
-                          <OrangeCell resourceType="alumni" recordId={a.id} field="newLastName" value={a.newLastName || "-"} hotFields={hot[a.id]} />
-                        </td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni" recordId={a.id} field="lastName" value={a.lastName} hotFields={hot[a.id]} /></td>
                         <td className="px-4 py-3">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="degreeLevel" value={a.degreeLevel ? (DEGREE_LEVEL_LABELS[a.degreeLevel] ?? a.degreeLevel) : "-"} hotFields={hot[a.id]} />
                         </td>
@@ -986,9 +956,6 @@ export default function AlumniCountPage() {
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
                           {formatBirthDateThai(a.birthDate) || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--muted)]">
-                          <OrangeCell resourceType="alumni" recordId={a.id} field="province" value={a.province || "-"} hotFields={hot[a.id]} />
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />

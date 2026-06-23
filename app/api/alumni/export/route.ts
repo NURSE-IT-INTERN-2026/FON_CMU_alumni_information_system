@@ -19,15 +19,12 @@ function mapRows(alumni: Awaited<ReturnType<typeof prisma.alumni.findMany>>) {
     "รหัสนักศึกษา": a.studentId,
     "คำนำหน้า": a.prefix,
     "ชื่อ": a.firstName,
-    "นามสกุลเดิม": a.maidenLastName,
+    "นามสกุล": a.lastName,
     "รุ่น/สาขา": a.cohort || "",
     "ระดับการศึกษา": a.degreeLevel ? DEGREE_LEVEL_LABELS[a.degreeLevel] || a.degreeLevel : "",
-    "นามสกุลใหม่": a.newLastName || "",
-    "จังหวัด": a.province || "",
     "อีเมล": a.email || "",
     "เบอร์โทร": a.phone || "",
-    "สถานที่ทำงาน": a.currentWorkplace || "",
-    "ประเทศ": a.country || "",
+    "ที่อยู่ปัจจุบัน": a.homeAddress || "",
     "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
     "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",
   }));
@@ -48,10 +45,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: "insensitive" } },
-        { maidenLastName: { contains: search, mode: "insensitive" } },
-        { newLastName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
         { studentId: { contains: search, mode: "insensitive" } },
-        { currentWorkplace: { contains: search, mode: "insensitive" } },
       ];
     }
 

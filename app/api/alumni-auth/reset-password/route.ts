@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       {
         actorType: "ALUMNI",
         alumniId: resetRecord.alumniId,
-        alumniName: `${resetRecord.alumni.firstName} ${resetRecord.alumni.maidenLastName}`,
+        alumniName: `${resetRecord.alumni.firstName} ${resetRecord.alumni.lastName}`,
       },
       "PASSWORD_RESET_COMPLETE",
       "alumni_auth",

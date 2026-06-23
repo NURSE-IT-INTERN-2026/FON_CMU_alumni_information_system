@@ -28,13 +28,13 @@ async function main() {
 
   const alumni = await prisma.alumni.findMany({
     where: { deletedAt: null },
-    select: { studentId: true, firstName: true, maidenLastName: true, major: true, degreeLevel: true, graduationYear: true },
+    select: { studentId: true, firstName: true, lastName: true, major: true, degreeLevel: true, graduationYear: true },
   });
   const alumniWithMajor = alumni.filter((a) => a.major && a.major.trim() !== "").length;
   console.log(`=== Alumni (synced records) ===`);
   console.log(`rows: ${alumni.length} | with major: ${alumniWithMajor}`);
   for (const a of alumni.slice(0, 3)) {
-    console.log(`  • ${a.studentId} ${a.firstName} ${a.maidenLastName} → major: ${a.major ?? "(null)"} | degree: ${a.degreeLevel} | grad: ${a.graduationYear ?? "(null)"}`);
+    console.log(`  • ${a.studentId} ${a.firstName} ${a.lastName} → major: ${a.major ?? "(null)"} | degree: ${a.degreeLevel} | grad: ${a.graduationYear ?? "(null)"}`);
   }
 
   await report(

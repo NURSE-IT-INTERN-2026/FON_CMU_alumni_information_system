@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     {
       actorType: "ALUMNI",
       alumniId,
-      alumniName: `${session.alumni.prefix}${session.alumni.firstName} ${session.alumni.maidenLastName}`,
+      alumniName: `${session.alumni.prefix}${session.alumni.firstName} ${session.alumni.lastName}`,
     },
     "UPDATE",
     "alumni_auth",

@@ -36,14 +36,14 @@ function randomDegreeLevel() {
   return ALL_DEGREE_LEVELS[Math.floor(Math.random() * ALL_DEGREE_LEVELS.length)];
 }
 
-function parseThaiName(raw: string): { prefix: string; firstName: string; maidenLastName: string; newLastName: string | null } {
+function parseThaiName(raw: string): { prefix: string; firstName: string; lastName: string } {
   let name = raw.replace(/\s+/g, " ").trim();
 
   // Extract maiden name from parentheses: "ลดารักษณ์ (เกียรติพลพจน์) ตั้งชีวินศิริกุล"
-  // → maidenLastName = "เกียรติพลพจน์", newLastName = "ตั้งชีวินศิริกุล"
+  // → lastName = "ตั้งชีวินศิริกุล" (the current surname; the parenthetical
+  // maiden name is dropped since the model keeps a single required lastName).
   // But English parentheticals like (Dean), (President) are titles, not names
-  let maidenLastName = "";
-  let newLastName: string | null = null;
+  let parenLastName = "";
   const parenMatch = name.match(/^(.+?)\s*\(([^)]+)\)\s*(.*)$/);
   if (parenMatch) {
     const parenContent = parenMatch[2].trim();
@@ -51,15 +51,14 @@ function parseThaiName(raw: string): { prefix: string; firstName: string; maiden
     const isEnglishTitle = /^(Dean|President|Director|Former|Prof|Dr|Mr|Mrs|Ms)/i.test(parenContent);
     if (isThaiName && !isEnglishTitle) {
       name = parenMatch[1].trim();
-      maidenLastName = parenContent;
       const after = parenMatch[3].trim();
-      if (after) newLastName = after.replace(/\s*[\[(].*?[\])]/g, "").trim() || null;
+      parenLastName = after.replace(/\s*[\[(].*?[\])]/g, "").trim();
     }
   }
 
   // Remove non-name parenthetical like [G 1], (Dean), (President)
   name = name.replace(/\s*[\[(].*?[\])]/g, "").trim();
-  if (newLastName) newLastName = newLastName.replace(/\s*[\[(].*?[\])]/g, "").trim() || null;
+  parenLastName = parenLastName.replace(/\s*[\[(].*?[\])]/g, "").trim();
 
   const thaiPrefixes = ["รศ.ดร.", "รศ ดร.", "ผศ.ดร.", "ผศ ดร.", "รศ.", "รศ ", "ผศ.", "ผศ ", "อ.ดร.", "ดร.", "อ.", "คุณ", "มล."];
   const engPrefixes = ["Prof.", "Assoc.Prof.", "Dr."];
@@ -83,15 +82,13 @@ function parseThaiName(raw: string): { prefix: string; firstName: string; maiden
   }
 
   const parts = name.split(/\s+/).filter(Boolean);
-  if (!maidenLastName) {
-    maidenLastName = parts.slice(1).join(" ") || "ไม่ทราบ";
-  }
+  // Prefer the parenthetical (current) surname; otherwise the trailing tokens.
+  const lastName = parenLastName || parts.slice(1).join(" ") || "ไม่ทราบ";
 
   return {
     prefix,
     firstName: parts[0] || "ไม่ทราบ",
-    maidenLastName,
-    newLastName,
+    lastName,
   };
 }
 
@@ -191,37 +188,6 @@ async function main() {
     "นางสาว", "นาง", "นาย", "นางสาว", "ดร.",
   ];
 
-  const provinces = [
-    "เชียงใหม่", "กรุงเทพมหานคร", "ลำปาง", "เชียงราย", "พะเยา",
-    "น่าน", "แพร่", "สุโขทัย", "พิษณุโลก", "ขอนแก่น",
-  ];
-
-  const workplaces = [
-    "โรงพยาบาลมหาราชนครเชียงใหม่",
-    "โรงพยาบาลรามาธิบดี",
-    "โรงพยาบาลศิริราช",
-    "คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
-    "โรงพยาบาลนพรัตนราชชาติ",
-    "สถาบันสุขภาพเด็กแห่งชาติมหาราชินี",
-    "โรงพยาบาลเชียงใหม่ใกล้หมอ",
-    "กรมวิทยาศาสตร์การแพทย์",
-    "กระทรวงสาธารณสุข",
-    "โรงพยาบาลสงฆ์ พะเยา",
-    "มหาวิทยาลัยมหิดล",
-    "มหาวิทยาลัยเชียงใหม่",
-    "โรงพยาบาลลำปาง",
-    "สถาบันราชานุกูล",
-    "โรงพยาบาลสมเด็จเจ้าพระยา",
-    null, null, null,
-  ];
-
-  const abroadCountries = [
-    "สหรัฐอเมริกา", "อังกฤษ", "ออสเตรเลีย", "ญี่ปุ่น",
-    "สิงคโปร์", "เยอรมนี", "แคนาดา", "สหรัฐอเมริกา",
-    "อังกฤษ", "ออสเตรเลีย", "ญี่ปุ่น", "สิงคโปร์",
-    "เยอรมนี", "แคนาดา", "สหรัฐอเมริกา",
-  ];
-
   const degreeLevels: ("BACHELOR" | "MASTER" | "DOCTORAL" | "NURSING_ASSISTANT")[] = [
     "BACHELOR", "BACHELOR", "BACHELOR", "BACHELOR", "MASTER",
     "BACHELOR", "BACHELOR", "BACHELOR", "MASTER", "BACHELOR",
@@ -253,28 +219,22 @@ async function main() {
 
   for (let i = 0; i < 50; i++) {
     const firstName = firstNames[i];
-    const maidenLastName = lastNames[i % lastNames.length];
+    const lastName = lastNames[i % lastNames.length];
 
     const hasEmail = i % 3 !== 2;
     const hasPhone = i % 2 === 0;
-    const workplace = workplaces[i % workplaces.length];
     const isPotential = i < 10;
     const isModelRep = i >= 10 && i < 18;
-    const isAbroad = i < 15;
 
     alumniData.push({
       studentId: `${genPrefixes[i]}43${String(i + 1).padStart(4, "0")}`,
       prefix: prefixes[i],
       firstName,
-      maidenLastName,
+      lastName,
       degreeLevel: degreeLevels[i],
       cohort: `รุ่น ${(i % 38) + 1}`,
-      newLastName: i % 7 === 0 ? "วงศ์สวัสดิ์ใหม่" : null,
-      province: i % 3 === 0 ? provinces[i % provinces.length] : null,
-      email: hasEmail ? `${firstName}.${maidenLastName}@gmail.com` : null,
+      email: hasEmail ? `${firstName}.${lastName}@gmail.com` : null,
       phone: hasPhone ? `0${8 + (i % 3)}-${String(1000 + i * 111).slice(0, 4)}-${String(1000 + i * 37).slice(0, 4)}` : null,
-      currentWorkplace: isAbroad ? null : workplace,
-      country: isAbroad ? abroadCountries[i % abroadCountries.length] : null,
       isPotential,
       isModelRepresentative: isModelRep,
       photoUrl: null,
@@ -315,10 +275,10 @@ async function main() {
   }
 
   // Build alumni name lookup: "firstname lastname" -> studentId
-  const allAlumni = await prisma.alumni.findMany({ select: { studentId: true, firstName: true, maidenLastName: true } });
+  const allAlumni = await prisma.alumni.findMany({ select: { studentId: true, firstName: true, lastName: true } });
   const alumniByName = new Map<string, string>();
   for (const a of allAlumni) {
-    alumniByName.set(`${a.firstName.trim()} ${a.maidenLastName.trim()}`.toLowerCase(), a.studentId);
+    alumniByName.set(`${a.firstName.trim()} ${a.lastName.trim()}`.toLowerCase(), a.studentId);
   }
 
   interface AwardRow { studentId: string | null; prefix: string | null; firstName: string; lastName: string; awardName: string; awardType: "INTERNATIONAL" | "NATIONAL" | "LOCAL"; year: number; description: string | null; }
@@ -345,17 +305,17 @@ async function main() {
     if (studentId) {
       await prisma.alumni.upsert({
         where: { studentId },
-        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
-        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, cohort: cohortFromStudentId(studentId) },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
       });
-      alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
+      alumniByName.set(`${parsed.firstName.trim()} ${parsed.lastName.trim()}`.toLowerCase(), studentId);
     }
 
     const key = dedupKey(studentId, awardName, year);
     if (seenAwards.has(key)) continue;
     seenAwards.add(key);
 
-    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
   }
 
   // --- File 2: ข้อมูลรางวัลศิษย์เก่าจาก CMU Alumni Information System.xlsx ---
@@ -372,17 +332,17 @@ async function main() {
     if (studentId) {
       await prisma.alumni.upsert({
         where: { studentId },
-        update: { prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, cohort: cohortFromStudentId(studentId) },
-        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, maidenLastName: parsed.maidenLastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
+        update: { prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, cohort: cohortFromStudentId(studentId) },
+        create: { studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, degreeLevel: "BACHELOR", cohort: cohortFromStudentId(studentId) },
       });
-      alumniByName.set(`${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase(), studentId);
+      alumniByName.set(`${parsed.firstName.trim()} ${parsed.lastName.trim()}`.toLowerCase(), studentId);
     }
 
     const key = dedupKey(studentId, awardName, year);
     if (seenAwards.has(key)) continue;
     seenAwards.add(key);
 
-    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+    awardRows.push({ studentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
   }
 
   // --- File 3: รางวัลนักศึกษา 3ปีย้อนหลัง.xlsx — ศิษย์เก่า sheet ---
@@ -401,7 +361,7 @@ async function main() {
 
     // Try to match by name
     const parsed = parseThaiName(fullName);
-    const nameKey = `${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase();
+    const nameKey = `${parsed.firstName.trim()} ${parsed.lastName.trim()}`.toLowerCase();
     const matchedStudentId = alumniByName.get(nameKey) || null;
 
     const key = dedupKey(matchedStudentId, awardName, year);
@@ -409,10 +369,10 @@ async function main() {
     seenAwards.add(key);
 
     if (matchedStudentId) {
-      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     } else {
       console.log(`  ⚠ No alumni match for: ${fullName} — storing without alumni link`);
-      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     }
   }
 
@@ -429,7 +389,7 @@ async function main() {
     if (!fullName || !awardName || !year) continue;
 
     const parsed = parseThaiName(fullName);
-    const nameKey = `${parsed.firstName.trim()} ${parsed.maidenLastName.trim()}`.toLowerCase();
+    const nameKey = `${parsed.firstName.trim()} ${parsed.lastName.trim()}`.toLowerCase();
     const matchedStudentId = alumniByName.get(nameKey) || null;
 
     const key = dedupKey(matchedStudentId, awardName, year);
@@ -437,10 +397,10 @@ async function main() {
     seenAwards.add(key);
 
     if (matchedStudentId) {
-      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: matchedStudentId, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     } else {
       console.log(`  ⚠ No alumni match for: ${fullName} — storing without alumni link`);
-      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.newLastName || parsed.maidenLastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
+      awardRows.push({ studentId: null, prefix: parsed.prefix, firstName: parsed.firstName, lastName: parsed.lastName, awardName, awardType: classifyAwardTier(awardName), year, description: null });
     }
   }
 
@@ -842,16 +802,14 @@ async function main() {
         update: {
           prefix: parsed.prefix,
           firstName: parsed.firstName,
-          maidenLastName: parsed.maidenLastName,
-          newLastName: parsed.newLastName,
+          lastName: parsed.lastName,
           degreeLevel: randomDegreeLevel(),
         },
         create: {
           studentId,
           prefix: parsed.prefix,
           firstName: parsed.firstName,
-          maidenLastName: parsed.maidenLastName,
-          newLastName: parsed.newLastName,
+          lastName: parsed.lastName,
           degreeLevel: randomDegreeLevel(),
         },
       });

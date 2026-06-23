@@ -20,11 +20,10 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   studentId: "",
   prefix: "",
   firstName: "",
-  maidenLastName: "",
+  lastName: "",
   degreeLevel: "" as any,
   cohort: "",
-  newLastName: "",
-  province: "",
+  homeAddress: "",
   awards: [],
   associations: [],
   graduateCommittees: [],
@@ -80,17 +79,17 @@ export default function NewAlumniPage() {
     const section = searchParams.get("section");
     const nameSearch = searchParams.get("nameSearch");
     const firstName = searchParams.get("firstName");
-    const maidenLastName = searchParams.get("maidenLastName");
+    const lastName = searchParams.get("lastName");
     const prefix = searchParams.get("prefix");
 
-    if (!section && !nameSearch && !firstName && !maidenLastName) return;
+    if (!section && !nameSearch && !firstName && !lastName) return;
 
     initialLoadDone.current = true;
 
     const overrides: Partial<AlumniWithRelatedFormData> = {};
     if (nameSearch) overrides.firstName = nameSearch;
     if (firstName) overrides.firstName = firstName;
-    if (maidenLastName) overrides.maidenLastName = maidenLastName;
+    if (lastName) overrides.lastName = lastName;
     if (prefix) overrides.prefix = prefix;
 
     const validSections = ["awards", "associations", "committees", "potentials", "modelReps", "abroad"] as const;
@@ -174,10 +173,9 @@ export default function NewAlumniPage() {
       studentId: data.studentId.trim(),
       prefix: data.prefix,
       firstName: data.firstName.trim(),
-      maidenLastName: data.maidenLastName.trim(),
+      lastName: data.lastName.trim(),
       cohort: data.cohort?.trim() || undefined,
-      newLastName: data.newLastName?.trim() || undefined,
-      province: data.province?.trim() || undefined,
+      homeAddress: data.homeAddress?.trim() || undefined,
       degreeLevel: data.degreeLevel,
     };
 
@@ -298,8 +296,8 @@ export default function NewAlumniPage() {
             <FormField label="ชื่อ" required error={errors.firstName?.message}>
               <FormInput registration={register("firstName")} error={errors.firstName?.message} placeholder="ชื่อ" />
             </FormField>
-            <FormField label="นามสกุล (เดิม)" required error={errors.maidenLastName?.message}>
-              <FormInput registration={register("maidenLastName")} error={errors.maidenLastName?.message} placeholder="นามสกุลเดิม" />
+            <FormField label="นามสกุล (เดิม)" required error={errors.lastName?.message}>
+              <FormInput registration={register("lastName")} error={errors.lastName?.message} placeholder="นามสกุลเดิม" />
             </FormField>
             <FormField label="รุ่น/สาขา">
               <FormInput registration={register("cohort")} placeholder="รุ่น/สาขา" />
@@ -314,11 +312,8 @@ export default function NewAlumniPage() {
                 ))}
               </FormSelect>
             </FormField>
-            <FormField label="นามสกุล (ใหม่)">
-              <FormInput registration={register("newLastName")} placeholder="นามสกุลใหม่" />
-            </FormField>
-            <FormField label="จังหวัด">
-              <FormInput registration={register("province")} placeholder="จังหวัด" />
+            <FormField label="ที่อยู่ปัจจุบัน">
+              <FormInput registration={register("homeAddress")} placeholder="ที่อยู่ปัจจุบัน" />
             </FormField>
           </div>
         </div>

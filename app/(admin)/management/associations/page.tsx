@@ -98,11 +98,11 @@ export default function AssociationsPage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("association", items.map((item) => item.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; maidenLastName: string; major?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
     setValue("prefix", a.prefix ?? "");
     setValue("firstName", a.firstName ?? "");
-    setValue("lastName", a.maidenLastName ?? "");
+    setValue("lastName", a.lastName ?? "");
     setValue("major", a.major ?? "");
     setNameSearch(displayName(a));
     setAlumniSearchField(null);

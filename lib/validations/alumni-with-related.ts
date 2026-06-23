@@ -109,15 +109,12 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
 export const alumniWithRelatedUpdateSchema = z.object({
   prefix: z.string().min(1, "กรุณากรอกคำนำหน้า"),
   firstName: z.string().min(1, "กรุณากรอกชื่อ"),
-  maidenLastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
+  lastName: z.string().min(1, "กรุณากรอกนามสกุล"),
   degreeLevel: z.enum(["DOCTORAL", "MASTER", "BACHELOR", "NURSING_ASSISTANT", "ASSOCIATE"]).optional().nullable(),
   cohort: z.string().optional().nullable(),
-  newLastName: z.string().optional().nullable(),
-  province: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
-  currentWorkplace: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
+  homeAddress: z.string().optional().nullable(),
   awards: z
     .array(
       z.object({
@@ -186,7 +183,7 @@ export const alumniProfileWithRelatedFormSchema = profileFormSchema.extend({
 });
 
 // Server schema: alumniWithRelatedUpdateSchema already has the core profile
-// fields (incl. email/phone/currentWorkplace/country) + the 5 relation arrays;
+// fields (incl. email/phone/homeAddress) + the 5 relation arrays;
 // we only add abroad (validated permissively — names are auto-filled in-txn,
 // so we must NOT route through alumniAgencyCreateSchema which requires a name).
 export const alumniProfileUpdateSchema = alumniWithRelatedUpdateSchema.extend({

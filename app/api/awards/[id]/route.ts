@@ -37,7 +37,7 @@ export async function PUT(
       where: { id },
       data: updateData,
       include: {
-        alumni: { select: { prefix: true, firstName: true, maidenLastName: true } },
+        alumni: { select: { prefix: true, firstName: true, lastName: true } },
       },
     });
 

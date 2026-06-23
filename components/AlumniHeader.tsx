@@ -9,8 +9,7 @@ interface AlumniHeaderProps {
   alumni: {
     prefix: string;
     firstName: string;
-    maidenLastName: string;
-    newLastName: string | null;
+    lastName: string;
   };
 }
 
@@ -25,7 +24,7 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const displayName = `${alumni.prefix}${alumni.firstName} ${alumni.newLastName || alumni.maidenLastName}`;
+  const displayName = `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`;
 
   function isItemActive(href: string) {
     return href === "/graduates/profile"

@@ -12,7 +12,7 @@ export interface AlumniSearchResult {
   studentId: string;
   prefix: string;
   firstName: string;
-  maidenLastName: string;
+  lastName: string;
   // CMU `major_name_th` (or local alumni `major`) — surfaced so entity forms can
   // auto-fill the `major` (สาขาวิชา) field when a record is linked to this alumni.
   major?: string;
@@ -61,7 +61,7 @@ export function useAlumniSearch() {
             studentId: a.studentId,
             prefix: a.prefix ?? "",
             firstName: a.firstName ?? "",
-            maidenLastName: a.maidenLastName ?? "",
+            lastName: a.lastName ?? "",
             major: a.major ?? "",
           });
         }
@@ -77,7 +77,7 @@ export function useAlumniSearch() {
             studentId: c.student_id,
             prefix: "",
             firstName: c.name_th || "",
-            maidenLastName: c.surname_th || "",
+            lastName: c.surname_th || "",
             major: c.major_name_th || "",
           });
         }
@@ -106,8 +106,8 @@ export function useAlumniSearch() {
   }, []);
 
   const displayName = useCallback(
-    (a: { prefix: string; firstName: string; maidenLastName: string }) =>
-      `${a.prefix}${a.firstName} ${a.maidenLastName}`,
+    (a: { prefix: string; firstName: string; lastName: string }) =>
+      `${a.prefix}${a.firstName} ${a.lastName}`,
     [],
   );
 

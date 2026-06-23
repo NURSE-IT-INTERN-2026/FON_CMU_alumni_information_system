@@ -197,7 +197,7 @@ export async function DELETE(
         "DELETE",
         "alumni",
         id,
-        { studentId: existing.studentId, name: `${existing.prefix}${existing.firstName} ${existing.maidenLastName}` },
+        { studentId: existing.studentId, name: `${existing.prefix}${existing.firstName} ${existing.lastName}` },
         getIp(request)
       );
     }

@@ -14,7 +14,7 @@ export interface TrashEntityConfig {
 
 /** Entities that support soft-delete + restore/hard-delete (PRD §3.11). */
 export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
-  alumni: { delegate: "alumni", label: "ข้อมูลนักศึกษาเก่า", nameFields: ["prefix", "firstName", "maidenLastName"], resource: "alumni" },
+  alumni: { delegate: "alumni", label: "ข้อมูลนักศึกษาเก่า", nameFields: ["prefix", "firstName", "lastName"], resource: "alumni" },
   awards: { delegate: "award", label: "รางวัล", nameFields: ["awardName"], resource: "award" },
   associations: { delegate: "association", label: "สมาคม/ชมรม", nameFields: ["associationName"], resource: "association" },
   "graduate-committee": { delegate: "graduateCommittee", label: "กรรมการบัณฑิต", nameFields: ["fullName"], resource: "graduate_committee" },
