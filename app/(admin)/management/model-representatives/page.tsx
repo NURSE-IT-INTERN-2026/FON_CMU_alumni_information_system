@@ -845,6 +845,9 @@ export default function ModelRepresentativesPage() {
                       className="h-4 w-4 rounded border-gray-300"
                     />
                   </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    ลำดับ
+                  </th>
                   {tableHeader("network", "เครือข่าย", true)}
                   {tableHeader("generation", "รุ่นที่", true, "center")}
                   {tableHeader("studentId", "รหัสนักศึกษา", true)}
@@ -858,7 +861,7 @@ export default function ModelRepresentativesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {managePageItems.map((a) => (
+                {managePageItems.map((a, i) => (
                   <tr
                     key={a.id}
                     className="transition-colors hover:bg-gray-50"
@@ -871,6 +874,7 @@ export default function ModelRepresentativesPage() {
                         className="h-4 w-4 rounded border-gray-300"
                       />
                     </td>
+                    <td className="px-4 py-3 text-center text-gray-500">{manageStart + i + 1}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="cohort" value={a.cohort} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center text-gray-500">
                       <OrangeCell resourceType="model_representative" recordId={a.id} field="generation" value={a.generation} hotFields={hot[a.id]} />
@@ -940,6 +944,9 @@ export default function ModelRepresentativesPage() {
                 className="text-white text-left"
                 style={{ backgroundColor: "#5b21b6" }}
               >
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                  ลำดับ
+                </th>
                 {tableHeader("network", "เครือข่าย", false)}
                 {tableHeader("generation", "รุ่นที่", false, "center")}
                 {tableHeader("studentId", "รหัสนักศึกษา", false)}
@@ -950,11 +957,12 @@ export default function ModelRepresentativesPage() {
               </tr>
             </thead>
             <tbody>
-              {viewPageItems.map((a) => (
+              {viewPageItems.map((a, i) => (
                 <tr
                   key={a.id}
                   className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                 >
+                  <td className="px-4 py-3 text-center text-gray-500">{viewStart + i + 1}</td>
                   <td className="px-4 py-3">{a.cohort}</td>
                   <td className="px-4 py-3 text-center">
                     {a.generation}

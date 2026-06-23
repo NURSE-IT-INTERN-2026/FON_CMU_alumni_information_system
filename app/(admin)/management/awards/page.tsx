@@ -157,6 +157,7 @@ export default function AwardsPage() {
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
+  const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];
@@ -619,6 +620,9 @@ export default function AwardsPage() {
                     />
                   </th>
                 )}
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                  ลำดับ
+                </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
                   รหัสนักศึกษา <SortIcon field="studentId" />
                 </th>
@@ -656,7 +660,7 @@ export default function AwardsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center">
+                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -664,14 +668,14 @@ export default function AwardsPage() {
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
+                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
                 </tr>
               ) : awards.length === 0 ? (
                 <tr>
-                  <td colSpan={manageMode ? 13 : 11} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
+                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
-                awards.map((award) => (
+                awards.map((award, i) => (
                   <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
@@ -683,6 +687,7 @@ export default function AwardsPage() {
                         />
                       </td>
                     )}
+                    <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{award.studentId || "-"}</td>
                     <td className="px-4 py-3">{award.major || "-"}</td>
                     <td className="px-4 py-3">{award.prefix || "-"}</td>
