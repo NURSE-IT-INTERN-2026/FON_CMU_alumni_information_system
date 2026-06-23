@@ -35,6 +35,7 @@ enum SessionType {
 enum ActorType {
   ADMIN
   ALUMNI
+  SYSTEM
 }
 
 model Alumni {
@@ -45,6 +46,7 @@ model Alumni {
   prefix                String
   firstName             String
   lastName              String
+  nameManuallyUpdated   Boolean     @default(false)
   englishName           String?
   cohort                String?
   degreeLevel           DegreeLevel
@@ -300,8 +302,9 @@ model ActivityLog {
   ipAddress  String?
   createdAt  DateTime  @default(now())
 
-  user   AdminUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
-  alumni Alumni?    @relation(fields: [alumniId], references: [id], onDelete: SetNull)
+  user         AdminUser?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alumni       Alumni?             @relation(fields: [alumniId], references: [id], onDelete: SetNull)
+  fieldChanges FieldChangeHistory[]
 
   @@index([userId])
   @@index([alumniId])
@@ -339,11 +342,15 @@ model FieldChangeHistory {
   userId       String?
   alumniId     String?
   actorName    String?
-  reason       String?
-  createdAt    DateTime  @default(now())
+  reason        String?
+  activityLogId String?
+  createdAt     DateTime  @default(now())
+
+  activityLog ActivityLog? @relation(fields: [activityLogId], references: [id], onDelete: SetNull)
 
   @@index([resourceType, resourceId, field, createdAt])
   @@index([resourceType, resourceId])
+  @@index([activityLogId])
   @@map("field_change_history")
 }
 

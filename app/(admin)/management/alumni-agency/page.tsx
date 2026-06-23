@@ -9,7 +9,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -218,7 +218,6 @@ export default function AlumniAgencyPage() {
   const [viewPage, setViewPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as any,
     defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
@@ -352,30 +351,23 @@ export default function AlumniAgencyPage() {
   const openCreate = () => {
     formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
     setEditingId(null);
-    setEditReason("");
     setShowForm(true);
   };
 
   const openEdit = (a: AlumniAgency) => {
     formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
-    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setEditReason("");
     formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
     setErrorMsg("");
-    if (editingId && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
     try {
       const payload = {
@@ -391,7 +383,6 @@ export default function AlumniAgencyPage() {
         major: data.major.trim() || null,
         notes: data.notes.trim() || null,
         order: Number(data.order) || 0,
-        ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
         await apiFetch(`/api/alumni-agency/${editingId}`, { method: "PUT", json: payload });
@@ -640,20 +631,6 @@ export default function AlumniAgencyPage() {
               <FormInput registration={register("order")} type="number" />
             </FormField>
           </div>
-          {editingId && (
-            <FormField label="เหตุผลในการแก้ไข" required>
-              <select
-                value={editReason}
-                onChange={(e) => setEditReason(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-              >
-                <option value="">— กรุณาเลือก —</option>
-                {EDIT_REASON_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </FormField>
-          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">

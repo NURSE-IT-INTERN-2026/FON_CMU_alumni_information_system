@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
 import { queryKeys } from "@/lib/query-keys";
@@ -73,7 +73,6 @@ export default function GraduateCommitteePage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(committeePageFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
@@ -131,7 +130,6 @@ export default function GraduateCommitteePage() {
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setEditingId(null);
-    setEditReason("");
     setShowForm(true);
   };
 
@@ -149,14 +147,12 @@ export default function GraduateCommitteePage() {
     });
     setNameSearch("");
     setEditingId(c.id);
-    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setEditReason("");
     setAlumniSearchField(null);
     clearResults();
     formReset(DEFAULT_FORM_VALUES);
@@ -166,14 +162,10 @@ export default function GraduateCommitteePage() {
   const onSave = async (data: CommitteePageFormData) => {
     const studentId = getValues("studentId");
     setErrorMsg("");
-    if (editingId && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
     try {
       if (editingId) {
-        const payload = { studentId, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear), reason: editReason };
+        const payload = { studentId, major: getValues("major")?.trim() || null, ...data, termYear: Number(data.termYear) };
         await apiFetch(`/api/graduate-committee/${editingId}`, { method: "PUT", json: payload });
       } else {
         if (studentId) {
@@ -433,20 +425,6 @@ export default function GraduateCommitteePage() {
               <FormInput registration={register("remarks")} error={errors.remarks?.message} type="text" />
             </FormField>
           </div>
-          {editingId && (
-            <FormField label="เหตุผลในการแก้ไข" required>
-              <select
-                value={editReason}
-                onChange={(e) => setEditReason(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-              >
-                <option value="">— กรุณาเลือก —</option>
-                {EDIT_REASON_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </FormField>
-          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">

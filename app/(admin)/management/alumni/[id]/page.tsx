@@ -9,7 +9,6 @@ import {
   AWARD_TYPE_LABELS,
   DEGREE_LEVEL_OPTIONS,
   PREFIX_OPTIONS,
-  EDIT_REASON_OPTIONS,
 } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
@@ -189,7 +188,6 @@ export default function AdminAlumniProfilePage() {
 
   const [tab, setTab] = useState<"profile" | "logs">("profile");
   const [editMode, setEditMode] = useState(false);
-  const [editReason, setEditReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -249,16 +247,11 @@ export default function AdminAlumniProfilePage() {
     if (!alumni) return;
     setErrorMsg("");
     setSuccessMsg("");
-    if (!editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
 
     // update-with-related persists core + 5 related sections (it does NOT
     // handle alumniAgency), so alumniAgency is intentionally omitted here.
     const payload: Record<string, unknown> = {
-      reason: editReason,
       prefix: data.prefix,
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
@@ -357,7 +350,7 @@ export default function AdminAlumniProfilePage() {
         </div>
         {tab === "profile" && !editMode && canWrite && (
           <button
-            onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); setEditReason(""); }}
+            onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); }}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
           >
             แก้ไข
@@ -492,22 +485,6 @@ export default function AdminAlumniProfilePage() {
               <SectionToggle title="ผู้แทนรุ่น" open={sections.modelReps} onToggle={() => toggleSection("modelReps")}>
                 <RepeatableFieldArray control={control} register={register} errors={errors} name="modelRepresentatives" emptyRow={{ cohort: "", generation: "" }} fields={MODEL_REP_FIELDS} />
               </SectionToggle>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  เหตุผลในการแก้ไข <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={editReason}
-                  onChange={(e) => setEditReason(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-                >
-                  <option value="">— กรุณาเลือก —</option>
-                  {EDIT_REASON_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)] disabled:opacity-60">

@@ -46,7 +46,15 @@ interface AlumniLogContext {
   alumniName: string;
 }
 
-export type LogContext = AdminLogContext | AlumniLogContext;
+// System-generated events (e.g. graduation logs). alumniId/alumniName optional
+// — set when the event is about a specific alumni.
+interface SystemLogContext {
+  actorType: "SYSTEM";
+  alumniId?: string;
+  alumniName?: string;
+}
+
+export type LogContext = AdminLogContext | AlumniLogContext | SystemLogContext;
 
 export async function logActivity(
   ctx: LogContext,
@@ -55,42 +63,48 @@ export async function logActivity(
   resourceId?: string | null,
   details?: Record<string, unknown> | null,
   ipAddress?: string | null,
-  reason?: string | null
-): Promise<void> {
+  reason?: string | null,
+  tx: Prisma.TransactionClient = prisma
+): Promise<string | null> {
   try {
+    const common = {
+      action,
+      resource,
+      resourceId: resourceId ?? null,
+      reason: reason ?? null,
+      details: details ? (details as Prisma.InputJsonValue) : undefined,
+      ipAddress: ipAddress ?? null,
+    };
+    let data: Prisma.ActivityLogUncheckedCreateInput;
     if (ctx.actorType === "ADMIN") {
-      await prisma.activityLog.create({
-        data: {
-          actorType: "ADMIN",
-          userId: ctx.userId,
-          userEmail: ctx.userEmail,
-          userRole: ctx.userRole,
-          action,
-          resource,
-          resourceId: resourceId ?? null,
-          reason: reason ?? null,
-          details: details ? (details as Prisma.InputJsonValue) : undefined,
-          ipAddress: ipAddress ?? null,
-        },
-      });
+      data = {
+        ...common,
+        actorType: "ADMIN",
+        userId: ctx.userId,
+        userEmail: ctx.userEmail,
+        userRole: ctx.userRole,
+      };
+    } else if (ctx.actorType === "ALUMNI") {
+      data = {
+        ...common,
+        actorType: "ALUMNI",
+        alumniId: ctx.alumniId,
+        alumniName: ctx.alumniName,
+      };
     } else {
-      await prisma.activityLog.create({
-        data: {
-          actorType: "ALUMNI",
-          alumniId: ctx.alumniId,
-          alumniName: ctx.alumniName,
-          action,
-          resource,
-          resourceId: resourceId ?? null,
-          reason: reason ?? null,
-          details: details ? (details as Prisma.InputJsonValue) : undefined,
-          ipAddress: ipAddress ?? null,
-        },
-      });
+      data = {
+        ...common,
+        actorType: "SYSTEM",
+        ...(ctx.alumniId ? { alumniId: ctx.alumniId } : {}),
+        ...(ctx.alumniName ? { alumniName: ctx.alumniName } : {}),
+      };
     }
+    const log = await tx.activityLog.create({ data });
+    return log.id;
   } catch (err) {
     // Logging must never break the main request
     console.error("Failed to write activity log:", err);
+    return null;
   }
 }
 

@@ -87,6 +87,10 @@ export async function PUT(
       }
     }
 
+    // Every edit locks the current name as the alumni's override — future
+    // highest-degree re-syncs won't clobber a manually-edited value.
+    updateData.nameManuallyUpdated = true;
+
     if (updateData.studentId && updateData.studentId !== existing.studentId) {
       const newStudentId = updateData.studentId as string;
 

@@ -19,16 +19,6 @@ export const PREFIX_OPTIONS = [
   { value: "อื่นๆ", label: "อื่นๆ" },
 ];
 
-/**
- * Reason required when editing any record (admin data pages + alumni profile).
- * No default — forces an explicit choice to keep activity logs accurate.
- */
-export const EDIT_REASON_VALUES = ["แก้ไขให้ถูกต้อง", "อัปเดตข้อมูล"] as const;
-export const EDIT_REASON_OPTIONS = EDIT_REASON_VALUES.map((value) => ({
-  value,
-  label: value,
-}));
-
 export interface NavItem {
   href: string;
   label: string;

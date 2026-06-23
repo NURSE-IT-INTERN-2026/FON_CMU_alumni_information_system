@@ -82,6 +82,7 @@ export async function PUT(request: NextRequest) {
             email: validated.email || null,
             phone: validated.phone || null,
             homeAddress: validated.homeAddress?.trim() || null,
+            nameManuallyUpdated: true,
             isPotential: hasPotentials,
             isModelRepresentative: hasModelReps,
           },

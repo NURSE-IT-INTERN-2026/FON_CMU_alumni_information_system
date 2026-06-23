@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -104,7 +104,6 @@ export default function ModelRepresentativesPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(modelRepPageFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
@@ -279,7 +278,6 @@ export default function ModelRepresentativesPage() {
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setEditingId(null);
-    setEditReason("");
     setShowForm(true);
   };
 
@@ -295,14 +293,12 @@ export default function ModelRepresentativesPage() {
     });
     setNameSearch("");
     setEditingId(item.id);
-    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setShowCohortDropdown(false);
@@ -313,10 +309,6 @@ export default function ModelRepresentativesPage() {
   const onSave = async (data: ModelRepPageFormData) => {
     const studentId = getValues("studentId");
     setErrorMsg("");
-    if (editingId && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
     try {
       const payload = {
@@ -325,7 +317,6 @@ export default function ModelRepresentativesPage() {
         ...data,
         cohort: data.cohort.trim(),
         generation: Number(data.generation),
-        ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
         await apiFetch(`/api/model-representatives/${editingId}`, { method: "PUT", json: payload });
@@ -700,20 +691,6 @@ export default function ModelRepresentativesPage() {
               <FormInput registration={register("generation")} error={errors.generation?.message} type="number" />
             </FormField>
           </div>
-          {editingId && (
-            <FormField label="เหตุผลในการแก้ไข" required>
-              <select
-                value={editReason}
-                onChange={(e) => setEditReason(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-              >
-                <option value="">— กรุณาเลือก —</option>
-                {EDIT_REASON_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </FormField>
-          )}
           <div className="mt-4 flex justify-end gap-3">
             <button
               onClick={closeForm}

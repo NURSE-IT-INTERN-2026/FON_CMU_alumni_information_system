@@ -8,7 +8,7 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import { useCanWrite } from "@/lib/role-context";
-import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, EDIT_REASON_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
 import { queryKeys } from "@/lib/query-keys";
@@ -113,7 +113,6 @@ export default function AwardsPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
     resolver: zodResolver(awardPageFormSchema) as any,
     defaultValues: DEFAULT_FORM_VALUES,
@@ -193,7 +192,6 @@ export default function AwardsPage() {
     setNameSearch("");
     setFormSearchField(null);
     setEditingId(null);
-    setEditReason("");
     setShowForm(true);
   };
 
@@ -213,14 +211,12 @@ export default function AwardsPage() {
     });
     setNameSearch(recipientDisplay(a));
     setEditingId(a.id);
-    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setFormSearchField(null);
@@ -230,10 +226,6 @@ export default function AwardsPage() {
   const onSave = async (data: AwardPageFormData) => {
     const studentId = getValues("studentId");
     setErrorMsg("");
-    if (editingId && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
     try {
       const payload = {
@@ -248,7 +240,6 @@ export default function AwardsPage() {
         link: data.link?.trim() || null,
         imageUrl: data.imageUrl?.trim() || null,
         description: data.description?.trim() || null,
-        ...(editingId ? { reason: editReason } : {}),
       };
       if (editingId) {
         await apiFetch(`/api/awards/${editingId}`, { method: "PUT", json: payload });
@@ -468,20 +459,6 @@ export default function AwardsPage() {
             <FormField label="รายละเอียด" className="sm:col-span-2">
               <FormInput registration={register("description")} type="text" />
             </FormField>
-            {editingId && (
-              <FormField label="เหตุผลในการแก้ไข" required className="sm:col-span-2">
-                <select
-                  value={editReason}
-                  onChange={(e) => setEditReason(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-                >
-                  <option value="">— กรุณาเลือก —</option>
-                  {EDIT_REASON_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </FormField>
-            )}
           </div>
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>

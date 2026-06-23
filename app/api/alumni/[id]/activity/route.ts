@@ -84,6 +84,7 @@ export async function GET(
     const fieldClauses = [
       { resourceType: "alumni", resourceId: alumni.id },
       { resourceType: "alumni_profile", resourceId: alumni.id },
+      { resourceType: "education", resourceId: alumni.id },
       ...(awardIds.length ? [{ resourceType: "award", resourceId: { in: awardIds } }] : []),
       ...(assocIds.length ? [{ resourceType: "association", resourceId: { in: assocIds } }] : []),
       ...(committeeIds.length ? [{ resourceType: "graduate_committee", resourceId: { in: committeeIds } }] : []),
@@ -114,6 +115,27 @@ export async function GET(
       }),
     ]);
 
+    // Field changes linked to each activity log (via activityLogId) — drives the
+    // click-to-open changes modal. SYSTEM graduation logs link education fields.
+    const activityIds = activityLogs.map((l) => l.id);
+    const linkedChanges = activityIds.length
+      ? await prisma.fieldChangeHistory.findMany({
+          where: { activityLogId: { in: activityIds } },
+          select: { activityLogId: true, field: true, oldValue: true, newValue: true },
+          orderBy: { field: "asc" },
+        })
+      : [];
+    const changesByLog = new Map<
+      string,
+      { field: string; oldValue: string | null; newValue: string | null }[]
+    >();
+    for (const c of linkedChanges) {
+      if (!c.activityLogId) continue;
+      const arr = changesByLog.get(c.activityLogId) ?? [];
+      arr.push({ field: c.field, oldValue: c.oldValue, newValue: c.newValue });
+      changesByLog.set(c.activityLogId, arr);
+    }
+
     const fieldItems = fieldChanges.map((f) => ({
       kind: "field" as const,
       id: f.id,
@@ -131,9 +153,11 @@ export async function GET(
       const actorName =
         l.actorType === "ALUMNI"
           ? l.alumniName
-          : [l.user?.firstName, l.user?.lastName].filter(Boolean).join(" ") ||
-            l.userEmail ||
-            null;
+          : l.actorType === "SYSTEM"
+            ? "ระบบ"
+            : [l.user?.firstName, l.user?.lastName].filter(Boolean).join(" ") ||
+              l.userEmail ||
+              null;
       return {
         kind: "activity" as const,
         id: l.id,
@@ -145,6 +169,7 @@ export async function GET(
         actorName,
         reason: l.reason,
         details: l.details,
+        changes: changesByLog.get(l.id) ?? [],
       };
     });
 

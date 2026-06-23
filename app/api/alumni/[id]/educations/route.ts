@@ -5,6 +5,8 @@ import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
+import { generateGraduationLogs } from "@/lib/graduation-log";
+import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 // Resolve an alumni by UUID or studentId (mirrors GET /api/alumni/[id]).
@@ -86,6 +88,9 @@ export async function POST(
         { alumniId: alumni.id, studentId: created.studentId, degreeLevel: created.degreeLevel },
         ip,
       );
+      // SYSTEM graduation log + re-sync the current name from the highest degree.
+      await generateGraduationLogs(alumni.id);
+      await syncNameFromHighestDegree(alumni.id);
 
       return NextResponse.json(created, { status: 201 });
     } catch (error) {

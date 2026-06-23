@@ -22,6 +22,7 @@ import {
 import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 import { syncPrimarySnapshot } from "@/lib/education-sync";
+import { generateGraduationLogs } from "@/lib/graduation-log";
 
 const alumniSignupApiSchema = z.object({
   studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
@@ -240,6 +241,8 @@ export async function POST(request: Request) {
           });
           await syncPrimarySnapshot(alumniId);
         }
+        // SYSTEM graduation log for this new degree.
+        await generateGraduationLogs(alumniId);
       }
     } catch (error) {
       // P2002 = unique violation (email/studentId race) → 409

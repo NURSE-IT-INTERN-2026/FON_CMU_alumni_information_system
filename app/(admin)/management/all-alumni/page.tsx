@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
@@ -207,7 +207,6 @@ export default function AlumniCountPage() {
   const alumni = allMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalAlumni = manageQuery.data?.total ?? 0;
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const hot = useHotFields("alumni", alumni.map((a) => a.id));
   const [saving, setSaving] = useState(false);
 
@@ -355,22 +354,16 @@ export default function AlumniCountPage() {
       homeAddress: a.homeAddress || "",
     });
     setEditingId(a.id);
-    setEditReason("");
   };
 
   const closeForm = () => {
     setEditingId(null);
-    setEditReason("");
     formReset(EMPTY_EDIT_FORM);
   };
 
   const handleSave = async (data: AlumniEditFormData) => {
     setErrorMsg("");
     const isLocal = !!editingId && isLocalRecordId(editingId);
-    if (isLocal && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     // studentId is the key (FK for all related tables), so it must be unique
     // across the merged view. Check the full loaded set (local + CMU) up front
     // for immediate feedback; the PUT route re-checks the local DB (409) as the
@@ -398,7 +391,6 @@ export default function AlumniCountPage() {
         email: data.email.trim() || null,
         phone: data.phone.trim() || null,
         homeAddress: data.homeAddress.trim() || null,
-        ...(isLocal ? { reason: editReason } : {}),
       };
 
       // CMU-only record (not yet in local DB) → POST to create
@@ -705,20 +697,6 @@ export default function AlumniCountPage() {
                   <FormInput registration={register("homeAddress")} type="text" />
                 </FormField>
               </div>
-              {editingId && isLocalRecordId(editingId) && (
-                <FormField label="เหตุผลในการแก้ไข" required className="mt-4">
-                  <select
-                    value={editReason}
-                    onChange={(e) => setEditReason(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-                  >
-                    <option value="">— กรุณาเลือก —</option>
-                    {EDIT_REASON_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </FormField>
-              )}
               <div className="mt-4 flex justify-end gap-3">
                 <button
                   onClick={closeForm}

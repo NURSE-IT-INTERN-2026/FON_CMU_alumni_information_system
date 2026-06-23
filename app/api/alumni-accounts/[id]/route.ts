@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
-import { EDIT_REASON_VALUES } from "@/lib/constants";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
@@ -60,16 +59,9 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // Admin edits require an explicit reason (PRD §3.15).
-    const reason = EDIT_REASON_VALUES.includes(body?.reason)
-      ? (body.reason as string)
-      : null;
-    if (!reason) {
-      return NextResponse.json(
-        { error: "กรุณาเลือกเหตุผลในการแก้ไข" },
-        { status: 400 }
-      );
-    }
+    // Edit reason is optional (the UI no longer requires it). Pass whatever
+    // value through to the audit logs.
+    const reason = typeof body?.reason === "string" ? body.reason : undefined;
 
     // Admin can edit all alumni fields
     const allowedFields = [

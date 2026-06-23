@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEGREE_LEVEL_VALUES } from "./alumni";
+import { editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณากรอกรหัสนักศึกษา",
@@ -41,7 +42,7 @@ export const educationUpdateSchema = z.object({
   cohort: z.string().trim().nullable().optional(),
   firstName: z.string().trim().nullable().optional(),
   lastName: z.string().trim().nullable().optional(),
-  reason: z.string().optional(),
+  reason: editReasonField(),
 });
 
 export type EducationCreateInput = z.infer<typeof educationCreateSchema>;

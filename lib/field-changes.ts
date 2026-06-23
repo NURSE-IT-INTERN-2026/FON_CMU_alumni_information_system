@@ -57,6 +57,15 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
     "homeAddress",
     "remarks",
   ],
+  education: [
+    "studentId",
+    "degreeLevel",
+    "graduationYear",
+    "major",
+    "cohort",
+    "firstName",
+    "lastName",
+  ],
 };
 
 function coerce(v: unknown): string | null {

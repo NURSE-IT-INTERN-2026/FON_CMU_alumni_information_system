@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
-import { PAGE_SIZE, BASE_PATH, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
 import { queryKeys } from "@/lib/query-keys";
@@ -74,7 +74,6 @@ export default function AssociationsPage() {
   const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReason, setEditReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
@@ -139,7 +138,6 @@ export default function AssociationsPage() {
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setEditingId(null);
-    setEditReason("");
     setShowForm(true);
   };
 
@@ -156,14 +154,12 @@ export default function AssociationsPage() {
     });
     setNameSearch("");
     setEditingId(item.id);
-    setEditReason("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setEditReason("");
     formReset(DEFAULT_FORM_VALUES);
     setNameSearch("");
     setAlumniSearchField(null);
@@ -173,13 +169,9 @@ export default function AssociationsPage() {
   const onSave = async (data: AssociationPageFormData) => {
     const studentId = getValues("studentId");
     setErrorMsg("");
-    if (editingId && !editReason) {
-      setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
-      return;
-    }
     setSaving(true);
     try {
-      const payload = { studentId, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear), ...(editingId ? { reason: editReason } : {}) };
+      const payload = { studentId, major: getValues("major")?.trim() || null, ...data, recordedYear: Number(data.recordedYear) };
       if (editingId) {
         await apiFetch(`/api/associations/${editingId}`, { method: "PUT", json: payload });
       } else {
@@ -427,20 +419,6 @@ export default function AssociationsPage() {
               <FormInput registration={register("recordedYear")} error={errors.recordedYear?.message} type="text" placeholder="เช่น 2568" />
             </FormField>
           </div>
-          {editingId && (
-            <FormField label="เหตุผลในการแก้ไข" required>
-              <select
-                value={editReason}
-                onChange={(e) => setEditReason(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-              >
-                <option value="">— กรุณาเลือก —</option>
-                {EDIT_REASON_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </FormField>
-          )}
           <div className="mt-4 flex justify-end gap-3">
             <button onClick={closeForm} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
             <button onClick={handleSubmit(onSave)} disabled={saving} className="rounded-lg bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">

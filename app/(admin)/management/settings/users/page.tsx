@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite, useRole } from "@/lib/role-context";
-import { DEGREE_LEVEL_OPTIONS, EDIT_REASON_OPTIONS } from "@/lib/constants";
+import { DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -286,7 +286,6 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
   const [errorMsg, setErrorMsg] = useState("");
   const [emailEdit, setEmailEdit] = useState<AlumniAccount | null>(null);
   const [emailValue, setEmailValue] = useState("");
-  const [emailReason, setEmailReason] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
 
   const pageSize = 10;
@@ -316,17 +315,15 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
   const openEmailEdit = (a: AlumniAccount) => {
     setEmailEdit(a);
     setEmailValue(a.email || "");
-    setEmailReason("");
   };
 
   const saveEmail = async () => {
     if (!emailEdit) return;
     if (!emailValue.trim()) { setErrorMsg("กรุณากรอกอีเมล"); return; }
-    if (!emailReason) { setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข"); return; }
     setEmailSaving(true);
     setErrorMsg("");
     try {
-      await apiFetch(`/api/alumni-accounts/${emailEdit.id}`, { method: "PUT", json: { email: emailValue.trim(), reason: emailReason } });
+      await apiFetch(`/api/alumni-accounts/${emailEdit.id}`, { method: "PUT", json: { email: emailValue.trim() } });
       setEmailEdit(null);
       qc.invalidateQueries({ queryKey: queryKeys.alumniAccounts.all });
     } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด"); } finally { setEmailSaving(false); }
@@ -431,19 +428,6 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
               onChange={(e) => setEmailValue(e.target.value)}
               className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
             />
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              เหตุผลในการแก้ไข <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={emailReason}
-              onChange={(e) => setEmailReason(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
-            >
-              <option value="">— กรุณาเลือก —</option>
-              {EDIT_REASON_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
             <div className="flex justify-end gap-3">
               <button onClick={() => setEmailEdit(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">ยกเลิก</button>
               <button onClick={saveEmail} disabled={emailSaving} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">

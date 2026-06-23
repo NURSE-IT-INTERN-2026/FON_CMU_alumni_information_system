@@ -45,6 +45,7 @@ export async function PUT(
           email: validated.email || null,
           phone: validated.phone || null,
           homeAddress: validated.homeAddress?.trim() || null,
+          nameManuallyUpdated: true,
           isPotential: hasPotentials,
           isModelRepresentative: hasModelReps,
           // Admin edit — flag so the alumni sees the "edited by admin" popup
