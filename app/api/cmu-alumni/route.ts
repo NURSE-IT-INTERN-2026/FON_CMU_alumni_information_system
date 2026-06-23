@@ -8,6 +8,11 @@ import { PAGE_SIZE } from "@/lib/constants";
 
 const RATE_LIMIT_MAX = 300;
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+// Upper bound on pageSize. The all-alumni "manage" mode fetches the full CMU
+// list in one request (to merge with local data and paginate the result on the
+// client), so this is larger than a typical page. The default stays at
+// PAGE_SIZE; this only guards against absurd input.
+const MAX_PAGE_SIZE = 50_000;
 
 export async function GET(request: NextRequest) {
   // 1. Auth check
@@ -39,7 +44,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.max(
       1,
-      Math.min(100, parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10)),
+      Math.min(MAX_PAGE_SIZE, parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10)),
     );
     const search = searchParams.get("search")?.trim().toLowerCase() || "";
     const sortField = searchParams.get("sortField") || "student_id";

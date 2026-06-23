@@ -33,6 +33,7 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
     "notes",
   ],
   alumni: [
+    "studentId",
     "prefix",
     "firstName",
     "maidenLastName",

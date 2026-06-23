@@ -59,6 +59,15 @@ export const alumniCreateSchema = z.object({
 });
 
 export const alumniUpdateSchema = z.object({
+  // studentId is editable here (manage-mode edit form). It's the FK that every
+  // related table (awards, associations, …) references, so changes must be
+  // unique — the PUT /api/alumni/[id] route enforces this (409 on collision)
+  // and the DB FK is `ON UPDATE CASCADE`, so related rows follow automatically.
+  studentId: z
+    .string()
+    .min(1, MSG.studentIdRequired)
+    .regex(/^\d+$/, MSG.studentIdNumeric)
+    .optional(),
   prefix: z.string().min(1, MSG.prefixRequired).optional(),
   firstName: z.string().min(1, MSG.firstNameRequired).optional(),
   maidenLastName: z.string().min(1, MSG.maidenLastNameRequired).optional(),

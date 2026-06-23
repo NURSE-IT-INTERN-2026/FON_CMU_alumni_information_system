@@ -141,21 +141,26 @@ export default function AlumniCountPage() {
   const qc = useQueryClient();
   // Manage mode: merge CMU Registrar + local DB (with soft-delete overlay).
   // The merge logic now lives in the queryFn and returns { merged, total }.
+  // NOTE: the query is keyed WITHOUT `page` — we fetch the full merged set once
+  // (per search/filter/sort) and paginate it on the client by slicing
+  // `allMerged`. This is required because the merged CMU+local result can only
+  // be sorted/paginated correctly once the full set is assembled.
   const manageQuery = useQuery({
-    queryKey: ["alumni", "manage", { page, search, filtersKey, sortField, sortDir }],
+    queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir }],
     enabled: manageMode,
     queryFn: async () => {
+      // Fetch the FULL CMU list (not a single page) so the client can merge,
+      // sort, and paginate the complete set. `fetchCmuGraduates` caches the
+      // upstream call for 5 min, so this is one request per search/filter/sort.
       const cmuParams = new URLSearchParams({
-        page: String(page), pageSize: String(PAGE_SIZE), search,
+        page: "1", pageSize: "50000", search,
         sortField: sortField as string, sortDir,
       });
       facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
       let cmuData: CmuAlumni[] = [];
-      let cmuTotalCount = 0;
       try {
         const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${cmuParams}`);
         cmuData = cmuJson.data || [];
-        cmuTotalCount = cmuJson.total || 0;
       } catch {}
 
       const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
@@ -194,26 +199,35 @@ export default function AlumniCountPage() {
       for (const a of Object.values(localMap)) {
         if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) merged.push(a);
       }
-      const adjustedTotal = cmuTotalCount - deletedStudentIds.size +
-        Object.values(localMap).filter(a => !localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)).length;
-      // Sort the merged CMU+local result client-side so local-only fields
+      // Sort the full merged CMU+local result client-side so local-only fields
       // (birthDate, prefix, …) reorder correctly; the CMU proxy can't sort them.
-      return { merged: sortAlumni(merged, sortField, sortDir), total: Math.max(0, adjustedTotal) };
+      // We hold the complete set, so the total is simply its length.
+      return { merged: sortAlumni(merged, sortField, sortDir), total: merged.length };
     },
   });
-  const alumni = manageQuery.data?.merged ?? [];
+  // Manage mode paginates the full merged set on the client. `allMerged` holds
+  // every row (for cross-page delete/bulk-delete lookups); `alumni` is the
+  // current page's slice that the table renders. Since the query is keyed
+  // without `page`, navigating pages is instant (no refetch).
+  const allMerged = manageQuery.data?.merged ?? [];
+  const alumni = allMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalAlumni = manageQuery.data?.total ?? 0;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editReason, setEditReason] = useState("");
   const hot = useHotFields("alumni", alumni.map((a) => a.id));
   const [saving, setSaving] = useState(false);
 
-  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<AlumniEditFormData>({
+  const { register, handleSubmit, setError: setFormError, formState: { errors: formErrors }, reset: formReset } = useForm<AlumniEditFormData>({
     resolver: zodResolver(alumniEditFormSchema) as any,
     defaultValues: EMPTY_EDIT_FORM,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  // Editing a CMU-only record (no local row yet) creates a local OVERRIDE
+  // keyed by the CMU student_id. CMU is read-only, so the studentId (the key
+  // that links the override to its CMU record) is locked — only already-local
+  // records (PUT path) may change it. See handleSave / PUT /api/alumni/[id].
+  const editingCmuOnly = !!editingId && !isLocalRecordId(editingId);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{
     imported: number;
@@ -366,6 +380,21 @@ export default function AlumniCountPage() {
       setErrorMsg("กรุณาเลือกเหตุผลในการแก้ไข");
       return;
     }
+    // studentId is the key (FK for all related tables), so it must be unique
+    // across the merged view. Check the full loaded set (local + CMU) up front
+    // for immediate feedback; the PUT route re-checks the local DB (409) as the
+    // authoritative backstop.
+    const newStudentId = data.studentId.trim();
+    const conflict = allMerged.some(
+      (a) => a.id !== editingId && a.studentId === newStudentId,
+    );
+    if (conflict) {
+      setFormError("studentId", {
+        type: "manual",
+        message: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว กรุณาใช้รหัสอื่น",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -406,8 +435,10 @@ export default function AlumniCountPage() {
         // Local record → soft delete via DELETE endpoint
         await apiFetch(`/api/alumni/${deleteId}`, { method: "DELETE" });
       } else {
-        // CMU-only record → create a soft-deleted local record to hide it
-        const alumniRecord = alumni.find((a) => a.id === deleteId);
+        // CMU-only record → create a soft-deleted local record to hide it.
+        // Look up in `allMerged` (full set), not the page slice, in case the
+        // row was selected on a different page before the dialog opened.
+        const alumniRecord = allMerged.find((a) => a.id === deleteId);
         if (alumniRecord) {
           await apiFetch(`/api/alumni`, {
             method: "POST",
@@ -445,9 +476,11 @@ export default function AlumniCountPage() {
         await apiFetch(`/api/alumni/bulk-delete`, { method: "POST", json: { ids: localIds } });
       }
 
-      // For CMU-only records, create soft-deleted local records to hide them
+      // For CMU-only records, create soft-deleted local records to hide them.
+      // Look up in `allMerged` (full set) so CMU-only rows selected on other
+      // pages resolve correctly.
       for (const cmuId of cmuIds) {
-        const record = alumni.find((a) => a.id === cmuId);
+        const record = allMerged.find((a) => a.id === cmuId);
         if (record) {
           await apiFetch(`/api/alumni`, {
             method: "POST",
@@ -631,7 +664,19 @@ export default function AlumniCountPage() {
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <FormField label="รหัสนักศึกษา" required error={formErrors.studentId?.message}>
-                  <FormInput registration={register("studentId")} error={formErrors.studentId?.message} type="text" />
+                  <FormInput
+                    registration={register("studentId")}
+                    error={formErrors.studentId?.message}
+                    type="text"
+                    readOnly={editingCmuOnly}
+                    className={editingCmuOnly ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}
+                    title={editingCmuOnly ? "รหัสนักศึกษาจากระบบทะเบียน ใช้เป็นคีย์เชื่อมข้อมูล จึงแก้ไขไม่ได้" : undefined}
+                  />
+                  {editingCmuOnly && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      รหัสนักศึกษาจากระบบทะเบียน — แก้ไขไม่ได้ (บันทึกเป็นข้อมูลทับระเบียน)
+                    </p>
+                  )}
                 </FormField>
                 <FormField label="คำนำหน้า" required error={formErrors.prefix?.message}>
                   <FormSelect registration={register("prefix")} error={formErrors.prefix?.message}>

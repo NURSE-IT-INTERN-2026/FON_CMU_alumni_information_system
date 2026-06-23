@@ -5,6 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity, getIp } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
+import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
@@ -87,12 +88,43 @@ export async function PUT(
     }
 
     if (updateData.studentId && updateData.studentId !== existing.studentId) {
-      const duplicate = await prisma.alumni.findUnique({
-        where: { studentId: updateData.studentId as string },
+      const newStudentId = updateData.studentId as string;
+
+      // Case 3: another local alumni already uses this studentId.
+      const localDuplicate = await prisma.alumni.findUnique({
+        where: { studentId: newStudentId },
       });
-      if (duplicate) {
+      if (localDuplicate) {
         return NextResponse.json(
           { error: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
+          { status: 409 }
+        );
+      }
+
+      // Cases 1 & 2: the studentId matches a CMU Registrar record — whether
+      // that CMU record is CMU-only (1) or already overlaid by a local alumni
+      // (2). Re-keying onto another person's CMU record would corrupt the
+      // merged view (the local row would overlay a different person), so
+      // reject. The new studentId can't be the *current* alumni's own CMU
+      // record (we only get here when it differs from `existing.studentId`),
+      // so any match is a different person. CMU `student_id` carries trailing
+      // spaces — trim before comparing (same convention as `ensure-alumni`).
+      // `fetchCmuGraduates` caches the list for 5 min.
+      let cmuGraduates: CmuGraduate[];
+      try {
+        cmuGraduates = await fetchCmuGraduates();
+      } catch {
+        return NextResponse.json(
+          { error: "ระบบทะเบียนมหาวิทยาลัยไม่ตอบสนอง ไม่สามารถตรวจสอบรหัสนักศึกษาได้ กรุณาลองใหม่ภายหลัง" },
+          { status: 503 }
+        );
+      }
+      const cmuDuplicate = cmuGraduates.some(
+        (g) => String(g.student_id ?? "").trim() === newStudentId,
+      );
+      if (cmuDuplicate) {
+        return NextResponse.json(
+          { error: "รหัสนักศึกษานี้ตรงกับข้อมูลในระบบทะเบียนของมหาวิทยาลัย" },
           { status: 409 }
         );
       }
