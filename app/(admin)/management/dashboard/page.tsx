@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
+import { DEGREE_COLORS } from "@/lib/constants";
 import {
   LineChart,
   Line,
@@ -101,7 +102,11 @@ interface ChartData {
   series: ChartSeries[];
 }
 
-const SERIES_COLORS = ["#f57f17", "#00838f", "#5b21b6", "#2e7d32", "#c62828"];
+// Degree-level colors are shared via DEGREE_COLORS (@/lib/constants) so the
+// education cards on the profile pages match the dashboard graph. Order here
+// follows the lowest→highest degree sequence used by the chart series.
+const DEGREE_ORDER = ["NURSING_ASSISTANT", "ASSOCIATE", "BACHELOR", "MASTER", "DOCTORAL"];
+const SERIES_COLORS = DEGREE_ORDER.map((k) => DEGREE_COLORS[k]);
 
 // ---------------------------------------------------------------------------
 // Card config
@@ -117,11 +122,11 @@ interface CardConfig {
 }
 
 const DEGREE_MINI_CARDS = [
-  { key: "NURSING_ASSISTANT", label: "ผู้ช่วยพยาบาล", color: "#f57f17" },
-  { key: "ASSOCIATE", label: "อนุปริญญา", color: "#00838f" },
-  { key: "BACHELOR", label: "ปริญญาตรี", color: "#5b21b6" },
-  { key: "MASTER", label: "ปริญญาโท", color: "#2e7d32" },
-  { key: "DOCTORAL", label: "ปริญญาเอก", color: "#c62828" },
+  { key: "NURSING_ASSISTANT", label: "ผู้ช่วยพยาบาล", color: DEGREE_COLORS.NURSING_ASSISTANT },
+  { key: "ASSOCIATE", label: "อนุปริญญา", color: DEGREE_COLORS.ASSOCIATE },
+  { key: "BACHELOR", label: "ปริญญาตรี", color: DEGREE_COLORS.BACHELOR },
+  { key: "MASTER", label: "ปริญญาโท", color: DEGREE_COLORS.MASTER },
+  { key: "DOCTORAL", label: "ปริญญาเอก", color: DEGREE_COLORS.DOCTORAL },
 ];
 
 // PRD §3.2: awards summary on the dashboard, grouped by type (in this order).

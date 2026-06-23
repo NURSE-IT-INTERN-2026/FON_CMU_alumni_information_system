@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getIp } from "@/lib/activity-log";
 import { fetchCmuGraduates, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
-import { normalizeCmuBirthday } from "@/lib/alumni-verify";
+import { normalizeCmuBirthday, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { PAGE_SIZE } from "@/lib/constants";
 
 const RATE_LIMIT_MAX = 300;
@@ -60,8 +60,11 @@ export async function GET(request: NextRequest) {
     const majors = facetList("major");
     const graduationYears = facetList("graduationYear");
 
-    // 4. Fetch from CMU Registrar API
-    const graduates = await fetchCmuGraduates();
+    // 4. Fetch from CMU Registrar API, then collapse a person's multiple
+    //    degree records into their HIGHEST degree (same first name + last name
+    //    + birthday). Done on the FULL list before search/facets/sort/pagination
+    //    so two records that would land on different pages still collapse.
+    const graduates = dedupeCmuGraduatesByPerson(await fetchCmuGraduates());
 
     // 5. Apply search filter
     let filtered = graduates;

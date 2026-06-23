@@ -9,6 +9,7 @@ import {
   cmuLevelToEnum,
   type CmuGraduate,
 } from "@/lib/cmu-registrar";
+import { dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import {
   ENTITY_DELEGATE,
   FACET_FIELDS,
@@ -134,7 +135,7 @@ export async function getAlumniFacetValues(
   const isYear = YEAR_FIELDS.has(field);
   const search = opts.search?.trim().toLowerCase();
 
-  const [cmuGraduates, localAlumni] = await Promise.all([
+  const [cmuGraduatesRaw, localAlumni] = await Promise.all([
     fetchCmuGraduates(),
     prisma.alumni.findMany({
       select: {
@@ -146,6 +147,9 @@ export async function getAlumniFacetValues(
       },
     }),
   ]);
+  // Collapse a person's multiple CMU degree records into their highest degree
+  // so facet counts match the all-alumni table (which dedups the same way).
+  const cmuGraduates = dedupeCmuGraduatesByPerson(cmuGraduatesRaw);
 
   const cmuStudentIds = new Set(cmuGraduates.map((g) => g.student_id));
   const deletedStudentIds = new Set<string>();

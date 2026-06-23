@@ -44,18 +44,15 @@ model Alumni {
   birthDate             String?
   prefix                String
   firstName             String
-  maidenLastName        String
+  lastName              String
   englishName           String?
   cohort                String?
-  newLastName           String?
   degreeLevel           DegreeLevel
-  province              String?
   email                 String?     @unique
   phone                 String?
   major                 String?
   graduationYear        Int?
-  currentWorkplace      String?
-  country               String?
+  primaryEducationId    String?  @unique
   homeAddress           String?
   remarks               String?
   isPotential           Boolean     @default(false)
@@ -81,6 +78,8 @@ model Alumni {
   passwordResets       PasswordReset[]
   sessions             Session[]
   activityLogs         ActivityLog[]
+  educations           Education[]
+  primaryEducation     Education?  @relation("PrimaryEducation", fields: [primaryEducationId], references: [id], onDelete: SetNull)
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -88,6 +87,35 @@ model Alumni {
   @@index([major])
   @@index([graduationYear])
   @@map("alumni")
+}
+
+// One row per degree an alumni earned at FON. CMU Registrar returns one record
+// per degree, so a person with a Bachelor's then a Doctoral has two rows here
+// (distinct `studentId`, `degreeLevel`, `graduationYear`, `major`, `cohort`).
+// `Alumni` keeps a denormalized "primary" snapshot of the chosen row
+// (`studentId`/`degreeLevel`/`graduationYear`/`major`/`cohort` + the
+// `primaryEducationId` pointer) so the 6 related tables (Award, Association, …)
+// keep joining on `Alumni.studentId`. Keep that snapshot in sync via
+// `syncPrimarySnapshot` (`lib/education-sync.ts`) — never edit it directly.
+model Education {
+  id             String      @id @default(uuid())
+  alumniId       String
+  studentId      String      @unique
+  degreeLevel    DegreeLevel
+  graduationYear Int?
+  major          String?
+  cohort         String?
+  firstName      String?
+  lastName       String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  alumni         Alumni      @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+  primaryFor     Alumni?     @relation("PrimaryEducation")
+
+  @@unique([alumniId, degreeLevel])
+  @@index([alumniId])
+  @@map("education")
 }
 
 model Award {

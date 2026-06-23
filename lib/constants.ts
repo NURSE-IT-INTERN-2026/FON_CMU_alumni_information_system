@@ -64,3 +64,17 @@ export const DEGREE_LEVEL_OPTIONS = [
   { value: "MASTER", label: "ปริญญาโท" },
   { value: "DOCTORAL", label: "ปริญญาเอก" },
 ];
+
+/**
+ * Per-degree hex colors — the single source of truth. Mirrors the degree-level
+ * colors on the admin dashboard's all-alumni graph. Reused by the education
+ * cards on the profile pages so a degree looks the same everywhere.
+ */
+export const DEGREE_COLORS: Record<string, string> = {
+  NURSING_ASSISTANT: "#f57f17",
+  ASSOCIATE: "#00838f",
+  BACHELOR: "#5b21b6",
+  MASTER: "#2e7d32",
+  DOCTORAL: "#c62828",
+};
+

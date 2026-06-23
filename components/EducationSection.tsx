@@ -1,0 +1,517 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { DEGREE_LEVEL_OPTIONS, DEGREE_COLORS } from "@/lib/constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/** Education record as returned by the education API routes. */
+export interface Education {
+  id: string;
+  alumniId: string;
+  studentId: string;
+  degreeLevel: string;
+  graduationYear: number | null;
+  major: string | null;
+  cohort: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+const DEGREE_LABELS: Record<string, string> = Object.fromEntries(
+  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+interface EducationFormState {
+  studentId: string;
+  degreeLevel: string;
+  graduationYear: string;
+  major: string;
+  cohort: string;
+  firstName: string;
+  lastName: string;
+}
+
+const EMPTY_FORM: EducationFormState = {
+  studentId: "",
+  degreeLevel: "",
+  graduationYear: "",
+  major: "",
+  cohort: "",
+  firstName: "",
+  lastName: "",
+};
+
+interface Props {
+  /** Alumni UUID this section belongs to. */
+  alumniId: string;
+  /** GET (list) + POST (add) base path, e.g. `/api/alumni/{id}/educations`. */
+  listPath: string;
+  /** Whether the viewer may add/edit (admin write roles, or the alumni themself). */
+  canWrite: boolean;
+  /** Called after an add/edit so the parent can refetch its alumni snapshot. */
+  onChanged?: () => void;
+}
+
+/**
+ * "ประวัติการศึกษา" — an alumni's degrees shown as a colored rolling-slot
+ * carousel: a window of three with the focused card centered and its neighbors
+ * peeking (tilted, dimmed) on the left/right. Click a side card, a chevron, or
+ * a dot to roll the window. Each card is tinted with the degree's dashboard
+ * color (`DEGREE_COLORS`). Add/edit reuse the same dialogs + CMU auto-fill.
+ * Editing the PRIMARY education re-syncs the `Alumni` snapshot server-side, so
+ * `onChanged` lets the host page refresh.
+ */
+export default function EducationSection({ alumniId, listPath, canWrite, onChanged }: Props) {
+  const qc = useQueryClient();
+  const [index, setIndex] = useState(0);
+  const [touched, setTouched] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [addForm, setAddForm] = useState<EducationFormState>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<EducationFormState>(EMPTY_FORM);
+  const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.education.list(alumniId),
+    queryFn: () =>
+      apiFetch<{ data: Education[]; primaryEducationId: string | null }>(listPath),
+  });
+
+  const educations = data?.data ?? [];
+  const primaryId = data?.primaryEducationId ?? null;
+  const primaryIndex = educations.findIndex((e) => e.id === primaryId);
+  const safeFrontIndex = educations.length
+    ? Math.max(0, Math.min(touched ? index : (primaryIndex >= 0 ? primaryIndex : 0), educations.length - 1))
+    : 0;
+  const current = educations[safeFrontIndex] ?? null;
+
+  const addMutation = useMutation({
+    mutationFn: (form: EducationFormState) =>
+      apiFetch<Education>(listPath, {
+        method: "POST",
+        json: {
+          studentId: form.studentId.trim(),
+          degreeLevel: form.degreeLevel,
+          graduationYear: form.graduationYear.trim() === "" ? null : Number(form.graduationYear),
+          major: form.major.trim() || null,
+          cohort: form.cohort.trim() || null,
+          firstName: form.firstName.trim() || null,
+          lastName: form.lastName.trim() || null,
+        },
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.education.list(alumniId) });
+      onChanged?.();
+      setAddOpen(false);
+      setAddForm(EMPTY_FORM);
+      setTouched(true);
+      setIndex(educations.length); // bring the new card to the front
+      setMessage({ kind: "success", text: "เพิ่มหลักสูตรเรียบร้อยแล้ว" });
+    },
+    onError: (e) => setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (form: EducationFormState) =>
+      apiFetch<Education>(`/api/educations/${current?.id}`, {
+        method: "PUT",
+        json: {
+          studentId: form.studentId.trim(),
+          degreeLevel: form.degreeLevel,
+          graduationYear: form.graduationYear.trim() === "" ? null : Number(form.graduationYear),
+          major: form.major.trim() || null,
+          cohort: form.cohort.trim() || null,
+          firstName: form.firstName.trim() || null,
+          lastName: form.lastName.trim() || null,
+        },
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.education.list(alumniId) });
+      onChanged?.();
+      setEditOpen(false);
+      setMessage({ kind: "success", text: "บันทึกการแก้ไขเรียบร้อยแล้ว" });
+    },
+    onError: (e) => setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
+  });
+
+  async function lookupCmu(studentId: string, target: "add" | "edit") {
+    const sid = studentId.trim();
+    if (!sid) return;
+    setLookingUp(true);
+    try {
+      const res = await apiFetch<{
+        degreeLevel: string;
+        graduationYear: number | null;
+        major: string | null;
+        cohort: string | null;
+        firstName: string | null;
+        lastName: string | null;
+      }>(`/api/cmu-alumni/lookup?studentId=${encodeURIComponent(sid)}`);
+      const patch: EducationFormState = {
+        studentId: sid,
+        degreeLevel: res.degreeLevel || "",
+        graduationYear: res.graduationYear != null ? String(res.graduationYear) : "",
+        major: res.major ?? "",
+        cohort: res.cohort ?? "",
+        firstName: res.firstName ?? "",
+        lastName: res.lastName ?? "",
+      };
+      if (target === "add") setAddForm(patch);
+      else setEditForm((f) => ({ ...patch, studentId: f.studentId }));
+      setMessage({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "ไม่พบข้อมูลในระบบทะเบียน" });
+    } finally {
+      setLookingUp(false);
+    }
+  }
+
+  function openEdit() {
+    if (!current) return;
+    setEditForm({
+      studentId: current.studentId,
+      degreeLevel: current.degreeLevel,
+      graduationYear: current.graduationYear != null ? String(current.graduationYear) : "",
+      major: current.major ?? "",
+      cohort: current.cohort ?? "",
+      firstName: current.firstName ?? "",
+      lastName: current.lastName ?? "",
+    });
+    setMessage(null);
+    setEditOpen(true);
+  }
+
+  function openAdd() {
+    setAddForm(EMPTY_FORM);
+    setMessage(null);
+    setAddOpen(true);
+  }
+
+  // Roll the slot by `delta` (clamped to the ends — not circular).
+  function go(delta: number) {
+    setTouched(true);
+    setIndex(Math.max(0, Math.min(educations.length - 1, safeFrontIndex + delta)));
+  }
+
+  const n = educations.length;
+
+  return (
+    <div className="rounded-lg border border-[var(--border)] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-[var(--muted)]">ประวัติการศึกษา</h3>
+        {canWrite && (
+          <Button type="button" size="sm" variant="outline" onClick={openAdd}>
+            + เพิ่มหลักสูตร
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="py-10 text-center text-sm text-[var(--muted)]">กำลังโหลด…</p>
+      ) : n === 0 ? (
+        <p className="py-10 text-center text-sm text-[var(--muted)]">ยังไม่มีข้อมูลการศึกษา</p>
+      ) : (
+        <>
+          {/* Rolling-slot carousel — left | CENTER | right. The center card is
+              focused; its neighbors peek on the sides (tilted, dimmed). Click a
+              side card or a chevron to roll the window. Cards are horizontally
+              distributed (not stacked) so they don't overlap. */}
+          <div
+            className="relative mx-auto h-[230px] w-full max-w-xl overflow-hidden"
+            style={{ perspective: "1200px" }}
+          >
+            {educations.length > 1 && (
+              <button
+                type="button"
+                aria-label="หลักสูตรก่อนหน้า"
+                onClick={() => go(-1)}
+                disabled={safeFrontIndex <= 0}
+                className="absolute left-1 top-1/2 z-30 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[var(--card)] p-1.5 text-[var(--muted)] shadow disabled:opacity-30"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+
+            {educations.map((edu, i) => {
+              const offset = i - safeFrontIndex; // -1 left, 0 center, +1 right
+              const abs = Math.abs(offset);
+              const color = DEGREE_COLORS[edu.degreeLevel] ?? "#6b7280";
+              const spread = 205;
+              const tilt = offset > 0 ? -18 : 18;
+              const scale = offset === 0 ? 1 : 1 - Math.min(abs, 2) * 0.13;
+              const transform =
+                offset === 0
+                  ? "translate(-50%, -50%) translateX(0px) translateZ(0px) rotateY(0deg) scale(1)"
+                  : `translate(-50%, -50%) translateX(${offset * spread}px) translateZ(${-Math.min(abs, 2) * 70}px) rotateY(${tilt}deg) scale(${scale})`;
+              return (
+                <button
+                  type="button"
+                  key={edu.id}
+                  aria-label={`หลักสูตร ${DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}`}
+                  aria-current={offset === 0}
+                  onClick={() => { setTouched(true); setIndex(i); }}
+                  className="absolute left-1/2 top-1/2 flex h-[180px] w-[220px] flex-col rounded-xl border bg-[var(--card)] p-4 text-left shadow-lg"
+                  style={{
+                    transform,
+                    zIndex: 20 - abs,
+                    opacity: abs <= 2 ? (offset === 0 ? 1 : 0.6) : 0,
+                    pointerEvents: abs <= 1 ? "auto" : "none",
+                    transition: "transform 450ms cubic-bezier(0.22,1,0.36,1), opacity 350ms ease",
+                    borderTop: `5px solid ${color}`,
+                    backgroundColor: `${color}0D`,
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-bold" style={{ color }}>
+                      {DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}
+                    </span>
+                    {edu.id === primaryId && (
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}1A`, color }}>
+                        หลักสูตรหลัก
+                      </span>
+                    )}
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <Field label="รหัสนักศึกษา" value={edu.studentId} />
+                    <Field label="รุ่นที่" value={edu.cohort || "—"} />
+                    <Field label="สาขาวิชา" value={edu.major || "—"} />
+                    <Field label="ปีที่จบ" value={edu.graduationYear != null ? String(edu.graduationYear) : "—"} />
+                    <Field label="ชื่อ(ขณะศึกษา)" value={edu.firstName || "—"} />
+                    <Field label="นามสกุล(ขณะศึกษา)" value={edu.lastName || "—"} />
+                  </dl>
+                </button>
+              );
+            })}
+
+            {educations.length > 1 && (
+              <button
+                type="button"
+                aria-label="หลักสูตรถัดไป"
+                onClick={() => go(1)}
+                disabled={safeFrontIndex >= educations.length - 1}
+                className="absolute right-1 top-1/2 z-30 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[var(--card)] p-1.5 text-[var(--muted)] shadow disabled:opacity-30"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Dots to jump to a card */}
+          <div className="mt-2 flex items-center justify-center gap-1.5">
+            {educations.map((edu, i) => (
+              <button
+                key={edu.id}
+                type="button"
+                aria-label={`ไปยังหลักสูตร ${DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}`}
+                onClick={() => { setTouched(true); setIndex(i); }}
+                className="h-2 rounded-full transition-all"
+                style={{
+                  width: i === safeFrontIndex ? 18 : 8,
+                  backgroundColor: i === safeFrontIndex ? (DEGREE_COLORS[educations[i].degreeLevel] ?? "#6b7280") : "var(--muted)",
+                }}
+              />
+            ))}
+          </div>
+
+          {canWrite && current && (
+            <div className="mt-3 text-center">
+              <Button type="button" size="sm" variant="secondary" onClick={openEdit}>
+                แก้ไขหลักสูตรนี้
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      {message && (
+        <p className={`mt-3 text-center text-sm ${message.kind === "error" ? "text-red-600" : "text-green-600"}`}>
+          {message.text}
+        </p>
+      )}
+
+      {/* Add dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>เพิ่มหลักสูตรการศึกษา</DialogTitle>
+            <DialogDescription>
+              กรอกรหัสนักศึกษาแล้วกด &quot;ดึงจากทะเบียน&quot; เพื่อเติมข้อมูลอัตโนมัติ หรือกรอกเองได้
+            </DialogDescription>
+          </DialogHeader>
+          <EducationForm
+            form={addForm}
+            onChange={setAddForm}
+            lookingUp={lookingUp}
+            onLookup={() => lookupCmu(addForm.studentId, "add")}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)} disabled={addMutation.isPending}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={() => addMutation.mutate(addForm)}
+              disabled={addMutation.isPending || !addForm.studentId.trim() || !addForm.degreeLevel}
+            >
+              {addMutation.isPending ? "กำลังบันทึก…" : "บันทึก"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>แก้ไขหลักสูตรการศึกษา</DialogTitle>
+            <DialogDescription>
+              {current?.id === primaryId
+                ? "นี่คือหลักสูตรหลัก — การแก้ไขจะอัปเดตข้อมูลหลักของศิษย์เก่าท่านนี้ด้วย"
+                : "แก้ไขรายละเอียดหลักสูตรนี้"}
+            </DialogDescription>
+          </DialogHeader>
+          <EducationForm
+            form={editForm}
+            onChange={setEditForm}
+            lookingUp={lookingUp}
+            onLookup={() => lookupCmu(editForm.studentId, "edit")}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editMutation.isPending}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={() => editMutation.mutate(editForm)}
+              disabled={editMutation.isPending || !editForm.studentId.trim() || !editForm.degreeLevel}
+            >
+              {editMutation.isPending ? "กำลังบันทึก…" : "บันทึก"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase text-[var(--muted)]">{label}</dt>
+      <dd className="text-sm">{value}</dd>
+    </div>
+  );
+}
+
+function EducationForm({
+  form,
+  onChange,
+  lookingUp,
+  onLookup,
+}: {
+  form: EducationFormState;
+  onChange: (f: EducationFormState) => void;
+  lookingUp: boolean;
+  onLookup: () => void;
+}) {
+  const set = (key: keyof EducationFormState, value: string) =>
+    onChange({ ...form, [key]: value });
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <Label htmlFor="edu-studentId">รหัสนักศึกษา</Label>
+        <div className="flex gap-2">
+          <Input
+            id="edu-studentId"
+            value={form.studentId}
+            onChange={(e) => set("studentId", e.target.value)}
+            inputMode="numeric"
+          />
+          <Button type="button" variant="secondary" size="sm" onClick={onLookup} disabled={lookingUp || !form.studentId.trim()}>
+            {lookingUp ? "…" : "ดึงจากทะเบียน"}
+          </Button>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="edu-degree">ระดับปริญญา</Label>
+        <Select value={form.degreeLevel} onValueChange={(v) => set("degreeLevel", v)}>
+          <SelectTrigger id="edu-degree" className="w-full">
+            <SelectValue placeholder="เลือกระดับปริญญา" />
+          </SelectTrigger>
+          <SelectContent>
+            {DEGREE_LEVEL_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="edu-year">ปีที่จบ (พ.ศ.)</Label>
+          <Input
+            id="edu-year"
+            value={form.graduationYear}
+            onChange={(e) => set("graduationYear", e.target.value)}
+            inputMode="numeric"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="edu-cohort">รุ่นที่</Label>
+          <Input
+            id="edu-cohort"
+            value={form.cohort}
+            onChange={(e) => set("cohort", e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="edu-major">สาขาวิชา</Label>
+        <Input
+          id="edu-major"
+          value={form.major}
+          onChange={(e) => set("major", e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="edu-firstName">ชื่อ(ขณะศึกษา)</Label>
+          <Input
+            id="edu-firstName"
+            value={form.firstName}
+            onChange={(e) => set("firstName", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="edu-lastName">นามสกุล(ขณะศึกษา)</Label>
+          <Input
+            id="edu-lastName"
+            value={form.lastName}
+            onChange={(e) => set("lastName", e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

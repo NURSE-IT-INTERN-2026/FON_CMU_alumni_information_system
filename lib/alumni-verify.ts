@@ -3,7 +3,7 @@
  * the CMU Registrar API. No Prisma, no network — safe to unit-test.
  *
  * Identity fields (5): studentId, cohort (= graduation year), firstName,
- * maidenLastName, birthDate (form collects Buddhist-era DDMMYYYY).
+ * lastName, birthDate (form collects Buddhist-era DDMMYYYY).
  *
  * CMU mapping: student_id, grad_year, name_th, surname_th, birthday (DD-MM-YYYY
  * Gregorian).
@@ -101,6 +101,18 @@ export function formatBirthDateThai(
   return `${dd}-${mm}-${be}`;
 }
 
+/**
+ * Same as {@link formatBirthDateThai} but with "/" separators —
+ * "DD/MM/YYYY" (Buddhist era), e.g. "1997-12-01" → "01/12/2540". Used by the
+ * profile pages' "วันเกิด (วว/ดด/ปปปป)" field.
+ */
+export function formatBirthDateThaiSlash(
+  input: string | null | undefined,
+): string | null {
+  const dashed = formatBirthDateThai(input);
+  return dashed ? dashed.replaceAll("-", "/") : null;
+}
+
 /** True when the form birthDate and CMU birthday refer to the same Gregorian day. */
 export function birthDatesMatch(
   formInput: string | null | undefined,
@@ -165,7 +177,7 @@ export interface SignupIdentityInput {
   studentId: string;
   cohort: string;
   firstName: string;
-  maidenLastName: string;
+  lastName: string;
   birthDate: string;
 }
 
@@ -180,7 +192,7 @@ export function matchCmuGraduate(
   // studentId + names are the core identity (always present for a valid record)
   if (String(grad.student_id ?? "").trim() !== input.studentId.trim()) return false;
   if (normalizeName(grad.name_th) !== normalizeName(input.firstName)) return false;
-  if (normalizeName(grad.surname_th) !== normalizeName(input.maidenLastName))
+  if (normalizeName(grad.surname_th) !== normalizeName(input.lastName))
     return false;
 
   // CMU data is sparse — grad_year & birthday are frequently null. Enforce them
@@ -191,4 +203,74 @@ export function matchCmuGraduate(
   if (grad.birthday && !birthDatesMatch(input.birthDate, grad.birthday)) return false;
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Display-only dedup: collapse a person's multiple degree records
+// ---------------------------------------------------------------------------
+
+/**
+ * Highest → lowest degree ranking. The CMU Registrar returns one record per
+ * degree a person earned at FON, so the same person can appear several times.
+ * When deduping for display we keep the record of their HIGHEST degree. Order
+ * matches `DEGREE_ORDER` in `app/api/alumni-count/route.ts` and the CLAUDE.md
+ * degree-level list.
+ */
+export const DEGREE_RANK: Record<DegreeLevelValue, number> = {
+  NURSING_ASSISTANT: 1,
+  ASSOCIATE: 2,
+  BACHELOR: 3,
+  MASTER: 4,
+  DOCTORAL: 5,
+};
+
+/**
+ * Deduplicate CMU graduate records for DISPLAY: when the same person appears
+ * under multiple degree levels (same first name, last name, and birthday), keep
+ * only the record for their HIGHEST degree level.
+ *
+ * **DISPLAY/COUNT-ONLY.** Never feed the result to studentId-keyed lookups
+ * (`lib/ensure-alumni.ts`, `app/api/alumni/[id]/route.ts`): a person's
+ * lower-degree records carry distinct `student_id`s, and dedup drops them,
+ * which would silently break CMU enrichment on import and on the alumni
+ * profile view. Apply it only in display/count surfaces (currently
+ * `/api/cmu-alumni`, `lib/filter-facets-server.ts`, `/api/alumni-count`,
+ * `/api/dashboard`). The raw `fetchCmuGraduates()` list stays un-deduped so
+ * those studentId-keyed consumers keep working.
+ *
+ * Match key: normalized `name_th` + `surname_th` + canonical birthday. A record
+ * missing its birthday or either name is never collapsed (kept verbatim in a
+ * separate bucket) — the trio is the identity, and a partial key would wrongly
+ * merge strangers. Ties on degree rank keep the first-encountered record
+ * (stable; `Map` preserves insertion order). The returned order is not
+ * meaningful — every caller sorts or aggregates afterward.
+ */
+export function dedupeCmuGraduatesByPerson(
+  graduates: CmuGraduate[],
+): CmuGraduate[] {
+  const bestByKey = new Map<string, CmuGraduate>();
+  const unkeyed: CmuGraduate[] = []; // incomplete identity — kept verbatim
+
+  for (const g of graduates) {
+    const firstName = normalizeName(g.name_th);
+    const lastName = normalizeName(g.surname_th);
+    const birthday = normalizeCmuBirthday(g.birthday);
+    if (!firstName || !lastName || !birthday) {
+      unkeyed.push(g);
+      continue;
+    }
+    const key = `${firstName}\u0000${lastName}\u0000${birthday}`;
+    const prev = bestByKey.get(key);
+    if (!prev) {
+      bestByKey.set(key, g);
+      continue;
+    }
+    const prevRank =
+      DEGREE_RANK[cmuLevelToDegree(prev.level_id, prev.major_name_th)] ?? 0;
+    const curRank =
+      DEGREE_RANK[cmuLevelToDegree(g.level_id, g.major_name_th)] ?? 0;
+    if (curRank > prevRank) bestByKey.set(key, g);
+  }
+
+  return [...bestByKey.values(), ...unkeyed];
 }

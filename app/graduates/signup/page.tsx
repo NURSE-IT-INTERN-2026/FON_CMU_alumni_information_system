@@ -4,10 +4,11 @@ import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { BASE_PATH } from "@/lib/constants";
+import { BASE_PATH, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { alumniSignupSchema, type AlumniSignupData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import FormSelect from "@/components/form/FormSelect";
 
 export default function AlumniSignupPage() {
   return (
@@ -34,9 +35,10 @@ function AlumniSignupForm() {
     resolver: zodResolver(alumniSignupSchema),
     defaultValues: {
       studentId: "",
+      degreeLevel: "",
       cohort: "",
       firstName: "",
-      maidenLastName: "",
+      lastName: "",
       birthDate: "",
       email: "",
       password: "",
@@ -54,9 +56,10 @@ function AlumniSignupForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentId: data.studentId.trim(),
+          degreeLevel: data.degreeLevel,
           cohort: data.cohort.trim(),
           firstName: data.firstName.trim(),
-          maidenLastName: data.maidenLastName.trim(),
+          lastName: data.lastName.trim(),
           birthDate: data.birthDate,
           email: data.email.trim().toLowerCase(),
           password: data.password,
@@ -157,6 +160,19 @@ function AlumniSignupForm() {
               </FormField>
             </div>
 
+            <FormField label="ระดับการศึกษา" error={errors.degreeLevel?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormSelect
+                registration={register("degreeLevel")}
+                error={errors.degreeLevel?.message}
+                className="w-full px-4 py-2.5 text-[var(--foreground)] border-[var(--border)]"
+              >
+                <option value="">เลือกระดับการศึกษา</option>
+                {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </FormSelect>
+            </FormField>
+
             <div className="grid grid-cols-2 gap-3">
               <FormField label="ชื่อ (ขณะศึกษา)" error={errors.firstName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                 <FormInput
@@ -169,11 +185,11 @@ function AlumniSignupForm() {
                   className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                 />
               </FormField>
-              <FormField label="สกุล (ขณะศึกษา)" error={errors.maidenLastName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+              <FormField label="สกุล (ขณะศึกษา)" error={errors.lastName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                 <FormInput
-                  registration={register("maidenLastName")}
-                  error={errors.maidenLastName?.message}
-                  id="maidenLastName"
+                  registration={register("lastName")}
+                  error={errors.lastName?.message}
+                  id="lastName"
                   type="text"
                   autoComplete="off"
                   placeholder="รักเรียน"

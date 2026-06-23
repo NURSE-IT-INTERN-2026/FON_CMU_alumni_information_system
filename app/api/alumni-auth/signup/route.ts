@@ -19,12 +19,18 @@ import {
   normalizeYear,
   isYearLike,
 } from "@/lib/alumni-verify";
+import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
+import type { DegreeLevel } from "@/app/generated/prisma/client";
+import { syncPrimarySnapshot } from "@/lib/education-sync";
 
 const alumniSignupApiSchema = z.object({
   studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
   cohort: z.string().min(1, "กรุณากรอกปีที่จบ"),
+  degreeLevel: z.enum(DEGREE_LEVEL_VALUES, {
+    message: "กรุณาเลือกระดับการศึกษา",
+  }),
   firstName: z.string().min(1, "กรุณากรอกชื่อ"),
-  maidenLastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
+  lastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
   birthDate: z
     .string()
     .min(1, "กรุณากรอกวันเกิด")
@@ -59,7 +65,7 @@ export async function POST(request: Request) {
     const email = validated.email.trim().toLowerCase();
     const studentId = validated.studentId.trim();
     const firstName = validated.firstName.trim();
-    const maidenLastName = validated.maidenLastName.trim();
+    const lastName = validated.lastName.trim();
     const cohort = validated.cohort.trim();
 
     // 1. Email dedup (application-level guard; @unique is the DB backstop)
@@ -94,7 +100,7 @@ export async function POST(request: Request) {
     if (localAlumni) {
       const nameOk =
         normalizeName(localAlumni.firstName) === normalizeName(firstName) &&
-        normalizeName(localAlumni.maidenLastName) === normalizeName(maidenLastName);
+        normalizeName(localAlumni.lastName) === normalizeName(lastName);
       const cohortOk =
         !isYearLike(localAlumni.cohort) ||
         normalizeYear(localAlumni.cohort) === normalizeYear(cohort);
@@ -126,7 +132,7 @@ export async function POST(request: Request) {
             studentId,
             cohort,
             firstName,
-            maidenLastName,
+            lastName,
             birthDate: validated.birthDate,
           })
         : false;
@@ -139,6 +145,23 @@ export async function POST(request: Request) {
             "ข้อมูลไม่ตรงกับหลักฐานการศึกษา กรุณาตรวจสอบและลองใหม่อีกครั้ง",
         },
         { status: 400 }
+      );
+    }
+
+    // 4b. Verify the selected degreeLevel against the authoritative degree for
+    //     this studentId — CMU's level when it was consulted, otherwise the
+    //     matching local Education row (or the alumni snapshot).
+    let authoritativeDegree: string | null = null;
+    if (cmuGrad) {
+      authoritativeDegree = cmuLevelToDegree(cmuGrad.level_id, cmuGrad.major_name_th);
+    } else {
+      const edu = await prisma.education.findUnique({ where: { studentId } });
+      authoritativeDegree = edu?.degreeLevel ?? localAlumni?.degreeLevel ?? null;
+    }
+    if (authoritativeDegree && validated.degreeLevel !== authoritativeDegree) {
+      return NextResponse.json(
+        { error: "ระดับการศึกษาไม่ตรงกับหลักฐานการศึกษา กรุณาตรวจสอบและลองใหม่อีกครั้ง" },
+        { status: 400 },
       );
     }
 
@@ -162,7 +185,7 @@ export async function POST(request: Request) {
                   cohort: localAlumni.cohort ?? cmuGrad.grad_year,
                   birthDate: localAlumni.birthDate ?? validated.birthDate,
                   firstName: localAlumni.firstName || firstName,
-                  maidenLastName: localAlumni.maidenLastName || maidenLastName,
+                  lastName: localAlumni.lastName || lastName,
                 }
               : {}),
           },
@@ -173,13 +196,11 @@ export async function POST(request: Request) {
           data: {
             studentId,
             firstName,
-            maidenLastName,
+            lastName,
             cohort,
             birthDate: validated.birthDate,
             prefix: "-",
-            degreeLevel: cmuGrad
-              ? cmuLevelToDegree(cmuGrad.level_id, cmuGrad.major_name_th)
-              : "BACHELOR",
+            degreeLevel: validated.degreeLevel as DegreeLevel,
             email,
             passwordHash,
             hasLoggedIn: true,
@@ -187,6 +208,38 @@ export async function POST(request: Request) {
           },
         });
         alumniId = created.id;
+      }
+
+      // 5b. Ensure an Education row exists for this signup degree; set it as the
+      //     primary if the alumni has none yet (so the profile shows it).
+      const existingEdu = await prisma.education.findUnique({ where: { studentId } });
+      if (!existingEdu) {
+        const gy = cmuGrad?.grad_year ? Number(cmuGrad.grad_year) : NaN;
+        const edu = await prisma.education.create({
+          data: {
+            alumniId,
+            studentId,
+            degreeLevel: validated.degreeLevel as DegreeLevel,
+            graduationYear: Number.isFinite(gy) && gy > 0 ? gy : null,
+            major: cmuGrad?.major_name_th?.trim() || null,
+            cohort: cohort || null,
+            // Name at study time: prefer the CMU record, fall back to the
+            // submitted current name.
+            firstName: cmuGrad?.name_th?.trim() || firstName,
+            lastName: cmuGrad?.surname_th?.trim() || lastName,
+          },
+        });
+        const primary = await prisma.alumni.findUnique({
+          where: { id: alumniId },
+          select: { primaryEducationId: true },
+        });
+        if (primary && !primary.primaryEducationId) {
+          await prisma.alumni.update({
+            where: { id: alumniId },
+            data: { primaryEducationId: edu.id },
+          });
+          await syncPrimarySnapshot(alumniId);
+        }
       }
     } catch (error) {
       // P2002 = unique violation (email/studentId race) → 409
@@ -212,7 +265,7 @@ export async function POST(request: Request) {
       {
         actorType: "ALUMNI",
         alumniId,
-        alumniName: `${firstName} ${maidenLastName}`,
+        alumniName: `${firstName} ${lastName}`,
       },
       "SIGNUP",
       "alumni_auth",

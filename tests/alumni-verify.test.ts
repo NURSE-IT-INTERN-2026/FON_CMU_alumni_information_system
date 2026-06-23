@@ -9,6 +9,7 @@ import {
   isYearLike,
   cmuLevelToDegree,
   matchCmuGraduate,
+  dedupeCmuGraduatesByPerson,
 } from "../lib/alumni-verify";
 import type { CmuGraduate } from "../lib/cmu-registrar";
 
@@ -138,7 +139,7 @@ describe("matchCmuGraduate", () => {
     studentId: "512045001",
     cohort: "2560",
     firstName: "สมหญิง",
-    maidenLastName: "รักเรียน",
+    lastName: "รักเรียน",
     birthDate: "01122540",
   };
 
@@ -152,7 +153,7 @@ describe("matchCmuGraduate", () => {
     expect(matchCmuGraduate(grad, { ...input, studentId: "999" })).toBe(false);
   });
   it("rejects wrong name", () => {
-    expect(matchCmuGraduate(grad, { ...input, maidenLastName: "อื่นๆ" })).toBe(false);
+    expect(matchCmuGraduate(grad, { ...input, lastName: "อื่นๆ" })).toBe(false);
   });
   it("rejects wrong graduation year", () => {
     expect(matchCmuGraduate(grad, { ...input, cohort: "2561" })).toBe(false);
@@ -165,5 +166,107 @@ describe("matchCmuGraduate", () => {
   });
   it("matches when CMU grad_year is missing (sparse data)", () => {
     expect(matchCmuGraduate({ ...grad, grad_year: "" }, input)).toBe(true);
+  });
+});
+
+describe("dedupeCmuGraduatesByPerson", () => {
+  // Build a graduate with sensible defaults; override only the identity + degree
+  // fields each test cares about. Same person = same name_th/surname_th/birthday.
+  const grad = (overrides: Partial<CmuGraduate>): CmuGraduate => ({
+    student_id: "1",
+    birthday: "01-12-1997",
+    cmuitaccount: "",
+    sex_id: "",
+    name_th: "สมหญิง",
+    middle_name_th: "",
+    surname_th: "รักเรียน",
+    name_en: "",
+    middle_name_en: "",
+    surname_en: "",
+    level_id: "1",
+    faculty_id: "12",
+    major_id: "",
+    major_name_th: "",
+    major_sub_name_th: "",
+    curriculum_id: "",
+    grad_date: "",
+    grad_year: "2560",
+    grad_semester: "",
+    study_time_id: "",
+    plan_id: "",
+    plan_name_th: "",
+    std_phone: "",
+    std_mobile: "",
+    grad_school: "",
+    grad_province: "",
+    grad_program: "",
+    grad_gpa: "",
+    adm_type: "",
+    ...overrides,
+  });
+
+  it("keeps only the highest degree when first/last/birthday match", () => {
+    const bachelor = grad({ student_id: "3600001", level_id: "1" });
+    const doctoral = grad({ student_id: "9900001", level_id: "5" });
+    const out = dedupeCmuGraduatesByPerson([bachelor, doctoral]);
+    expect(out).toHaveLength(1);
+    expect(out[0].student_id).toBe("9900001");
+    expect(out[0].level_id).toBe("5");
+  });
+
+  it("keeps doctoral over master", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "6300001", level_id: "3" }),
+      grad({ student_id: "9900001", level_id: "5" }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].level_id).toBe("5");
+  });
+
+  it("collapses two same-degree records to one (stable: first kept on tie)", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "3600001", level_id: "1" }),
+      grad({ student_id: "3600002", level_id: "1" }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].student_id).toBe("3600001");
+  });
+
+  it("keeps distinct people separate (different surname)", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "3600001", surname_th: "รักเรียน" }),
+      grad({ student_id: "3600002", surname_th: "อื่นๆ" }),
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("collapses despite different birthday formats (DD-MM-YYYY vs DDMMYYYY)", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "3600001", level_id: "1", birthday: "01-12-1997" }),
+      grad({ student_id: "9900001", level_id: "5", birthday: "01121997" }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].level_id).toBe("5");
+  });
+
+  it("is case/whitespace tolerant on names", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "3600001", level_id: "1", name_th: " Som  sak ", surname_th: "  Smith " }),
+      grad({ student_id: "9900001", level_id: "5", name_th: "som sak", surname_th: "smith" }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].level_id).toBe("5");
+  });
+
+  it("keeps incomplete-identity records verbatim (not merged with a full match)", () => {
+    const noBirthday = grad({ student_id: "3600001", level_id: "1", birthday: "" });
+    const noLastName = grad({ student_id: "3600002", level_id: "3", surname_th: "" });
+    const full = grad({ student_id: "9900001", level_id: "5" });
+    const out = dedupeCmuGraduatesByPerson([noBirthday, noLastName, full]);
+    expect(out).toHaveLength(3);
+  });
+
+  it("handles an empty list", () => {
+    expect(dedupeCmuGraduatesByPerson([])).toEqual([]);
   });
 });

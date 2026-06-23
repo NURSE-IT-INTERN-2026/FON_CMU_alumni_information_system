@@ -78,21 +78,29 @@ async function fetchFromCmuApi(
 ): Promise<unknown> {
   const { token, accountName, apiId } = getEnvConfig();
 
-  const body = new URLSearchParams();
-  body.append("cmuaccount_name", accountName);
-  body.append("api_id", apiId);
+  const auth = new URLSearchParams();
+  auth.append("cmuaccount_name", accountName);
+  auth.append("api_id", apiId);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
 
+  // GET/HEAD cannot carry a body (undici throws "Request with GET/HEAD method
+  // cannot have body") — pass the auth params as a query string for GET, and in
+  // the body for POST.
+  const isGet = method === "GET";
+  const finalUrl = isGet
+    ? `${url}${url.includes("?") ? "&" : "?"}${auth.toString()}`
+    : url;
+
   try {
-    const response = await fetch(url, {
+    const response = await fetch(finalUrl, {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        ...(isGet ? {} : { "Content-Type": "application/x-www-form-urlencoded" }),
       },
-      body: body.toString(),
+      body: isGet ? undefined : auth.toString(),
       signal: controller.signal,
     });
 
@@ -189,29 +197,20 @@ export async function fetchCmuGraduates(): Promise<CmuGraduate[]> {
  * Fetch a single graduate by student ID from the CMU Registrar API.
  * Returns null if the student is not found or is not a FON graduate.
  */
+/**
+ * Fetch a single graduate by student ID. Resolves from the cached full graduate
+ * list (`fetchCmuGraduates`, already filtered to FON) rather than a per-id GET
+ * endpoint — reliable, and shares the 5-min cache with the dashboard / all-alumni
+ * table / import flow. CMU `student_id` values carry trailing spaces, so both
+ * sides are trimmed before comparing. Returns null if not a FON graduate.
+ */
 export async function fetchCmuGraduateById(
   studentId: string,
 ): Promise<CmuGraduate | null> {
-  const { baseUrl } = getEnvConfig();
-  const facultyId = getFacultyId();
-
-  const raw = await fetchFromCmuApi(`${baseUrl}/${encodeURIComponent(studentId)}`, "GET");
-
-  // The API may return a single object or an array with one entry
-  let record: CmuGraduate | null = null;
-  if (Array.isArray(raw) && raw.length > 0) {
-    record = raw[0] as CmuGraduate;
-  } else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    // Check if it's an empty/error response
-    if ("student_id" in (raw as Record<string, unknown>)) {
-      record = raw as CmuGraduate;
-    }
-  }
-
-  if (!record) return null;
-
-  // Only return FON graduates
-  if (String(record.faculty_id) !== facultyId) return null;
-
-  return record;
+  const sid = String(studentId ?? "").trim();
+  if (!sid) return null;
+  const graduates = await fetchCmuGraduates();
+  return (
+    graduates.find((g) => String(g.student_id ?? "").trim() === sid) ?? null
+  );
 }

@@ -26,6 +26,10 @@ export const queryKeys = {
   modelRepresentatives: { all: ["modelRepresentatives"] as const },
   alumniAgency: { all: ["alumniAgency"] as const },
   alumni: { all: ["alumni"] as const },
+  education: {
+    all: ["education"] as const,
+    list: (alumniId: string) => ["education", "list", alumniId] as const,
+  },
 
   // Bespoke-param pages.
   news: {
