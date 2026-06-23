@@ -12,17 +12,26 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const resourceType = searchParams.get("resourceType");
-  if (!resourceType) {
+  const resourceTypeParam = searchParams.get("resourceType");
+  if (!resourceTypeParam) {
     return NextResponse.json({ error: "resourceType required" }, { status: 400 });
   }
+  // Accept one or many resource types (comma-separated) so a value changed
+  // under either of two tracking scopes — e.g. an alumni core field edited by
+  // an admin (`alumni`) OR by the alumni themselves (`alumni_profile`) — can be
+  // highlighted and inspected through a single query.
+  const resourceTypes = resourceTypeParam
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const resourceTypeWhere = { in: resourceTypes };
 
   const idsParam = searchParams.get("ids");
   if (idsParam !== null) {
     const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
     if (ids.length === 0) return NextResponse.json({});
     const rows = await prisma.fieldChangeHistory.findMany({
-      where: { resourceType, resourceId: { in: ids } },
+      where: { resourceType: resourceTypeWhere, resourceId: { in: ids } },
       select: { resourceId: true, field: true },
       distinct: ["resourceId", "field"],
     });
@@ -43,7 +52,7 @@ export async function GET(request: NextRequest) {
   }
 
   const history = await prisma.fieldChangeHistory.findMany({
-    where: { resourceType, resourceId, field },
+    where: { resourceType: resourceTypeWhere, resourceId, field },
     orderBy: { createdAt: "desc" },
     take: 50,
   });

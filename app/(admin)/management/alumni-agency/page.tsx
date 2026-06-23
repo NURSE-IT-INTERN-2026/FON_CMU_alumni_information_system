@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -212,6 +213,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export default function AlumniAgencyPage() {
   const canWrite = useCanWrite();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState("");
@@ -777,7 +779,7 @@ export default function AlumniAgencyPage() {
               </thead>
               <tbody>
                 {pagedAlumni.map((a, idx) => (
-                  <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
                         <input
@@ -852,7 +854,7 @@ export default function AlumniAgencyPage() {
               </thead>
               <tbody>
                 {pagedViewAlumni.map((a, idx) => (
-                  <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
@@ -979,7 +981,7 @@ export default function AlumniAgencyPage() {
                   </thead>
                   <tbody>
                     {thailandAlumni.map((a, idx) => (
-                      <tr key={a.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                      <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                         <td className="px-4 py-3 text-center">{(thailandPage - 1) * PAGE_SIZE + idx + 1}</td>
                         <td className="px-4 py-3 font-mono text-gray-700">{a.studentId || "-"}</td>
                         <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>

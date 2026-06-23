@@ -579,7 +579,7 @@ export default function PotentialsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {potentials.map((p, i) => (
-                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (p.studentId) router.push(`/management/alumni/${p.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
                   {manageMode && (
                     <td className="px-4 py-3 text-center">
                       <input

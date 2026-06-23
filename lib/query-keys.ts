@@ -63,6 +63,7 @@ export const queryKeys = {
     all: ["alumniProfile"] as const,
     me: () => ["alumniProfile", "me"] as const,
     admin: (id: string) => ["alumniProfile", "admin", id] as const,
+    activity: (id: string) => ["alumniProfile", "activity", id] as const,
   },
 
   // field-changes — powers useHotFields.

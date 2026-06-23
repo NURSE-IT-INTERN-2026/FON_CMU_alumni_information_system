@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
@@ -80,6 +81,7 @@ const recipientDisplay = (a: { prefix: string | null; firstName: string; lastNam
 
 export default function AwardsPage() {
   const canWrite = useCanWrite();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
@@ -676,7 +678,7 @@ export default function AwardsPage() {
                 </tr>
               ) : (
                 awards.map((award, i) => (
-                  <tr key={award.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                  <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
                         <input

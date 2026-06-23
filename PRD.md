@@ -125,6 +125,7 @@ The login page has **two separate login sections — Admin and Alumni** — and 
 - Table columns: รหัสนักศึกษา, รุ่น, คำนำหน้า, ชื่อ, นามสกุล, ระดับการศึกษา, สาขาวิชา, ปีสำเร็จการศึกษา, วันเกิด (`วว/ดด/ปปปป`), หมายเหตุ
 - **Filters:** ระดับการศึกษา, สาขาวิชา, ปีที่สำเร็จการศึกษา
 - *(Note: the dashboard's line graph + 5 mini count cards also live on the dashboard, see §3.2.)*
+- **Row click:** clicking a row opens that alumni's profile view (§3.18). Manage rows link by alumni id; View (CMU) rows link by `student_id` (the profile shows "ไม่พบข้อมูลศิษย์เก่า" if the alumni isn't in the local DB yet).
 
 ### 3.4 Awards Page (รางวัล)
 
@@ -238,6 +239,15 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 ### 3.17 Alumni News Page
 
 - Alumni can **view news** created by admins (published news cards, same display as the admin/public news page), but cannot create or edit news.
+
+### 3.18 Admin Alumni Profile View
+
+- Route: `/management/alumni/[id]` — the route param accepts the alumni UUID **or** `studentId`.
+- **Entry:** reached by **clicking any row** in the all-alumni table and every alumni-related table (alumni-agency, awards, associations, graduate-committee, model-representatives, potentials). Clicks on a checkbox, edit/delete button, an orange value, or a link/image inside a row do not navigate.
+- **Layout** mirrors the alumni-portal profile page: ข้อมูลพื้นฐาน / ข้อมูลติดต่อ / ข้อมูลการทำงาน + related sections (รางวัล, สมาคม/ชมรม, กรรมการบัณฑิต, ศักยภาพ, ผู้แทนรุ่น, ต้นสังกัดศิษย์เก่า).
+- **Orange edit-history indicators:** core fields changed by an admin (`resourceType: alumni`) **or** by the alumni themselves (`resourceType: alumni_profile`) render orange; clicking opens the per-field edit-history modal (old → new, who, when, reason).
+- **Edit mode** (roles with write permission): edits core fields + the 5 related sections via `PUT /api/alumni/update-with-related/[id]` (requires เหตุผลในการแก้ไข; sets `adminEditedAt`). ต้นสังกัดศิษย์เก่า is view-only here (the route does not persist it).
+- **ประวัติการเปลี่ยนแปลง toggle:** switches the page to a merged change timeline — field-change history (alumni core `alumni`/`alumni_profile` + this alumni's related rows) ∪ activity-log events for the alumni; newest first (see §9.3 `/api/alumni/[id]/activity`).
 
 ---
 
@@ -506,7 +516,7 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 | `/alumni-agency` | Public | Alumni-agency page with **Thailand/Abroad toggle** (columns now shared; Abroad adds ประเทศ) |
 | `/settings/profile` | Any admin | My account — ชื่อ, นามสกุล, CMU account, ตำแหน่ง |
 | `/settings/users` | Superadmin/Admin | Account management (admin/exec accounts + alumni accounts); suspend accounts, change alumni email, view alumni profile |
-| `/settings/alumni/[id]` | Superadmin/Admin | View/edit individual alumni profile (admin edit sets `adminEditedAt`) |
+| `/management/alumni/[id]` | Any admin (write for edit) | Individual alumni profile view — orange edit-history indicators, edit mode, and ประวัติการเปลี่ยนแปลง toggle (replaces the old `/settings/alumni/[id]`) |
 | `/settings/logs` | Superadmin/Admin/Executive | System logs — activity types incl. update/suspend; orange clickable updated values show history |
 | `/settings/trash` | Superadmin exclusive | Trash bin — review/restore/hard-delete soft-deleted records |
 
@@ -550,6 +560,7 @@ All API routes are under `/api/`.
 |----------|---------|------|-------------|
 | `/api/alumni-accounts` | GET | Admin | List all alumni who have logged in at least once (paginated, searchable) |
 | `/api/alumni-accounts/[id]` | GET, PUT | Admin | View/update an alumni's profile (admins can edit `citizenId`/`birthDate`; sets `adminEditedAt` on save) |
+| `/api/alumni/[id]/activity` | GET | Admin (not executive) | Merged change timeline for one alumni — field-change history (alumni core `alumni`/`alumni_profile` + related rows) ∪ activity-log events; newest first (powers §3.18 data-logs toggle) |
 
 ### 9.4 Data Entity Routes (Admin)
 

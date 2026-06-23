@@ -906,9 +906,10 @@ export default function AlumniCountPage() {
                     alumni.map((a, idx) => (
                       <tr
                         key={a.id}
-                        className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
+                        onClick={() => router.push(`/management/alumni/${a.id}`)}
+                        className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                       >
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected(a.id)}
@@ -947,7 +948,7 @@ export default function AlumniCountPage() {
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => openEdit(a)}
@@ -1122,7 +1123,8 @@ export default function AlumniCountPage() {
                       return (
                         <tr
                           key={a.student_id}
-                          className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
+                          onClick={() => router.push(`/management/alumni/${a.student_id}`)}
+                          className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                         >
                           <td className="px-4 py-3 text-center">
                             {(page - 1) * PAGE_SIZE + idx + 1}

@@ -21,17 +21,22 @@ export default function FieldHistoryModal({
   field,
   onClose,
 }: {
-  resourceType: string;
+  // One resource type, or several (e.g. ["alumni", "alumni_profile"]) so a
+  // field changed under either tracking scope shows a complete history.
+  resourceType: string | string[];
   resourceId: string;
   field: string;
   onClose: () => void;
 }) {
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const resourceTypeParam = Array.isArray(resourceType)
+    ? resourceType.join(",")
+    : resourceType;
 
   useEffect(() => {
     let cancelled = false;
     fetch(
-      `${BASE_PATH}/api/field-changes?resourceType=${encodeURIComponent(resourceType)}&resourceId=${encodeURIComponent(resourceId)}&field=${encodeURIComponent(field)}`
+      `${BASE_PATH}/api/field-changes?resourceType=${encodeURIComponent(resourceTypeParam)}&resourceId=${encodeURIComponent(resourceId)}&field=${encodeURIComponent(field)}`
     )
       .then((r) => (r.ok ? r.json() : []))
       .then((d: HistoryEntry[]) => {
@@ -43,7 +48,7 @@ export default function FieldHistoryModal({
     return () => {
       cancelled = true;
     };
-  }, [resourceType, resourceId, field]);
+  }, [resourceTypeParam, resourceId, field]);
 
   const fmt = (s: string) =>
     new Date(s).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });

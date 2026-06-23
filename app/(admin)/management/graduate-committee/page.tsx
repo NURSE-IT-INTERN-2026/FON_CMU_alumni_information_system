@@ -589,7 +589,7 @@ export default function GraduateCommitteePage() {
               </thead>
               <tbody>
                 {committees.map((c, i) => (
-                  <tr key={c.id} className="border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                  <tr key={c.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (c.studentId) router.push(`/management/alumni/${c.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     {manageMode && (
                       <td className="px-4 py-3 text-center">
                         <input

@@ -18,16 +18,28 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const alumni = await prisma.alumni.findUnique({
-      where: { id },
-      include: {
-        awards: true,
-        associations: true,
-        graduateCommittees: true,
-        potentials: true,
-        modelRepresentatives: true,
-      },
-    });
+    // The route param accepts either the alumni UUID (`id`) or its
+    // `studentId` — every alumni-related table links here with whichever key
+    // its row exposes (all-alumni manage rows have the UUID; the entity tables
+    // + alumni-agency only carry `studentId`). Try UUID first, then studentId.
+    const RELATED_INCLUDE = {
+      awards: true,
+      associations: true,
+      graduateCommittees: true,
+      potentials: true,
+      modelRepresentatives: true,
+      alumniAgency: true,
+    } as const;
+
+    const alumni =
+      (await prisma.alumni.findUnique({
+        where: { id },
+        include: RELATED_INCLUDE,
+      })) ??
+      (await prisma.alumni.findUnique({
+        where: { studentId: id },
+        include: RELATED_INCLUDE,
+      }));
 
     if (!alumni) {
       return NextResponse.json(

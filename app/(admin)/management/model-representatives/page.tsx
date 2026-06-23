@@ -864,7 +864,8 @@ export default function ModelRepresentativesPage() {
                 {managePageItems.map((a, i) => (
                   <tr
                     key={a.id}
-                    className="transition-colors hover:bg-gray-50"
+                    onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
+                    className="cursor-pointer transition-colors hover:bg-gray-50"
                   >
                     <td className="px-4 py-3 text-center">
                       <input
@@ -960,7 +961,8 @@ export default function ModelRepresentativesPage() {
               {viewPageItems.map((a, i) => (
                 <tr
                   key={a.id}
-                  className="border-b border-[var(--border)] transition-colors hover:bg-gray-50"
+                  onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
+                  className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                 >
                   <td className="px-4 py-3 text-center text-gray-500">{viewStart + i + 1}</td>
                   <td className="px-4 py-3">{a.cohort}</td>

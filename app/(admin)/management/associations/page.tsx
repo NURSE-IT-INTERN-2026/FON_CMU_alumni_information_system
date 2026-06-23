@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
@@ -50,6 +51,7 @@ const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", 
 
 export default function AssociationsPage() {
   const canWrite = useCanWrite();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
@@ -579,7 +581,7 @@ export default function AssociationsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((item, i) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={item.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (item.studentId) router.push(`/management/alumni/${item.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
                   {manageMode && (
                     <td className="px-4 py-3 text-center">
                       <input

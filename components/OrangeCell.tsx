@@ -15,7 +15,10 @@ export default function OrangeCell({
   value,
   hotFields,
 }: {
-  resourceType: string;
+  // One resource type, or several (e.g. ["alumni", "alumni_profile"]) so a
+  // value changed under either tracking scope is highlighted and its modal
+  // shows the combined history.
+  resourceType: string | string[];
   recordId: string;
   field: string;
   value: ReactNode;

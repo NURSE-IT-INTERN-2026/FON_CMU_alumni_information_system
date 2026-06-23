@@ -95,6 +95,7 @@ app/
 │       ├── dashboard/            # Dashboard (charts, count cards, latest news)
 │       ├── all-alumni/           # All-alumni table
 │       ├── new-alumni/           # Alumni creation (full-form with related records)
+│       ├── alumni/[id]/          # Admin alumni profile VIEW — orange edit-history, edit mode, data-logs toggle (param = UUID or studentId)
 │       ├── alumni-agency/        # Thailand/Abroad toggle table
 │       ├── associations/
 │       ├── graduate-committee/
@@ -102,7 +103,7 @@ app/
 │       ├── awards/
 │       ├── potentials/
 │       ├── news/                 # News management (cards, not a table)
-│       └── settings/{profile,users,logs,trash,alumni/[id]}/
+│       └── settings/{profile,users,logs,trash}/
 ├── admin/{alumni,news,users}/    # Admin-side views (verify purpose before editing)
 ├── graduates/                    # Alumni ("graduates") portal
 │   ├── layout.tsx
@@ -112,7 +113,7 @@ app/
 │       ├── profile/              # Alumni self-profile (view/edit)
 │       └── news/ + news/[id]/    # Alumni news (read-only)
 ├── api/                          # REST API routes
-│   ├── alumni/                   # CRUD + import/export/bulk-delete + create-with-related + update-with-related/[id]
+│   ├── alumni/                   # CRUD + import/export/bulk-delete + create-with-related + update-with-related/[id] + [id]/activity (merged change timeline; [id] GET resolves UUID or studentId)
 │   ├── alumni-agency/            # CRUD + import/export/bulk-delete (renamed from abroad-alumni)
 │   ├── alumni-accounts/[id]/     # Admin alumni-account mgmt (+ /suspend)
 │   ├── alumni-auth/              # signup, login-email, forgot/reset-password, accept-tos, logout
@@ -156,6 +157,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 **Correlations — routes that pair or overlap (touching one affects the other):**
 - **Soft-delete round-trip:** `DELETE /api/{entity}/[id]` + `/api/{entity}/bulk-delete` set `deletedAt`; recoverable only via `POST /api/trash/restore` (+ permanent `POST /api/trash/hard-delete`, superadmin). **Exception:** `news` DELETE → `DISCONTINUED`, never trash-recoverable.
 - **Full-form vs single CRUD:** `POST /api/alumni/create-with-related` + `PUT /api/alumni/update-with-related/[id]` write Alumni AND its 6 related entities in one transaction — overlaps `/api/alumni` POST/PUT and the per-entity routes; one save can change several pages.
+- **Admin alumni profile view:** `/management/alumni/[id]` (param = alumni UUID **or** `studentId` — `GET /api/alumni/[id]` resolves either) is reached by clicking any row on the all-alumni + alumni-related tables; its data-logs tab reads `GET /api/alumni/[id]/activity` (field-change history ∪ activity log). Editing there saves via `PUT /api/alumni/update-with-related/[id]` (overlaps the full-form route; sets `adminEditedAt`). Replaces the deleted `/management/settings/alumni/[id]`. Orange indicators on this page query BOTH `resourceType: alumni` and `alumni_profile` (admin + alumni-self edits) — `OrangeCell`/`FieldHistoryModal`/`/api/field-changes` accept comma-joined `resourceType`.
 - **Account lifecycle:** `POST /api/alumni-accounts/[id]/suspend` toggles suspension AND kills active `Session`s; `PUT /api/users/[id]` does the same for admin users.
 - **CMU lookup:** `/api/cmu-alumni` (list/search) + `lib/cmu-registrar.ts` (`fetchCmuGraduateById`) feed import major-sync (`lib/ensure-alumni.ts`) and signup verification (`/api/alumni-auth/signup`).
 - **Twin auth:** `/api/auth/*` (ADMIN) vs `/api/alumni-auth/*` (ALUMNI) share the `Session` model, split by `sessionType`.
