@@ -242,16 +242,30 @@ export default function AlumniCountPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // CMU Registrar data (view mode only) — merge CMU + local overlay.
+  // Like manage mode, the query is keyed WITHOUT `page`: we fetch the FULL
+  // merged set once (per search/filter/sort) and paginate it on the client by
+  // slicing `allViewMerged`. Navigating pages is therefore instant — no
+  // per-page refetch of the CMU proxy or the local-alumni DB scan. The CMU
+  // proxy still sorts server-side (every view field is CMU-sortable), so we
+  // keep its returned order and just slice it.
   const viewQuery = useQuery({
-    queryKey: ["alumni", "view", { page, search, filtersKey, sortField, sortDir }],
+    queryKey: ["alumni", "view", { search, filtersKey, sortField, sortDir }],
     enabled: !manageMode,
     queryFn: async () => {
+      // Fetch the FULL CMU list (not a single page) so the client can overlay
+      // local data and paginate the complete set. `fetchCmuGraduates` caches
+      // the upstream call for 5 min, so this is one request per search/filter/sort.
       const params = new URLSearchParams({
-        page: String(page), pageSize: String(PAGE_SIZE), search,
+        page: "1", pageSize: "50000", search,
         sortField: sortField as string, sortDir,
       });
       facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      const data = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${params}`);
+      let cmu: { data: CmuAlumni[]; total: number };
+      try {
+        cmu = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${params}`);
+      } catch {
+        cmu = { data: [], total: 0 };
+      }
 
       // Fetch local alumni (including soft-deleted) for overlay and filtering
       const localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
@@ -268,7 +282,7 @@ export default function AlumniCountPage() {
 
       // Merge: overlay local data on CMU records, skip soft-deleted
       const merged: CmuAlumni[] = [];
-      for (const a of data.data) {
+      for (const a of cmu.data) {
         if (deletedStudentIds.has(a.student_id)) continue;
         const local = localMap[a.student_id];
         if (local) {
@@ -283,10 +297,17 @@ export default function AlumniCountPage() {
           merged.push({ ...a, cohort: null, birthDate: normalizeCmuBirthday(a.birthday) });
         }
       }
-      return { merged, total: Math.max(0, data.total - deletedStudentIds.size) };
+      // `merged.length` is the authoritative row count (CMU records minus the
+      // soft-deleted overlay) — matches what we actually render/paginate.
+      return { merged, total: merged.length };
     },
   });
-  const cmuAlumni = viewQuery.data?.merged ?? [];
+  // View mode paginates the full merged set on the client. `allViewMerged`
+  // holds every row; `cmuAlumni` is the current page's slice that the table
+  // renders. Since the query is keyed without `page`, navigating pages is
+  // instant (no refetch).
+  const allViewMerged = viewQuery.data?.merged ?? [];
+  const cmuAlumni = allViewMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const cmuTotal = viewQuery.data?.total ?? 0;
   const tableLoading = manageMode ? manageQuery.isPending : viewQuery.isPending;
 
