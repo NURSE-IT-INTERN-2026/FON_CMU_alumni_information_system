@@ -10,6 +10,7 @@ import {
   cmuLevelToDegree,
   matchCmuGraduate,
   dedupeCmuGraduatesByPerson,
+  bachelorCohortFromGradYear,
 } from "../lib/alumni-verify";
 import type { CmuGraduate } from "../lib/cmu-registrar";
 
@@ -268,5 +269,30 @@ describe("dedupeCmuGraduatesByPerson", () => {
 
   it("handles an empty list", () => {
     expect(dedupeCmuGraduatesByPerson([])).toEqual([]);
+  });
+});
+
+describe("bachelorCohortFromGradYear", () => {
+  it("derives DN{YY} from a Buddhist grad_year string (the documented example)", () => {
+    expect(bachelorCohortFromGradYear("2525")).toBe("DN22"); // 2525 - 3 = 2522 → "22"
+  });
+
+  it("accepts a number", () => {
+    expect(bachelorCohortFromGradYear(2530)).toBe("DN27"); // 2530 - 3 = 2527 → "27"
+  });
+
+  it("wraps the last two digits past a century boundary", () => {
+    expect(bachelorCohortFromGradYear(2500)).toBe("DN97"); // 2500 - 3 = 2497 → "97"
+  });
+
+  it("does NOT zero-pad single-digit cohort numbers", () => {
+    expect(bachelorCohortFromGradYear(2510)).toBe("DN7"); // 2510 - 3 = 2507 → "7"
+  });
+
+  it("returns null for missing / non-numeric input", () => {
+    expect(bachelorCohortFromGradYear("")).toBeNull();
+    expect(bachelorCohortFromGradYear(null)).toBeNull();
+    expect(bachelorCohortFromGradYear(undefined)).toBeNull();
+    expect(bachelorCohortFromGradYear("abc")).toBeNull();
   });
 });

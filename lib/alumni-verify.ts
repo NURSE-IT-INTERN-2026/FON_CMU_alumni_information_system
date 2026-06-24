@@ -31,6 +31,26 @@ export function normalizeName(value: string | null | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Cohort derivation (Bachelor) → "DN{YY}"
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a Bachelor cohort label from a Buddhist graduation year: "DN{YY}",
+ * where YY = the last two digits of (gradYear - 3). E.g. grad_year 2525 →
+ * "DN22" (2525 − 3 = 2522 → "22"). Used to auto-fill the cohort column for
+ * Bachelor graduates — CMU returns `grad_year` but no cohort. Returns null for
+ * a missing/non-numeric year. Caller gates on degree == BACHELOR.
+ */
+export function bachelorCohortFromGradYear(
+  gradYear: string | number | null | undefined,
+): string | null {
+  const n =
+    typeof gradYear === "number" ? gradYear : parseInt(String(gradYear ?? ""), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `DN${(n - 3) % 100}`;
+}
+
+// ---------------------------------------------------------------------------
 // Birth date normalization → canonical Gregorian "YYYY-MM-DD"
 // ---------------------------------------------------------------------------
 

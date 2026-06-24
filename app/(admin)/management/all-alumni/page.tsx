@@ -15,7 +15,7 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { normalizeCmuBirthday, formatBirthDateThai } from "@/lib/alumni-verify";
+import { normalizeCmuBirthday, formatBirthDateThai, bachelorCohortFromGradYear } from "@/lib/alumni-verify";
 import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -79,6 +79,8 @@ interface CmuAlumni {
   std_mobile: string;
   adm_type: string;
   cohort?: string | null;
+  // Local overlay: คำนำหน้า (prefix) from the local Alumni record — CMU has none.
+  prefix?: string | null;
   // CMU Registrar birthday, raw "MM-DD-YYYY" (passed through by /api/cmu-alumni).
   birthday?: string | null;
   // Normalized "YYYY-MM-DD" for display + chronological sort.
@@ -177,12 +179,19 @@ export default function AlumniCountPage() {
         if (deletedStudentIds.has(c.student_id)) continue;
         const local = localMap[c.student_id];
         localStudentIdsUsed.add(c.student_id);
+        // CMU returns no cohort. For Bachelor graduates (level_id "1") derive
+        // "DN{YY}" from grad_year (YY = last two digits of grad_year - 3), used
+        // as a fallback so the column isn't blank. Mirrors the view-mode merge —
+        // uses the CMU record's level/year so a person shows the same cohort in
+        // both tables.
+        const derivedCohort =
+          c.level_id === "1" && c.grad_year ? bachelorCohortFromGradYear(c.grad_year) : null;
         if (local) {
-          merged.push({ ...local, birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate });
+          merged.push({ ...local, cohort: local.cohort || derivedCohort, birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate });
         } else {
           merged.push({
             id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
-            lastName: c.surname_th || "", cohort: c.cohort || null,
+            lastName: c.surname_th || "", cohort: derivedCohort,
             degreeLevel: null, major: c.major_name_th || null,
             graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
             email: null, phone: null, homeAddress: null,
@@ -191,7 +200,12 @@ export default function AlumniCountPage() {
         }
       }
       for (const a of Object.values(localMap)) {
-        if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) merged.push(a);
+        if (!localStudentIdsUsed.has(a.studentId) && !deletedStudentIds.has(a.studentId)) {
+          // No CMU record for this alumni — derive from the local snapshot instead.
+          const derivedLocal =
+            a.degreeLevel === "BACHELOR" && a.graduationYear ? bachelorCohortFromGradYear(a.graduationYear) : null;
+          merged.push({ ...a, cohort: a.cohort || derivedLocal });
+        }
       }
       // Sort the full merged CMU+local result client-side so local-only fields
       // (birthDate, prefix, …) reorder correctly; the CMU proxy can't sort them.
@@ -285,16 +299,24 @@ export default function AlumniCountPage() {
       for (const a of cmu.data) {
         if (deletedStudentIds.has(a.student_id)) continue;
         const local = localMap[a.student_id];
+        // CMU returns no cohort. For Bachelor graduates (level_id "1") derive
+        // "DN{YY}" from grad_year (YY = last two digits of grad_year - 3), used
+        // as a fallback when no local cohort is set so the column isn't blank.
+        const derivedCohort =
+          a.level_id === "1" && a.grad_year
+            ? bachelorCohortFromGradYear(a.grad_year)
+            : null;
         if (local) {
           merged.push({
             ...a,
+            prefix: local.prefix || null,
             name_th: local.firstName || a.name_th,
             surname_th: local.lastName || a.surname_th,
-            cohort: local.cohort || null,
+            cohort: local.cohort || derivedCohort,
             birthDate: normalizeCmuBirthday(a.birthday) ?? local.birthDate,
           });
         } else {
-          merged.push({ ...a, cohort: null, birthDate: normalizeCmuBirthday(a.birthday) });
+          merged.push({ ...a, prefix: null, cohort: derivedCohort, birthDate: normalizeCmuBirthday(a.birthday) });
         }
       }
       // `merged.length` is the authoritative row count (CMU records minus the
@@ -1087,6 +1109,9 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
                       รุ่น <SortIcon field="cohort" />
                     </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                      คำนำหน้า
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
                       ชื่อ <SortIcon field="name" />
                     </th>
@@ -1113,7 +1138,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center">
+                      <td colSpan={11} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -1122,7 +1147,7 @@ export default function AlumniCountPage() {
                   ) : cmuAlumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -1143,6 +1168,9 @@ export default function AlumniCountPage() {
                           <td className="px-4 py-3">{a.student_id}</td>
                           <td className="px-4 py-3 text-[var(--muted)]">
                             {a.cohort || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--muted)]">
+                            {a.prefix || "-"}
                           </td>
                           <td className="px-4 py-3">{a.name_th || "-"}</td>
                           <td className="px-4 py-3">{a.surname_th || "-"}</td>
