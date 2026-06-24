@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -74,20 +73,19 @@ interface Props {
 }
 
 /**
- * "ประวัติการศึกษา" — an alumni's degrees shown as a colored rolling-slot
- * carousel: a window of three with the focused card centered and its neighbors
- * peeking (tilted, dimmed) on the left/right. Click a side card, a chevron, or
- * a dot to roll the window. Each card is tinted with the degree's dashboard
- * color (`DEGREE_COLORS`). Add/edit reuse the same dialogs + CMU auto-fill.
- * Editing the PRIMARY education re-syncs the `Alumni` snapshot server-side, so
- * `onChanged` lets the host page refresh.
+ * "ประวัติการศึกษา" — an alumni's degrees shown as a responsive grid of
+ * colored cards (1 per row on narrow screens, 2 per row on wider ones). Each
+ * card is tinted with its degree's dashboard color (`DEGREE_COLORS`) and sizes
+ * to its content, so nothing overlaps or overflows; the primary degree is
+ * badged. Add/edit reuse the same dialogs + CMU auto-fill. Editing the PRIMARY
+ * education re-syncs the `Alumni` snapshot server-side, so `onChanged` lets the
+ * host page refresh.
  */
 export default function EducationSection({ alumniId, listPath, canWrite, onChanged }: Props) {
   const qc = useQueryClient();
-  const [index, setIndex] = useState(0);
-  const [touched, setTouched] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<EducationFormState>(EMPTY_FORM);
   const [editForm, setEditForm] = useState<EducationFormState>(EMPTY_FORM);
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
@@ -101,11 +99,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
 
   const educations = data?.data ?? [];
   const primaryId = data?.primaryEducationId ?? null;
-  const primaryIndex = educations.findIndex((e) => e.id === primaryId);
-  const safeFrontIndex = educations.length
-    ? Math.max(0, Math.min(touched ? index : (primaryIndex >= 0 ? primaryIndex : 0), educations.length - 1))
-    : 0;
-  const current = educations[safeFrontIndex] ?? null;
+  const editingEdu = educations.find((e) => e.id === editingId) ?? null;
 
   const addMutation = useMutation({
     mutationFn: (form: EducationFormState) =>
@@ -126,8 +120,6 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       onChanged?.();
       setAddOpen(false);
       setAddForm(EMPTY_FORM);
-      setTouched(true);
-      setIndex(educations.length); // bring the new card to the front
       setMessage({ kind: "success", text: "เพิ่มหลักสูตรเรียบร้อยแล้ว" });
     },
     onError: (e) => setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
@@ -135,7 +127,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
 
   const editMutation = useMutation({
     mutationFn: (form: EducationFormState) =>
-      apiFetch<Education>(`/api/educations/${current?.id}`, {
+      apiFetch<Education>(`/api/educations/${editingId}`, {
         method: "PUT",
         json: {
           studentId: form.studentId.trim(),
@@ -188,16 +180,16 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
     }
   }
 
-  function openEdit() {
-    if (!current) return;
+  function openEdit(edu: Education) {
+    setEditingId(edu.id);
     setEditForm({
-      studentId: current.studentId,
-      degreeLevel: current.degreeLevel,
-      graduationYear: current.graduationYear != null ? String(current.graduationYear) : "",
-      major: current.major ?? "",
-      cohort: current.cohort ?? "",
-      firstName: current.firstName ?? "",
-      lastName: current.lastName ?? "",
+      studentId: edu.studentId,
+      degreeLevel: edu.degreeLevel,
+      graduationYear: edu.graduationYear != null ? String(edu.graduationYear) : "",
+      major: edu.major ?? "",
+      cohort: edu.cohort ?? "",
+      firstName: edu.firstName ?? "",
+      lastName: edu.lastName ?? "",
     });
     setMessage(null);
     setEditOpen(true);
@@ -208,14 +200,6 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
     setMessage(null);
     setAddOpen(true);
   }
-
-  // Roll the slot by `delta` (clamped to the ends — not circular).
-  function go(delta: number) {
-    setTouched(true);
-    setIndex(Math.max(0, Math.min(educations.length - 1, safeFrontIndex + delta)));
-  }
-
-  const n = educations.length;
 
   return (
     <div className="rounded-lg border border-[var(--border)] p-4">
@@ -230,119 +214,51 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
 
       {isLoading ? (
         <p className="py-10 text-center text-sm text-[var(--muted)]">กำลังโหลด…</p>
-      ) : n === 0 ? (
+      ) : educations.length === 0 ? (
         <p className="py-10 text-center text-sm text-[var(--muted)]">ยังไม่มีข้อมูลการศึกษา</p>
       ) : (
-        <>
-          {/* Rolling-slot carousel — left | CENTER | right. The center card is
-              focused; its neighbors peek on the sides (tilted, dimmed). Click a
-              side card or a chevron to roll the window. Cards are horizontally
-              distributed (not stacked) so they don't overlap. */}
-          <div
-            className="relative mx-auto h-[230px] w-full max-w-xl overflow-hidden"
-            style={{ perspective: "1200px" }}
-          >
-            {educations.length > 1 && (
-              <button
-                type="button"
-                aria-label="หลักสูตรก่อนหน้า"
-                onClick={() => go(-1)}
-                disabled={safeFrontIndex <= 0}
-                className="absolute left-1 top-1/2 z-30 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[var(--card)] p-1.5 text-[var(--muted)] shadow disabled:opacity-30"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            )}
-
-            {educations.map((edu, i) => {
-              const offset = i - safeFrontIndex; // -1 left, 0 center, +1 right
-              const abs = Math.abs(offset);
-              const color = DEGREE_COLORS[edu.degreeLevel] ?? "#6b7280";
-              const spread = 205;
-              const tilt = offset > 0 ? -18 : 18;
-              const scale = offset === 0 ? 1 : 1 - Math.min(abs, 2) * 0.13;
-              const transform =
-                offset === 0
-                  ? "translate(-50%, -50%) translateX(0px) translateZ(0px) rotateY(0deg) scale(1)"
-                  : `translate(-50%, -50%) translateX(${offset * spread}px) translateZ(${-Math.min(abs, 2) * 70}px) rotateY(${tilt}deg) scale(${scale})`;
-              return (
-                <button
-                  type="button"
-                  key={edu.id}
-                  aria-label={`หลักสูตร ${DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}`}
-                  aria-current={offset === 0}
-                  onClick={() => { setTouched(true); setIndex(i); }}
-                  className="absolute left-1/2 top-1/2 flex h-[180px] w-[220px] flex-col rounded-xl border bg-[var(--card)] p-4 text-left shadow-lg"
-                  style={{
-                    transform,
-                    zIndex: 20 - abs,
-                    opacity: abs <= 2 ? (offset === 0 ? 1 : 0.6) : 0,
-                    pointerEvents: abs <= 1 ? "auto" : "none",
-                    transition: "transform 450ms cubic-bezier(0.22,1,0.36,1), opacity 350ms ease",
-                    borderTop: `5px solid ${color}`,
-                    backgroundColor: `${color}0D`,
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-bold" style={{ color }}>
-                      {DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}
-                    </span>
-                    {edu.id === primaryId && (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${color}1A`, color }}>
-                        หลักสูตรหลัก
-                      </span>
-                    )}
-                  </div>
-                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                    <Field label="รหัสนักศึกษา" value={edu.studentId} />
-                    <Field label="รุ่นที่" value={edu.cohort || "—"} />
-                    <Field label="สาขาวิชา" value={edu.major || "—"} />
-                    <Field label="ปีที่จบ" value={edu.graduationYear != null ? String(edu.graduationYear) : "—"} />
-                    <Field label="ชื่อ(ขณะศึกษา)" value={edu.firstName || "—"} />
-                    <Field label="นามสกุล(ขณะศึกษา)" value={edu.lastName || "—"} />
-                  </dl>
-                </button>
-              );
-            })}
-
-            {educations.length > 1 && (
-              <button
-                type="button"
-                aria-label="หลักสูตรถัดไป"
-                onClick={() => go(1)}
-                disabled={safeFrontIndex >= educations.length - 1}
-                className="absolute right-1 top-1/2 z-30 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[var(--card)] p-1.5 text-[var(--muted)] shadow disabled:opacity-30"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Dots to jump to a card */}
-          <div className="mt-2 flex items-center justify-center gap-1.5">
-            {educations.map((edu, i) => (
-              <button
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {educations.map((edu) => {
+            const color = DEGREE_COLORS[edu.degreeLevel] ?? "#6b7280";
+            const isPrimary = edu.id === primaryId;
+            return (
+              <div
                 key={edu.id}
-                type="button"
-                aria-label={`ไปยังหลักสูตร ${DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}`}
-                onClick={() => { setTouched(true); setIndex(i); }}
-                className="h-2 rounded-full transition-all"
-                style={{
-                  width: i === safeFrontIndex ? 18 : 8,
-                  backgroundColor: i === safeFrontIndex ? (DEGREE_COLORS[educations[i].degreeLevel] ?? "#6b7280") : "var(--muted)",
-                }}
-              />
-            ))}
-          </div>
-
-          {canWrite && current && (
-            <div className="mt-3 text-center">
-              <Button type="button" size="sm" variant="secondary" onClick={openEdit}>
-                แก้ไขหลักสูตรนี้
-              </Button>
-            </div>
-          )}
-        </>
+                className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+                style={{ borderTop: `5px solid ${color}`, backgroundColor: `${color}0D` }}
+              >
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-base font-bold" style={{ color }}>
+                    {DEGREE_LABELS[edu.degreeLevel] ?? edu.degreeLevel}
+                  </span>
+                  {isPrimary && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{ backgroundColor: `${color}1A`, color }}
+                    >
+                      หลักสูตรหลัก
+                    </span>
+                  )}
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  <Field label="รหัสนักศึกษา" value={edu.studentId} />
+                  <Field label="รุ่นที่" value={edu.cohort || "—"} />
+                  <Field label="สาขาวิชา" value={edu.major || "—"} />
+                  <Field label="ปีที่จบ" value={edu.graduationYear != null ? String(edu.graduationYear) : "—"} />
+                  <Field label="ชื่อ(ขณะศึกษา)" value={edu.firstName || "—"} />
+                  <Field label="นามสกุล(ขณะศึกษา)" value={edu.lastName || "—"} />
+                </dl>
+                {canWrite && (
+                  <div className="mt-3 text-right">
+                    <Button type="button" size="sm" variant="outline" onClick={() => openEdit(edu)}>
+                      แก้ไข
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {message && (
@@ -386,7 +302,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
           <DialogHeader>
             <DialogTitle>แก้ไขหลักสูตรการศึกษา</DialogTitle>
             <DialogDescription>
-              {current?.id === primaryId
+              {editingEdu?.id === primaryId
                 ? "นี่คือหลักสูตรหลัก — การแก้ไขจะอัปเดตข้อมูลหลักของศิษย์เก่าท่านนี้ด้วย"
                 : "แก้ไขรายละเอียดหลักสูตรนี้"}
             </DialogDescription>
@@ -416,9 +332,9 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <dt className="text-[10px] uppercase text-[var(--muted)]">{label}</dt>
-      <dd className="text-sm">{value}</dd>
+    <div className="min-w-0">
+      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
+      <dd className="break-words text-sm font-medium">{value}</dd>
     </div>
   );
 }
