@@ -80,7 +80,7 @@ export default function UsersPage() {
               : "text-[var(--muted)] hover:text-[var(--foreground)]"
           }`}
         >
-          บัญชีผู้ดูแลระบบ/ผู้บริหาร
+          บัญชีผู้ดูแลระบบ
         </button>
         <button
           onClick={() => setActiveTab("alumni")}
@@ -161,8 +161,8 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const formatDate = (d: string) => new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
 
   const roleBadge = (role: string) => {
-    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", executive: "bg-amber-100 text-amber-700", admin: "bg-purple-100 text-purple-700" };
-    const l: Record<string, string> = { superadmin: "ผู้ดูแลระบบสูงสุด", executive: "ผู้บริหาร", admin: "ผู้ดูแลระบบ" };
+    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", admin: "bg-purple-100 text-purple-700" };
+    const l: Record<string, string> = { superadmin: "ผู้ดูแลระบบสูงสุด", admin: "ผู้ดูแลระบบ" };
     return <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${s[role] || "bg-gray-100 text-gray-700"}`}>{l[role] || role}</span>;
   };
 
@@ -201,7 +201,6 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
               <FormSelect registration={register("role")}>
                 <option value="admin">ผู้ดูแลระบบ</option>
                 <option value="superadmin">ผู้ดูแลระบบสูงสุด</option>
-                <option value="executive">ผู้บริหาร</option>
               </FormSelect>
             </FormField>
           </div>

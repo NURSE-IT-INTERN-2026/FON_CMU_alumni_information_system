@@ -111,9 +111,8 @@ async function main() {
   console.log("Upserting admin users...");
   const adminHash = await hashPassword("password123");
   const superadminHash = await hashPassword("password123");
-  const executiveHash = await hashPassword("password123");
 
-  const [admin, superadmin, executive] = await Promise.all([
+  const [admin, superadmin] = await Promise.all([
     prisma.adminUser.upsert({
       where: { email: "admin@cmu.ac.th" },
       update: { firstName: "ผู้ดูแล", lastName: "ระบบ", passwordHash: adminHash, role: "admin" },
@@ -136,21 +135,9 @@ async function main() {
         role: "superadmin",
       },
     }),
-    prisma.adminUser.upsert({
-      where: { email: "executive@cmu.ac.th" },
-      update: { firstName: "ผู้บริหาร", lastName: "ระบบ", passwordHash: executiveHash, role: "executive" },
-      create: {
-        firstName: "ผู้บริหาร",
-        lastName: "ระบบ",
-        email: "executive@cmu.ac.th",
-        passwordHash: executiveHash,
-        role: "executive",
-      },
-    }),
   ]);
   console.log(`  Upserted admin: ${admin.email}`);
-  console.log(`  Upserted superadmin: ${superadmin.email}`);
-  console.log(`  Upserted executive: ${executive.email}\n`);
+  console.log(`  Upserted superadmin: ${superadmin.email}\n`);
 
   // ── 2. Upsert alumni records ──
   console.log("Upserting alumni...");

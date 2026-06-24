@@ -15,13 +15,6 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
-    if (session.user.role === "executive") {
-      return NextResponse.json(
-        { error: "คุณไม่มีสิทธิ์ดำเนินการนี้" },
-        { status: 403 }
-      );
-    }
-
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const suspend = body?.suspend === true;

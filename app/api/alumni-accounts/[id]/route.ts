@@ -13,13 +13,6 @@ export async function GET(
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
-    if (session.user.role === "executive") {
-      return NextResponse.json(
-        { error: "คุณไม่มีสิทธิ์ดำเนินการนี้" },
-        { status: 403 }
-      );
-    }
-
     const { id } = await params;
     const alumni = await prisma.alumni.findUnique({ where: { id } });
 
@@ -49,13 +42,6 @@ export async function PUT(
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
-    if (session.user.role === "executive") {
-      return NextResponse.json(
-        { error: "คุณไม่มีสิทธิ์ดำเนินการนี้" },
-        { status: 403 }
-      );
-    }
-
     const { id } = await params;
     const body = await request.json();
 

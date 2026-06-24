@@ -9,12 +9,6 @@ export async function checkWritePermission(): Promise<NextResponse | null> {
       { status: 401 }
     );
   }
-  if (session.user.role === "executive") {
-    return NextResponse.json(
-      { error: "คุณไม่มีสิทธิ์ดำเนินการนี้" },
-      { status: 403 }
-    );
-  }
   return null;
 }
 

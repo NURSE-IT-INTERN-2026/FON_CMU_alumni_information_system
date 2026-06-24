@@ -215,7 +215,7 @@ Each admin page that displays alumni data has a **management mode toggle**. Afte
 Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation (left navbar) with the following pages:
 
 - **My Account** — displays the logged-in admin's ชื่อ, นามสกุล, CMU account, ตำแหน่ง (role).
-- **Account Management** — manage admin/executive and alumni accounts.
+- **Account Management** — manage admin and alumni accounts.
 - **System Logs** — activity logs (see §3.16).
 - **Trash Bin** *(superadmin exclusive)* — review/confirm/restore/hard-delete soft-deleted records (see §3.11).
 
@@ -560,7 +560,7 @@ All API routes are under `/api/`.
 |----------|---------|------|-------------|
 | `/api/alumni-accounts` | GET | Admin | List all alumni who have logged in at least once (paginated, searchable) |
 | `/api/alumni-accounts/[id]` | GET, PUT | Admin | View/update an alumni's profile (admins can edit `citizenId`/`birthDate`; sets `adminEditedAt` on save) |
-| `/api/alumni/[id]/activity` | GET | Admin (not executive) | Merged change timeline for one alumni — field-change history (alumni core `alumni`/`alumni_profile` + related rows) ∪ activity-log events; newest first (powers §3.18 data-logs toggle) |
+| `/api/alumni/[id]/activity` | GET | Admin | Merged change timeline for one alumni — field-change history (alumni core `alumni`/`alumni_profile` + related rows) ∪ activity-log events; newest first (powers §3.18 data-logs toggle) |
 
 ### 9.4 Data Entity Routes (Admin)
 

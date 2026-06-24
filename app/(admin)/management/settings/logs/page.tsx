@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRole } from "@/lib/role-context";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -67,20 +65,11 @@ const RESOURCE_LABELS: Record<string, string> = {
 const PAGE_SIZE = 20;
 
 export default function LogsPage() {
-  const role = useRole();
-  const router = useRouter();
-
   const [page, setPage] = useState(1);
   const [resourceFilter, setResourceFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
-
-  useEffect(() => {
-    if (role === "executive") {
-      router.replace("/management/dashboard");
-    }
-  }, [role, router]);
 
   const { data: logsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, source: sourceFilter }),
@@ -153,8 +142,6 @@ export default function LogsPage() {
       </div>
     );
   }
-
-  if (role === "executive") return null;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

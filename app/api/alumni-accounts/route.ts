@@ -8,12 +8,6 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
-    if (session.user.role === "executive") {
-      return NextResponse.json(
-        { error: "คุณไม่มีสิทธิ์ดำเนินการนี้" },
-        { status: 403 }
-      );
-    }
 
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1", 10);

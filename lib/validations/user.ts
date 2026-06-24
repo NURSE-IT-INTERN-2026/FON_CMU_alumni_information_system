@@ -9,7 +9,7 @@ const MSG = {
   roleInvalid: "บทบาทไม่ถูกต้อง",
 };
 
-export const USER_ROLE_VALUES = ["superadmin", "admin", "executive"] as const;
+export const USER_ROLE_VALUES = ["superadmin", "admin"] as const;
 
 // --- API schemas ---
 

@@ -74,7 +74,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 
 - **Session-based auth** using `bcryptjs` + HTTP-only cookies (`fon-cmu-session`). Session tokens stored in `Session` model, 7-day expiry.
 - **CMU OAuth2** with PKCE via Microsoft Entra ID (`lib/oauth.ts`). Callback at `/intern/api/auth/callback/`.
-- **3 Roles:** `superadmin` (full CRUD + user management), `admin` (CRUD + import/export), `executive` (read-only).
+- **2 Roles:** `superadmin` (full CRUD + user management), `admin` (CRUD + import/export).
 - **Alumni portal** (`/graduates/*`): separate self-service session flow — email/password login, identity-verification sign-up, first-login TOS acceptance. Reuses the `Session` model with `sessionType: ALUMNI`; auth routes under `app/api/alumni-auth/`.
 - **Role context:** `lib/role-context.tsx` provides `useRole()`, `useCanWrite()`, `useIsAdmin()` hooks.
 - **Write permission check:** `lib/permissions.ts` — `checkWritePermission()` returns 401/403 for unauthorized requests.

@@ -190,7 +190,7 @@ function LoginForm() {
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              ผู้ดูแลระบบ / ผู้บริหาร
+              ผู้ดูแลระบบ
             </button>
             <button
               onClick={() => { setMode("alumni"); setError(""); }}

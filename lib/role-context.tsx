@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-const RoleContext = createContext<string>("executive");
+const RoleContext = createContext<string>("admin");
 
 export function RoleProvider({
   role,
@@ -19,7 +19,8 @@ export function useRole() {
 }
 
 export function useCanWrite() {
-  return useRole() !== "executive";
+  const role = useRole();
+  return role === "admin" || role === "superadmin";
 }
 
 export function useIsAdmin() {

@@ -13,14 +13,11 @@ type WriterCtx =
   | { kind: "admin"; userId: string; userEmail: string; userRole: string }
   | { kind: "alumni"; alumniId: string; alumniName: string };
 
-// A write is allowed for a non-executive admin, or for the alumni that owns the
-// record. Returns null with no session at all.
+// A write is allowed for any admin, or for the alumni that owns the record.
+// Returns null with no session at all.
 async function resolveWriter(alumniOwnerId: string): Promise<WriterCtx | NextResponse> {
   const admin = await getSession();
   if (admin) {
-    if (admin.user.role === "executive") {
-      return NextResponse.json({ error: "คุณไม่มีสิทธิ์ดำเนินการนี้" }, { status: 403 });
-    }
     return { kind: "admin", userId: admin.user.id, userEmail: admin.user.email, userRole: admin.user.role };
   }
   const alumniSession = await getAlumniSession();

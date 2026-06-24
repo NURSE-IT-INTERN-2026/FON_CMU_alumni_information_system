@@ -20,7 +20,6 @@ export default async function ProfilePage() {
 
   const roleLabels: Record<string, string> = {
     superadmin: "ผู้ดูแลระบบสูงสุด",
-    executive: "ผู้บริหาร",
     admin: "ผู้ดูแลระบบ",
   };
   const roleLabel = roleLabels[user.role] || user.role;

@@ -27,9 +27,6 @@ export async function GET(
   if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
-  if (session.user.role === "executive") {
-    return NextResponse.json({ error: "คุณไม่มีสิทธิ์ดูข้อมูลนี้" }, { status: 403 });
-  }
 
   try {
     const { id } = await params;

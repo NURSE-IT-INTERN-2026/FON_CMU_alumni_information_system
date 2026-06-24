@@ -53,9 +53,6 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
-  if (session.user.role === "executive") {
-    return NextResponse.json({ error: "คุณไม่มีสิทธิ์ดำเนินการนี้" }, { status: 403 });
-  }
   try {
     const { id } = await params;
     const alumni = await resolveAlumni(id);
