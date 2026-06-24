@@ -6,6 +6,7 @@ import { logActivity, getIp } from "@/lib/activity-log";
 import { educationUpdateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { syncPrimarySnapshot } from "@/lib/education-sync";
+import { assertEducationSamePerson } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 type WriterCtx =
@@ -81,6 +82,26 @@ export async function PUT(
 
     const body = await request.json();
     const validated = educationUpdateSchema.parse(body);
+
+    // Identity guard: if the studentId is being changed, the new one must still
+    // belong to the SAME person (birthday match) — never re-point to a
+    // stranger's degree.
+    if (validated.studentId && validated.studentId !== existing.studentId) {
+      const alumni = await prisma.alumni.findUnique({
+        where: { id: existing.alumniId },
+        select: { birthDate: true, educations: { select: { studentId: true } } },
+      });
+      const identityError = await assertEducationSamePerson({
+        alumniBirthDate: alumni?.birthDate ?? null,
+        existingStudentIds: (alumni?.educations ?? [])
+          .map((e) => e.studentId)
+          .filter((sid) => sid !== existing.studentId),
+        newStudentId: validated.studentId,
+      });
+      if (identityError) {
+        return NextResponse.json({ error: identityError }, { status: 400 });
+      }
+    }
 
     try {
       const updated = await prisma.$transaction(async (tx) => {

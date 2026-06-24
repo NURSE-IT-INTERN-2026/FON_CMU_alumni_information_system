@@ -7,6 +7,7 @@ import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { generateGraduationLogs } from "@/lib/graduation-log";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
+import { assertEducationSamePerson } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 // GET /api/alumni-profile/educations — the logged-in alumni's education records.
@@ -40,6 +41,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = educationCreateSchema.parse(body);
+
+    // Identity guard: the studentId must belong to the SAME person as this
+    // alumni (birthday match) — never attach a stranger's degree.
+    const profile = await prisma.alumni.findUnique({
+      where: { id: alumni.id },
+      select: { birthDate: true, educations: { select: { studentId: true } } },
+    });
+    const identityError = await assertEducationSamePerson({
+      alumniBirthDate: profile?.birthDate ?? null,
+      existingStudentIds: profile?.educations.map((e) => e.studentId) ?? [],
+      newStudentId: validated.studentId,
+    });
+    if (identityError) {
+      return NextResponse.json({ error: identityError }, { status: 400 });
+    }
 
     try {
       const created = await prisma.education.create({

@@ -160,7 +160,8 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
         cohort: string | null;
         firstName: string | null;
         lastName: string | null;
-      }>(`/api/cmu-alumni/lookup?studentId=${encodeURIComponent(sid)}`);
+        samePersonWarning?: string | null;
+      }>(`/api/cmu-alumni/lookup?studentId=${encodeURIComponent(sid)}&alumniId=${encodeURIComponent(alumniId)}`);
       const patch: EducationFormState = {
         studentId: sid,
         degreeLevel: res.degreeLevel || "",
@@ -172,7 +173,11 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       };
       if (target === "add") setAddForm(patch);
       else setEditForm((f) => ({ ...patch, studentId: f.studentId }));
-      setMessage({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
+      if (res.samePersonWarning) {
+        setMessage({ kind: "error", text: res.samePersonWarning });
+      } else {
+        setMessage({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
+      }
     } catch (e) {
       setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "ไม่พบข้อมูลในระบบทะเบียน" });
     } finally {
