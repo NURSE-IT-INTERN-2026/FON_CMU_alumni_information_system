@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
+import { useRole } from "@/lib/role-context";
+import { useBulkSelection } from "@/lib/useBulkSelection";
 import {
   FIELD_LABELS,
   formatValue,
@@ -68,6 +70,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   user: "ผู้ใช้งาน",
   alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",
   education: "ประวัติการศึกษา",
+  activity_log: "บันทึกกิจกรรม",
 };
 
 const PAGE_SIZE = 20;
@@ -91,6 +94,23 @@ export default function LogsPage() {
   const [sourceFilter, setSourceFilter] = useState("");
   const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
 
+  // Log deletion is superadmin-only (irreversible audit changes).
+  const canDeleteLogs = useRole() === "superadmin";
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const {
+    selectedCount,
+    toggleSelect,
+    selectAll,
+    deselectAll,
+    isSelected,
+    isAllSelected,
+    getSelectedArray,
+  } = useBulkSelection();
+  const qc = useQueryClient();
+
   const { data: logsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, source: sourceFilter }),
     queryFn: () => {
@@ -104,10 +124,57 @@ export default function LogsPage() {
   const logs = logsData?.data ?? [];
   const total = logsData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageIds = logs.map((l) => l.id);
 
   const handleFilterChange = () => {
     setPage(1);
   };
+
+  function handleRowClick(id: string) {
+    if (!selectionMode) {
+      // First click enters selection mode and selects the clicked row.
+      setSelectionMode(true);
+      toggleSelect(id);
+    } else {
+      toggleSelect(id);
+    }
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    deselectAll();
+  }
+
+  async function deleteLogs(ids: string[]) {
+    setDeleting(true);
+    setErrorMsg("");
+    try {
+      await apiFetch("/api/logs/bulk-delete", { method: "POST", json: { ids } });
+      qc.invalidateQueries({ queryKey: queryKeys.logs.all });
+      return true;
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
+      return false;
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = getSelectedArray();
+    if (ids.length === 0) return;
+    if (await deleteLogs(ids)) {
+      exitSelectionMode();
+      setShowBulkDeleteDialog(false);
+      setPage(1);
+    }
+  }
+
+  async function handleDeleteOne(id: string) {
+    if (await deleteLogs([id])) {
+      setDetailLog(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -115,7 +182,17 @@ export default function LogsPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           บันทึกกิจกรรม
         </h1>
-        <span className="text-sm text-gray-500">ทั้งหมด {total.toLocaleString()} รายการ</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">ทั้งหมด {total.toLocaleString()} รายการ</span>
+          {canDeleteLogs && !selectionMode && (
+            <button
+              onClick={() => setSelectionMode(true)}
+              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 cursor-pointer"
+            >
+              เลือกเพื่อลบ
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -154,6 +231,41 @@ export default function LogsPage() {
         </select>
       </div>
 
+      {errorMsg && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{errorMsg}</div>
+      )}
+
+      {/* Selection toolbar */}
+      {selectionMode && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-purple-800">
+            เลือกแล้ว <span className="font-bold">{selectedCount}</span> รายการ
+          </span>
+          <button
+            onClick={() => (isAllSelected(pageIds) ? deselectAll() : selectAll(pageIds))}
+            disabled={logs.length === 0}
+            className="rounded-lg border border-purple-300 bg-white px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-40 cursor-pointer"
+          >
+            {isAllSelected(pageIds) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหน้า"}
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={exitSelectionMode}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteDialog(true)}
+              disabled={selectedCount === 0}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40 cursor-pointer"
+            >
+              ลบที่เลือก ({selectedCount})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
         {loading ? (
@@ -166,6 +278,16 @@ export default function LogsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {selectionMode && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected(pageIds)}
+                      onChange={() => (isAllSelected(pageIds) ? deselectAll() : selectAll(pageIds))}
+                      className="h-4 w-4 cursor-pointer accent-purple-600"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3">วันที่/เวลา</th>
                 <th className="px-4 py-3">ผู้ใช้งาน</th>
                 <th className="px-4 py-3">กิจกรรม</th>
@@ -187,9 +309,24 @@ export default function LogsPage() {
                   : isAlumniActor
                     ? ""
                     : (log.userEmail || "");
+                const selected = isSelected(log.id);
 
                 return (
-                  <tr key={log.id} className="hover:bg-gray-50">
+                  <tr
+                    key={log.id}
+                    onClick={canDeleteLogs ? () => handleRowClick(log.id) : undefined}
+                    className={`${selected ? "bg-purple-50" : ""} ${canDeleteLogs ? "cursor-pointer" : ""} hover:bg-gray-50`}
+                  >
+                    {selectionMode && (
+                      <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleSelect(log.id)}
+                          className="h-4 w-4 cursor-pointer accent-purple-600"
+                        />
+                      </td>
+                    )}
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDate(log.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{actorName}</div>
@@ -213,7 +350,12 @@ export default function LogsPage() {
                     <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center">
-                        <button onClick={() => setDetailLog(log)} className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDetailLog(log); }}
+                          className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
+                          title="ดูรายละเอียด"
+                          aria-label="ดูรายละเอียด"
+                        >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         </button>
                       </div>
@@ -239,7 +381,35 @@ export default function LogsPage() {
 
       {/* Details modal */}
       {detailLog && (
-        <DetailModal log={detailLog} onClose={() => setDetailLog(null)} />
+        <DetailModal
+          log={detailLog}
+          canDelete={canDeleteLogs}
+          deleting={deleting}
+          onClose={() => setDetailLog(null)}
+          onDelete={handleDeleteOne}
+        />
+      )}
+
+      {/* Bulk-delete confirmation */}
+      {showBulkDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setShowBulkDeleteDialog(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบบันทึกกิจกรรม</h3>
+            <p className="mb-2 text-sm text-gray-600">
+              คุณต้องการลบบันทึกกิจกรรม <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
+              การดำเนินการนี้ไม่สามารถย้อนกลับได้
+            </p>
+            <p className="mb-6 text-xs text-gray-500">
+              ระบบจะบันทึกการลบไว้ 1 รายการเพื่อให้สามารถตรวจสอบย้อนหลังได้
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowBulkDeleteDialog(false)} disabled={deleting} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">ยกเลิก</button>
+              <button onClick={handleBulkDelete} disabled={deleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40 cursor-pointer">
+                {deleting ? "กำลังลบ..." : "ยืนยัน"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -249,7 +419,19 @@ export default function LogsPage() {
 /* Detail modal — one shape per action (create / edit / delete)               */
 /* -------------------------------------------------------------------------- */
 
-function DetailModal({ log, onClose }: { log: ActivityLog; onClose: () => void }) {
+function DetailModal({
+  log,
+  canDelete,
+  deleting,
+  onClose,
+  onDelete,
+}: {
+  log: ActivityLog;
+  canDelete: boolean;
+  deleting: boolean;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
   const changes = extractChanges(log.details);
   const rows = detailRows(log.details);
   const resourceLabel = RESOURCE_LABELS[log.resource] ?? log.resource;
@@ -292,9 +474,21 @@ function DetailModal({ log, onClose }: { log: ActivityLog; onClose: () => void }
           )}
         </div>
 
-        {log.reason && (
-          <p className="border-t border-gray-100 pt-3 text-xs text-gray-500">หมายเหตุ: {log.reason}</p>
-        )}
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+          {log.reason ? (
+            <p className="text-xs text-gray-500">หมายเหตุ: {log.reason}</p>
+          ) : <span />}
+          {canDelete && (
+            <button
+              onClick={() => onDelete(log.id)}
+              disabled={deleting}
+              className="shrink-0 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40 cursor-pointer"
+            >
+              {deleting ? "กำลังลบ..." : "ลบรายการนี้"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

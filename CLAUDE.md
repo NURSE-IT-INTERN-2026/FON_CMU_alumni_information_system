@@ -128,7 +128,7 @@ app/
 │   ├── cmu-alumni/               # CMU Registrar list/search proxy (GET only) + /lookup?studentId=&alumniId= (GET — single-record auto-fill preview for the add-education form; returns samePersonWarning when alumniId is a different person)
 │   ├── users/[id]/               # User management
 │   ├── trash/{restore,hard-delete}/   # Superadmin soft-delete recovery
-│   ├── field-changes/ · filter-facets/ · dashboard/ · logs/   # Supporting read endpoints
+│   ├── field-changes/ · filter-facets/ · dashboard/ · logs/   # logs = read-only GET + superadmin-only bulk-delete
 │   └── upload/                   # Image upload (PNG/JPG, max 5 MB)
 ```
 
@@ -152,6 +152,7 @@ Each data entity follows a consistent route structure:
   - `alumni-profile` — no `/[id]`; operates on the logged-in alumni (`getAlumniSession`). GET/PUT/DELETE. `alumni-profile/educations` adds alumni-self GET/POST of education records.
   - `cmu-alumni` — read-only external Registrar proxy (GET list/search) + `lookup?studentId=&alumniId=` (single-record preview for the add-education form; with `alumniId`, returns `samePersonWarning` if the record belongs to a different person).
   - `educations` — degree records (1:N per alumni). `GET/POST /api/alumni/[id]/educations` (admin) and `GET/POST /api/alumni-profile/educations` (alumni-self) for list/add; `GET/PUT/DELETE /api/educations/[id]` for one record (admin OR owning alumni via `resolveWriter`). Every add, and a PUT that changes `studentId`, must pass `assertEducationSamePerson` (`lib/education-identity.ts`) — a studentId whose CMU birthday differs from the alumni's is rejected with 400 (can't attach a stranger's degree). No import/export/bulk-delete.
+  - `logs` — otherwise read-only (GET list only). Adds a **superadmin-only** `POST /api/logs/bulk-delete` `{ ids }` that **hard-deletes** (`deleteMany`; `ActivityLog` has no `deletedAt`) and writes one accountability trace row (`BULK_DELETE` / resource `activity_log`, details `{ count }`). Not soft-delete, not trash-recoverable. UI gate on the logs page is `useRole() === "superadmin"` (NOT `useIsAdmin()`, which covers both roles).
 
 ### Route Correlations, Redirects & Entry Points
 
