@@ -68,7 +68,25 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
+    const existing = await prisma.graduateCommittee.findUnique({ where: { id } });
     await prisma.graduateCommittee.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    const session = await getSession();
+    if (session && existing) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "graduate_committee",
+        id,
+        {
+          position: existing.position,
+          termYear: existing.termYear,
+          cohort: existing.cohort,
+          name: `${existing.prefix ?? ""}${existing.firstName} ${existing.lastName}`.trim(),
+        },
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete graduate committee:", error);

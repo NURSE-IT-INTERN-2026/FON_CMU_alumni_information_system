@@ -66,7 +66,25 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
+    const existing = await prisma.modelRepresentative.findUnique({ where: { id } });
     await prisma.modelRepresentative.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    const session = await getSession();
+    if (session && existing) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "model_representative",
+        id,
+        {
+          cohort: existing.cohort,
+          generation: existing.generation,
+          major: existing.major,
+          name: `${existing.prefix ?? ""}${existing.firstName} ${existing.lastName}`.trim(),
+        },
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete model representative:", error);

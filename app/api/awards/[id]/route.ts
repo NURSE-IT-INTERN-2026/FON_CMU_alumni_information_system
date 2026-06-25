@@ -80,16 +80,22 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
+    const existing = await prisma.award.findUnique({ where: { id } });
     await prisma.award.update({ where: { id }, data: { deletedAt: new Date() } });
 
     const session = await getSession();
-    if (session) {
+    if (session && existing) {
       await logActivity(
         { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "DELETE",
         "award",
         id,
-        null,
+        {
+          awardName: existing.awardName,
+          awardType: existing.awardType,
+          year: existing.year,
+          name: `${existing.prefix ?? ""}${existing.firstName} ${existing.lastName}`.trim(),
+        },
       );
     }
 

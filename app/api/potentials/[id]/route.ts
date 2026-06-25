@@ -67,7 +67,25 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
+    const existing = await prisma.potential.findUnique({ where: { id } });
     await prisma.potential.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    const session = await getSession();
+    if (session && existing) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "potential",
+        id,
+        {
+          career: existing.career,
+          position: existing.position,
+          recordedYear: existing.recordedYear,
+          name: `${existing.prefix ?? ""}${existing.firstName} ${existing.lastName}`.trim(),
+        },
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete potential:", error);
