@@ -240,6 +240,18 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 
 > Read at the start of every task. These are the rules for how I communicate results and keep this instruction file honest. Follow them unless the user says otherwise.
 
+### Git workflow — branch off, do the work, commit, then merge to `main`
+
+Default flow for **every** task that changes code (the user wants it; it supersedes the generic "commit only when asked" rule):
+
+1. **Branch off `main` first** — before writing any code, create a descriptively-named branch from `main` and switch to it. Never work or commit directly on `main`.
+2. **Do the task** on that branch.
+3. **Commit when finished** — once the work is done and verification (build/lint/tests) is green, commit it.
+4. **Confirm in case of errors** — if anything fails (build, lint, tests, a merge conflict, or any unexpected problem), STOP and ask the user before committing/merging instead of forcing it through. Proceed only once it's green, or the user OKs it.
+5. **Merge to `main`** — after committing, check out `main` and merge the branch back with `--no-ff` (keeps the feature unit visible in history). Leave the working tree clean and end on `main`.
+
+Don't `git push` unless explicitly asked. If a request only needs exploration/answers (no code change), skip the flow.
+
 ### On finishing any task — produce a completion report
 
 Before claiming a task is done, give a short structured report (tight bullets — never a file dump). Cover all of:
@@ -247,7 +259,7 @@ Before claiming a task is done, give a short structured report (tight bullets �
 - **Plan executed** — the goal and the approach (1–3 lines). If the approach changed mid-task, say why.
 - **Files changed** — `created` / `updated` / `deleted`, each with its real path (e.g. `app/(admin)/management/awards/page.tsx`). Don't lump them; distinguish creates from edits from deletes.
 - **Libraries / tech used** — anything used or newly introduced (e.g. `@tanstack/react-query`, `zod`, `exceljs`). If a new dependency was added, name it + version + why.
-- **Branch** — the current git branch (e.g. `main`, `feature/x`). State whether changes are committed or still uncommitted, and the commit hash if committed. Per repo + harness rule: commit/push only when asked, and branch first if on `main`.
+- **Branch** — the current git branch (e.g. `main`, `feature/x`). State whether changes are committed or still uncommitted, and the commit hash if committed. Follow the **Git workflow** above — branch off `main` first, commit when done, merge back to `main`; pause for the user's confirmation if anything fails. Don't push unless asked.
 - **Verification** — what confirms it works: tests run (+ pass/fail), `npm run lint` / `npm run build` status, manual steps. If something was NOT verified, say so explicitly rather than implying it was. To verify **live behavior**, hit the already-running dev server on `:3000` with `curl` (see Known Pitfalls: *Never spawn a second `next dev`*) — **never** start a second dev server for verification.
 
 ### On fixing a bug or problem — produce a root-cause report
