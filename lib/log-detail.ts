@@ -125,22 +125,3 @@ export function extractChanges(details: Record<string, unknown> | null): FieldCh
   if (!Array.isArray(raw)) return null;
   return raw as FieldChange[];
 }
-
-/**
- * One-line human summary for the table's รายละเอียด column — prefers the most
- * identifying value present. Returns "" when nothing useful is logged.
- */
-export function primaryIdentifier(details: Record<string, unknown> | null): string {
-  if (!details) return "";
-  const preferred = ["name", "title", "awardName", "associationName", "email", "studentId", "career", "workplace"];
-  for (const key of preferred) {
-    const v = details[key];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  // Fall back to the first non-meta scalar value.
-  for (const [k, v] of Object.entries(details)) {
-    if (META_KEYS.has(k)) continue;
-    if (typeof v === "string" || typeof v === "number") return formatValue(k, v);
-  }
-  return "";
-}
