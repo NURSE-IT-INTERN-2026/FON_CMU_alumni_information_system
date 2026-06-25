@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import sanitizeHtml from "sanitize-html";
 import prisma from "@/lib/prisma";
+import { assetUrl, prefixUploadsInHtml } from "@/lib/asset-url";
 
 function formatThaiDate(date: Date): string {
   const months = [
@@ -64,7 +65,7 @@ export default async function NewsDetailPage({
         {news.coverImageUrl && (
           <div className="px-6 sm:px-8">
             <img
-              src={news.coverImageUrl}
+              src={assetUrl(news.coverImageUrl)}
               alt={news.title}
               className="w-full rounded-lg"
             />
@@ -74,7 +75,7 @@ export default async function NewsDetailPage({
         <div
           className="prose prose-sm sm:prose !max-w-none px-6 py-6 sm:px-8 sm:py-8"
           dangerouslySetInnerHTML={{
-            __html: sanitizeHtml(news.body, {
+            __html: prefixUploadsInHtml(sanitizeHtml(news.body, {
               allowedTags: sanitizeHtml.defaults.allowedTags.concat([
                 "img", "figure", "figcaption", "iframe",
               ]),
@@ -85,7 +86,7 @@ export default async function NewsDetailPage({
                 "*": ["class", "style"],
               },
               allowedIframeHostnames: ["www.youtube.com", "player.vimeo.com"],
-            }),
+            })),
           }}
         />
       </article>
