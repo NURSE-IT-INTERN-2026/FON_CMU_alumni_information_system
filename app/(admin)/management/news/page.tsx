@@ -8,6 +8,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
 import { assetUrl, prefixUploadsInHtml, stripUploadsInHtml } from "@/lib/asset-url";
+import { ImageEditorDialog } from "@/components/news/ImageEditorDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -19,6 +20,8 @@ import FormSelect from "@/components/form/FormSelect";
 // PRD §3.12: news lists show at most 9 cards per page.
 const NEWS_PAGE_SIZE = 9;
 const MAX_INLINE_IMAGES = 4;
+// CSS class toggled on a body image the admin has clicked to edit. Stripped before save.
+const IMG_SEL_CLASS = "__nimg-sel";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -103,6 +106,13 @@ export default function NewsListPage() {
   const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
   const tablePickerRef = useRef<HTMLDivElement>(null);
 
+  // News image editor: cover crop/resize + body image crop/resize/delete + px text size.
+  const [coverEditing, setCoverEditing] = useState(false);
+  const [bodyEditSrc, setBodyEditSrc] = useState<string | null>(null);
+  const [selectedImgEl, setSelectedImgEl] = useState<HTMLImageElement | null>(null);
+  const [bodyImgWidth, setBodyImgWidth] = useState<number>(0);
+  const [fontSizePx, setFontSizePx] = useState<string>("16");
+
   const TOOLBAR_COMMANDS = [
     "bold", "italic", "underline", "strikeThrough",
     "insertUnorderedList", "insertOrderedList",
@@ -132,6 +142,32 @@ export default function NewsListPage() {
       sel?.addRange(range);
     }
     document.execCommand(command, false, value);
+    setFormValue("body", editor.innerHTML);
+    updateToolbarState();
+  }, [updateToolbarState]);
+
+  // Apply an arbitrary pixel font size to the current selection. execCommand("fontSize")
+  // only accepts the legacy 1–7 scale, so use "7" as a marker then swap each marker for a
+  // px-sized <span style="font-size"> (sanitize-html allows style on all tags → survives render).
+  const applyFontSize = useCallback((px: number) => {
+    const editor = editorRef.current;
+    if (!editor || !Number.isFinite(px) || px <= 0) return;
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    document.execCommand("fontSize", false, "7");
+    editor.querySelectorAll('font[size="7"]').forEach((f) => {
+      const span = document.createElement("span");
+      span.style.fontSize = `${px}px`;
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.replaceWith(span);
+    });
     setFormValue("body", editor.innerHTML);
     updateToolbarState();
   }, [updateToolbarState]);
@@ -244,15 +280,22 @@ export default function NewsListPage() {
     setShowForm(false);
     setEditingId(null);
     formReset(EMPTY_FORM);
+    setSelectedImgEl(null);
+    setCoverEditing(false);
+    setBodyEditSrc(null);
   };
 
   const handleSave = async (data: NewsFormData) => {
     setSaving(true);
     setErrorMsg("");
     try {
+      // Drop transient body-image selection markers + serialize the live editor HTML
+      // (classList changes don't fire onInput, so read fresh rather than trusting data.body).
+      const editor = editorRef.current;
+      if (editor) editor.querySelectorAll(`img.${IMG_SEL_CLASS}`).forEach((el) => el.classList.remove(IMG_SEL_CLASS));
       const payload = {
         title: data.title.trim(),
-        body: stripUploadsInHtml(data.body),
+        body: stripUploadsInHtml(editor ? editor.innerHTML : data.body),
         coverImageUrl: data.coverImageUrl?.trim() || null,
         status: data.status,
       };
@@ -375,6 +418,14 @@ export default function NewsListPage() {
               {watch("coverImageUrl") ? (
                 <div className="relative inline-block w-full">
                   <img src={assetUrl(watch("coverImageUrl"))!} alt="preview" className="w-full rounded-lg" />
+                  <button
+                    type="button"
+                    title="แก้ไขรูป (ครอป/ปรับขนาด)"
+                    onClick={() => setCoverEditing(true)}
+                    className="absolute top-2 right-11 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setFormValue("coverImageUrl", "")}
@@ -549,23 +600,37 @@ export default function NewsListPage() {
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("strikeThrough")} title="ขีดทับ" className={`rounded p-1.5 ${activeStates.strikeThrough ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H9a3 3 0 0 0-3 3 3 3 0 0 0 3 3h6"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M15 12a3 3 0 1 1 0 6H8"/></svg>
                 </button>
-                {/* Font size */}
-                <label title="ขนาดตัวอักษร" className="flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
+                {/* Font size (px) */}
+                <label title="ขนาดตัวอักษร (px)" className="flex cursor-pointer items-center gap-0.5 rounded p-1.5 text-gray-600 hover:bg-gray-200">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                  <select
+                  <input
+                    type="number"
+                    min={8}
+                    max={96}
+                    step={1}
+                    value={fontSizePx}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onChange={(e) => execFormat("fontSize", e.target.value)}
-                    className="ml-0.5 h-5 cursor-pointer border-none bg-transparent text-xs text-gray-600 outline-none"
-                    defaultValue="3"
-                  >
-                    <option value="1">เล็กมาก</option>
-                    <option value="2">เล็ก</option>
-                    <option value="3">ปกติ</option>
-                    <option value="4">ใหญ่</option>
-                    <option value="5">ใหญ่มาก</option>
-                    <option value="6">ใหญ่พิเศษ</option>
-                    <option value="7">ใหญ่สุด</option>
-                  </select>
+                    onChange={(e) => setFontSizePx(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        (e.target as HTMLInputElement).blur();
+                        const n = Math.round(Number(fontSizePx));
+                        if (Number.isFinite(n) && n > 0) applyFontSize(Math.max(8, Math.min(96, n)));
+                      }
+                    }}
+                    onBlur={() => {
+                      const n = Math.round(Number(fontSizePx));
+                      if (Number.isFinite(n) && n > 0) {
+                        const clamped = Math.max(8, Math.min(96, n));
+                        setFontSizePx(String(clamped));
+                        applyFontSize(clamped);
+                      }
+                    }}
+                    className="w-12 border-none bg-transparent text-xs text-gray-600 outline-none"
+                    aria-label="ขนาดตัวอักษร (px)"
+                  />
+                  <span className="text-[10px] text-gray-400">px</span>
                 </label>
                 <span className="mx-1 h-5 w-px bg-gray-300" />
                 {/* Align left */}
@@ -585,6 +650,45 @@ export default function NewsListPage() {
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
               </div>
+              {/* Selected body-image toolbar: display width, crop/compress, delete */}
+              {selectedImgEl && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary)]/5 p-2 text-sm">
+                  <span className="text-xs font-medium text-[var(--primary)]">รูปที่เลือก</span>
+                  <label className="flex items-center gap-1 text-gray-600">
+                    ความกว้าง
+                    <input
+                      type="number"
+                      min={50}
+                      max={2000}
+                      step={1}
+                      value={bodyImgWidth || ""}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const n = Math.round(Number(e.target.value));
+                        if (Number.isFinite(n) && n > 0 && selectedImgEl) {
+                          const clamped = Math.max(50, Math.min(2000, n));
+                          selectedImgEl.style.width = `${clamped}px`;
+                          selectedImgEl.style.height = "auto";
+                          setBodyImgWidth(clamped);
+                          setFormValue("body", editorRef.current?.innerHTML || "");
+                        }
+                      }}
+                      className="w-20 rounded border border-gray-300 px-2 py-0.5 outline-none focus:border-[var(--primary)]"
+                    />
+                    px
+                  </label>
+                  <button type="button" onClick={() => setBodyEditSrc(selectedImgEl.getAttribute("src") || "")} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50">
+                    ครอป/บีบอัด
+                  </button>
+                  <button type="button" onClick={() => { selectedImgEl.remove(); setSelectedImgEl(null); setFormValue("body", editorRef.current?.innerHTML || ""); }} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">
+                    ลบ
+                  </button>
+                  <button type="button" onClick={() => { selectedImgEl.classList.remove(IMG_SEL_CLASS); setSelectedImgEl(null); }} className="ml-auto rounded-md px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">
+                    ยกเลิกเลือก
+                  </button>
+                </div>
+              )}
+              <style>{`img.${IMG_SEL_CLASS}{outline:3px solid var(--primary);outline-offset:2px}`}</style>
               {/* Editor area */}
               <div
                 ref={editorRef}
@@ -597,6 +701,19 @@ export default function NewsListPage() {
                 }}
                 onKeyUp={updateToolbarState}
                 onMouseUp={updateToolbarState}
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.tagName === "IMG") {
+                    const im = target as HTMLImageElement;
+                    editorRef.current?.querySelectorAll(`img.${IMG_SEL_CLASS}`).forEach((el) => el.classList.remove(IMG_SEL_CLASS));
+                    im.classList.add(IMG_SEL_CLASS);
+                    setSelectedImgEl(im);
+                    setBodyImgWidth(Math.round(im.getBoundingClientRect().width) || im.naturalWidth || 0);
+                  } else if (selectedImgEl) {
+                    selectedImgEl.classList.remove(IMG_SEL_CLASS);
+                    setSelectedImgEl(null);
+                  }
+                }}
                 onPaste={(e) => {
                   const items = e.clipboardData.items;
                   for (let i = 0; i < items.length; i++) {
@@ -612,6 +729,44 @@ export default function NewsListPage() {
                 suppressContentEditableWarning
               />
             </div>
+
+            {/* Cover image editor (crop 16:9 + resize) */}
+            {coverEditing && (
+              <ImageEditorDialog
+                key={watch("coverImageUrl") || "cover"}
+                src={assetUrl(watch("coverImageUrl")) || ""}
+                aspect={16 / 9}
+                title="แก้ไขรูปปก"
+                onClose={() => setCoverEditing(false)}
+                onConfirm={async (file) => {
+                  const u = await uploadImage(file);
+                  if (u) setFormValue("coverImageUrl", u);
+                  setCoverEditing(false);
+                }}
+              />
+            )}
+            {/* Body image editor (free crop + resize) */}
+            {bodyEditSrc && (
+              <ImageEditorDialog
+                key={bodyEditSrc}
+                src={bodyEditSrc}
+                title="แก้ไขรูปในเนื้อหา"
+                onClose={() => setBodyEditSrc(null)}
+                onConfirm={async (file) => {
+                  const u = await uploadImage(file);
+                  if (u && selectedImgEl) {
+                    selectedImgEl.src = assetUrl(u);
+                    selectedImgEl.removeAttribute("width");
+                    selectedImgEl.removeAttribute("height");
+                    selectedImgEl.style.width = "";
+                    selectedImgEl.style.height = "";
+                    setBodyImgWidth(Math.round(selectedImgEl.getBoundingClientRect().width) || selectedImgEl.naturalWidth || 0);
+                    setFormValue("body", editorRef.current?.innerHTML || "");
+                  }
+                  setBodyEditSrc(null);
+                }}
+              />
+            )}
 
             {/* Status */}
             <FormField label="สถานะ">
