@@ -64,3 +64,98 @@ export async function sendPasswordResetEmail(
     `,
   });
 }
+
+/**
+ * Sent when an admin approves a pending signup — the alumni can now log in.
+ * `name` is the alumni's current display name (prefix + first + last).
+ */
+export async function sendSignupApprovedEmail(to: string, name: string): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const loginUrl = `${baseUrl}/alumni/login`;
+
+  await transporter.sendMail({
+    from:
+      process.env.SMTP_FROM ||
+      '"FON CMU Alumni" <noreply@cmu.ac.th>',
+    to,
+    subject:
+      "บัญชีของท่านได้รับอนุมัติแล้ว - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
+    html: `
+      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #2e7d32; margin: 0; font-size: 22px;">บัญชีของท่านได้รับอนุมัติแล้ว</h2>
+          </div>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            เรียน ${name},
+          </p>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+            ได้รับการอนุมัติแล้ว ท่านสามารถเข้าสู่ระบบได้ทันที
+          </p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${loginUrl}" style="display: inline-block; background-color: #2e7d32; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
+              เข้าสู่ระบบ
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดใปเบราว์เซอร์:
+          </p>
+          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
+            ${loginUrl}
+          </p>
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <p style="color: #9ca3af; font-size: 12px;">
+            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+/**
+ * Sent when an admin rejects a pending signup. Deliberately vague — no field
+ * details, just "contact the admin" — so the alumni knows to follow up.
+ */
+export async function sendSignupRejectedEmail(
+  to: string,
+  name: string,
+  reason?: string | null,
+): Promise<void> {
+  await transporter.sendMail({
+    from:
+      process.env.SMTP_FROM ||
+      '"FON CMU Alumni" <noreply@cmu.ac.th>',
+    to,
+    subject:
+      "แจ้งผลการพิจารณาการลงทะเบียน - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
+    html: `
+      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #c62828; margin: 0; font-size: 22px;">แจ้งผลการพิจารณาการลงทะเบียน</h2>
+          </div>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            เรียน ${name},
+          </p>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+            ยังไม่ได้รับการอนุมัติ หากท่านมีข้อสงสัยหรือต้องการสอบถามรายละเอียดเพิ่มเติม
+            กรุณาติดต่อผู้ดูแลระบบ
+          </p>
+          ${reason ? `
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            <strong>หมายเหตุ:</strong> ${reason}
+          </p>` : ""}
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <p style="color: #9ca3af; font-size: 12px;">
+            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}

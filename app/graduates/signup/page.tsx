@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { BASE_PATH, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { alumniSignupSchema, type AlumniSignupData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
@@ -19,9 +18,9 @@ export default function AlumniSignupPage() {
 }
 
 function AlumniSignupForm() {
-  const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   function formatBirthDate(value: string): string {
     return value.replace(/\D/g, "").slice(0, 8);
@@ -73,8 +72,10 @@ function AlumniSignupForm() {
         return;
       }
 
-      // Auto-logged-in by the API (session cookie set) — go straight to profile
-      router.push(resData.redirect || "/graduates/profile");
+      // Signup creates a PENDING account — an admin must approve before the
+      // alumni can log in. Show a confirmation instead of redirecting (no
+      // session is created).
+      setSubmitted(true);
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
@@ -114,6 +115,28 @@ function AlumniSignupForm() {
       {/* Right panel — Signup form */}
       <div className="flex w-full items-center justify-center bg-white px-6 py-12 lg:w-1/2">
         <div className="w-full max-w-md">
+          {submitted ? (
+            <div className="text-center">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-[var(--foreground)]">ลงทะเบียนสำเร็จ</h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
+                ระบบได้รับข้อมูลของท่านแล้ว บัญชีของท่านอยู่ระหว่างการตรวจสอบ
+                กรุณารอการอนุมัติจากผู้ดูแลระบบก่อนเข้าสู่ระบบ
+                ท่านจะได้รับอีเมลแจ้งเตือนเมื่อบัญชีพร้อมใช้งาน
+              </p>
+              <a
+                href={`${BASE_PATH}/login`}
+                className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
+              >
+                กลับสู่หน้าเข้าสู่ระบบ
+              </a>
+            </div>
+          ) : (
+          <>
           {/* Mobile logo */}
           <div className="mb-8 text-center lg:hidden">
             <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
@@ -282,6 +305,8 @@ function AlumniSignupForm() {
               เข้าสู่ระบบ
             </a>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

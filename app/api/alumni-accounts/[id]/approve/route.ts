@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { checkWritePermission } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity-log";
+import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
+import { syncPrimarySnapshot } from "@/lib/education-sync";
+import { generateGraduationLogs } from "@/lib/graduation-log";
+import { sendSignupApprovedEmail } from "@/lib/email";
+import { cmuLevelToDegree } from "@/lib/alumni-verify";
+import type { DegreeLevel } from "@/app/generated/prisma/client";
+
+// Approve a pending (or previously rejected) alumni signup → accountStatus
+// ACTIVE. Creates the Education row + primary snapshot + graduation logs that
+// signup deferred (so a rejected signup never pollutes degree data). Notifies
+// the alumni by email on a real transition into ACTIVE.
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const denied = await checkWritePermission();
+    if (denied) return denied;
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    }
+    const { id } = await params;
+
+    const alumni = await prisma.alumni.findUnique({ where: { id } });
+    if (!alumni) {
+      return NextResponse.json({ error: "ไม่พบบัญชี" }, { status: 404 });
+    }
+
+    const wasActive = alumni.accountStatus === "ACTIVE";
+
+    // CMU-authoritative values for the Education row (best-effort; falls back to
+    // the alumni snapshot if CMU is unavailable at approval time).
+    let cmuGrad = null;
+    try {
+      cmuGrad = await fetchCmuGraduateById(alumni.studentId);
+    } catch {
+      cmuGrad = null;
+    }
+    const degreeLevel = cmuGrad
+      ? cmuLevelToDegree(cmuGrad.level_id, cmuGrad.major_name_th)
+      : alumni.degreeLevel;
+    const gy = cmuGrad?.grad_year ? Number(cmuGrad.grad_year) : NaN;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.alumni.update({
+        where: { id },
+        data: { accountStatus: "ACTIVE" },
+      });
+
+      // Ensure an Education row exists for this signup degree; set it as the
+      // primary if the alumni has none yet, then re-sync the denormalized
+      // snapshot (studentId/degreeLevel/year/major/cohort) from it.
+      const existingEdu = await tx.education.findUnique({
+        where: { studentId: alumni.studentId },
+      });
+      if (!existingEdu) {
+        const edu = await tx.education.create({
+          data: {
+            alumniId: id,
+            studentId: alumni.studentId,
+            degreeLevel: degreeLevel as DegreeLevel,
+            graduationYear:
+              Number.isFinite(gy) && gy > 0 ? gy : alumni.graduationYear,
+            major: cmuGrad?.major_name_th?.trim() || alumni.major,
+            cohort: alumni.cohort,
+            firstName: cmuGrad?.name_th?.trim() || alumni.firstName,
+            lastName: cmuGrad?.surname_th?.trim() || alumni.lastName,
+          },
+        });
+        if (!alumni.primaryEducationId) {
+          await tx.alumni.update({
+            where: { id },
+            data: { primaryEducationId: edu.id },
+          });
+          await syncPrimarySnapshot(id, tx);
+        }
+      }
+    });
+
+    // Graduation logs do their own CMU fetches — run outside the txn (idempotent).
+    await generateGraduationLogs(id);
+
+    await logActivity(
+      {
+        actorType: "ADMIN",
+        userId: session.user.id,
+        userEmail: session.user.email,
+        userRole: session.user.role,
+      },
+      "APPROVE",
+      "alumni_auth",
+      id,
+      {
+        alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`,
+        studentId: alumni.studentId,
+      },
+    );
+
+    // Notify only on a real transition into ACTIVE (not an idempotent re-approve).
+    if (!wasActive && alumni.email) {
+      try {
+        await sendSignupApprovedEmail(
+          alumni.email,
+          `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`.trim(),
+        );
+      } catch (err) {
+        console.error("Failed to send signup-approved email:", err);
+      }
+    }
+
+    return NextResponse.json({ success: true, accountStatus: "ACTIVE" });
+  } catch (error) {
+    console.error("POST /api/alumni-accounts/[id]/approve error:", error);
+    return NextResponse.json(
+      { error: "เกิดข้อผิดพลาดในการดำเนินการ" },
+      { status: 500 }
+    );
+  }
+}
