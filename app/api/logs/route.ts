@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId;
     if (source === "alumni") where.actorType = "ALUMNI";
     else if (source === "admin") where.actorType = "ADMIN";
+    else if (source === "system") where.actorType = "SYSTEM";
 
     const [data, total] = await Promise.all([
       prisma.activityLog.findMany({

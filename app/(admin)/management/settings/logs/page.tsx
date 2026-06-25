@@ -59,6 +59,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   news: "ข่าวสาร",
   user: "ผู้ใช้งาน",
   alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",
+  education: "ประวัติการศึกษา",
 };
 
 const PAGE_SIZE = 20;
@@ -161,6 +162,7 @@ export default function LogsPage() {
           <option value="">ทุกแหล่งที่มา</option>
           <option value="admin">ผู้ดูแลระบบ</option>
           <option value="alumni">ศิษย์เก่า</option>
+          <option value="system">ระบบ</option>
         </select>
 
         <select
@@ -207,13 +209,18 @@ export default function LogsPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {logs.map((log) => {
+                const isSystemActor = log.actorType === "SYSTEM";
                 const isAlumniActor = log.actorType === "ALUMNI";
-                const actorName = isAlumniActor
-                  ? (log.alumniName || "—")
-                  : (log.user ? `${log.user.firstName} ${log.user.lastName}` : "—");
-                const actorSub = isAlumniActor
+                const actorName = isSystemActor
+                  ? "ระบบ"
+                  : isAlumniActor
+                    ? (log.alumniName || "—")
+                    : (log.user ? `${log.user.firstName} ${log.user.lastName}` : "—");
+                const actorSub = isSystemActor
                   ? ""
-                  : (log.userEmail || "");
+                  : isAlumniActor
+                    ? ""
+                    : (log.userEmail || "");
 
                 return (
                   <tr key={log.id} className="hover:bg-gray-50">
@@ -221,6 +228,9 @@ export default function LogsPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{actorName}</div>
                       <div className="flex items-center gap-1.5">
+                        {isSystemActor && (
+                          <span className="inline-block rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">ระบบ</span>
+                        )}
                         {isAlumniActor && (
                           <span className="inline-block rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">ศิษย์เก่า</span>
                         )}
