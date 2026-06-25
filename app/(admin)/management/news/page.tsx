@@ -793,7 +793,7 @@ export default function NewsListPage() {
               >
                 <div className="aspect-video w-full overflow-hidden bg-gray-100">
                   {item.coverImageUrl ? (
-                    <img src={item.coverImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
                       <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
