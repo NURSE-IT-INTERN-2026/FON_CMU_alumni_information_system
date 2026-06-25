@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkSuperAdminPermission } from "@/lib/permissions";
-import { getSession } from "@/lib/auth";
-import { logActivity } from "@/lib/activity-log";
 
 /**
  * POST /api/logs/bulk-delete — permanently delete activity-log entries.
  * Superadmin-only (irreversible). Hard-deletes (ActivityLog has no soft-delete
- * column) and writes ONE trace row (BULK_DELETE / activity_log, details {count})
- * so deletions stay accountable.
+ * column). Deliberately does NOT log the deletion itself — leaving a trace would
+ * defeat the purpose of removing log entries.
  */
 export async function POST(request: NextRequest) {
   const permErr = await checkSuperAdminPermission();
@@ -31,23 +29,6 @@ export async function POST(request: NextRequest) {
     const result = await prisma.activityLog.deleteMany({
       where: { id: { in: ids } },
     });
-
-    // Accountability trace (never blocks the request).
-    const session = await getSession();
-    if (session) {
-      await logActivity(
-        {
-          actorType: "ADMIN",
-          userId: session.user.id,
-          userEmail: session.user.email,
-          userRole: session.user.role,
-        },
-        "BULK_DELETE",
-        "activity_log",
-        null,
-        { count: result.count }
-      );
-    }
 
     return NextResponse.json({ success: true, count: result.count });
   } catch (error) {
