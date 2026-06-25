@@ -72,7 +72,25 @@ export async function DELETE(
   if (permErr) return permErr;
   try {
     const { id } = await params;
+    const existing = await prisma.alumniAgency.findUnique({ where: { id } });
     await prisma.alumniAgency.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    const session = await getSession();
+    if (session && existing) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "DELETE",
+        "alumni_agency",
+        id,
+        {
+          workplace: existing.workplace,
+          cohort: existing.cohort,
+          major: existing.major,
+          name: `${existing.prefix ?? ""}${existing.firstName ?? ""} ${existing.lastName ?? ""}`.trim(),
+        },
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete alumni agency:", error);
