@@ -3,6 +3,7 @@ import Link from "next/link";
 import sanitizeHtml from "sanitize-html";
 import prisma from "@/lib/prisma";
 import { assetUrl, prefixUploadsInHtml } from "@/lib/asset-url";
+import { getSession } from "@/lib/auth";
 
 function formatThaiDate(date: Date): string {
   const months = [
@@ -26,7 +27,12 @@ export default async function NewsDetailPage({
     where: { id },
   });
 
-  if (!news || news.status !== "PUBLISHED") {
+  // Public visitors only see PUBLISHED news; an authenticated admin can preview
+  // any status (so clicking a DRAFT/DISCONTINUED card in manage mode renders
+  // instead of 404ing). getSession() returns only ADMIN sessions.
+  const adminSession = await getSession();
+  const isAdmin = !!adminSession;
+  if (!news || (!isAdmin && news.status !== "PUBLISHED")) {
     notFound();
   }
 
