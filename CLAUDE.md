@@ -73,7 +73,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 ### Auth & Roles
 
 - **Session-based auth** using `bcryptjs` + HTTP-only cookies (`fon-cmu-session`). Session tokens stored in `Session` model, 7-day expiry.
-- **CMU OAuth2** with PKCE via Microsoft Entra ID (`lib/oauth.ts`). Callback at `/intern/api/auth/callback/`.
+- **CMU OAuth2** with PKCE via Microsoft Entra ID (`lib/oauth.ts`). Callback at `/api/auth/callback/` (route `app/api/auth/callback/route.ts`; the registered redirect URI is the `CALLBACK_URL` env var, which both the authorize request and the token exchange read).
 - **2 Roles:** `superadmin` (full CRUD + user management), `admin` (CRUD + import/export).
 - **Alumni portal** (`/graduates/*`): separate self-service session flow — email/password login, identity-verification sign-up, first-login TOS acceptance. Reuses the `Session` model with `sessionType: ALUMNI`; auth routes under `app/api/alumni-auth/`.
 - **Role context:** `lib/role-context.tsx` provides `useRole()`, `useCanWrite()`, `useIsAdmin()` hooks.
@@ -122,7 +122,7 @@ app/
 │   ├── alumni-count/             # Dashboard aggregation
 │   ├── associations/ · awards/ · graduate-committee/ · model-representatives/ · potentials/  # CRUD + import/export/bulk-delete
 │   ├── news/                     # CRUD + bulk-delete (delete → DISCONTINUED)
-│   ├── auth/{login,cmu-login,logout,cleanup}/
+│   ├── auth/{login,cmu-login,logout,callback,cleanup}/   # callback = CMU OAuth callback (Microsoft Entra ID PKCE)
 │   ├── educations/[id]/          # Education record GET/PUT/DELETE (admin OR owning alumni; PUT of the primary re-syncs the Alumni snapshot)
 │   ├── alumni/[id]/educations/   # Admin: list + add an alumni's education records
 │   ├── cmu-alumni/               # CMU Registrar list/search proxy (GET only) + /lookup?studentId=&alumniId= (GET — single-record auto-fill preview for the add-education form; returns samePersonWarning when alumniId is a different person)
@@ -130,7 +130,6 @@ app/
 │   ├── trash/{restore,hard-delete}/   # Superadmin soft-delete recovery
 │   ├── field-changes/ · filter-facets/ · dashboard/ · logs/   # Supporting read endpoints
 │   └── upload/                   # Image upload (PNG/JPG, max 5 MB)
-└── intern/api/auth/callback/     # CMU OAuth callback
 ```
 
 ### API Route Pattern
@@ -171,11 +170,11 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 - `/` → `/management/dashboard`; `/management` → `/management/dashboard`.
 - `app/(admin)/layout.tsx` → `/login` when no admin session. `app/graduates/(authed)/layout.tsx` → `/login` (no alumni session) or `/graduates/tos` (TOS not yet accepted). `settings/profile` & `graduates/tos` pages also redirect to `/login` when unauthenticated.
 - Both logout routes (`/api/auth/logout`, `/api/alumni-auth/logout`) → `/login`.
-- OAuth: `/intern/api/auth/callback/` → dashboard on success, `/login?error=…` on failure; flow starts at `/api/auth/cmu-login`.
+- OAuth: `/api/auth/callback/` → dashboard on success, `/login?error=…` on failure; flow starts at `/api/auth/cmu-login`.
 
 **Entry points — legitimately have no in-app links (do NOT flag as unused):**
 - Public/landing: `/`, `/login`, `/news/[id]`, `/graduates/{signup,forgot-password,reset-password,tos}`.
-- OAuth/callback: `/intern/api/auth/callback/`, `/api/auth/cmu-login`.
+- OAuth/callback: `/api/auth/callback/`, `/api/auth/cmu-login`.
 - Cron: `/api/auth/cleanup` (secured by `CLEANUP_SECRET` env var).
 
 ### Key Libraries
@@ -280,7 +279,7 @@ Routes here interconnect — admin pages link to each other, client components `
 
 - **Identify each route** — its path, (for APIs) method(s), what it does, and who calls it.
 - **Correlations** — other routes that link to / fetch / depend on it, and any it overlaps or shares data with. Flag one-way vs round-trip pairs (e.g. `DELETE /api/alumni/[id]` soft-deletes → recoverable via `POST /api/trash/restore`; `DELETE /api/news/[id]` → `DISCONTINUED`, unrecoverable).
-- **Redirection** — any redirect it issues or is subject to (layout guards, `proxy.ts`, OAuth callback `/intern/api/auth/callback/`, role-based fallbacks). Mind `basePath: "/alumni"` on all paths.
+- **Redirection** — any redirect it issues or is subject to (layout guards, `proxy.ts`, OAuth callback `/api/auth/callback/`, role-based fallbacks). Mind `basePath: "/alumni"` on all paths.
 - **Delete unused routes** — if a route has no link, fetch, redirect, or test referencing it, delete it instead of leaving dead code. First grep for the path in all its forms (literal, `/[id]` param form, and any `BASE_PATH`-prepended variant) to confirm nothing references it.
 
 If a route's purpose can't be stated in one line, that's a signal it's doing too much or isn't needed — say so.
