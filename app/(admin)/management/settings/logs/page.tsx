@@ -70,7 +70,6 @@ const RESOURCE_LABELS: Record<string, string> = {
   user: "ผู้ใช้งาน",
   alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",
   education: "ประวัติการศึกษา",
-  activity_log: "บันทึกกิจกรรม",
 };
 
 const PAGE_SIZE = 20;
@@ -395,12 +394,9 @@ export default function LogsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setShowBulkDeleteDialog(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบบันทึกกิจกรรม</h3>
-            <p className="mb-2 text-sm text-gray-600">
+            <p className="mb-6 text-sm text-gray-600">
               คุณต้องการลบบันทึกกิจกรรม <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
               การดำเนินการนี้ไม่สามารถย้อนกลับได้
-            </p>
-            <p className="mb-6 text-xs text-gray-500">
-              ระบบจะบันทึกการลบไว้ 1 รายการเพื่อให้สามารถตรวจสอบย้อนหลังได้
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowBulkDeleteDialog(false)} disabled={deleting} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">ยกเลิก</button>
