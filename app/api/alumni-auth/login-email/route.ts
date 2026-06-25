@@ -8,7 +8,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError } from "@/lib/validations/helpers";
 import { alumniLoginSchema } from "@/lib/validations/auth";
 
@@ -107,7 +107,6 @@ export async function POST(request: Request) {
       "alumni_auth",
       alumni.id,
       { action: "login", method: "email" },
-      getIp(request)
     );
 
     return NextResponse.json({

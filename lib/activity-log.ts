@@ -62,7 +62,6 @@ export async function logActivity(
   resource: LogResource,
   resourceId?: string | null,
   details?: Record<string, unknown> | null,
-  ipAddress?: string | null,
   reason?: string | null,
   tx: Prisma.TransactionClient = prisma
 ): Promise<string | null> {
@@ -73,7 +72,6 @@ export async function logActivity(
       resourceId: resourceId ?? null,
       reason: reason ?? null,
       details: details ? (details as Prisma.InputJsonValue) : undefined,
-      ipAddress: ipAddress ?? null,
     };
     let data: Prisma.ActivityLogUncheckedCreateInput;
     if (ctx.actorType === "ADMIN") {

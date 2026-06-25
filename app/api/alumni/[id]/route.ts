@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
 import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
@@ -156,7 +156,6 @@ export async function PUT(
         "alumni",
         id,
         { changes },
-        getIp(request),
         validated.reason
       );
     }
@@ -202,7 +201,6 @@ export async function DELETE(
         "alumni",
         id,
         { studentId: existing.studentId, name: `${existing.prefix}${existing.firstName} ${existing.lastName}` },
-        getIp(request)
       );
     }
 

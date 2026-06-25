@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
         "alumni",
         null,
         { count: result.count, ids },
-        getIp(request)
       );
     }
 

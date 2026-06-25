@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 
 // Suspend (or reactivate) an alumni account. Suspending is a full block
 // (PRD §3.15): the alumni can't log in and any existing session is killed
@@ -42,7 +42,6 @@ export async function POST(
       {
         alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`,
       },
-      getIp(request)
     );
 
     return NextResponse.json({ success: true, suspendedAt: alumni.suspendedAt });

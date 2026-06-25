@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, newsUpdateSchema } from "@/lib/validations";
 
 export async function GET(
@@ -78,7 +78,6 @@ export async function PUT(
       "news",
       id,
       { title: news.title, status: news.status },
-      getIp(request)
     );
 
     return NextResponse.json(news);
@@ -123,7 +122,6 @@ export async function DELETE(
       "news",
       id,
       { title: existing.title, status: "DISCONTINUED" },
-      getIp(request)
     );
 
     return NextResponse.json({ message: "ยุติการเผยแพร่ข่าวสารสำเร็จ" });

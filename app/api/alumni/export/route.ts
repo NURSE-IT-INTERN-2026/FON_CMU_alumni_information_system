@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -62,7 +62,6 @@ export async function GET(request: NextRequest) {
       "alumni",
       null,
       { count: rows.length, mode: "filtered", search: search || undefined },
-      getIp(request),
     );
 
     return buildExcelResponse(rows, "ศิษย์เก่า", "alumni_export");
@@ -107,7 +106,6 @@ export async function POST(request: NextRequest) {
       "alumni",
       null,
       { count: rows.length, mode: "selected" },
-      getIp(request),
     );
 
     return buildExcelResponse(rows, "ศิษย์เก่า", "alumni_export");

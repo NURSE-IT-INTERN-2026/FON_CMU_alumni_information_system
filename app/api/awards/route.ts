@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, awardCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
         "award",
         award.id,
         { awardName: award.awardName, awardType: award.awardType, year: award.year },
-        getIp(request)
       );
     }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSuperAdminPermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { TRASH_ENTITIES, getDelegate, buildDisplayName } from "@/lib/trash";
 
 /** POST /api/trash/restore { entity, id } — un-soft-delete a record (superadmin only). */
@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
         cfg.resource,
         id,
         { entity, name: buildDisplayName(existing, cfg.nameFields) },
-        getIp(request)
       );
     }
     return NextResponse.json({ success: true });

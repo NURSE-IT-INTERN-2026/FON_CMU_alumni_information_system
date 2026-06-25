@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSuperAdminPermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { TRASH_ENTITIES, getDelegate, buildDisplayName } from "@/lib/trash";
 
 /** POST /api/trash/hard-delete { entity, id, confirm } — permanently delete a soft-deleted record (superadmin only, requires confirm). */
@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
         cfg.resource,
         id,
         { entity, name },
-        getIp(request)
       );
     }
     return NextResponse.json({ success: true });

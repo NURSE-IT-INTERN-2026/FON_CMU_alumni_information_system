@@ -4,7 +4,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
 
 const resetPasswordApiSchema = z.object({
@@ -83,7 +83,6 @@ export async function POST(request: Request) {
       "alumni_auth",
       resetRecord.alumniId,
       null,
-      getIp(request)
     );
 
     return NextResponse.json({

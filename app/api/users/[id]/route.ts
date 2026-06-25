@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkSuperAdminPermission } from "@/lib/permissions";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, userUpdateSchema } from "@/lib/validations";
 
 export async function GET(
@@ -103,7 +103,6 @@ export async function PUT(
       "user",
       id,
       { email: user.email, role: user.role },
-      getIp(request)
     );
 
     // Suspend/activate: kill the user's sessions on suspend (full block) and
@@ -118,7 +117,6 @@ export async function PUT(
         "user",
         id,
         { email: user.email, role: user.role },
-        getIp(request)
       );
     }
 
@@ -163,7 +161,6 @@ export async function DELETE(
       "user",
       id,
       { email: existing.email, role: existing.role },
-      getIp(request)
     );
 
     return NextResponse.json({ message: "ลบผู้ใช้งานสำเร็จ" });

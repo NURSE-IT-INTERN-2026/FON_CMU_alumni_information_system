@@ -299,7 +299,6 @@ model ActivityLog {
   resourceId String?
   reason     String?
   details    Json?
-  ipAddress  String?
   createdAt  DateTime  @default(now())
 
   user         AdminUser?          @relation(fields: [userId], references: [id], onDelete: Cascade)

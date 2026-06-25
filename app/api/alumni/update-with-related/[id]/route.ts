@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { AwardType, DegreeLevel } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
@@ -164,7 +164,6 @@ export async function PUT(
         "alumni",
         id,
         { changes, source: "update-with-related" },
-        getIp(request),
         validated.reason
       );
     }

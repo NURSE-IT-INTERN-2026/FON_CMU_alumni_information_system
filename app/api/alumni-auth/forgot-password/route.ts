@@ -4,7 +4,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendPasswordResetEmail } from "@/lib/email";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { randomBytes } from "crypto";
 import { handleZodError } from "@/lib/validations/helpers";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
@@ -75,7 +75,6 @@ export async function POST(request: Request) {
       "alumni_auth",
       alumni.id,
       { email: alumni.email },
-      getIp(request)
     );
 
     return NextResponse.json({ message: successMessage });

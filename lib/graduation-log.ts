@@ -137,7 +137,6 @@ export async function generateGraduationLogs(
         major: ev.major,
         cohort: ev.cohort,
       },
-      null,
       `สำเร็จการศึกษา ${label}`,
       tx,
     );

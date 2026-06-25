@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getAlumniSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { generateGraduationLogs } from "@/lib/graduation-log";
@@ -71,14 +71,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const ip = getIp(request);
       await logActivity(
         { actorType: "ALUMNI", alumniId: alumni.id, alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
         "CREATE",
         "education",
         created.id,
         { source: "alumni_self_add", studentId: created.studentId, degreeLevel: created.degreeLevel },
-        ip,
       );
       // SYSTEM graduation log + re-sync the current name from the highest degree.
       await generateGraduationLogs(alumni.id);

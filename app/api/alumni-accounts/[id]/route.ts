@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
@@ -83,7 +83,6 @@ export async function PUT(
     // Log admin edit of alumni profile + field-change history
     const changes = computeFieldChanges(old, alumni, TRACKED_FIELDS.alumni_profile);
     await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason });
-    const ip = getIp(request);
     await logActivity(
       {
         actorType: "ADMIN",
@@ -95,7 +94,6 @@ export async function PUT(
       "alumni_profile",
       alumni.id,
       { changes, source: "admin_edit" },
-      ip,
       reason
     );
 

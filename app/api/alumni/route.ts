@@ -5,7 +5,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
@@ -135,7 +135,6 @@ export async function POST(request: NextRequest) {
         "alumni",
         alumni.id,
         { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
-        getIp(request)
       );
     }
 

@@ -3,10 +3,10 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkSuperAdminPermission } from "@/lib/permissions";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, userCreateSchema } from "@/lib/validations";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession();
     if (!session) {
@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
         "user",
         user.id,
         { email: user.email, role: user.role },
-        getIp(request)
       );
     }
 

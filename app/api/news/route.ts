@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, newsCreateSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
@@ -82,7 +82,6 @@ export async function POST(request: NextRequest) {
       "news",
       news.id,
       { title: news.title, status: news.status },
-      getIp(request)
     );
 
     return NextResponse.json(news, { status: 201 });

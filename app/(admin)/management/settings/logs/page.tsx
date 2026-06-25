@@ -17,7 +17,6 @@ interface ActivityLog {
   resource: string;
   resourceId: string | null;
   details: Record<string, unknown> | null;
-  ipAddress: string | null;
   reason: string | null;
   createdAt: string;
   user: {
@@ -204,17 +203,16 @@ export default function LogsPage() {
                 <th className="px-4 py-3">กิจกรรม</th>
                 <th className="px-4 py-3">ประเภทข้อมูล</th>
                 <th className="px-4 py-3">รายละเอียด</th>
-                <th className="px-4 py-3">IP Address</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {logs.map((log) => {
                 const isAlumniActor = log.actorType === "ALUMNI";
                 const actorName = isAlumniActor
-                  ? (log.alumniName || "ศิษย์เก่า")
+                  ? (log.alumniName || "—")
                   : (log.user ? `${log.user.firstName} ${log.user.lastName}` : "—");
                 const actorSub = isAlumniActor
-                  ? "ศิษย์เก่า"
+                  ? ""
                   : (log.userEmail || "");
 
                 return (
@@ -226,7 +224,9 @@ export default function LogsPage() {
                         {isAlumniActor && (
                           <span className="inline-block rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">ศิษย์เก่า</span>
                         )}
-                        <span className="text-xs text-gray-400">{actorSub}</span>
+                        {actorSub && (
+                          <span className="text-xs text-gray-400">{actorSub}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -245,7 +245,6 @@ export default function LogsPage() {
                         )}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{log.ipAddress || "-"}</td>
                   </tr>
                 );
               })}

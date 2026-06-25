@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { AwardType, DegreeLevel } from "@/app/generated/prisma/client";
 import { getAlumniSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniProfileUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
@@ -203,7 +203,6 @@ export async function PUT(request: NextRequest) {
       // Log alumni profile edit + field-change history
       const changes = computeFieldChanges(oldCore, alumni, TRACKED_FIELDS.alumni_profile);
       await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` }, reason: validated.reason });
-      const ip = getIp(request);
       await logActivity(
         {
           actorType: "ALUMNI",
@@ -224,7 +223,6 @@ export async function PUT(request: NextRequest) {
             alumniAgency: validated.alumniAgency?.length ?? 0,
           },
         },
-        ip,
         validated.reason
       );
 
@@ -257,7 +255,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const session = await getAlumniSession();
     if (!session || !session.alumni) {
@@ -279,7 +277,6 @@ export async function DELETE(request: NextRequest) {
       }),
     ]);
 
-    const ip = getIp(request);
     await logActivity(
       {
         actorType: "ALUMNI",
@@ -290,7 +287,6 @@ export async function DELETE(request: NextRequest) {
       "alumni_profile",
       alumniId,
       { source: "alumni_self_delete" },
-      ip
     );
 
     return NextResponse.json({ success: true });

@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, modelRepUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
@@ -43,7 +43,6 @@ export async function PUT(
         "model_representative",
         id,
         { changes },
-        getIp(request),
         validated.reason
       );
     }

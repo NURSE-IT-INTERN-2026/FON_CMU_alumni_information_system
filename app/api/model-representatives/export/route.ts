@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -55,7 +55,6 @@ export async function GET(request: NextRequest) {
       "model_representative",
       null,
       { count: items.length, mode: "filtered", search: search || undefined },
-      getIp(request),
     );
 
     const rows = items.map((a) => ({
@@ -106,7 +105,6 @@ export async function POST(request: NextRequest) {
       "model_representative",
       null,
       { count: items.length, mode: "selected" },
-      getIp(request),
     );
 
     const rows = items.map((a) => ({

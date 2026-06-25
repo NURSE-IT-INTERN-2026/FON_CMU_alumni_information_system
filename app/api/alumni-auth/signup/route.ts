@@ -8,7 +8,7 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import {
@@ -277,7 +277,6 @@ export async function POST(request: Request) {
         email,
         source: cmuVerified ? "cmu" : "local",
       },
-      getIp(request)
     );
 
     return NextResponse.json({

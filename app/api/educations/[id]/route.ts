@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession, getAlumniSession } from "@/lib/auth";
-import { logActivity, getIp } from "@/lib/activity-log";
+import { logActivity } from "@/lib/activity-log";
 import { educationUpdateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { syncPrimarySnapshot } from "@/lib/education-sync";
@@ -123,14 +123,12 @@ export async function PUT(
         return edu;
       });
 
-      const ip = getIp(request);
       await logActivity(
         actorOf(ctx),
         "UPDATE",
         "education",
         updated.id,
         { alumniId: existing.alumniId, studentId: updated.studentId, degreeLevel: updated.degreeLevel, reason: validated.reason },
-        ip,
         validated.reason,
       );
 
@@ -179,14 +177,12 @@ export async function DELETE(
 
     await prisma.education.delete({ where: { id } });
 
-    const ip = getIp(request);
     await logActivity(
       actorOf(ctx),
       "DELETE",
       "education",
       id,
       { alumniId: existing.alumniId, studentId: existing.studentId, degreeLevel: existing.degreeLevel },
-      ip,
     );
 
     return NextResponse.json({ success: true });
