@@ -29,10 +29,16 @@ function parseGradDate(s: string | null | undefined): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-/** Fall back to the Buddhist `graduationYear` → a Jan-1 of that year (for ordering). */
+/** Fall back to the Buddhist `graduationYear` → a Jan-1 of that year (CE), for
+ * ordering. `graduationYear` is stored in the Buddhist calendar (e.g. 2525 =
+ * CE 1982); convert to CE so the backdate lands on the real graduation year,
+ * not ~543 years in the future (which would float the log to the top of the
+ * activity list as an "unknown entity"). Threshold 2400 cleanly separates
+ * Buddhist years (≥2444 in any university context) from stray CE values. */
 function yearToDate(year: number | null, fallback: Date): Date {
   if (!year || !Number.isFinite(year)) return fallback;
-  return new Date(year, 0, 1);
+  const ce = year > 2400 ? year - 543 : year;
+  return new Date(ce, 0, 1);
 }
 
 interface DegreeEvent {
