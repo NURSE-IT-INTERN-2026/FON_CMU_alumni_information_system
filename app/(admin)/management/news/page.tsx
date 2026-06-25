@@ -7,6 +7,7 @@ import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
+import { assetUrl, prefixUploadsInHtml, stripUploadsInHtml } from "@/lib/asset-url";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -175,7 +176,7 @@ export default function NewsListPage() {
       return;
     }
     uploadImage(file).then((url) => {
-      if (url) execFormat("insertHTML", `<img src="${url}" style="max-width:100%;height:auto" /><br/>`);
+      if (url) execFormat("insertHTML", `<img src="${assetUrl(url)}" style="max-width:100%;height:auto" /><br/>`);
     });
   };
 
@@ -217,7 +218,7 @@ export default function NewsListPage() {
 
   useEffect(() => {
     if (showForm && editorRef.current) {
-      editorRef.current.innerHTML = watch("body") || "";
+      editorRef.current.innerHTML = prefixUploadsInHtml(watch("body") || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, editingId]);
@@ -251,7 +252,7 @@ export default function NewsListPage() {
     try {
       const payload = {
         title: data.title.trim(),
-        body: data.body,
+        body: stripUploadsInHtml(data.body),
         coverImageUrl: data.coverImageUrl?.trim() || null,
         status: data.status,
       };
@@ -373,7 +374,7 @@ export default function NewsListPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">รูปปก</label>
               {watch("coverImageUrl") ? (
                 <div className="relative inline-block w-full">
-                  <img src={watch("coverImageUrl")!} alt="preview" className="w-full rounded-lg" />
+                  <img src={assetUrl(watch("coverImageUrl"))!} alt="preview" className="w-full rounded-lg" />
                   <button
                     type="button"
                     onClick={() => setFormValue("coverImageUrl", "")}
@@ -729,7 +730,7 @@ export default function NewsListPage() {
                   <Link href={`/news/${item.id}`} className="block">
                     <div className="aspect-video w-full overflow-hidden bg-gray-100">
                       {item.coverImageUrl ? (
-                        <img src={item.coverImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                        <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                       ) : (
                         <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
                           <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

@@ -6,6 +6,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
+import { assetUrl } from "@/lib/asset-url";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -122,7 +123,7 @@ export default function AlumniNewsPage() {
               >
                 <div className="aspect-video w-full overflow-hidden bg-gray-100">
                   {item.coverImageUrl ? (
-                    <img src={item.coverImageUrl} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
                       <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
