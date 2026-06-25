@@ -116,6 +116,14 @@ export async function getAlumniSession(): Promise<AlumniSession | null> {
     return null;
   }
 
+  // Admin-approval signup flow: only ACTIVE accounts have a valid session.
+  // PENDING/REJECTED accounts never receive a session, but guard here too so a
+  // stale session row (e.g. created just before an account was suspended/
+  // rejected) can't grant access.
+  if (session.alumni.accountStatus !== "ACTIVE") {
+    return null;
+  }
+
   return session as AlumniSession;
 }
 

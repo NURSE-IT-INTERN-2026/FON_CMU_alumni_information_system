@@ -38,6 +38,17 @@ enum ActorType {
   SYSTEM
 }
 
+// Alumni account lifecycle for the admin-approval signup flow. New signups are
+// PENDING until an admin reviews them; ACTIVE accounts may log in; REJECTED
+// accounts are kept (re-approvable) but blocked from login. Default ACTIVE so
+// pre-existing rows and CMU-only/imported rows (no credentials) are unaffected
+// — login is additionally gated on `passwordHash`.
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
 model Alumni {
   id                    String      @id @default(uuid())
   studentId             String      @unique
@@ -68,6 +79,11 @@ model Alumni {
   lastLoginAt           DateTime?
   tosAcceptedAt         DateTime?
   cmuEmail              String?
+  // Admin-approval signup flow: PENDING until reviewed. Snapshot of the
+  // CMU Registrar comparison captured at signup — drives the admin's
+  // field-by-field approve/review modal (null for accounts created otherwise).
+  accountStatus         AccountStatus @default(ACTIVE)
+  signupVerification    Json?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
@@ -88,6 +104,7 @@ model Alumni {
   @@index([cohort])
   @@index([major])
   @@index([graduationYear])
+  @@index([accountStatus])
   @@map("alumni")
 }
 

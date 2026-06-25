@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
+const STATUS_FILTERS = new Set(["pending", "active", "rejected"]);
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -13,8 +15,18 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || "10", 10);
     const search = searchParams.get("search") || "";
+    const status = (searchParams.get("status") || "").toLowerCase();
 
-    const where: Record<string, unknown> = { hasLoggedIn: true };
+    // Any alumni with credentials is an account (PENDING / ACTIVE / REJECTED).
+    // (Previously gated on `hasLoggedIn`, which skipped not-yet-approved signups.)
+    const where: Record<string, unknown> = {
+      passwordHash: { not: null },
+      deletedAt: null,
+    };
+
+    if (STATUS_FILTERS.has(status)) {
+      where.accountStatus = status.toUpperCase();
+    }
 
     if (search) {
       where.OR = [
@@ -28,7 +40,8 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.alumni.findMany({
         where,
-        orderBy: { lastLoginAt: "desc" },
+        // Newest first so fresh pending signups surface at the top.
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
@@ -43,6 +56,9 @@ export async function GET(request: NextRequest) {
           phone: true,
           lastLoginAt: true,
           suspendedAt: true,
+          accountStatus: true,
+          createdAt: true,
+          signupVerification: true,
         },
       }),
       prisma.alumni.count({ where }),

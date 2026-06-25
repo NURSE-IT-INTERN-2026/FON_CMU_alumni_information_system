@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { userCreateSchema, type UserCreateInput } from "@/lib/validations";
+import type { SignupVerification } from "@/lib/signup-verification";
+import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
@@ -34,6 +36,8 @@ const EMPTY_FORM = {
 };
 
 /* ───── Alumni Account types ───── */
+type AccountStatus = "PENDING" | "ACTIVE" | "REJECTED";
+
 interface AlumniAccount {
   id: string;
   studentId: string;
@@ -47,7 +51,21 @@ interface AlumniAccount {
   phone: string | null;
   lastLoginAt: string | null;
   suspendedAt: string | null;
+  accountStatus: AccountStatus;
+  createdAt: string;
+  signupVerification: SignupVerification | null;
 }
+
+const STATUS_LABELS: Record<AccountStatus, string> = {
+  PENDING: "รออนุมัติ",
+  ACTIVE: "ใช้งาน",
+  REJECTED: "ปฏิเสธ",
+};
+const STATUS_BADGE_CLASSES: Record<AccountStatus, string> = {
+  PENDING: "bg-amber-100 text-amber-700",
+  ACTIVE: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
+};
 
 const DEGREE_LABELS: Record<string, string> = {
   DOCTORAL: "ปริญญาเอก",
@@ -282,24 +300,37 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
 function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: ReturnType<typeof useRouter> }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | AccountStatus>("all");
   const [errorMsg, setErrorMsg] = useState("");
   const [emailEdit, setEmailEdit] = useState<AlumniAccount | null>(null);
   const [emailValue, setEmailValue] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
+  const [reviewAccount, setReviewAccount] = useState<AlumniAccount | null>(null);
+  const [reviewActioning, setReviewActioning] = useState(false);
 
   const pageSize = 10;
 
   const qc = useQueryClient();
   const { data: alumniData, isPending: loading } = useQuery({
-    queryKey: ["alumniAccounts", "list", { page, search }],
+    queryKey: ["alumniAccounts", "list", { page, search, statusFilter }],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (search) params.set("search", search);
+      if (statusFilter !== "all") params.set("status", statusFilter);
       return apiFetch<{ data: AlumniAccount[]; total: number }>(`/api/alumni-accounts?${params}`);
     },
   });
   const alumni = alumniData?.data ?? [];
   const total = alumniData?.total ?? 0;
+
+  // Pending-approval count (independent of the list's status filter) so the
+  // admin always sees what needs attention.
+  const { data: pendingData } = useQuery({
+    queryKey: ["alumniAccounts", "pendingCount"],
+    queryFn: () =>
+      apiFetch<{ total: number }>(`/api/alumni-accounts?status=pending&pageSize=1`),
+  });
+  const pendingCount = pendingData?.total ?? 0;
 
   const totalPages = Math.ceil(total / pageSize);
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -328,6 +359,46 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
     } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาด"); } finally { setEmailSaving(false); }
   };
 
+  // --- Admin-approval actions (review modal) ---
+  const refreshAfterReview = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.alumniAccounts.all });
+  };
+
+  const handleApprove = async () => {
+    if (!reviewAccount) return;
+    setReviewActioning(true); setErrorMsg("");
+    try {
+      await apiFetch(`/api/alumni-accounts/${reviewAccount.id}/approve`, { method: "POST" });
+      setReviewAccount(null);
+      refreshAfterReview();
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการอนุมัติ"); }
+    finally { setReviewActioning(false); }
+  };
+
+  const handleReject = async () => {
+    if (!reviewAccount) return;
+    setReviewActioning(true); setErrorMsg("");
+    try {
+      await apiFetch(`/api/alumni-accounts/${reviewAccount.id}/reject`, { method: "POST", json: {} });
+      setReviewAccount(null);
+      refreshAfterReview();
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการปฏิเสธ"); }
+    finally { setReviewActioning(false); }
+  };
+
+  const handleReverify = async () => {
+    if (!reviewAccount) return;
+    setReviewActioning(true); setErrorMsg("");
+    try {
+      const res = await apiFetch<{ verification: SignupVerification }>(
+        `/api/alumni-accounts/${reviewAccount.id}/reverify`,
+        { method: "POST" },
+      );
+      setReviewAccount({ ...reviewAccount, signupVerification: res.verification });
+    } catch (e) { setErrorMsg(e instanceof Error ? e.message : "ไม่สามารถตรวจสอบใหม่ได้"); }
+    finally { setReviewActioning(false); }
+  };
+
   return (
     <>
       {errorMsg && (
@@ -337,8 +408,20 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
         </div>
       )}
 
-      {/* Search */}
-      <div className="mb-4">
+      {pendingCount > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+          <span>มีคำขอลงทะเบียนรอการอนุมัติ <strong>{pendingCount}</strong> รายการ</span>
+          {statusFilter !== "PENDING" && (
+            <button onClick={() => { setStatusFilter("PENDING"); setPage(1); }} className="ml-auto rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 cursor-pointer">
+              ดูรายการรออนุมัติ
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Search + status filter */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
           type="text"
           value={search}
@@ -346,6 +429,16 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
           placeholder="ค้นหาชื่อ, รหัสนักศึกษา, อีเมล..."
           className="w-full max-w-sm rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
         />
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
+          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+        >
+          <option value="all">ทุกสถานะ</option>
+          <option value="PENDING">รออนุมัติ</option>
+          <option value="ACTIVE">ใช้งาน</option>
+          <option value="REJECTED">ปฏิเสธ</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-lg bg-white shadow-sm">
@@ -358,6 +451,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ชื่อ-สกุล</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รุ่นที่</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ระดับปริญญา</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">สถานะ</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">อีเมล</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">เบอร์โทรศัพท์</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">เข้าสู่ระบบล่าสุด</th>
@@ -366,9 +460,9 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center"><div className="flex justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div></td></tr>
+                <tr><td colSpan={canWrite ? 10 : 9} className="px-4 py-12 text-center"><div className="flex justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div></td></tr>
               ) : alumni.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูลศิษย์เก่าที่เคยเข้าสู่ระบบ</td></tr>
+                <tr><td colSpan={canWrite ? 10 : 9} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td></tr>
               ) : (
                 alumni.map((a, i) => (
                   <tr
@@ -381,18 +475,28 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                     <td className="px-4 py-3 whitespace-nowrap">{a.prefix}{a.firstName} {a.newLastName || a.lastName}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.cohort || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[a.accountStatus]}`}>
+                        {STATUS_LABELS[a.accountStatus]}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.email || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.phone || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{formatDate(a.lastLoginAt)}</td>
                     {canWrite && (
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => setReviewAccount(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" title="ตรวจสอบการลงทะเบียน">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                          </button>
                           <button onClick={() => openEmailEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="เปลี่ยนอีเมล">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
                           </button>
-                          <button onClick={() => toggleSuspend(a)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${a.suspendedAt ? "text-green-600" : "text-amber-600"}`} title={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"}>
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                          </button>
+                          {a.accountStatus === "ACTIVE" && (
+                            <button onClick={() => toggleSuspend(a)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${a.suspendedAt ? "text-green-600" : "text-amber-600"}`} title={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"}>
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -436,6 +540,136 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
           </div>
         </div>
       )}
+
+      {/* Signup review / approval modal */}
+      {reviewAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">ตรวจสอบการลงทะเบียน</h3>
+              <p className="text-sm text-gray-600">
+                {reviewAccount.prefix}{reviewAccount.firstName} {reviewAccount.lastName} · รหัสนักศึกษา {reviewAccount.studentId}
+              </p>
+              <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[reviewAccount.accountStatus]}`}>
+                {STATUS_LABELS[reviewAccount.accountStatus]}
+              </span>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{errorMsg}</div>
+            )}
+
+            {reviewAccount.signupVerification ? (
+              <VerificationFields v={reviewAccount.signupVerification} />
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                ไม่มีข้อมูลการตรวจสอบสำหรับบัญชีนี้
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button onClick={handleReverify} disabled={reviewActioning} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
+                ตรวจสอบใหม่
+              </button>
+              {reviewAccount.accountStatus !== "REJECTED" && (
+                <button onClick={handleReject} disabled={reviewActioning} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer">
+                  ปฏิเสธ
+                </button>
+              )}
+              {reviewAccount.accountStatus !== "ACTIVE" && (
+                <button onClick={handleApprove} disabled={reviewActioning} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 cursor-pointer">
+                  อนุมัติ
+                </button>
+              )}
+              <button onClick={() => setReviewAccount(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+/* ───── Signup verification review components ───── */
+function VerdictIcon({ match }: { match: boolean | null }) {
+  if (match === null) return <span className="text-gray-400">—</span>;
+  if (match) return <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">✓</span>;
+  return <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-700">✗</span>;
+}
+
+function SummaryBanner({ color, text }: { color: "green" | "red" | "amber"; text: string }) {
+  const cls =
+    color === "green"
+      ? "border-green-200 bg-green-50 text-green-700"
+      : color === "red"
+        ? "border-red-200 bg-red-50 text-red-700"
+        : "border-amber-200 bg-amber-50 text-amber-700";
+  return <div className={`rounded-lg border px-4 py-2.5 text-sm font-medium ${cls}`}>{text}</div>;
+}
+
+const VERIFICATION_FIELDS: {
+  key: keyof SignupVerification["fields"];
+  label: string;
+  fmt: (x: string | null) => string | null;
+}[] = [
+  { key: "studentId", label: "รหัสนักศึกษา", fmt: (x) => x },
+  { key: "firstName", label: "ชื่อ", fmt: (x) => x },
+  { key: "lastName", label: "นามสกุล", fmt: (x) => x },
+  { key: "birthDate", label: "วันเกิด", fmt: (x) => (x ? formatBirthDateThaiSlash(x) ?? x : null) },
+  { key: "cohort", label: "ปีที่จบ / รุ่น", fmt: (x) => x },
+  { key: "degreeLevel", label: "ระดับการศึกษา", fmt: (x) => (x ? DEGREE_LABELS[x] ?? x : null) },
+];
+
+/** Renders the field-by-field CMU comparison for a pending signup. */
+function VerificationFields({ v }: { v: SignupVerification }) {
+  let summary: ReactNode;
+  if (!v.cmuConsulted) {
+    summary = <SummaryBanner color="amber" text="ไม่สามารถติดต่อระบบทะเบียนเพื่อตรวจสอบได้ในขณะลงทะเบียน — กด 'ตรวจสอบใหม่' เพื่อลองอีกครั้ง" />;
+  } else if (!v.cmuFound) {
+    summary = <SummaryBanner color="red" text="ไม่พบรหัสนักศึกษานี้ในระบบทะเบียน" />;
+  } else {
+    const mismatches = VERIFICATION_FIELDS.filter((f) => v.fields[f.key].match === false).length;
+    summary =
+      mismatches === 0
+        ? <SummaryBanner color="green" text="ข้อมูลตรงกับระบบทะเบียนทั้งหมด" />
+        : <SummaryBanner color="red" text={`ข้อมูลไม่ตรงกับระบบทะเบียน ${mismatches} รายการ`} />;
+  }
+
+  return (
+    <div>
+      <div className="mb-4">{summary}</div>
+      {v.cmuFound ? (
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
+                <th className="px-3 py-2 font-semibold">รายการ</th>
+                <th className="px-3 py-2 font-semibold">ที่กรอก</th>
+                <th className="px-3 py-2 font-semibold">ระบบทะเบียน</th>
+                <th className="px-3 py-2 text-center font-semibold">ผล</th>
+              </tr>
+            </thead>
+            <tbody>
+              {VERIFICATION_FIELDS.map((f) => {
+                const verdict = v.fields[f.key];
+                return (
+                  <tr key={f.key} className="border-t border-gray-100">
+                    <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">{f.label}</td>
+                    <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.submitted) ?? "—"}</td>
+                    <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.authoritative) ?? "—"}</td>
+                    <td className="px-3 py-2 text-center"><VerdictIcon match={verdict.match} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">ไม่สามารถเปรียบเทียบรายละเอียดได้เนื่องจากไม่พบข้อมูลในระบบทะเบียน</p>
+      )}
+      <p className="mt-3 text-xs text-gray-400">ตรวจสอบล่าสุดเมื่อ {new Date(v.comparedAt).toLocaleString("th-TH")}</p>
+    </div>
   );
 }

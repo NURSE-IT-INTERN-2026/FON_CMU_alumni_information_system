@@ -59,6 +59,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // Admin-approval signup flow: only ACTIVE accounts may log in. A PENDING
+    // account is awaiting review; a REJECTED account was declined. Surfaced
+    // before the password check so the applicant knows their status (consistent
+    // with the suspended/not-registered messages above).
+    if (alumni.accountStatus === "PENDING") {
+      return NextResponse.json(
+        { error: "บัญชีของท่านอยู่ระหว่างตรวจสอบ กรุณารอการอนุมัติจากผู้ดูแลระบบ" },
+        { status: 403 }
+      );
+    }
+    if (alumni.accountStatus === "REJECTED") {
+      return NextResponse.json(
+        { error: "บัญชีของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ" },
+        { status: 403 }
+      );
+    }
+
     // Check if alumni has set up a password
     if (!alumni.passwordHash) {
       return NextResponse.json(
