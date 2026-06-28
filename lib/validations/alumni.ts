@@ -56,7 +56,8 @@ export const alumniCreateSchema = z.object({
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional().default("BACHELOR"),
   cohort: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  contactEmail: z.string().optional().nullable(),
+  phones: z.array(z.string()).optional().nullable(),
   homeAddress: z.string().optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   isPotential: z.boolean().optional().default(false),
@@ -80,7 +81,8 @@ export const alumniUpdateSchema = z.object({
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional(),
   cohort: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  contactEmail: z.string().optional().nullable(),
+  phones: z.array(z.string()).optional().nullable(),
   homeAddress: z.string().optional().nullable(),
   photoUrl: z.string().optional().nullable(),
   isPotential: z.boolean().optional(),
@@ -103,7 +105,14 @@ export const profileFormSchema = z.object({
     .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
       message: "รูปแบบอีเมลไม่ถูกต้อง",
     }),
-  phone: z.string().optional().default(""),
+  contactEmail: z
+    .string()
+    .optional()
+    .default("")
+    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: "รูปแบบอีเมลไม่ถูกต้อง",
+    }),
+  phones: z.string().optional().default(""),
   homeAddress: z.string().optional().default(""),
 });
 

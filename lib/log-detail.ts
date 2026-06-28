@@ -22,8 +22,9 @@ export const FIELD_LABELS: Record<string, string> = {
   firstName: "ชื่อ",
   lastName: "นามสกุล",
   englishName: "ชื่อภาษาอังกฤษ",
-  email: "อีเมล",
-  phone: "เบอร์โทรศัพท์",
+  email: "อีเมล (เข้าสู่ระบบ)",
+  contactEmail: "อีเมลติดต่อ",
+  phones: "เบอร์โทรศัพท์",
   homeAddress: "ที่อยู่ปัจจุบัน",
   // education / degree
   degreeLevel: "ระดับการศึกษา",

@@ -62,7 +62,12 @@ model Alumni {
   cohort                String?
   degreeLevel           DegreeLevel
   email                 String?     @unique
-  phone                 String?
+  // Contact email (for reaching the alumni) — DISTINCT from `email`, which is
+  // the login/auth identity. Populated from the legacy dump via import.
+  contactEmail          String?
+  // One or more phone numbers (the legacy dump has landline + "มือถือ" mobile,
+  // often comma-separated). Stored as a list, never a comma-clumped string.
+  phones                String[]    @default([])
   major                 String?
   graduationYear        Int?
   primaryEducationId    String?  @unique

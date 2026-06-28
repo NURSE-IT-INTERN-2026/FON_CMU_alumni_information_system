@@ -26,6 +26,7 @@ import RepeatableFieldArray, { type FieldDef } from "@/components/form/Repeatabl
 import OrangeCell from "@/components/OrangeCell";
 import EducationSection from "@/components/EducationSection";
 import { useHotFields } from "@/lib/use-hot-fields";
+import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 import AlumniActivityTimeline from "@/components/AlumniActivityTimeline";
 
@@ -85,7 +86,8 @@ interface AlumniData {
   cohort: string | null;
   degreeLevel: string;
   email: string | null;
-  phone: string | null;
+  contactEmail: string | null;
+  phones: string[];
   homeAddress: string | null;
   awards?: AwardData[];
   associations?: AssociationData[];
@@ -138,7 +140,8 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
     cohort: data.cohort || "",
     degreeLevel: data.degreeLevel || "",
     email: data.email || "",
-    phone: data.phone || "",
+    contactEmail: data.contactEmail || "",
+    phones: joinPhones(data.phones),
     homeAddress: data.homeAddress || "",
     awards: (data.awards || []).map((a) => ({
       awardName: a.awardName,
@@ -210,7 +213,7 @@ export default function AdminAlumniProfilePage() {
     resolver: zodResolver(alumniProfileWithRelatedFormSchema) as unknown as Resolver<AlumniProfileWithRelatedFormData>,
     defaultValues: {
       prefix: "", firstName: "", lastName: "", cohort: "",
-      degreeLevel: "", email: "", phone: "", homeAddress: "",
+      degreeLevel: "", email: "", contactEmail: "", phones: "", homeAddress: "",
       awards: [], associations: [], graduateCommittees: [],
       potentials: [], modelRepresentatives: [], alumniAgency: [],
     },
@@ -258,7 +261,8 @@ export default function AdminAlumniProfilePage() {
       cohort: data.cohort?.trim() || "",
       degreeLevel: data.degreeLevel,
       email: data.email?.trim() || "",
-      phone: data.phone?.trim() || "",
+      contactEmail: data.contactEmail?.trim() || "",
+      phones: parsePhones(data.phones),
       homeAddress: data.homeAddress?.trim() || "",
       awards: (data.awards || []).map((a) => ({
         awardName: a.awardName,
@@ -454,11 +458,14 @@ export default function AdminAlumniProfilePage() {
                     ))}
                   </FormSelect>
                 </FormField>
-                <FormField label="อีเมล" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="อีเมล (เข้าสู่ระบบ)" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("email")} error={errors.email?.message} type="email" className={AUTH_INPUT_CLASS} />
                 </FormField>
-                <FormField label="เบอร์โทรศัพท์" labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput registration={register("phone")} type="text" className={AUTH_INPUT_CLASS} />
+                <FormField label="อีเมลติดต่อ" error={errors.contactEmail?.message} labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput registration={register("contactEmail")} error={errors.contactEmail?.message} type="email" className={AUTH_INPUT_CLASS} />
+                </FormField>
+                <FormField label="เบอร์โทรศัพท์ (คั่นหลายเบอร์ด้วยจุลภาค)" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput registration={register("phones")} type="text" className={AUTH_INPUT_CLASS} />
                 </FormField>
                 <FormField label="ที่อยู่ปัจจุบัน" labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput registration={register("homeAddress")} type="text" className={AUTH_INPUT_CLASS} />
@@ -520,8 +527,9 @@ export default function AdminAlumniProfilePage() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลติดต่อ</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <HotInfoField label="อีเมล" value={alumni.email} field="email" alumniId={alumni.id} hot={hot} />
-                  <HotInfoField label="เบอร์โทรศัพท์" value={alumni.phone} field="phone" alumniId={alumni.id} hot={hot} />
+                  <HotInfoField label="อีเมล (เข้าสู่ระบบ)" value={alumni.email} field="email" alumniId={alumni.id} hot={hot} />
+                  <HotInfoField label="อีเมลติดต่อ" value={alumni.contactEmail} field="contactEmail" alumniId={alumni.id} hot={hot} />
+                  <HotInfoField label="เบอร์โทรศัพท์" value={joinPhones(alumni.phones)} field="phones" alumniId={alumni.id} hot={hot} />
                   <HotInfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} field="homeAddress" alumniId={alumni.id} hot={hot} />
                 </div>
               </div>
