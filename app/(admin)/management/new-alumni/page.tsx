@@ -16,6 +16,11 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 
+// Birthday input is Buddhist-era DDMMYYYY (e.g. 01122540) — keep it digits-only.
+function formatBirthDate(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 8);
+}
+
 const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   studentId: "",
   prefix: "",
@@ -23,7 +28,7 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   lastName: "",
   degreeLevel: "" as any,
   cohort: "",
-  homeAddress: "",
+  birthDate: "",
   awards: [],
   associations: [],
   graduateCommittees: [],
@@ -174,8 +179,8 @@ export default function NewAlumniPage() {
       prefix: data.prefix,
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
+      birthDate: data.birthDate,
       cohort: data.cohort?.trim() || undefined,
-      homeAddress: data.homeAddress?.trim() || undefined,
       degreeLevel: data.degreeLevel,
     };
 
@@ -290,14 +295,31 @@ export default function NewAlumniPage() {
             <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
               <FormInput registration={register("studentId")} error={errors.studentId?.message} placeholder="รหัสนักศึกษา" />
             </FormField>
-            <FormField label="คำนำหน้า" required error={errors.prefix?.message}>
+            <FormField label="คำนำหน้า" error={errors.prefix?.message}>
               <FormInput registration={register("prefix")} error={errors.prefix?.message} placeholder="คำนำหน้า" />
             </FormField>
             <FormField label="ชื่อ" required error={errors.firstName?.message}>
               <FormInput registration={register("firstName")} error={errors.firstName?.message} placeholder="ชื่อ" />
             </FormField>
-            <FormField label="นามสกุล (เดิม)" required error={errors.lastName?.message}>
-              <FormInput registration={register("lastName")} error={errors.lastName?.message} placeholder="นามสกุลเดิม" />
+            <FormField label="นามสกุล" required error={errors.lastName?.message}>
+              <FormInput registration={register("lastName")} error={errors.lastName?.message} placeholder="นามสกุล" />
+            </FormField>
+            <FormField label="วันเกิด (ววปปปป พ.ศ.)" required error={errors.birthDate?.message}>
+              <FormInput
+                registration={register("birthDate", {
+                  onChange: (e) => {
+                    e.target.value = formatBirthDate(e.target.value);
+                  },
+                })}
+                error={errors.birthDate?.message}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="01122540"
+              />
+              {!errors.birthDate && (
+                <p className="mt-1 text-xs text-gray-400">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
+              )}
             </FormField>
             <FormField label="รุ่น/สาขา">
               <FormInput registration={register("cohort")} placeholder="รุ่น/สาขา" />
@@ -311,9 +333,6 @@ export default function NewAlumniPage() {
                   </option>
                 ))}
               </FormSelect>
-            </FormField>
-            <FormField label="ที่อยู่ปัจจุบัน">
-              <FormInput registration={register("homeAddress")} placeholder="ที่อยู่ปัจจุบัน" />
             </FormField>
           </div>
         </div>

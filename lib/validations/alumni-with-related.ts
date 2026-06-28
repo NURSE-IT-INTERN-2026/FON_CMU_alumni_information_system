@@ -107,7 +107,7 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
 // --- Update schema (no studentId, no alumniAgency, required core fields) ---
 
 export const alumniWithRelatedUpdateSchema = z.object({
-  prefix: z.string().min(1, "กรุณากรอกคำนำหน้า"),
+  prefix: z.string().optional(),
   firstName: z.string().min(1, "กรุณากรอกชื่อ"),
   lastName: z.string().min(1, "กรุณากรอกนามสกุล"),
   degreeLevel: z.enum(["DOCTORAL", "MASTER", "BACHELOR", "NURSING_ASSISTANT", "ASSOCIATE"]).optional().nullable(),
