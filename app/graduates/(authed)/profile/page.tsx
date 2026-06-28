@@ -24,7 +24,14 @@ import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
+import OrangeCell from "@/components/OrangeCell";
+import { useHotFields } from "@/lib/use-hot-fields";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
+
+// Alumni core fields are tracked under BOTH "alumni" (admin edits / imports) and
+// "alumni_profile" (alumni self-edits) — query both so an orange indicator and
+// its modal cover changes from either actor (mirrors the admin profile page).
+const ALUMNI_RESOURCE_TYPES: string[] = ["alumni", "alumni_profile"];
 
 interface AwardData {
   id: string;
@@ -241,6 +248,14 @@ export default function AlumniProfilePage() {
     queryKey: queryKeys.alumniProfile.me(),
     queryFn: () => apiFetch<AlumniData>("/api/alumni-profile"),
   });
+
+  // Hot fields across both tracking scopes — drives the orange change
+  // indicators on the personal/contact fields (e.g. an imported name change).
+  const hotMap = useHotFields(
+    ALUMNI_RESOURCE_TYPES.join(","),
+    alumni ? [alumni.id] : [],
+  );
+  const hot = alumni ? hotMap[alumni.id] ?? [] : [];
 
   // 401 (expired/missing session) -> back to login.
   useEffect(() => {
@@ -678,9 +693,9 @@ export default function AlumniProfilePage() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลส่วนตัว</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="คำนำหน้า" value={alumni.prefix} />
-                  <InfoField label="ชื่อ" value={alumni.firstName} />
-                  <InfoField label="นามสกุล" value={alumni.lastName} />
+                  <InfoField label="คำนำหน้า" value={alumni.prefix} field="prefix" recordId={alumni.id} hot={hot} />
+                  <InfoField label="ชื่อ" value={alumni.firstName} field="firstName" recordId={alumni.id} hot={hot} />
+                  <InfoField label="นามสกุล" value={alumni.lastName} field="lastName" recordId={alumni.id} hot={hot} />
                   <InfoField label="วันเกิด (วว/ดด/ปปปป)" value={formatBirthDateThaiSlash(alumni.birthDate)} />
                 </div>
               </div>
@@ -698,9 +713,9 @@ export default function AlumniProfilePage() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลติดต่อ</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="อีเมล" value={alumni.email} />
-                  <InfoField label="เบอร์โทรศัพท์" value={alumni.phone} />
-                  <InfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} />
+                  <InfoField label="อีเมล" value={alumni.email} field="email" recordId={alumni.id} hot={hot} />
+                  <InfoField label="เบอร์โทรศัพท์" value={alumni.phone} field="phone" recordId={alumni.id} hot={hot} />
+                  <InfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} field="homeAddress" recordId={alumni.id} hot={hot} />
                 </div>
               </div>
 
@@ -833,11 +848,36 @@ export default function AlumniProfilePage() {
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string | null | undefined }) {
+function InfoField({
+  label,
+  value,
+  field,
+  recordId,
+  hot,
+}: {
+  label: string;
+  value: string | null | undefined;
+  field?: string;
+  recordId?: string;
+  hot?: string[];
+}) {
+  const showHot = !!field && !!recordId && !!hot?.includes(field);
   return (
     <div>
       <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
-      <p className="mt-0.5 text-sm text-[var(--foreground)]">{value || "—"}</p>
+      <div className="mt-0.5 text-sm text-[var(--foreground)]">
+        {showHot ? (
+          <OrangeCell
+            resourceType={ALUMNI_RESOURCE_TYPES}
+            recordId={recordId!}
+            field={field!}
+            value={value || "—"}
+            hotFields={hot}
+          />
+        ) : (
+          value || "—"
+        )}
+      </div>
     </div>
   );
 }
