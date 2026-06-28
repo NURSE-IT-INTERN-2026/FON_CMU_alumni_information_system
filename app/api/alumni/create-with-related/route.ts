@@ -3,6 +3,8 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { AwardType } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedCreateSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
@@ -138,6 +140,21 @@ export async function POST(request: NextRequest) {
 
       return created;
     });
+
+    // Log the alumni CREATE (best-effort — logActivity swallows its own errors).
+    // This full-form route is what the new-alumni page posts to; without this
+    // call, creating an alumni via the form left no activity-log entry (the
+    // single POST /api/alumni route logs, but this one didn't).
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "CREATE",
+        "alumni",
+        alumni.id,
+        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
+      );
+    }
 
     return NextResponse.json(alumni, { status: 201 });
   } catch (error) {
