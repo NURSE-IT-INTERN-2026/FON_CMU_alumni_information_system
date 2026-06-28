@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
         email: validated.email || null,
         phone: validated.phone || null,
         homeAddress: validated.homeAddress?.trim() || null,
+        birthDate: validated.birthDate || null,
         isPotential: validated.isPotential,
         isModelRepresentative: validated.isModelRepresentative,
         photoUrl: validated.photoUrl || null,

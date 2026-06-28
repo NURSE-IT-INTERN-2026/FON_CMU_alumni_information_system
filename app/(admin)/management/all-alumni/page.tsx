@@ -701,7 +701,7 @@ export default function AlumniCountPage() {
                     </p>
                   )}
                 </FormField>
-                <FormField label="คำนำหน้า" required error={formErrors.prefix?.message}>
+                <FormField label="คำนำหน้า" error={formErrors.prefix?.message}>
                   <FormSelect registration={register("prefix")} error={formErrors.prefix?.message}>
                     <option value="">-- เลือกคำนำหน้า --</option>
                     {PREFIX_OPTIONS.map((opt) => (

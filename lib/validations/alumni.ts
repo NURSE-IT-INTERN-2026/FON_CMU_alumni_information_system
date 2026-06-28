@@ -4,9 +4,10 @@ import { editReasonField } from "./helpers";
 const MSG = {
   studentIdRequired: "กรุณากรอกรหัสนักศึกษา",
   studentIdNumeric: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น",
-  prefixRequired: "กรุณากรอกคำนำหน้า",
   firstNameRequired: "กรุณากรอกชื่อ",
   lastNameRequired: "กรุณากรอกนามสกุล",
+  birthDateRequired: "กรุณากรอกวันเกิด",
+  birthDateFormat: "รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY",
   degreeLevelRequired: "กรุณาเลือกระดับการศึกษา",
   degreeLevelInvalid: "ระดับการศึกษาไม่ถูกต้อง",
 };
@@ -26,23 +27,32 @@ export const alumniFormSchema = z.object({
     .string()
     .min(1, MSG.studentIdRequired)
     .regex(/^\d+$/, MSG.studentIdNumeric),
-  prefix: z.string().min(1, MSG.prefixRequired),
+  prefix: z.string().optional().default(""),
   firstName: z.string().min(1, MSG.firstNameRequired),
   lastName: z.string().min(1, MSG.lastNameRequired),
+  // Buddhist-era DDMMYYYY (e.g. 01122540) — matches the alumni-signup format.
+  birthDate: z
+    .string()
+    .min(1, MSG.birthDateRequired)
+    .regex(/^\d{8}$/, MSG.birthDateFormat),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES, {
     message: MSG.degreeLevelRequired,
   }),
   cohort: z.string().optional().default(""),
-  homeAddress: z.string().optional().default(""),
 });
 
 // --- API schemas ---
 
 export const alumniCreateSchema = z.object({
   studentId: z.string().min(1, MSG.studentIdRequired).regex(/^\d+$/, MSG.studentIdNumeric),
-  prefix: z.string().min(1, MSG.prefixRequired),
+  prefix: z.string().optional().default(""),
   firstName: z.string().min(1, MSG.firstNameRequired),
   lastName: z.string().min(1, MSG.lastNameRequired),
+  birthDate: z
+    .string()
+    .regex(/^\d{8}$/, MSG.birthDateFormat)
+    .optional()
+    .nullable(),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional().default("BACHELOR"),
   cohort: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
@@ -64,7 +74,7 @@ export const alumniUpdateSchema = z.object({
     .min(1, MSG.studentIdRequired)
     .regex(/^\d+$/, MSG.studentIdNumeric)
     .optional(),
-  prefix: z.string().min(1, MSG.prefixRequired).optional(),
+  prefix: z.string().optional(),
   firstName: z.string().min(1, MSG.firstNameRequired).optional(),
   lastName: z.string().min(1, MSG.lastNameRequired).optional(),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional(),
@@ -81,7 +91,7 @@ export const alumniUpdateSchema = z.object({
 // --- Profile form schema (no studentId — used by alumni profile page) ---
 
 export const profileFormSchema = z.object({
-  prefix: z.string().min(1, MSG.prefixRequired),
+  prefix: z.string().optional().default(""),
   firstName: z.string().min(1, MSG.firstNameRequired),
   lastName: z.string().min(1, MSG.lastNameRequired),
   cohort: z.string().optional().default(""),

@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
           email: validated.email || null,
           phone: validated.phone || null,
           homeAddress: validated.homeAddress?.trim() || null,
+          birthDate: validated.birthDate || null,
           photoUrl: validated.photoUrl || null,
           isPotential: hasPotentials,
           isModelRepresentative: hasModelReps,

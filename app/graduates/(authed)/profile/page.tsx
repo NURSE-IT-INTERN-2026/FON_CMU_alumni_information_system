@@ -503,7 +503,7 @@ export default function AlumniProfilePage() {
 
               {/* Editable fields */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField label="คำนำหน้า" required error={errors.prefix?.message} labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="คำนำหน้า" error={errors.prefix?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormSelect
                     registration={register("prefix")}
                     error={errors.prefix?.message}
