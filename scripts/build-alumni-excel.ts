@@ -31,17 +31,17 @@
  *   StudID      → รหัสนักศึกษา        (required, numeric; non-numeric dropped)
  *   PRENAME     → คำนำหน้า            (required)
  *   TFNAME      → ชื่อ                (required)
- *   TLNAME      → นามสกุลเดิม          (maiden / name at study time — required)
- *   TLNAME_NEW  → นามสกุลใหม่          (current last name — blank when unchanged;
- *                                     on import this is applied as an auto-edit
- *                                     over นามสกุลเดิม and logged, so the field
- *                                     shows an orange change indicator)
+ *   TLNAME      → นามสกุล             (required)
  *   TMajorID_Code → (dropped — raw 2-digit major code, no name to decode, and
  *                   CMU fills major/cohort on profile view; cohort is optional)
  *   TypeEdu     → ระดับการศึกษา       (decoded via ref_Edu to the Thai label the
  *                                     import's DEGREE_LEVEL_MAP understands)
- *   email       → อีเมล
- *   PHONE ?? mobile ?? phone_work → เบอร์โทร
+ *   email       → อีเมล              (CONTACT email — import writes it to
+ *                                    `contactEmail`, NOT the auth `email`)
+ *   PHONE ?? mobile ?? phone_work → เบอร์โทร (parsed via parsePhones: keeps only
+ *                                    the mobile after "มือถือ", splits commas into
+ *                                    a list; emitted comma-joined — the import
+ *                                    re-splits into `phones[]`)
  *   col_17/AMPR/PROV/POST → ที่อยู่ปัจจุบัน (joined into one address string)
  *
  * The legacy table can hold one row per degree for the same person (distinct
@@ -53,6 +53,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ExcelJS from "exceljs";
+import { parsePhones } from "@/lib/parse-phone";
 
 const ALUMNI_JSON = "imports/json/alumni_json/Tbl_temp_(main_alumni_data).json";
 const REF_EDU_JSON = "imports/json/alumni_json/ref_Edu.json";
@@ -203,40 +204,42 @@ function main() {
   // Map → output rows + track required-field completeness.
   const rows: Record<string, string>[] = [];
   let missingRequired = 0;
-  let nameChanges = 0;
+  let multiPhoneRows = 0;
   const outDegreeDist = new Map<string, number>();
   for (const r of byId.values()) {
     const prefix = clean(r.PRENAME);
     const firstName = clean(r.TFNAME);
-    const oldLastName = clean(r.TLNAME);        // นามสกุลเดิม (name at study time)
-    const newLastName = clean(r.TLNAME_NEW);    // นามสกุลใหม่ (current) — "" when unchanged
+    const lastName = clean(r.TLNAME);
     const degreeCode = clean(r.TypeEdu);
     const degreeLabel = degreeCode ? DEGREE_LABEL[degreeCode] ?? DEGREE_FALLBACK : DEGREE_FALLBACK;
-    const phone = clean(r.PHONE) || clean(r.mobile) || clean(r.phone_work);
+    // Phone: keep only the mobile after "มือถือ" and split commas into a list;
+    // emit comma-joined for the cell (the import re-splits into phones[]).
+    let phones = parsePhones(r.PHONE);
+    if (!phones.length) phones = parsePhones(r.mobile);
+    if (!phones.length) phones = parsePhones(r.phone_work);
+    if (phones.length > 1) multiPhoneRows++;
     const address = buildAddress(r);
 
     outDegreeDist.set(degreeLabel, (outDegreeDist.get(degreeLabel) ?? 0) + 1);
-    if (newLastName && newLastName !== oldLastName) nameChanges++;
 
-    if (!prefix || !firstName || !oldLastName) missingRequired++;
+    if (!prefix || !firstName || !lastName) missingRequired++;
 
     rows.push({
       รหัสนักศึกษา: clean(r.StudID),
       คำนำหน้า: prefix,
       ชื่อ: firstName,
-      นามสกุลเดิม: oldLastName,
-      นามสกุลใหม่: newLastName,
+      นามสกุล: lastName,
       "รุ่น/สาขา": "",
       ระดับการศึกษา: degreeLabel,
       อีเมล: clean(r.email),
-      เบอร์โทร: phone,
+      เบอร์โทร: phones.join(", "),
       ที่อยู่ปัจจุบัน: address,
     });
   }
 
   console.log(`\nOutput rows: ${rows.length}`);
-  console.log(`Rows missing a required field (prefix/ชื่อ/นามสกุลเดิม): ${missingRequired} (import will skip these)`);
-  console.log(`Rows with a new last name (นามสกุลใหม่ ≠ เดิม): ${nameChanges} (import will log each as a name-change edit)`);
+  console.log(`Rows missing a required field (prefix/ชื่อ/นามสกุล): ${missingRequired} (import will skip these)`);
+  console.log(`Rows with >1 phone number: ${multiPhoneRows}`);
   console.log("\nระดับการศึกษา distribution (output):");
   for (const [k, n] of [...outDegreeDist.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${k.padEnd(45)} ${n}`);

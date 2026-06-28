@@ -4,8 +4,8 @@ import { DegreeLevel } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
-import { recordFieldChanges } from "@/lib/field-changes";
 import { readExcelRows } from "@/lib/excel-import";
+import { parsePhones } from "@/lib/parse-phone";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -21,25 +21,6 @@ const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
   "NURSING_ASSISTANT": "NURSING_ASSISTANT",
   "ASSOCIATE": "ASSOCIATE",
 };
-
-// Reason stamped on every import-driven name change so admins/alumni can tell
-// the auto-edit (นามสกุลเดิม → นามสกุลใหม่) apart from a hands-on edit.
-const NAME_CHANGE_REASON = "นำเข้านามสกุลใหม่จากการอิมพอร์ต";
-
-interface ImportRecord {
-  studentId: string;
-  prefix: string;
-  firstName: string;
-  oldLastName: string;
-  newLastName: string; // "" when the column is blank
-  finalLastName: string; // newLastName || oldLastName
-  hasNameChange: boolean; // newLastName !== "" && newLastName !== oldLastName
-  cohort: string | null;
-  degreeLevel: DegreeLevel;
-  email: string | null;
-  phone: string | null;
-  homeAddress: string | null;
-}
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -71,7 +52,17 @@ export async function POST(request: NextRequest) {
     const rows = await readExcelRows(buffer);
 
     const errors: { row: number; message: string }[] = [];
-    const records: ImportRecord[] = [];
+    const records: {
+      studentId: string;
+      prefix: string;
+      firstName: string;
+      lastName: string;
+      cohort: string | null;
+      degreeLevel: DegreeLevel;
+      contactEmail: string | null;
+      phones: string[];
+      homeAddress: string | null;
+    }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -80,23 +71,20 @@ export async function POST(request: NextRequest) {
       const studentId = row["รหัสนักศึกษา"]?.toString().trim();
       const prefix = row["คำนำหน้า"]?.toString().trim();
       const firstName = row["ชื่อ"]?.toString().trim();
-      // นามสกุลเดิม is the required maiden/old last name. Fall back to the
-      // legacy "นามสกุล" header so an exported file (which still uses that
-      // header) round-trips through import unchanged.
-      const oldLastName = (row["นามสกุลเดิม"] ?? row["นามสกุล"] ?? "")
-        .toString()
-        .trim();
-      const newLastName = (row["นามสกุลใหม่"] ?? "").toString().trim();
+      const lastName = row["นามสกุล"]?.toString().trim();
       const cohort = row["รุ่น/สาขา"]?.toString().trim() || null;
       const degreeLevelRaw = row["ระดับการศึกษา"]?.toString().trim();
       const degreeLevel = degreeLevelRaw
         ? DEGREE_LEVEL_MAP[degreeLevelRaw] || "BACHELOR"
         : "BACHELOR";
-      const email = row["อีเมล"]?.toString().trim() || null;
-      const phone = row["เบอร์โทร"]?.toString().trim() || null;
+      // อีเมล is the CONTACT email (NOT the auth/login `email`).
+      const contactEmail = row["อีเมล"]?.toString().trim() || null;
+      // เบอร์โทร may hold several numbers (comma-separated, possibly with a
+      // "มือถือ" label) — parse into a list, never a clumped string.
+      const phones = parsePhones(row["เบอร์โทร"]);
       const homeAddress = row["ที่อยู่ปัจจุบัน"]?.toString().trim() || null;
 
-      if (!studentId || !prefix || !firstName || !oldLastName) {
+      if (!studentId || !prefix || !firstName || !lastName) {
         errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
         continue;
       }
@@ -106,129 +94,53 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const hasNameChange = newLastName !== "" && newLastName !== oldLastName;
       records.push({
         studentId,
         prefix,
         firstName,
-        oldLastName,
-        newLastName,
-        finalLastName: newLastName !== "" ? newLastName : oldLastName,
-        hasNameChange,
+        lastName,
         cohort,
         degreeLevel,
-        email,
-        phone,
+        contactEmail,
+        phones,
         homeAddress,
       });
     }
 
-    const actor = {
-      actorType: "ADMIN" as const,
-      userId: session.user.id,
-      userEmail: session.user.email,
-      userRole: session.user.role,
-    };
-
     let imported = 0;
-    let nameChanges = 0;
 
     for (const record of records) {
-      const baseData = {
-        prefix: record.prefix,
-        firstName: record.firstName,
-        cohort: record.cohort,
-        degreeLevel: record.degreeLevel,
-        email: record.email,
-        phone: record.phone,
-        homeAddress: record.homeAddress,
-      };
-
-      const existing = await prisma.alumni.findUnique({
+      const result = await prisma.alumni.upsert({
         where: { studentId: record.studentId },
+        update: {
+          prefix: record.prefix,
+          firstName: record.firstName,
+          lastName: record.lastName,
+          cohort: record.cohort,
+          degreeLevel: record.degreeLevel,
+          contactEmail: record.contactEmail,
+          phones: record.phones,
+          homeAddress: record.homeAddress,
+        },
+        create: record,
       });
-
-      let alumniId: string;
-      // The "from" value for the change log. null ⇒ no edit to record.
-      let changeFrom: string | null = null;
-
-      if (existing) {
-        // Refresh an existing record. Land on the final (new, if any) last
-        // name directly; only log when it actually differs from what's stored
-        // so re-importing the same file is idempotent.
-        alumniId = existing.id;
-        await prisma.alumni.update({
-          where: { studentId: record.studentId },
-          data: {
-            ...baseData,
-            lastName: record.finalLastName,
-            ...(record.hasNameChange ? { nameManuallyUpdated: true } : {}),
-          },
-        });
-        if (record.hasNameChange && existing.lastName !== record.finalLastName) {
-          changeFrom = existing.lastName;
-        }
-      } else {
-        // New record: create with the final last name, then record the
-        // historical นามสกุลเดิม → นามสกุลใหม่ change as an auto-edit so the
-        // field shows an orange indicator and the old name is preserved in
-        // the edit history.
-        const created = await prisma.alumni.create({
-          data: {
-            studentId: record.studentId,
-            ...baseData,
-            lastName: record.finalLastName,
-            ...(record.hasNameChange ? { nameManuallyUpdated: true } : {}),
-          },
-        });
-        alumniId = created.id;
-        if (record.hasNameChange) changeFrom = record.oldLastName;
-      }
-
-      if (changeFrom !== null) {
-        nameChanges++;
-        // Fire-and-forget history (both helpers swallow errors internally).
-        await recordFieldChanges({
-          resourceType: "alumni",
-          resourceId: alumniId,
-          changes: [
-            { field: "lastName", from: changeFrom, to: record.finalLastName },
-          ],
-          actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email },
-          reason: NAME_CHANGE_REASON,
-        });
-        await logActivity(
-          actor,
-          "UPDATE",
-          "alumni",
-          alumniId,
-          {
-            field: "lastName",
-            from: changeFrom,
-            to: record.finalLastName,
-            source: "import-name-change",
-          },
-          NAME_CHANGE_REASON
-        );
-      }
-
-      imported++;
+      if (result) imported++;
     }
 
     await logActivity(
-      actor,
+      {
+        actorType: "ADMIN",
+        userId: session.user.id,
+        userEmail: session.user.email,
+        userRole: session.user.role,
+      },
       "IMPORT",
       "alumni",
       null,
-      {
-        imported,
-        nameChanges,
-        attempted: records.length,
-        errors: errors.length,
-      }
+      { imported, attempted: records.length, errors: errors.length }
     );
 
-    return NextResponse.json({ imported, nameChanges, skipped: 0, errors });
+    return NextResponse.json({ imported, skipped: 0, errors });
   } catch (error) {
     console.error("POST /api/alumni/import error:", error);
     return NextResponse.json(

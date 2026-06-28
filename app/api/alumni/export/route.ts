@@ -4,6 +4,7 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
+import { joinPhones } from "@/lib/parse-phone";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -22,8 +23,8 @@ function mapRows(alumni: Awaited<ReturnType<typeof prisma.alumni.findMany>>) {
     "นามสกุล": a.lastName,
     "รุ่น/สาขา": a.cohort || "",
     "ระดับการศึกษา": a.degreeLevel ? DEGREE_LEVEL_LABELS[a.degreeLevel] || a.degreeLevel : "",
-    "อีเมล": a.email || "",
-    "เบอร์โทร": a.phone || "",
+    "อีเมล": a.contactEmail || "",
+    "เบอร์โทร": joinPhones(a.phones),
     "ที่อยู่ปัจจุบัน": a.homeAddress || "",
     "ศักยภาพ": a.isPotential ? "ใช่" : "ไม่ใช่",
     "ผู้แทนรุ่น": a.isModelRepresentative ? "ใช่" : "ไม่ใช่",

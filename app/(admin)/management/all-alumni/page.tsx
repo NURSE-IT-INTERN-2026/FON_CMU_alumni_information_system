@@ -16,6 +16,7 @@ import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
 import { normalizeCmuBirthday, formatBirthDateThai, bachelorCohortFromGradYear } from "@/lib/alumni-verify";
+import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -51,7 +52,8 @@ interface Alumni {
   birthDate: string | null;
   remarks: string | null;
   email: string | null;
-  phone: string | null;
+  contactEmail: string | null;
+  phones: string[];
   homeAddress: string | null;
   isPotential: boolean;
   isModelRepresentative: boolean;
@@ -113,7 +115,8 @@ const EMPTY_EDIT_FORM: AlumniEditFormData = {
   cohort: "",
   degreeLevel: "",
   email: "",
-  phone: "",
+  contactEmail: "",
+  phones: "",
   homeAddress: "",
 };
 
@@ -194,7 +197,7 @@ export default function AlumniCountPage() {
             lastName: c.surname_th || "", cohort: derivedCohort,
             degreeLevel: null, major: c.major_name_th || null,
             graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
-            email: null, phone: null, homeAddress: null,
+            email: null, contactEmail: null, phones: [], homeAddress: null,
             isPotential: false, isModelRepresentative: false, photoUrl: null,
           });
         }
@@ -393,7 +396,8 @@ export default function AlumniCountPage() {
       cohort: a.cohort || "",
       degreeLevel: a.degreeLevel || "",
       email: a.email || "",
-      phone: a.phone || "",
+      contactEmail: a.contactEmail || "",
+      phones: joinPhones(a.phones),
       homeAddress: a.homeAddress || "",
     });
     setEditingId(a.id);
@@ -432,7 +436,8 @@ export default function AlumniCountPage() {
         cohort: data.cohort.trim() || null,
         degreeLevel: data.degreeLevel || null,
         email: data.email.trim() || null,
-        phone: data.phone.trim() || null,
+        contactEmail: data.contactEmail.trim() || null,
+        phones: parsePhones(data.phones),
         homeAddress: data.homeAddress.trim() || null,
       };
 
@@ -730,11 +735,14 @@ export default function AlumniCountPage() {
                     ))}
                   </FormSelect>
                 </FormField>
-                <FormField label="อีเมล">
+                <FormField label="อีเมล (เข้าสู่ระบบ)">
                   <FormInput registration={register("email")} type="email" />
                 </FormField>
-                <FormField label="เบอร์โทร">
-                  <FormInput registration={register("phone")} type="text" />
+                <FormField label="อีเมลติดต่อ">
+                  <FormInput registration={register("contactEmail")} type="email" />
+                </FormField>
+                <FormField label="เบอร์โทร (คั่นหลายเบอร์ด้วยจุลภาค)">
+                  <FormInput registration={register("phones")} type="text" />
                 </FormField>
                 <FormField label="ที่อยู่ปัจจุบัน">
                   <FormInput registration={register("homeAddress")} type="text" />

@@ -113,7 +113,8 @@ export const alumniWithRelatedUpdateSchema = z.object({
   degreeLevel: z.enum(["DOCTORAL", "MASTER", "BACHELOR", "NURSING_ASSISTANT", "ASSOCIATE"]).optional().nullable(),
   cohort: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  contactEmail: z.string().optional().nullable(),
+  phones: z.array(z.string()).optional().nullable(),
   homeAddress: z.string().optional().nullable(),
   awards: z
     .array(

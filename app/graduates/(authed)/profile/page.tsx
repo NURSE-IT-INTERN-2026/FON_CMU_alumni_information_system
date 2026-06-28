@@ -24,14 +24,8 @@ import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
-import OrangeCell from "@/components/OrangeCell";
-import { useHotFields } from "@/lib/use-hot-fields";
+import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
-
-// Alumni core fields are tracked under BOTH "alumni" (admin edits / imports) and
-// "alumni_profile" (alumni self-edits) — query both so an orange indicator and
-// its modal cover changes from either actor (mirrors the admin profile page).
-const ALUMNI_RESOURCE_TYPES: string[] = ["alumni", "alumni_profile"];
 
 interface AwardData {
   id: string;
@@ -83,7 +77,8 @@ interface AlumniData {
   cohort: string | null;
   degreeLevel: string;
   email: string | null;
-  phone: string | null;
+  contactEmail: string | null;
+  phones: string[];
   homeAddress: string | null;
   hasLoggedIn: boolean;
   adminEditedAt: string | null;
@@ -106,7 +101,8 @@ const defaultFormValues: AlumniProfileWithRelatedFormData = {
   cohort: "",
   degreeLevel: "",
   email: "",
-  phone: "",
+  contactEmail: "",
+  phones: "",
   homeAddress: "",
   awards: [],
   associations: [],
@@ -160,7 +156,8 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
     cohort: data.cohort || "",
     degreeLevel: data.degreeLevel || "",
     email: data.email || "",
-    phone: data.phone || "",
+    contactEmail: data.contactEmail || "",
+    phones: joinPhones(data.phones),
     homeAddress: data.homeAddress || "",
     awards: (data.awards || []).map((a) => ({
       awardName: a.awardName,
@@ -249,14 +246,6 @@ export default function AlumniProfilePage() {
     queryFn: () => apiFetch<AlumniData>("/api/alumni-profile"),
   });
 
-  // Hot fields across both tracking scopes — drives the orange change
-  // indicators on the personal/contact fields (e.g. an imported name change).
-  const hotMap = useHotFields(
-    ALUMNI_RESOURCE_TYPES.join(","),
-    alumni ? [alumni.id] : [],
-  );
-  const hot = alumni ? hotMap[alumni.id] ?? [] : [];
-
   // 401 (expired/missing session) -> back to login.
   useEffect(() => {
     if (error instanceof ApiError && error.status === 401) router.push("/login");
@@ -317,7 +306,8 @@ export default function AlumniProfilePage() {
       cohort: data.cohort?.trim() || "",
       degreeLevel: data.degreeLevel,
       email: data.email?.trim() || "",
-      phone: data.phone?.trim() || "",
+      contactEmail: data.contactEmail?.trim() || "",
+      phones: parsePhones(data.phones),
       homeAddress: data.homeAddress?.trim() || "",
       // Send every section so the server can apply replace-all semantics
       // (empty array = clear existing entries for that section).
@@ -570,7 +560,7 @@ export default function AlumniProfilePage() {
                   </FormSelect>
                 </FormField>
 
-                <FormField label="อีเมล" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="อีเมล (เข้าสู่ระบบ)" error={errors.email?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput
                     registration={register("email")}
                     error={errors.email?.message}
@@ -579,9 +569,18 @@ export default function AlumniProfilePage() {
                   />
                 </FormField>
 
-                <FormField label="เบอร์โทรศัพท์" labelClassName={AUTH_LABEL_CLASS}>
+                <FormField label="อีเมลติดต่อ" error={errors.contactEmail?.message} labelClassName={AUTH_LABEL_CLASS}>
                   <FormInput
-                    registration={register("phone")}
+                    registration={register("contactEmail")}
+                    error={errors.contactEmail?.message}
+                    type="email"
+                    className={AUTH_INPUT_CLASS}
+                  />
+                </FormField>
+
+                <FormField label="เบอร์โทรศัพท์ (คั่นหลายเบอร์ด้วยจุลภาค)" labelClassName={AUTH_LABEL_CLASS}>
+                  <FormInput
+                    registration={register("phones")}
                     type="text"
                     className={AUTH_INPUT_CLASS}
                   />
@@ -693,9 +692,9 @@ export default function AlumniProfilePage() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลส่วนตัว</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="คำนำหน้า" value={alumni.prefix} field="prefix" recordId={alumni.id} hot={hot} />
-                  <InfoField label="ชื่อ" value={alumni.firstName} field="firstName" recordId={alumni.id} hot={hot} />
-                  <InfoField label="นามสกุล" value={alumni.lastName} field="lastName" recordId={alumni.id} hot={hot} />
+                  <InfoField label="คำนำหน้า" value={alumni.prefix} />
+                  <InfoField label="ชื่อ" value={alumni.firstName} />
+                  <InfoField label="นามสกุล" value={alumni.lastName} />
                   <InfoField label="วันเกิด (วว/ดด/ปปปป)" value={formatBirthDateThaiSlash(alumni.birthDate)} />
                 </div>
               </div>
@@ -713,9 +712,10 @@ export default function AlumniProfilePage() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลติดต่อ</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoField label="อีเมล" value={alumni.email} field="email" recordId={alumni.id} hot={hot} />
-                  <InfoField label="เบอร์โทรศัพท์" value={alumni.phone} field="phone" recordId={alumni.id} hot={hot} />
-                  <InfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} field="homeAddress" recordId={alumni.id} hot={hot} />
+                  <InfoField label="อีเมล (เข้าสู่ระบบ)" value={alumni.email} />
+                  <InfoField label="อีเมลติดต่อ" value={alumni.contactEmail} />
+                  <InfoField label="เบอร์โทรศัพท์" value={joinPhones(alumni.phones)} />
+                  <InfoField label="ที่อยู่ปัจจุบัน" value={alumni.homeAddress} />
                 </div>
               </div>
 
@@ -848,36 +848,11 @@ export default function AlumniProfilePage() {
   );
 }
 
-function InfoField({
-  label,
-  value,
-  field,
-  recordId,
-  hot,
-}: {
-  label: string;
-  value: string | null | undefined;
-  field?: string;
-  recordId?: string;
-  hot?: string[];
-}) {
-  const showHot = !!field && !!recordId && !!hot?.includes(field);
+function InfoField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
       <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
-      <div className="mt-0.5 text-sm text-[var(--foreground)]">
-        {showHot ? (
-          <OrangeCell
-            resourceType={ALUMNI_RESOURCE_TYPES}
-            recordId={recordId!}
-            field={field!}
-            value={value || "—"}
-            hotFields={hot}
-          />
-        ) : (
-          value || "—"
-        )}
-      </div>
+      <p className="mt-0.5 text-sm text-[var(--foreground)]">{value || "—"}</p>
     </div>
   );
 }

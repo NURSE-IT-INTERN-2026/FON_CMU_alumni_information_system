@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/api-client";
 import { userCreateSchema, type UserCreateInput } from "@/lib/validations";
 import type { SignupVerification } from "@/lib/signup-verification";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
+import { joinPhones } from "@/lib/parse-phone";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
@@ -48,7 +49,8 @@ interface AlumniAccount {
   cohort: string | null;
   degreeLevel: string;
   email: string | null;
-  phone: string | null;
+  contactEmail: string | null;
+  phones: string[];
   lastLoginAt: string | null;
   suspendedAt: string | null;
   accountStatus: AccountStatus;
@@ -481,7 +483,7 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.email || "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{a.phone || "—"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{joinPhones(a.phones) || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{formatDate(a.lastLoginAt)}</td>
                     {canWrite && (
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
