@@ -31,7 +31,11 @@
  *   StudID      → รหัสนักศึกษา        (required, numeric; non-numeric dropped)
  *   PRENAME     → คำนำหน้า            (required)
  *   TFNAME      → ชื่อ                (required)
- *   TLNAME_NEW ?? TLNAME → นามสกุล    (current last name preferred over maiden)
+ *   TLNAME      → นามสกุลเดิม          (maiden / name at study time — required)
+ *   TLNAME_NEW  → นามสกุลใหม่          (current last name — blank when unchanged;
+ *                                     on import this is applied as an auto-edit
+ *                                     over นามสกุลเดิม and logged, so the field
+ *                                     shows an orange change indicator)
  *   TMajorID_Code → (dropped — raw 2-digit major code, no name to decode, and
  *                   CMU fills major/cohort on profile view; cohort is optional)
  *   TypeEdu     → ระดับการศึกษา       (decoded via ref_Edu to the Thai label the
@@ -199,25 +203,29 @@ function main() {
   // Map → output rows + track required-field completeness.
   const rows: Record<string, string>[] = [];
   let missingRequired = 0;
+  let nameChanges = 0;
   const outDegreeDist = new Map<string, number>();
   for (const r of byId.values()) {
     const prefix = clean(r.PRENAME);
     const firstName = clean(r.TFNAME);
-    const lastName = clean(r.TLNAME_NEW) || clean(r.TLNAME);
+    const oldLastName = clean(r.TLNAME);        // นามสกุลเดิม (name at study time)
+    const newLastName = clean(r.TLNAME_NEW);    // นามสกุลใหม่ (current) — "" when unchanged
     const degreeCode = clean(r.TypeEdu);
     const degreeLabel = degreeCode ? DEGREE_LABEL[degreeCode] ?? DEGREE_FALLBACK : DEGREE_FALLBACK;
     const phone = clean(r.PHONE) || clean(r.mobile) || clean(r.phone_work);
     const address = buildAddress(r);
 
     outDegreeDist.set(degreeLabel, (outDegreeDist.get(degreeLabel) ?? 0) + 1);
+    if (newLastName && newLastName !== oldLastName) nameChanges++;
 
-    if (!prefix || !firstName || !lastName) missingRequired++;
+    if (!prefix || !firstName || !oldLastName) missingRequired++;
 
     rows.push({
       รหัสนักศึกษา: clean(r.StudID),
       คำนำหน้า: prefix,
       ชื่อ: firstName,
-      นามสกุล: lastName,
+      นามสกุลเดิม: oldLastName,
+      นามสกุลใหม่: newLastName,
       "รุ่น/สาขา": "",
       ระดับการศึกษา: degreeLabel,
       อีเมล: clean(r.email),
@@ -227,7 +235,8 @@ function main() {
   }
 
   console.log(`\nOutput rows: ${rows.length}`);
-  console.log(`Rows missing a required field (prefix/ชื่อ/นามสกุล): ${missingRequired} (import will skip these)`);
+  console.log(`Rows missing a required field (prefix/ชื่อ/นามสกุลเดิม): ${missingRequired} (import will skip these)`);
+  console.log(`Rows with a new last name (นามสกุลใหม่ ≠ เดิม): ${nameChanges} (import will log each as a name-change edit)`);
   console.log("\nระดับการศึกษา distribution (output):");
   for (const [k, n] of [...outDegreeDist.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${k.padEnd(45)} ${n}`);
