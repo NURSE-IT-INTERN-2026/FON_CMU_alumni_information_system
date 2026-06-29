@@ -13,6 +13,13 @@
  *   3. A cross-source bridge: any entities sharing a `studentId`
  *      (a local education whose studentId matches a CMU record joins that CMU
  *      person — the same studentId denotes the same degree enrollment).
+ *
+ * The dashboard count is scoped to the **CMU registrar universe** (the same set
+ * the all-alumni table shows): local education upgrades a CMU person's degree,
+ * but a local-only person with no CMU record is excluded — otherwise legacy/junk
+ * local imports that the registrar doesn't know about would inflate the total
+ * above the all-alumni count. `groupPersonsByDegree` flags each person with
+ * `hasCmu`; `getPersonDegreeBreakdown` counts only those in the CMU universe.
  */
 import prisma from "@/lib/prisma";
 import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
@@ -53,13 +60,15 @@ function parseYear(v: string | null | undefined): number | null {
 
 /**
  * Pure grouping core (no I/O) — unit-testable. Returns one entry per PERSON:
- * their highest degree (null if none recognized) and that degree's
- * representative year (most recent among their highest-degree entities).
+ * their highest degree (null if none recognized), that degree's representative
+ * year (most recent among their highest-degree entities), and `hasCmu` — whether
+ * the group includes any CMU record (i.e. the person is in the registrar
+ * universe). `getPersonDegreeBreakdown` counts only `hasCmu` persons.
  */
 export function groupPersonsByDegree(
   cmu: CmuGraduate[],
   local: LocalAlumniInput[],
-): { degree: DegreeLevelValue | null; year: number | null }[] {
+): { degree: DegreeLevelValue | null; year: number | null; hasCmu: boolean }[] {
   const entities = new Map<string, DegreeEntity[]>();
   const studentIdToEntities = new Map<string, string[]>();
 
@@ -140,18 +149,21 @@ export function groupPersonsByDegree(
     for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
   }
 
-  // Aggregate entities into groups by root.
+  // Aggregate entities into groups by root. Track whether each group includes a
+  // CMU entity — only CMU-universe persons are counted by the dashboard.
   const groups = new Map<string, DegreeEntity[]>();
+  const groupHasCmu = new Map<string, boolean>();
   for (const id of entities.keys()) {
     const root = find(id);
     const arr = groups.get(root);
     const ents = entities.get(id)!;
     if (arr) for (const e of ents) arr.push(e);
     else groups.set(root, [...ents]);
+    if (id.startsWith("c:")) groupHasCmu.set(root, true);
   }
 
-  const persons: { degree: DegreeLevelValue | null; year: number | null }[] = [];
-  for (const ents of groups.values()) {
+  const persons: { degree: DegreeLevelValue | null; year: number | null; hasCmu: boolean }[] = [];
+  for (const [root, ents] of groups.entries()) {
     let maxRank = -1;
     for (const e of ents) if (e.degreeRank > maxRank) maxRank = e.degreeRank;
     const degree = maxRank > 0 ? RANK_TO_DEGREE[maxRank] ?? null : null;
@@ -162,7 +174,7 @@ export function groupPersonsByDegree(
         year = e.year;
       }
     }
-    persons.push({ degree, year });
+    persons.push({ degree, year, hasCmu: groupHasCmu.get(root) === true });
   }
   return persons;
 }
@@ -198,6 +210,11 @@ export async function getPersonDegreeBreakdown(): Promise<PersonDegreeBreakdown>
   const byYearDegree: Record<string, Record<string, number>> = {};
   let total = 0;
   for (const p of persons) {
+    // Count only the CMU registrar universe (matches the all-alumni table).
+    // Local education still upgrades a CMU person's degree via the merge above;
+    // a local-only person (no CMU record) is excluded so the graph isn't
+    // inflated by legacy/junk local imports the table doesn't show.
+    if (!p.hasCmu) continue;
     total++;
     if (!p.degree) continue; // unrecognized degree → counts toward total only
     byDegree[p.degree] = (byDegree[p.degree] ?? 0) + 1;
