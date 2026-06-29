@@ -5,6 +5,7 @@ import { ensureAlumni } from "@/lib/ensure-alumni";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
 import { splitFullName } from "@/lib/parse-name";
+import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
     let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
     for (const record of records) {
       try {
         const displayName = [record.prefix, record.firstName, record.lastName].filter(Boolean).join(" ");
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest) {
             },
           });
           updated++;
+          importedRecords.push({ id: studentId, name: displayName || studentId, op: "updated" });
         } else {
           await prisma.potential.create({
             data: {
@@ -121,6 +124,7 @@ export async function POST(request: NextRequest) {
             },
           });
           imported++;
+          importedRecords.push({ id: studentId, name: displayName || studentId, op: "created" });
         }
       } catch (err) {
         console.error("Import row error:", err);
@@ -128,6 +132,18 @@ export async function POST(request: NextRequest) {
         errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${who}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
       }
     }
+
+    await logImport({
+      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      resource: "potential",
+      fileName: captureFileName(file),
+      attempted: records.length,
+      created: imported,
+      updated,
+      failed: errors.length,
+      records: importedRecords,
+      errors,
+    });
 
     return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {
