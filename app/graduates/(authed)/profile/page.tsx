@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AWARD_TYPE_OPTIONS,
@@ -236,7 +236,7 @@ export default function AlumniProfilePage() {
     reset: formReset,
     formState: { errors },
   } = useForm<AlumniProfileWithRelatedFormData>({
-    resolver: zodResolver(alumniProfileWithRelatedFormSchema) as any,
+    resolver: zodResolver(alumniProfileWithRelatedFormSchema) as unknown as Resolver<AlumniProfileWithRelatedFormData>,
     defaultValues: defaultFormValues,
   });
 

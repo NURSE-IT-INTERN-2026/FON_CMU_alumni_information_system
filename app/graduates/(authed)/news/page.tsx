@@ -32,13 +32,6 @@ interface NewsItem {
   createdAt: string;
 }
 
-interface ApiResponse {
-  data: NewsItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
 
 export default function AlumniNewsPage() {
   const [page, setPage] = useState(1);

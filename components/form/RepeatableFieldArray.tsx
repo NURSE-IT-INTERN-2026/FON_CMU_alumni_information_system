@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useFieldArray, type UseFormRegister, type FieldErrors } from "react-hook-form";
+import { useFieldArray, type UseFormRegister, type FieldErrors, type Control, type FieldValues, type FieldPath, type FieldArrayPath } from "react-hook-form";
 
 const INPUT_CLASS =
   "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
@@ -16,17 +16,21 @@ export interface FieldDef {
   options?: { value: string; label: string }[];
 }
 
-interface RepeatableFieldArrayProps {
-  control: any;
-  register: UseFormRegister<any>;
-  errors: FieldErrors<any>;
-  name: string;
-  emptyRow: Record<string, any>;
+// Generic over the form's field values so callers pass their own
+// `Control<T>`/`UseFormRegister<T>` (react-hook-form's `Control` is invariant in
+// `T`, so a fixed `Control<FieldValues>` would reject concrete form types).
+interface RepeatableFieldArrayProps<TFieldValues extends FieldValues> {
+  control: Control<TFieldValues>;
+  register: UseFormRegister<TFieldValues>;
+  errors: FieldErrors<TFieldValues>;
+  name: FieldArrayPath<TFieldValues>;
+  // Kept loose: empty rows use "" for fields that coerce to number at submit.
+  emptyRow: Record<string, unknown>;
   fields: FieldDef[];
   singleRow?: boolean;
 }
 
-export default function RepeatableFieldArray({
+export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
   control,
   register,
   errors,
@@ -34,7 +38,7 @@ export default function RepeatableFieldArray({
   emptyRow,
   fields: fieldDefs,
   singleRow = false,
-}: RepeatableFieldArrayProps) {
+}: RepeatableFieldArrayProps<TFieldValues>) {
   const { fields, append, remove } = useFieldArray({
     control,
     name,
@@ -48,7 +52,7 @@ export default function RepeatableFieldArray({
     return (rowError as Record<string, { message?: string }>)[key]?.message;
   };
 
-  const addRow = () => append(emptyRow);
+  const addRow = () => append(emptyRow as never);
 
   const resetRow = (index: number) => {
     // Remove and re-add with empty values
@@ -77,7 +81,7 @@ export default function RepeatableFieldArray({
                 </label>
                 {f.type === "select" ? (
                   <select
-                    {...register(fieldPath)}
+                    {...register(fieldPath as FieldPath<TFieldValues>)}
                     className={hasError ? ERROR_INPUT_CLASS : INPUT_CLASS}
                   >
                     {f.options?.map((opt) => (
@@ -88,14 +92,14 @@ export default function RepeatableFieldArray({
                   </select>
                 ) : f.type === "textarea" ? (
                   <textarea
-                    {...register(fieldPath)}
+                    {...register(fieldPath as FieldPath<TFieldValues>)}
                     className={hasError ? ERROR_INPUT_CLASS : INPUT_CLASS}
                     rows={3}
                     placeholder={f.label}
                   />
                 ) : (
                   <input
-                    {...register(fieldPath)}
+                    {...register(fieldPath as FieldPath<TFieldValues>)}
                     className={hasError ? ERROR_INPUT_CLASS : INPUT_CLASS}
                     type={f.type || "text"}
                     placeholder={f.label}

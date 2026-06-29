@@ -66,14 +66,6 @@ export default function FacetFilter({
     [entity, field]
   );
 
-  // Load all values whenever the panel is opened.
-  useEffect(() => {
-    if (open) {
-      setSearch("");
-      fetchValues("");
-    }
-  }, [open, fetchValues]);
-
   // Debounced search.
   useEffect(() => {
     if (!open) return;
@@ -113,7 +105,16 @@ export default function FacetFilter({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          // Opening the panel: clear any previous search and load all values
+          // immediately. Done in the click handler (not an effect) so the
+          // setStates inside fetchValues aren't a setState-in-effect.
+          if (!open) {
+            setSearch("");
+            fetchValues("");
+          }
+          setOpen((o) => !o);
+        }}
         className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm bg-white transition-colors ${
           activeCount > 0
             ? "border-[var(--primary)] text-[var(--primary)]"

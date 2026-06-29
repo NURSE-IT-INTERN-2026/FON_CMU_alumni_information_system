@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
@@ -68,7 +68,7 @@ export default function AssociationsPage() {
   );
 
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(associationPageFormSchema) as any,
+    resolver: zodResolver(associationPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: DEFAULT_FORM_VALUES,
   });
   const [manageMode, setManageMode] = useState(false);
@@ -77,7 +77,6 @@ export default function AssociationsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,

@@ -34,14 +34,17 @@ export async function GET(request: NextRequest) {
       model.count({ where }),
     ]);
     return NextResponse.json({
-      data: records.map((r: unknown) => ({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        id: (r as any).id,
-        deletedAt: (r as any).deletedAt,
-        displayName: buildDisplayName(r, cfg.nameFields) || "(ไม่มีชื่อ)",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        snapshot: r as any,
-      })),
+      data: records.map((r: unknown) => {
+        // Trash records are polymorphic (any soft-deletable model), so cast to
+        // the minimal shape the listing needs rather than `any`.
+        const rec = r as { id: string; deletedAt: Date | string | null };
+        return {
+          id: rec.id,
+          deletedAt: rec.deletedAt,
+          displayName: buildDisplayName(r, cfg.nameFields) || "(ไม่มีชื่อ)",
+          snapshot: r as Record<string, unknown>,
+        };
+      }),
       total,
       page,
       pageSize: TRASH_PAGE_SIZE,

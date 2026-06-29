@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -114,13 +114,12 @@ export default function AwardsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(awardPageFormSchema) as any,
+    resolver: zodResolver(awardPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: DEFAULT_FORM_VALUES,
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,
@@ -152,7 +151,9 @@ export default function AwardsPage() {
     setPage(1);
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => (
+  // Render function (not a component) so React doesn't recreate a component
+  // identity on every render (react-hooks/static-components).
+  const renderSortIcon = (field: SortField) => (
     <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
   );
 
@@ -603,33 +604,33 @@ export default function AwardsPage() {
                   ลำดับ
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                  รหัสนักศึกษา <SortIcon field="studentId" />
+                  รหัสนักศึกษา {renderSortIcon("studentId")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                  สาขาวิชา <SortIcon field="major" />
+                  สาขาวิชา {renderSortIcon("major")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
-                  คำนำหน้า <SortIcon field="prefix" />
+                  คำนำหน้า {renderSortIcon("prefix")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
-                  ชื่อ <SortIcon field="name" />
+                  ชื่อ {renderSortIcon("name")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
-                  นามสกุล <SortIcon field="lastName" />
+                  นามสกุล {renderSortIcon("lastName")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("award")}>
-                  ชื่อรางวัล <SortIcon field="award" />
+                  ชื่อรางวัล {renderSortIcon("award")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("type")}>
-                  ประเภท <SortIcon field="type" />
+                  ประเภท {renderSortIcon("type")}
                 </th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
-                  ปีที่ได้รับ <SortIcon field="year" />
+                  ปีที่ได้รับ {renderSortIcon("year")}
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลิงค์</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รูปภาพ</th>
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("description")}>
-                  รายละเอียด <SortIcon field="description" />
+                  รายละเอียด {renderSortIcon("description")}
                 </th>
                 {manageMode && (
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>

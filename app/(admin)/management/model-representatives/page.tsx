@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
@@ -92,7 +92,9 @@ export default function ModelRepresentativesPage() {
       return apiFetch<{ data: ModelRepresentative[] }>(`/api/model-representatives${params.toString() ? `?${params}` : ""}`);
     },
   });
-  const alumni = alumniData?.data ?? [];
+  // Wrap in useMemo so the array identity is stable across renders (avoids
+  // re-running the sort memos below on every render — react-hooks/exhaustive-deps).
+  const alumni = useMemo(() => alumniData?.data ?? [], [alumniData]);
 
   const [viewSortField, setViewSortField] = useState<SortField>("network");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("asc");
@@ -105,13 +107,12 @@ export default function ModelRepresentativesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
-    resolver: zodResolver(modelRepPageFormSchema) as any,
+    resolver: zodResolver(modelRepPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: DEFAULT_FORM_VALUES,
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,
@@ -267,6 +268,10 @@ export default function ModelRepresentativesPage() {
     return result;
   }, [alumni]);
 
+  // react-hook-form's `watch()` reactively filters the cohort dropdown as the
+  // user types, which opts this component out of the React Compiler (benign —
+  // it still works, just isn't compiler-optimized).
+  // eslint-disable-next-line react-hooks/incompatible-library
   const cohortValue = watch("cohort");
   const cohortOptions = useMemo(() => {
     if (!cohortValue?.trim()) return allCohorts;

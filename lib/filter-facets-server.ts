@@ -46,17 +46,16 @@ export async function getFacetValues(
   const isRealValue = (v: any) => v !== null && v !== undefined && String(v).trim() !== "";
 
   if (isYear) {
-    const rows = await model.findMany({
+    const rows = (await model.findMany({
       where: baseWhere,
       distinct: [field],
       orderBy: { [field]: "desc" },
       select: { [field]: true },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let vals = rows.map((r: any) => r[field]).filter(isRealValue);
-    if (search) vals = vals.filter((v: any) => String(v).includes(search));
+    })) as Array<Record<string, unknown>>;
+    let vals: unknown[] = rows.map((r) => r[field]).filter(isRealValue);
+    if (search) vals = vals.filter((v) => String(v).includes(search));
     return {
-      values: vals.map((v: number) => ({ value: String(v), count: 0 })),
+      values: vals.map((v) => ({ value: String(v), count: 0 })),
       total: vals.length,
       page: 1,
       pageSize: vals.length,
@@ -66,15 +65,15 @@ export async function getFacetValues(
   }
 
   // Single groupBy over the whole set (count desc, value asc tiebreak) — no pagination.
-  const groups = await model.groupBy({
+  const groups = (await model.groupBy({
     by: [field],
     where: baseWhere,
     _count: { _all: true },
     orderBy: [{ _count: { [field]: "desc" } }, { [field]: "asc" }],
-  });
+  })) as Array<Record<string, unknown> & { _count?: { _all?: number } }>;
   const values: FacetValue[] = groups
-    .filter((g: any) => isRealValue(g[field]))
-    .map((g: any) => ({ value: String(g[field]), count: g._count?._all ?? 0 }));
+    .filter((g) => isRealValue(g[field]))
+    .map((g) => ({ value: String(g[field]), count: g._count?._all ?? 0 }));
   return {
     values,
     total: values.length,
