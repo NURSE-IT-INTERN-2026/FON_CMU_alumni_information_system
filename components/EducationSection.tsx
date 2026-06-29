@@ -209,7 +209,12 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
   return (
     <div className="rounded-lg border border-[var(--border)] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[var(--muted)]">ประวัติการศึกษา</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--muted)]">ประวัติการศึกษา</h3>
+          <p className="text-[11px] text-[var(--muted)]">
+            หลักสูตรหลักคือระดับปริญญาสูงสุด (ระบบเลือกโดยอัตโนมัติ เปลี่ยนเองไม่ได้)
+          </p>
+        </div>
         {canWrite && (
           <Button type="button" size="sm" variant="outline" onClick={openAdd}>
             + เพิ่มหลักสูตร
@@ -308,7 +313,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
             <DialogTitle>แก้ไขหลักสูตรการศึกษา</DialogTitle>
             <DialogDescription>
               {editingEdu?.id === primaryId
-                ? "นี่คือหลักสูตรหลัก — การแก้ไขจะอัปเดตข้อมูลหลักของศิษย์เก่าท่านนี้ด้วย"
+                ? "หลักสูตรนี้เป็นหลักสูตรหลัก (ระดับปริญญาสูงสุด เลือกโดยอัตโนมัติ) — การแก้ไขจะอัปเดตข้อมูลหลักของศิษย์เก่าท่านนี้ด้วย"
                 : "แก้ไขรายละเอียดหลักสูตรนี้"}
             </DialogDescription>
           </DialogHeader>

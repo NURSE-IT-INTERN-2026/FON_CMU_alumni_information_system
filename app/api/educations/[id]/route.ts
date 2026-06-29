@@ -5,7 +5,7 @@ import { getSession, getAlumniSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { educationUpdateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
-import { syncPrimarySnapshot } from "@/lib/education-sync";
+import { recomputePrimaryEducation } from "@/lib/education-sync";
 import { assertEducationSamePerson } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -114,12 +114,11 @@ export async function PUT(
             lastName: validated.lastName,
           },
         });
-        // Mirror the primary education onto the denormalized Alumni snapshot so
-        // the 6 related tables (join on Alumni.studentId) + all-alumni table
-        // stay consistent. Only when this row IS the primary.
-        if (existing.alumniId && (await tx.alumni.findUnique({ where: { id: existing.alumniId }, select: { primaryEducationId: true } }))?.primaryEducationId === id) {
-          await syncPrimarySnapshot(existing.alumniId, tx);
-        }
+        // Primary = highest degree. An edit (especially degreeLevel) can change
+        // which row is highest, so always recompute the primary + re-sync the
+        // denormalized snapshot (studentId/degree/year/major/cohort) that the 6
+        // related tables join on.
+        await recomputePrimaryEducation(existing.alumniId, tx);
         return edu;
       });
 
@@ -151,7 +150,9 @@ export async function PUT(
 }
 
 // DELETE /api/educations/[id] — admin or owning alumni. The primary education
-// cannot be deleted (reassign primary first — a v1 simplification).
+// is the highest degree and is auto-derived, so ANY education may be deleted:
+// if the doomed row is the primary, it is first reassigned to the next-highest
+// (clearing the FK), then deleted — atomically.
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -164,18 +165,13 @@ export async function DELETE(
     const ctx = await resolveWriter(existing.alumniId);
     if (ctx instanceof NextResponse) return ctx;
 
-    const alumni = await prisma.alumni.findUnique({
-      where: { id: existing.alumniId },
-      select: { primaryEducationId: true },
+    await prisma.$transaction(async (tx) => {
+      // Reassign primary away from this row (to the next-highest, or null) and
+      // re-sync the snapshot BEFORE deleting — the primaryEducationId FK would
+      // otherwise block the delete of the current primary.
+      await recomputePrimaryEducation(existing.alumniId, tx, id);
+      await tx.education.delete({ where: { id } });
     });
-    if (alumni?.primaryEducationId === id) {
-      return NextResponse.json(
-        { error: "ไม่สามารถลบหลักสูตรหลักได้ กรุณาเปลี่ยนหลักสูตรหลักก่อน" },
-        { status: 400 },
-      );
-    }
-
-    await prisma.education.delete({ where: { id } });
 
     await logActivity(
       actorOf(ctx),
