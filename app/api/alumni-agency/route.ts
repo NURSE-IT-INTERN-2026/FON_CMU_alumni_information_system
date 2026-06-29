@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort"];
+    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort"];
 
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["alumni-agency"]));
@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         where[searchFieldParam] = { contains: search, mode: "insensitive" };
       } else {
         where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { major: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
           { englishName: { contains: search, mode: "insensitive" } },

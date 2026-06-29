@@ -113,10 +113,12 @@ const abroadFormSchema = z.object({
 });
 type AbroadFormValues = z.infer<typeof abroadFormSchema>;
 
-type SearchField = "all" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
+type SearchField = "all" | "studentId" | "major" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
 
 const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
+  { value: "studentId", label: "รหัสนักศึกษา" },
+  { value: "major", label: "สาขาวิชา" },
   { value: "firstName", label: "ชื่อ" },
   { value: "lastName", label: "นามสกุล" },
   { value: "englishName", label: "ชื่ออังกฤษ" },
@@ -132,11 +134,13 @@ function displayName(a: AlumniAgency): string {
   return thai || a.englishName || "-";
 }
 
-type SortField = "cohort" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
+type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
 const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: "studentId", label: "รหัสนักศึกษา" },
   { field: "cohort", label: "รุ่น" },
+  { field: "major", label: "สาขาวิชา" },
   { field: "prefix", label: "คำนำหน้า" },
   { field: "firstName", label: "ชื่อ" },
   { field: "lastName", label: "นามสกุล" },
@@ -148,7 +152,9 @@ const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
 ];
 
 const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: "studentId", label: "รหัสนักศึกษา" },
   { field: "cohort", label: "รุ่น" },
+  { field: "major", label: "สาขาวิชา" },
   { field: "prefix", label: "คำนำหน้า" },
   { field: "firstName", label: "ชื่อ" },
   { field: "lastName", label: "นามสกุล" },
@@ -161,7 +167,9 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
 
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
+    case "studentId": return a.studentId || "";
     case "cohort": return a.cohort || "";
+    case "major": return a.major || "";
     case "prefix": return a.prefix || "";
     case "firstName": return a.firstName || "";
     case "lastName": return a.lastName || "";
@@ -763,7 +771,9 @@ export default function AlumniAgencyPage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
@@ -828,7 +838,9 @@ export default function AlumniAgencyPage() {
                 {pagedViewAlumni.map((a, idx) => (
                   <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
                     <td className="px-4 py-3">{a.firstName || "-"}</td>
                     <td className="px-4 py-3">{a.lastName || "-"}</td>
