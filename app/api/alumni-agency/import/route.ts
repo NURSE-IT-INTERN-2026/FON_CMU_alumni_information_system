@@ -13,6 +13,7 @@ import {
   parseExportFormat,
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
+import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
     let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
 
     // Read raw rows to detect format
     const rawRows = await readExcelRawRows(buffer);
@@ -62,10 +64,14 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        const displayName =
+          [data.firstName, data.lastName].filter(Boolean).join(" ") ||
+          data.englishName ||
+          data.studentId ||
+          "—";
         // Sync with CMU when a studentId is provided: link the alumni record
         // and auto-fill major from the Registrar API (backfill only).
         if (data.studentId) {
-          const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || data.englishName || "";
           const alumni = await ensureAlumni(data.studentId, displayName);
           data.studentId = alumni.studentId;
           if (!data.major) data.major = alumni.major;
@@ -83,9 +89,11 @@ export async function POST(request: NextRequest) {
         if (existing) {
           await prisma.alumniAgency.update({ where: { id: existing.id }, data });
           updated++;
+          importedRecords.push({ id: data.studentId ?? null, name: displayName, op: "updated" });
         } else {
           await prisma.alumniAgency.create({ data });
           imported++;
+          importedRecords.push({ id: data.studentId ?? null, name: displayName, op: "created" });
         }
       } catch (err) {
         console.error("Import row error:", err);
@@ -95,6 +103,18 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    await logImport({
+      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      resource: "alumni_agency",
+      fileName: captureFileName(file),
+      attempted: parsed.length,
+      created: imported,
+      updated,
+      failed: errors.length,
+      records: importedRecords,
+      errors,
+    });
 
     return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {

@@ -9,6 +9,7 @@ import { readExcelRows } from "@/lib/excel-import";
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 import { parseAwardRow } from "@/lib/award-import-parse";
+import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
     const errors: { row: number; message: string }[] = [];
     let imported = 0;
     let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const rowNumber = i + 2;
@@ -53,10 +55,10 @@ export async function POST(request: NextRequest) {
         // Sync with CMU by studentId; copy the resolved major onto the row.
         let major: string | null = null;
         let studentId = data!.studentId;
+        const displayName = [data!.prefix, data!.firstName, data!.lastName]
+          .filter(Boolean)
+          .join(" ") || data!.awardName;
         if (studentId) {
-          const displayName = [data!.prefix, data!.firstName, data!.lastName]
-            .filter(Boolean)
-            .join(" ");
           const alumni = await ensureAlumni(studentId, displayName || studentId);
           studentId = alumni.studentId;
           major = alumni.major;
@@ -90,9 +92,11 @@ export async function POST(request: NextRequest) {
         if (existing) {
           await prisma.award.update({ where: { id: existing.id }, data: payload });
           updated++;
+          importedRecords.push({ id: studentId ?? null, name: displayName, op: "updated" });
         } else {
           await prisma.award.create({ data: payload });
           imported++;
+          importedRecords.push({ id: studentId ?? null, name: displayName, op: "created" });
         }
       } catch {
         errors.push({
@@ -101,6 +105,18 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    await logImport({
+      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      resource: "award",
+      fileName: captureFileName(file),
+      attempted: rows.length,
+      created: imported,
+      updated,
+      failed: errors.length,
+      records: importedRecords,
+      errors,
+    });
 
     return NextResponse.json({ imported, updated, skipped: 0, errors });
   } catch (error) {

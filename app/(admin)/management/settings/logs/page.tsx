@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { useRole } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
+import { BASE_PATH } from "@/lib/constants";
 import {
   FIELD_LABELS,
   formatValue,
   detailRows,
   extractChanges,
+  extractImportDetails,
+  type ImportDetailView,
+  type ImportRecordView,
 } from "@/lib/log-detail";
 
 interface ActivityLog {
@@ -348,16 +352,23 @@ export default function LogsPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-center">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDetailLog(log); }}
-                          className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
-                          title="ดูรายละเอียด"
-                          aria-label="ดูรายละเอียด"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </button>
-                      </div>
+                      {log.action === "IMPORT" ? (
+                        <ImportRowSummary
+                          details={log.details}
+                          onOpen={() => setDetailLog(log)}
+                        />
+                      ) : (
+                        <div className="flex justify-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDetailLog(log); }}
+                            className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
+                            title="ดูรายละเอียด"
+                            aria-label="ดูรายละเอียด"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -430,6 +441,7 @@ function DetailModal({
 }) {
   const changes = extractChanges(log.details);
   const rows = detailRows(log.details);
+  const importDetails = extractImportDetails(log.details);
   const resourceLabel = RESOURCE_LABELS[log.resource] ?? log.resource;
 
   return (
@@ -438,7 +450,7 @@ function DetailModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -457,7 +469,9 @@ function DetailModal({
 
         {/* Body — tailored to the action */}
         <div className="mb-3">
-          {log.action === "UPDATE" && changes && changes.length > 0 ? (
+          {log.action === "IMPORT" && importDetails ? (
+            <ImportDetail details={importDetails} />
+          ) : log.action === "UPDATE" && changes && changes.length > 0 ? (
             <EditDiff changes={changes} />
           ) : log.action === "UPDATE" ? (
             <DataCard title="ข้อมูลหลังแก้ไข" rows={rows} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
@@ -543,6 +557,201 @@ function EditDiff({ changes }: { changes: { field: string; from: string | null; 
           ))}
         </dl>
       </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Import log — inline row summary + dedicated detail view                     */
+/* -------------------------------------------------------------------------- */
+
+type BadgeTone = "green" | "blue" | "red" | "purple" | "gray";
+
+const BADGE_TONES: Record<BadgeTone, string> = {
+  green: "bg-green-100 text-green-700",
+  blue: "bg-blue-100 text-blue-700",
+  red: "bg-red-100 text-red-700",
+  purple: "bg-purple-100 text-purple-700",
+  gray: "bg-gray-100 text-gray-600",
+};
+
+function CountBadge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${BADGE_TONES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Compact created/updated/failed badges shown inline on an IMPORT table row. */
+function ImportRowSummary({ details, onOpen }: { details: Record<string, unknown> | null; onOpen: () => void }) {
+  const d = extractImportDetails(details);
+  // Legacy number-only alumni imports aren't import-shaped — fall back to the eye icon.
+  if (!d) {
+    return (
+      <div className="flex justify-center">
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
+          title="ดูรายละเอียด" aria-label="ดูรายละเอียด"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </button>
+      </div>
+    );
+  }
+
+  const legacy = d.created === 0 && d.updated === 0 && d.imported > 0;
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      className="flex flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-purple-50 cursor-pointer"
+      title="ดูรายการที่นำเข้า"
+    >
+      {legacy ? (
+        <CountBadge tone="purple">นำเข้า {d.imported}</CountBadge>
+      ) : (
+        <>
+          {d.created > 0 && <CountBadge tone="green">สร้าง {d.created}</CountBadge>}
+          {d.updated > 0 && <CountBadge tone="blue">อัปเดต {d.updated}</CountBadge>}
+          {d.created === 0 && d.updated === 0 && <CountBadge tone="gray">ไม่มีรายการ</CountBadge>}
+        </>
+      )}
+      {d.failed > 0 && <CountBadge tone="red">ผิดพลาด {d.failed}</CountBadge>}
+      <span className="ml-0.5 inline-flex items-center text-[11px] font-medium text-purple-600">
+        ดูรายการ
+        <svg className="ml-0.5 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+      </span>
+    </button>
+  );
+}
+
+/** A single imported record — links to the alumni profile when it has a studentId. */
+function ImportRecordRow({ record }: { record: ImportRecordView }) {
+  const opBadge =
+    record.op === "created" ? <CountBadge tone="green">สร้าง</CountBadge> : <CountBadge tone="blue">อัปเดต</CountBadge>;
+  const content = (
+    <span className="flex min-w-0 items-center gap-2">
+      {opBadge}
+      <span className="truncate font-medium text-gray-800">{record.name || "—"}</span>
+      {record.id && <span className="shrink-0 text-xs text-gray-400">{record.id}</span>}
+    </span>
+  );
+  if (record.id) {
+    return (
+      <li className="hover:bg-purple-50/60">
+        <a
+          href={`${BASE_PATH}/management/alumni/${record.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between gap-2 px-3 py-2"
+        >
+          {content}
+          <svg className="h-4 w-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5h5v5M19 5l-9 9M19 13v5a1 1 0 01-1 1H6a1 1 0 01-1-1V6a1 1 0 011-1h5" /></svg>
+        </a>
+      </li>
+    );
+  }
+  return <li className="px-3 py-2">{content}</li>;
+}
+
+/** Full import detail view: summary header + searchable record list + failed rows. */
+function ImportDetail({ details }: { details: ImportDetailView }) {
+  const [query, setQuery] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
+
+  const legacy = details.created === 0 && details.updated === 0 && details.imported > 0;
+  const q = query.trim().toLowerCase();
+  const filtered =
+    q && details.records.length > 0
+      ? details.records.filter(
+          (r) => r.name.toLowerCase().includes(q) || (r.id ?? "").toLowerCase().includes(q)
+        )
+      : details.records;
+
+  return (
+    <div className="space-y-4">
+      {/* Summary header */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+        {details.fileName && (
+          <p className="mb-2 text-sm text-gray-500">
+            ไฟล์: <span className="font-medium text-gray-700">{details.fileName}</span>
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {legacy ? (
+            <CountBadge tone="purple">นำเข้า {details.imported}</CountBadge>
+          ) : (
+            <>
+              <CountBadge tone="green">สร้างใหม่ {details.created}</CountBadge>
+              <CountBadge tone="blue">อัปเดต {details.updated}</CountBadge>
+            </>
+          )}
+          {details.failed > 0 && <CountBadge tone="red">ผิดพลาด {details.failed}</CountBadge>}
+          <span className="text-xs text-gray-400">นำเข้าทั้งหมด {details.attempted} แถว</span>
+        </div>
+      </div>
+
+      {/* Record list */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-gray-700">รายการที่นำเข้า</p>
+          {details.records.length > 0 && (
+            <div className="relative">
+              <svg className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ค้นหา ชื่อ / รหัสนักศึกษา"
+                className="w-60 rounded-lg border border-gray-300 py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+          )}
+        </div>
+
+        {details.truncated && (
+          <p className="mb-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
+            แสดง {details.records.length.toLocaleString()} จาก {details.totalRecords.toLocaleString()} รายการ (ข้อมูลมากเกินกว่าจะบันทึกไว้ทั้งหมดในบันทึกกิจกรรม)
+          </p>
+        )}
+
+        {details.records.length === 0 ? (
+          <p className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-sm text-gray-400">ไม่มีรายการที่บันทึกไว้</p>
+        ) : filtered.length === 0 ? (
+          <p className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-sm text-gray-400">ไม่พบรายการที่ตรงกับ &ldquo;{query}&rdquo;</p>
+        ) : (
+          <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200">
+            {filtered.map((r, i) => (
+              <ImportRecordRow key={`${r.id ?? "noid"}-${i}`} record={r} />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Failed rows */}
+      {details.errors.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowErrors((s) => !s)}
+            className="flex items-center gap-1 text-sm font-semibold text-red-600 hover:text-red-700 cursor-pointer"
+          >
+            <svg className={`h-4 w-4 transition-transform ${showErrors ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+            รายการที่ผิดพลาด ({details.totalErrors})
+          </button>
+          {details.errorsTruncated && (
+            <p className="mt-1 ml-5 text-xs text-amber-700">แสดง {details.errors.length} จาก {details.totalErrors} รายการ</p>
+          )}
+          {showErrors && (
+            <ul className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-xl border border-red-100 bg-red-50/40 p-3 text-sm">
+              {details.errors.map((e, i) => (
+                <li key={i} className="text-red-700">
+                  <span className="font-medium">แถว {e.row > 0 ? e.row : "—"}:</span> {e.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

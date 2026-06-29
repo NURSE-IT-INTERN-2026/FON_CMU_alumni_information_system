@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { DegreeLevel } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { logActivity } from "@/lib/activity-log";
+import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
 import { readExcelRows } from "@/lib/excel-import";
 import { parsePhones } from "@/lib/parse-phone";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
@@ -109,6 +109,9 @@ export async function POST(request: NextRequest) {
     }
 
     let imported = 0;
+    let created = 0;
+    let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
 
     for (const record of records) {
       const result = await prisma.alumni.upsert({
@@ -130,22 +133,37 @@ export async function POST(request: NextRequest) {
       // always has a degree card on its profile.
       if (result) {
         await ensurePrimaryEducationFromSnapshot(result.id);
+        // An upsert returns the row either way; on a fresh create Prisma sets
+        // createdAt and updatedAt to the same instant, so equal timestamps ⇒ created.
+        const op: ImportedRecord["op"] =
+          result.createdAt.getTime() === result.updatedAt.getTime() ? "created" : "updated";
+        if (op === "created") created++;
+        else updated++;
         imported++;
+        importedRecords.push({
+          id: record.studentId,
+          name: `${record.prefix} ${record.firstName} ${record.lastName}`.trim(),
+          op,
+        });
       }
     }
 
-    await logActivity(
-      {
+    await logImport({
+      ctx: {
         actorType: "ADMIN",
         userId: session.user.id,
         userEmail: session.user.email,
         userRole: session.user.role,
       },
-      "IMPORT",
-      "alumni",
-      null,
-      { imported, attempted: records.length, errors: errors.length }
-    );
+      resource: "alumni",
+      fileName: captureFileName(file),
+      attempted: records.length,
+      created,
+      updated,
+      failed: errors.length,
+      records: importedRecords,
+      errors,
+    });
 
     return NextResponse.json({ imported, skipped: 0, errors });
   } catch (error) {

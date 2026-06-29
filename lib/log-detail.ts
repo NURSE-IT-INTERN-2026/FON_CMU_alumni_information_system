@@ -54,6 +54,13 @@ export const FIELD_LABELS: Record<string, string> = {
   role: "บทบาท",
   remarks: "หมายเหตุ",
   notes: "หมายเหตุ",
+  // import summary counts (rendered by ImportDetail; labels here are a fallback)
+  fileName: "ไฟล์",
+  attempted: "ทั้งหมดที่นำเข้า",
+  created: "สร้างใหม่",
+  updated: "อัปเดต",
+  failed: "ผิดพลาด",
+  imported: "นำเข้าแล้ว",
 };
 
 const NEWS_STATUS_LABELS: Record<string, string> = {
@@ -68,7 +75,21 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 /** Keys that are internal metadata, not user-facing data rows. */
-const META_KEYS = new Set(["source", "sections", "changes"]);
+const META_KEYS = new Set([
+  "source",
+  "sections",
+  "changes",
+  // IMPORT details: the record/error arrays + their cap flags are rendered by
+  // the dedicated ImportDetail component (via `extractImportDetails`), not as
+  // generic rows. (The scalar counts created/updated/failed/attempted/fileName
+  // are left in so a fallback still shows something useful.)
+  "records",
+  "truncated",
+  "totalRecords",
+  "errorsTruncated",
+  "totalErrors",
+  "op",
+]);
 
 function labelFor(field: string): string {
   return FIELD_LABELS[field] ?? field;
@@ -125,4 +146,96 @@ export function extractChanges(details: Record<string, unknown> | null): FieldCh
   const raw = details.changes;
   if (!Array.isArray(raw)) return null;
   return raw as FieldChange[];
+}
+
+export interface ImportRecordView {
+  /** studentId when present (null for unlinked rows). */
+  id: string | null;
+  name: string;
+  op: "created" | "updated";
+}
+
+export interface ImportErrorView {
+  row: number;
+  message: string;
+}
+
+export interface ImportDetailView {
+  fileName: string | null;
+  attempted: number;
+  created: number;
+  updated: number;
+  failed: number;
+  /** Legacy pre-redesign alumni imports stored only a combined `imported` count. */
+  imported: number;
+  records: ImportRecordView[];
+  truncated: boolean;
+  totalRecords: number;
+  errors: ImportErrorView[];
+  errorsTruncated: boolean;
+  totalErrors: number;
+}
+
+function asNumber(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+function asString(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * Read an IMPORT log's `details` into a typed view. Tolerates both the new
+ * shape (records[] + created/updated) and the legacy alumni shape
+ * (`{ imported, attempted, errors: <number> }`). Returns null when `details`
+ * isn't import-shaped, so the caller can fall back to a generic card.
+ */
+export function extractImportDetails(details: Record<string, unknown> | null): ImportDetailView | null {
+  if (!details) return null;
+  const isImport =
+    "records" in details ||
+    "created" in details ||
+    "updated" in details ||
+    "attempted" in details ||
+    "imported" in details;
+  if (!isImport) return null;
+
+  const recordsRaw = Array.isArray(details.records) ? details.records : [];
+  const records: ImportRecordView[] = recordsRaw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
+    .map((r) => ({
+      id: typeof r.id === "string" ? r.id : null,
+      name: typeof r.name === "string" ? r.name : String(r.name ?? ""),
+      op: r.op === "updated" ? "updated" : "created",
+    }));
+
+  const errorsRaw = Array.isArray(details.errors) ? details.errors : [];
+  const errors: ImportErrorView[] = errorsRaw
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => ({
+      row: asNumber(e.row),
+      message: typeof e.message === "string" ? e.message : String(e.message ?? ""),
+    }));
+
+  const totalRecords = asNumber(details.totalRecords);
+  const totalErrors = asNumber(details.totalErrors);
+
+  return {
+    fileName: asString(details.fileName),
+    attempted: asNumber(details.attempted),
+    created: asNumber(details.created),
+    updated: asNumber(details.updated),
+    failed: asNumber(details.failed),
+    imported: asNumber(details.imported),
+    records,
+    truncated: details.truncated === true,
+    totalRecords: totalRecords || records.length,
+    errors,
+    errorsTruncated: details.errorsTruncated === true,
+    totalErrors: totalErrors || errors.length,
+  };
 }
