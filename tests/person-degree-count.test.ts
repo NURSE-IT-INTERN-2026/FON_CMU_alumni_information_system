@@ -101,6 +101,25 @@ describe("groupPersonsByDegree", () => {
     expect(persons).toHaveLength(2);
   });
 
+  it("flags hasCmu so the dashboard can scope to the registrar universe", () => {
+    // A CMU person, a bridged local (same person → CMU universe), and a
+    // local-only person (no CMU record → outside the universe).
+    const persons = groupPersonsByDegree(
+      [grad({ student_id: "B1", level_id: "1", grad_year: "2553" })],
+      [
+        { alumniId: "A1", educations: [{ studentId: "B1", degreeLevel: "DOCTORAL", graduationYear: 2566 }] },
+        { alumniId: "A2", educations: [{ studentId: "X1", degreeLevel: "MASTER", graduationYear: 2560 }] },
+      ],
+    );
+    expect(persons).toHaveLength(2);
+    const inCmu = persons.filter((p) => p.hasCmu);
+    const localOnly = persons.filter((p) => !p.hasCmu);
+    expect(inCmu).toHaveLength(1); // CMU + bridged local collapsed to one
+    expect(inCmu[0].degree).toBe("DOCTORAL"); // locally-added higher degree wins
+    expect(localOnly).toHaveLength(1); // local-only stays its own person...
+    expect(localOnly[0].hasCmu).toBe(false); // ...but is excluded from the count
+  });
+
   it("picks the most recent year among the highest-degree records", () => {
     const persons = groupPersonsByDegree(
       [
