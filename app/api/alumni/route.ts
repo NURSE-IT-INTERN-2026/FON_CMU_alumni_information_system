@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
+import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -128,6 +129,12 @@ export async function POST(request: NextRequest) {
         modelRepresentatives: true,
       },
     });
+
+    // A live (non-soft-deleted) alumni must carry a primary Education row
+    // mirroring its snapshot — skip the soft-delete stub case.
+    if (!validated.softDelete) {
+      await ensurePrimaryEducationFromSnapshot(alumni.id);
+    }
 
     const session = await getSession();
     if (session) {

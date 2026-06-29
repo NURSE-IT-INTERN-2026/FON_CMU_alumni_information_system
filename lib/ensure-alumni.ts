@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
+import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
 import {
   cmuLevelToDegree,
   normalizeCmuBirthday,
@@ -148,7 +149,7 @@ export async function ensureAlumni(studentId: string, fullName: string) {
   if (cmu) {
     const f = cmuToAlumniFields(cmu);
     const fallback = splitFullName(fullName);
-    return prisma.alumni.create({
+    const created = await prisma.alumni.create({
       data: {
         studentId: sid,
         prefix: f.prefix || "นางสาว",
@@ -163,11 +164,14 @@ export async function ensureAlumni(studentId: string, fullName: string) {
         cmuEmail: f.cmuEmail,
       },
     });
+    // Every new alumni gets a primary Education row mirroring its snapshot.
+    await ensurePrimaryEducationFromSnapshot(created.id);
+    return created;
   }
 
   // No CMU data available — legacy stub.
   const fallback = splitFullName(fullName);
-  return prisma.alumni.create({
+  const created = await prisma.alumni.create({
     data: {
       studentId: sid,
       prefix: "นางสาว",
@@ -176,4 +180,6 @@ export async function ensureAlumni(studentId: string, fullName: string) {
       degreeLevel: "BACHELOR",
     },
   });
+  await ensurePrimaryEducationFromSnapshot(created.id);
+  return created;
 }
