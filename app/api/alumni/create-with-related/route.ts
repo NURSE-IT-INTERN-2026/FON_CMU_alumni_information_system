@@ -6,6 +6,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedCreateSchema } from "@/lib/validations";
+import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
           isModelRepresentative: hasModelReps,
         },
       });
+      // Give the new alumni a primary Education row mirroring its snapshot.
+      await ensurePrimaryEducationFromSnapshot(created.id, tx);
 
       if (validated.awards && validated.awards.length > 0) {
         await tx.award.createMany({

@@ -41,3 +41,77 @@ export async function syncPrimarySnapshot(
     },
   });
 }
+
+/**
+ * INVERSE of `syncPrimarySnapshot`: ensure an alumni has a **primary Education
+ * row** mirroring its denormalized degree snapshot. If the alumni has no
+ * Education rows, create one from the snapshot (`studentId`/`degreeLevel`/
+ * `graduationYear`/`major`/`cohort` + the study-time `firstName`/`lastName`)
+ * and point `primaryEducationId` at it. If rows exist but none is flagged
+ * primary, adopt the first. No-op once a valid primary is set.
+ *
+ * This is what makes "every active alumni has ≥1 Education row" hold — so the
+ * profile education section (`EducationSection`) is never empty for an alumni
+ * that plainly has a degree (which the all-alumni table shows from the CMU
+ * merge). Call it from EVERY alumni-creation path (import, `ensureAlumni`,
+ * create-with-related, base POST); the bulk backfill is
+ * `scripts/backfill-educations.ts`.
+ *
+ * Pass a transaction client (`tx`) to run inside a `prisma.$transaction`.
+ */
+export async function ensurePrimaryEducationFromSnapshot(
+  alumniId: string,
+  tx: Prisma.TransactionClient = prisma,
+): Promise<void> {
+  const alumni = await tx.alumni.findUnique({
+    where: { id: alumniId },
+    select: {
+      primaryEducationId: true,
+      studentId: true,
+      degreeLevel: true,
+      graduationYear: true,
+      major: true,
+      cohort: true,
+      firstName: true,
+      lastName: true,
+      educations: { select: { id: true }, orderBy: { graduationYear: "desc" } },
+    },
+  });
+  if (!alumni) return;
+
+  // A valid primary already exists — nothing to do.
+  if (
+    alumni.primaryEducationId &&
+    alumni.educations.some((e) => e.id === alumni.primaryEducationId)
+  ) {
+    return;
+  }
+
+  let primaryId = alumni.primaryEducationId;
+  if (alumni.educations.length === 0) {
+    // No degree rows at all — materialize one from the snapshot.
+    const created = await tx.education.create({
+      data: {
+        alumniId,
+        studentId: alumni.studentId,
+        degreeLevel: alumni.degreeLevel,
+        graduationYear: alumni.graduationYear,
+        major: alumni.major,
+        cohort: alumni.cohort,
+        firstName: alumni.firstName,
+        lastName: alumni.lastName,
+      },
+    });
+    primaryId = created.id;
+  } else if (!primaryId) {
+    // Rows exist but none flagged primary — adopt the highest (most recent grad).
+    primaryId = alumni.educations[0].id;
+  }
+
+  if (primaryId && primaryId !== alumni.primaryEducationId) {
+    await tx.alumni.update({
+      where: { id: alumniId },
+      data: { primaryEducationId: primaryId },
+    });
+  }
+}

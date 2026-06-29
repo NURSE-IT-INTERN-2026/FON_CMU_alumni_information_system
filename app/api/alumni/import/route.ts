@@ -6,6 +6,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { readExcelRows } from "@/lib/excel-import";
 import { parsePhones } from "@/lib/parse-phone";
+import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -124,7 +125,13 @@ export async function POST(request: NextRequest) {
         },
         create: record,
       });
-      if (result) imported++;
+      // Ensure the primary Education row exists (no-op when already set), so a
+      // freshly imported alumni — or one re-imported before the backfill ran —
+      // always has a degree card on its profile.
+      if (result) {
+        await ensurePrimaryEducationFromSnapshot(result.id);
+        imported++;
+      }
     }
 
     await logActivity(
