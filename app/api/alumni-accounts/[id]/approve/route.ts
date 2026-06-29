@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
-import { syncPrimarySnapshot } from "@/lib/education-sync";
+import { recomputePrimaryEducation } from "@/lib/education-sync";
 import { generateGraduationLogs } from "@/lib/graduation-log";
 import { sendSignupApprovedEmail } from "@/lib/email";
 import { cmuLevelToDegree } from "@/lib/alumni-verify";
@@ -53,14 +53,13 @@ export async function POST(
         data: { accountStatus: "ACTIVE" },
       });
 
-      // Ensure an Education row exists for this signup degree; set it as the
-      // primary if the alumni has none yet, then re-sync the denormalized
-      // snapshot (studentId/degreeLevel/year/major/cohort) from it.
+      // Ensure an Education row exists for this signup degree, then let the
+      // primary (highest degree) + denormalized snapshot re-sync from it.
       const existingEdu = await tx.education.findUnique({
         where: { studentId: alumni.studentId },
       });
       if (!existingEdu) {
-        const edu = await tx.education.create({
+        await tx.education.create({
           data: {
             alumniId: id,
             studentId: alumni.studentId,
@@ -73,14 +72,10 @@ export async function POST(
             lastName: cmuGrad?.surname_th?.trim() || alumni.lastName,
           },
         });
-        if (!alumni.primaryEducationId) {
-          await tx.alumni.update({
-            where: { id },
-            data: { primaryEducationId: edu.id },
-          });
-          await syncPrimarySnapshot(id, tx);
-        }
       }
+      // Primary = highest degree; assign it (and re-sync the snapshot) for the
+      // signup degree. Idempotent on re-approve.
+      await recomputePrimaryEducation(id, tx);
     });
 
     // Graduation logs do their own CMU fetches — run outside the txn (idempotent).

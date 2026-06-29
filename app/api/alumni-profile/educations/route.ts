@@ -7,6 +7,7 @@ import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { generateGraduationLogs } from "@/lib/graduation-log";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
+import { recomputePrimaryEducation } from "@/lib/education-sync";
 import { assertEducationSamePerson } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -81,6 +82,8 @@ export async function POST(request: NextRequest) {
       // SYSTEM graduation log + re-sync the current name from the highest degree.
       await generateGraduationLogs(alumni.id);
       await syncNameFromHighestDegree(alumni.id);
+      // Primary = highest degree; a newly-added higher degree becomes primary.
+      await recomputePrimaryEducation(alumni.id);
 
       return NextResponse.json(created, { status: 201 });
     } catch (error) {
