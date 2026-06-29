@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useCanWrite } from "@/lib/role-context";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 import {
@@ -11,7 +11,7 @@ import {
   type AlumniWithRelatedFormData,
 } from "@/lib/validations";
 import SectionToggle from "@/components/form/SectionToggle";
-import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
+import RepeatableFieldArray from "@/components/form/RepeatableFieldArray";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
@@ -26,7 +26,7 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   prefix: "",
   firstName: "",
   lastName: "",
-  degreeLevel: "" as any,
+  degreeLevel: "" as AlumniWithRelatedFormData["degreeLevel"],
   cohort: "",
   birthDate: "",
   awards: [],
@@ -57,7 +57,7 @@ export default function NewAlumniPage() {
   });
 
   const form = useForm<AlumniWithRelatedFormData>({
-    resolver: zodResolver(alumniWithRelatedFormSchema) as any,
+    resolver: zodResolver(alumniWithRelatedFormSchema) as unknown as Resolver<AlumniWithRelatedFormData>,
     defaultValues: DEFAULT_VALUES,
   });
 
@@ -70,7 +70,6 @@ export default function NewAlumniPage() {
   } = form;
 
   // Field arrays for each section
-  const awardArray = useFieldArray({ control, name: "awards" });
   const associationArray = useFieldArray({ control, name: "associations" });
   const committeeArray = useFieldArray({ control, name: "graduateCommittees" });
   const potentialArray = useFieldArray({ control, name: "potentials" });
@@ -98,14 +97,20 @@ export default function NewAlumniPage() {
     if (prefix) overrides.prefix = prefix;
 
     const validSections = ["awards", "associations", "committees", "potentials", "modelReps", "abroad"] as const;
-    if (section && validSections.includes(section as any)) {
+    if (section && (validSections as readonly string[]).includes(section)) {
+      // One-time mount pre-fill from URL query params (guarded by
+      // initialLoadDone above). Expanding the requested section is a legitimate
+      // setState-in-effect: it runs once on mount and must happen after hydration
+      // (reading searchParams during render would risk a hydration mismatch), so
+      // the cascading-render concern the rule guards against does not apply here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSections((prev) => ({ ...prev, [section]: true }));
 
       switch (section) {
         case "awards":
           overrides.awards = [{
             awardName: searchParams.get("awardName") || "",
-            awardType: (searchParams.get("awardType") as any) || "INTERNATIONAL",
+            awardType: (searchParams.get("awardType") as "INTERNATIONAL" | "NATIONAL" | "LOCAL" | null) || "INTERNATIONAL",
             year: searchParams.get("year") || "",
             description: searchParams.get("description") || "",
           }];
@@ -252,11 +257,6 @@ export default function NewAlumniPage() {
     }
   };
 
-  const inputClass =
-    "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
-  const errorInputClass =
-    "w-full border border-red-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent";
-  const labelClass = "block text-sm font-medium text-gray-700 mb-1";
   const btnPrimary =
     "bg-[var(--primary)] text-white px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50";
 
@@ -348,7 +348,7 @@ export default function NewAlumniPage() {
             register={register}
             errors={errors}
             name="awards"
-            emptyRow={{ awardName: "", awardType: "INTERNATIONAL" as any, year: "", description: "" }}
+            emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }}
             fields={[
               { key: "awardName", label: "ชื่อรางวัล", required: true },
               {

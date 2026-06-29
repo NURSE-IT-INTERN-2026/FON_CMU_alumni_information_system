@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -72,13 +72,12 @@ export default function PotentialsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
-    resolver: zodResolver(potentialPageFormSchema) as any,
+    resolver: zodResolver(potentialPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: FORM_DEFAULTS,
   });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,

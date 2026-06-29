@@ -1,5 +1,5 @@
 import React from "react";
-import type { UseFormRegister } from "react-hook-form";
+import type { UseFormRegisterReturn } from "react-hook-form";
 
 const BASE_CLASS =
   "w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
@@ -9,7 +9,7 @@ const FOCUS_RING_ERROR = "focus:ring-red-400";
 
 interface FormSelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name"> {
-  registration: ReturnType<UseFormRegister<any>>;
+  registration: UseFormRegisterReturn;
   error?: string;
   options?: { value: string; label: string }[];
   placeholder?: string;

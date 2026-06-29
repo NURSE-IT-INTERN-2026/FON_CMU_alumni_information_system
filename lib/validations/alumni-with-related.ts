@@ -6,15 +6,7 @@ import { associationFormSchema } from "./association";
 import { committeeFormSchema } from "./graduate-committee";
 import { potentialFormSchema } from "./potential";
 import { modelRepFormSchema } from "./model-representative";
-import {
-  alumniCreateSchema,
-  awardCreateSchema,
-  associationCreateSchema,
-  committeeCreateSchema,
-  potentialCreateSchema,
-  modelRepCreateSchema,
-  alumniAgencyCreateSchema,
-} from ".";
+import { alumniCreateSchema } from ".";
 
 // Per-element form schema for an alumni self-editing their abroad info.
 // Collects only the real, meaningful AlumniAgency columns the alumni owns;

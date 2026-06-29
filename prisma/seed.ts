@@ -27,7 +27,7 @@ function cohortFromStudentId(sid: string): string | undefined {
   return undefined;
 }
 
-function spreadPrefix(index: number, total: number): string {
+function spreadPrefix(index: number): string {
   const prefixes = Array.from({ length: 15 }, (_, i) => String(51 + i));
   return prefixes[index % prefixes.length];
 }
@@ -782,7 +782,7 @@ async function main() {
     const data = modelRepData[idx];
     let studentId = data.studentId;
     if (!studentId) {
-      studentId = `${spreadPrefix(idx, modelRepData.length)}43${String(idx + 1).padStart(4, "0")}`;
+      studentId = `${spreadPrefix(idx)}43${String(idx + 1).padStart(4, "0")}`;
       const parsed = parseThaiName(data.name);
       await prisma.alumni.upsert({
         where: { studentId },

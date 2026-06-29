@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCanWrite } from "@/lib/role-context";
@@ -15,7 +15,6 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
-import FacetFilter from "@/components/ui/facet-filter";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
@@ -128,12 +127,6 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
   { value: "cohort", label: "รุ่น" },
 ];
 
-function displayName(a: AlumniAgency): string {
-  const thai = [a.firstName, a.lastName].filter(Boolean).join(" ").trim();
-  if (thai && a.englishName) return `${thai} (${a.englishName})`;
-  return thai || a.englishName || "-";
-}
-
 type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
@@ -227,7 +220,7 @@ export default function AlumniAgencyPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
-    resolver: zodResolver(abroadFormSchema) as any,
+    resolver: zodResolver(abroadFormSchema) as unknown as Resolver<AbroadFormValues>,
     defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
@@ -247,7 +240,6 @@ export default function AlumniAgencyPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,
@@ -275,13 +267,8 @@ export default function AlumniAgencyPage() {
   const [thailandSearchField, setThailandSearchField] = useState<ThailandSearchField>("all");
   const [thailandSortField, setThailandSortField] = useState<ThailandSortField>("studentId");
   const [thailandSortDir, setThailandSortDir] = useState<ThailandSortDir>("asc");
-  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [filters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
-
-  const setFilter = (field: string, vals: string[]) => {
-    setFilters((prev) => ({ ...prev, [field]: vals }));
-    setThailandPage(1);
-  };
 
   const { data: thailandData, isPending: thailandLoading } = useQuery({
     queryKey: ["alumniAgency", "thailand", { thailandPage, thailandSearch, thailandSearchField, thailandSortField, thailandSortDir, filtersKey }],
@@ -325,7 +312,9 @@ export default function AlumniAgencyPage() {
       apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ search, country: countryFilter, searchField })}`),
     enabled: mode === "abroad",
   });
-  const alumni = abroadData?.data ?? [];
+  // Wrap in useMemo so the array identity is stable across renders (avoids
+  // re-running the sort memos below on every render — react-hooks/exhaustive-deps).
+  const alumni = useMemo(() => abroadData?.data ?? [], [abroadData]);
   const countries = abroadData?.countries ?? [];
 
   // View mode: flat sorted list

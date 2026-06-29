@@ -224,13 +224,12 @@ export default function DashboardPage() {
 
   // Defer chart render by one frame so the container has real dimensions
   // before ResponsiveContainer tries to measure it. This avoids the
-  // "width(-1) and height(-1)" warning from recharts.
+  // "width(-1) and height(-1)" warning from recharts. The setChartReady call
+  // lives in the rAF callback (not the effect body) so it isn't a
+  // setState-in-effect.
   useEffect(() => {
-    if (chartData) {
-      const id = requestAnimationFrame(() => setChartReady(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setChartReady(false);
+    const id = requestAnimationFrame(() => setChartReady(!!chartData));
+    return () => cancelAnimationFrame(id);
   }, [chartData]);
 
   const rechartsData = useMemo(

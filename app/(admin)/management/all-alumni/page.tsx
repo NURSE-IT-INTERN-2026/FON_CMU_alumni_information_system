@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -30,14 +30,6 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
 type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
 type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort" | "birthDate";
 type SortDir = "asc" | "desc";
-
-const DEGREE_COLORS: Record<string, string> = {
-  NURSING_ASSISTANT: "#f57f17",
-  ASSOCIATE: "#00838f",
-  BACHELOR: "#5b21b6",
-  MASTER: "#2e7d32",
-  DOCTORAL: "#c62828",
-};
 
 interface Alumni {
   id: string;
@@ -164,7 +156,7 @@ export default function AlumniCountPage() {
 
       const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
       facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      let localMap: Record<string, Alumni> = {};
+      const localMap: Record<string, Alumni> = {};
       const deletedStudentIds = new Set<string>();
       try {
         const localJson = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
@@ -228,7 +220,7 @@ export default function AlumniCountPage() {
   const [saving, setSaving] = useState(false);
 
   const { register, handleSubmit, setError: setFormError, formState: { errors: formErrors }, reset: formReset } = useForm<AlumniEditFormData>({
-    resolver: zodResolver(alumniEditFormSchema) as any,
+    resolver: zodResolver(alumniEditFormSchema) as unknown as Resolver<AlumniEditFormData>,
     defaultValues: EMPTY_EDIT_FORM,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -246,7 +238,6 @@ export default function AlumniCountPage() {
   } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,
@@ -356,12 +347,14 @@ export default function AlumniCountPage() {
   })();
 
   // Clamp `page` back into range when the result set shrinks (e.g. after a
-  // search/filter). Guard on `!tableLoading` because while a page query is
-  // pending, `totalPages` is transiently 1 (no data yet) and clamping would
-  // snap the user back to page 1 on the first visit to any new page.
-  useEffect(() => {
-    if (!tableLoading && page > totalPages) setPage(totalPages);
-  }, [totalPages, page, tableLoading]);
+  // search/filter). Done during render (not in an effect) — React discards
+  // this render and re-renders immediately with the clamped page, avoiding a
+  // cascading setState-in-effect. Guard on `!tableLoading` because while a
+  // page query is pending, `totalPages` is transiently 1 (no data yet) and
+  // clamping would snap the user back to page 1 on the first visit to a new page.
+  if (!tableLoading && page > totalPages) {
+    setPage(totalPages);
+  }
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -383,7 +376,9 @@ export default function AlumniCountPage() {
     setPage(1);
   };
 
-  const SortIcon = ({ field }: { field: ManageSortField | ViewSortField }) => (
+  // Render function (not a component) so React doesn't recreate a component
+  // identity on every render (react-hooks/static-components).
+  const renderSortIcon = (field: ManageSortField | ViewSortField) => (
     <span className="ml-1 inline-block">{sortField === field ? (sortDir === "asc" ? "▲" : "▼") : "▽"}</span>
   );
 
@@ -897,34 +892,34 @@ export default function AlumniCountPage() {
                       ลำดับ
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                      รหัสนักศึกษา <SortIcon field="studentId" />
+                      รหัสนักศึกษา {renderSortIcon("studentId")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น <SortIcon field="cohort" />
+                      รุ่น {renderSortIcon("cohort")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
-                      คำนำหน้า <SortIcon field="prefix" />
+                      คำนำหน้า {renderSortIcon("prefix")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                      ชื่อ <SortIcon field="firstName" />
+                      ชื่อ {renderSortIcon("firstName")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
-                      นามสกุล <SortIcon field="lastName" />
+                      นามสกุล {renderSortIcon("lastName")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
-                      ระดับการศึกษา <SortIcon field="degreeLevel" />
+                      ระดับการศึกษา {renderSortIcon("degreeLevel")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                      สาขาวิชา <SortIcon field="major" />
+                      สาขาวิชา {renderSortIcon("major")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("graduationYear")}>
-                      ปีสำเร็จการศึกษา <SortIcon field="graduationYear" />
+                      ปีสำเร็จการศึกษา {renderSortIcon("graduationYear")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
-                      วันเกิด <SortIcon field="birthDate" />
+                      วันเกิด {renderSortIcon("birthDate")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
-                      หมายเหตุ <SortIcon field="remarks" />
+                      หมายเหตุ {renderSortIcon("remarks")}
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       จัดการ
@@ -1112,31 +1107,31 @@ export default function AlumniCountPage() {
                       ลำดับ
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                      รหัสนักศึกษา <SortIcon field="studentId" />
+                      รหัสนักศึกษา {renderSortIcon("studentId")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น <SortIcon field="cohort" />
+                      รุ่น {renderSortIcon("cohort")}
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       คำนำหน้า
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
-                      ชื่อ <SortIcon field="name" />
+                      ชื่อ {renderSortIcon("name")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("surname")}>
-                      นามสกุล <SortIcon field="surname" />
+                      นามสกุล {renderSortIcon("surname")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
-                      ระดับการศึกษา <SortIcon field="degreeLevel" />
+                      ระดับการศึกษา {renderSortIcon("degreeLevel")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                      สาขาวิชา <SortIcon field="major" />
+                      สาขาวิชา {renderSortIcon("major")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
-                      ปีที่สำเร็จการศึกษา <SortIcon field="year" />
+                      ปีที่สำเร็จการศึกษา {renderSortIcon("year")}
                     </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
-                      วันเกิด <SortIcon field="birthDate" />
+                      วันเกิด {renderSortIcon("birthDate")}
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                       หมายเหตุ

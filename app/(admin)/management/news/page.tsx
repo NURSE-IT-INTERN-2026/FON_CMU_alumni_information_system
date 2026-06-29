@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -65,6 +65,15 @@ const EMPTY_FORM: {
   status: "DRAFT",
 };
 
+// Rich-text execCommand identifiers the toolbar reflects/pins. Module-scope so
+// the `updateToolbarState` callback below has a stable reference (and no dep).
+const TOOLBAR_COMMANDS = [
+  "bold", "italic", "underline", "strikeThrough",
+  "insertUnorderedList", "insertOrderedList",
+  "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
+  "createLink",
+];
+
 export default function NewsListPage() {
   const canWrite = useCanWrite();
   const [page, setPage] = useState(1);
@@ -78,13 +87,12 @@ export default function NewsListPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset, control, setValue: setFormValue, watch } = useForm<NewsFormData>({
-    resolver: zodResolver(newsFormSchema) as any,
+  const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset, setValue: setFormValue, watch, getValues } = useForm<NewsFormData>({
+    resolver: zodResolver(newsFormSchema) as unknown as Resolver<NewsFormData>,
     defaultValues: EMPTY_FORM,
   });
 
   const {
-    selectedIds,
     selectedCount,
     toggleSelect,
     selectAll,
@@ -113,13 +121,6 @@ export default function NewsListPage() {
   const [bodyImgWidth, setBodyImgWidth] = useState<number>(0);
   const [fontSizePx, setFontSizePx] = useState<string>("16");
 
-  const TOOLBAR_COMMANDS = [
-    "bold", "italic", "underline", "strikeThrough",
-    "insertUnorderedList", "insertOrderedList",
-    "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
-    "createLink",
-  ];
-
   const updateToolbarState = useCallback(() => {
     const states: Record<string, boolean> = {};
     for (const cmd of TOOLBAR_COMMANDS) {
@@ -144,7 +145,7 @@ export default function NewsListPage() {
     document.execCommand(command, false, value);
     setFormValue("body", editor.innerHTML);
     updateToolbarState();
-  }, [updateToolbarState]);
+  }, [updateToolbarState, setFormValue]);
 
   // Apply an arbitrary pixel font size to the current selection. execCommand("fontSize")
   // only accepts the legacy 1–7 scale, so use "7" as a marker then swap each marker for a
@@ -170,7 +171,7 @@ export default function NewsListPage() {
     });
     setFormValue("body", editor.innerHTML);
     updateToolbarState();
-  }, [updateToolbarState]);
+  }, [updateToolbarState, setFormValue]);
 
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) {
@@ -216,6 +217,9 @@ export default function NewsListPage() {
     });
   };
 
+  // react-hook-form's `watch()` opts this component out of the React Compiler
+  // (benign — the component still works, it just isn't compiler-optimized).
+  // eslint-disable-next-line react-hooks/incompatible-library
   const formBody = watch("body");
 
   const bodyStats = useMemo(() => {
@@ -254,7 +258,7 @@ export default function NewsListPage() {
 
   useEffect(() => {
     if (showForm && editorRef.current) {
-      editorRef.current.innerHTML = prefixUploadsInHtml(watch("body") || "");
+      editorRef.current.innerHTML = prefixUploadsInHtml(getValues("body") || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, editingId]);

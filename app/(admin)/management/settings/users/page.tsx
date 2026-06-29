@@ -2,10 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite, useRole } from "@/lib/role-context";
-import { DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -29,7 +28,7 @@ interface AdminUser {
   updatedAt: string;
 }
 
-const EMPTY_FORM = {
+const EMPTY_FORM: UserCreateInput = {
   firstName: "",
   lastName: "",
   email: "",
@@ -135,8 +134,8 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const role = useRole();
 
   const { register, handleSubmit, formState: { errors: formErrors }, reset: formReset } = useForm<UserCreateInput>({
-    resolver: zodResolver(userCreateSchema) as any,
-    defaultValues: EMPTY_FORM as any,
+    resolver: zodResolver(userCreateSchema) as unknown as Resolver<UserCreateInput>,
+    defaultValues: EMPTY_FORM,
   });
 
   const qc = useQueryClient();
@@ -146,9 +145,9 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   });
   const members = membersData ?? [];
 
-  const openCreate = () => { formReset(EMPTY_FORM as any); setEditingId(null); setShowForm(true); };
-  const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role } as any); setEditingId(m.id); setShowForm(true); };
-  const closeForm = () => { setShowForm(false); setEditingId(null); formReset(EMPTY_FORM as any); };
+  const openCreate = () => { formReset(EMPTY_FORM); setEditingId(null); setShowForm(true); };
+  const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role as "superadmin" | "admin" }); setEditingId(m.id); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setEditingId(null); formReset(EMPTY_FORM); };
 
   const toggleSuspend = async (m: AdminUser) => {
     try {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emailField, passwordField } from "./helpers";
+import { passwordField } from "./helpers";
 
 // --- Admin login (email + password, CMU domain) ---
 
