@@ -219,6 +219,8 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 | `lib/role-context.tsx` | `useRole()` / `useCanWrite()` / `useIsAdmin()` |
 | `lib/permissions.ts` | `checkWritePermission()` (401/403 guard) |
 | `lib/activity-log.ts` · `lib/field-changes.ts` | Audit logging + per-field change tracking |
+| `lib/import-log.ts` | IMPORT log builder — every import records `{id, name, op}` per row (see Lessons) |
+| `lib/log-detail.ts` | Client-safe reader turning `ActivityLog.details` JSON into Thai-labeled rows/modals |
 | `lib/ensure-alumni.ts` | Auto-create Alumni on import if studentId not found |
 | `lib/cmu-registrar.ts` | CMU Registrar API integration (syncs major on import) |
 | `lib/trash.ts` | Soft-delete trash management (restore / hard-delete) |
@@ -439,5 +441,10 @@ Template for a ledger entry:
   - Resolver: `resolver: zodResolver(schema) as unknown as Resolver<T>` (import `type Resolver` from `react-hook-form`).
   - `watch()`: prefer `getValues("field")` for a **one-time** read (e.g. loading an editor's initial HTML in an effect). For **reactive** `watch` (live previews/derived filters), keep it and add a documented `// eslint-disable-next-line react-hooks/incompatible-library`.
   - Shared form helpers that take `control`/`register`/`errors` (see `components/form/RepeatableFieldArray.tsx`) must be **generic** over the form's field values — `<TFieldValues extends FieldValues>(...)` with `Control<TFieldValues>` etc. — NOT a fixed `Control<FieldValues>`. The `name` prop is `FieldArrayPath<TFieldValues>` (so `useFieldArray` accepts it); dynamic per-row register paths cast `as FieldPath<TFieldValues>`; `emptyRow` stays `Record<string, unknown>` (rows use `""` for fields that coerce to number at submit). `FormInput/Select/Textarea` type their `registration` prop as `UseFormRegisterReturn` (default generic accepts any form's register return).
+
+### Every import writes a record-list IMPORT log (`logImport`) — never number-only, never silent
+- **Symptom:** The System Logs page told admins nothing useful about an import — only the alumni import logged, and just `{ imported, attempted, errors }` counts; the other 6 import types (awards/associations/graduate-committee/potentials/model-representatives/alumni-agency) wrote **no** log at all, so who imported what was untraceable.
+- **Root cause:** There was no shared helper, so each route either skipped logging or stored bare counts; `ActivityLog.details` (free-form `Json?`, arrays already used by `BULK_DELETE`'s `ids`) was an untapped home for the record list.
+- **Prevention:** Every `POST /api/{entity}/import` accumulates `{ id, name, op: "created"|"updated" }` per created/updated row and calls `logImport({ ctx, resource, fileName, attempted, created, updated, failed, records, errors })` (`lib/import-log.ts`, server-only). Alumni derives `op` from the upsert (`result.createdAt.getTime() === result.updatedAt.getTime()` ⇒ created). The record list is **capped** at `MAX_IMPORT_RECORDS_IN_LOG = 500` and errors at 50 — but **never silently**: `truncated`/`totalRecords`/`errorsTruncated`/`totalErrors` keep the real totals, and the summary counts are always exact (alumni imports can be 11k+ rows). HTTP response shape to the client is unchanged. The client reads it via `extractImportDetails` (`lib/log-detail.ts`, client-safe — also tolerates the legacy number-only row) and the logs page renders inline `สร้าง/อัปเดต/ผิดพลาด` badges + a searchable, clickable record-list modal (`ImportDetail`). **When adding a NEW import route, call `logImport` — don't regress to a silent or count-only import.** (`logActivity`'s `details` param is `Record<string, unknown>`; a typed shape needs `as unknown as Record<string, unknown>`.)
 
 
