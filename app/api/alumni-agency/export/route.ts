@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["firstName", "lastName", "englishName", "country", "workplace", "cohort"];
+    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "cohort"];
     const where: Record<string, unknown> = {};
 
     if (country) {
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.studentId || "",
       "รุ่น": a.cohort || "",
       "คำนำหน้า": a.prefix || "",
       "ชื่อ": a.firstName || "",
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
+      "รหัสนักศึกษา": a.studentId || "",
       "รุ่น": a.cohort || "",
       "คำนำหน้า": a.prefix || "",
       "ชื่อ": a.firstName || "",

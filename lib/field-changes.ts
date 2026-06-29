@@ -21,6 +21,7 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
   potential: ["prefix", "firstName", "lastName", "career", "position", "recordedYear", "major"],
   model_representative: ["prefix", "firstName", "lastName", "cohort", "generation", "major"],
   alumni_agency: [
+    "studentId",
     "major",
     "cohort",
     "prefix",
