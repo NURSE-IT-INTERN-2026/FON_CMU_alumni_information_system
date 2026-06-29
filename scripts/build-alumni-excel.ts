@@ -16,8 +16,23 @@
  *  - **Mojibake digits.** ASCII digits `0–9` (U+0030–39) in `StudID`/`TypeEdu`
  *    were corrupted to `İ/ı/Ĳ/ĳ/Ĵ/ĵ/Ķ/ĸ/Ĺ` (U+0130–0139) in some rows.
  *    `normMojibake()` maps them back to `0–9`, recovering ~360 student IDs and
- *    ~92 degree codes. It is applied to every field; Thai (U+0E00+) and ASCII
- *    letters are untouched, so it is safe on names/addresses.
+ *    ~92 degree codes. Applied ONLY to numeric fields (`StudID`/`TypeEdu`) via
+ *    `clean()` — never to text fields, where the same code points can be a
+ *    shifted Thai char and a digit repair would corrupt the name.
+ *  - **Malayalam-shift Thai corruption.** Some Thai characters (U+0E01–0E7F)
+ *    landed in the adjacent **Malayalam** block (U+0D00–0D7F) — a clean −0x100
+ *    shift. `repairMalayalam()` maps them back (+0x100), always landing in
+ *    valid Thai. Verified on the dump: e.g. `ปรีชาพงค์มิตണ→ร`, `หมഹ่→หมู่`,
+ *    `วิทยലลัย→วิทยาลัย`, `กาญഈน→กาญจน`. Malayalam never appears legitimately
+ *    in Thai alumni data, so the map is unambiguous. Applied to text fields
+ *    by `cleanText()`.
+ *  - **Unrecoverable row-concatenation garbage.** Text fields also carry
+ *    binary noise that is NOT a reversible transform — recurring CJK/Tibetan/
+ *    Latin-1 clusters (e.g. `鿐ݣ⌀ༀ耂߾JJJ\h`), `℡`/`⌀` separator runs, and
+ *    scattered one-off code points. These cannot be decoded back to Thai, so
+ *    `cleanText()` DROPS any char that isn't ASCII-printable, Thai, or common
+ *    punctuation (then collapses whitespace). The worst such rows are dropped
+ *    anyway by the numeric-StudID filter below.
  *  - **Row-concatenation corruption.** ~63 rows have a `StudID` that is
  *    several records mashed together (`"501251003นางวนิดา…0416010000134…"`),
  *    so their fields are unrecoverably misaligned. These are DROPPED (and
@@ -120,16 +135,75 @@ function clean(v: unknown): string {
   return normMojibake(v).trim();
 }
 
+/**
+ * Repair the corruption where Thai characters (U+0E01–0E7F) landed in the
+ * adjacent **Malayalam** block (U+0D00–0D7F) — a clean −0x100 shift that always
+ * lands back in valid Thai. Malayalam never appears legitimately in Thai alumni
+ * data, so the map is unambiguous. e.g. `ปรีชาพงค์มิตണ→…ร`, `หมഹ่→หมู่`.
+ */
+function repairMalayalam(s: string): string {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.charCodeAt(i);
+    out += cp >= 0x0d00 && cp <= 0x0d7f ? String.fromCharCode(cp + 0x100) : s[i];
+  }
+  return out;
+}
+
+/** Code points kept in a cleaned text cell beyond ASCII printable + Thai. */
+const TEXT_KEEP_EXTRA = new Set<number>([
+  0x2018, 0x2019, 0x201c, 0x201d, // ‘ ’ “ ”
+  0x2013, 0x2014, // – —
+  0x2026, // …
+  0x00b0, // °
+  0x0e3f, // ฿
+  0x2116, // №
+]);
+
+/** True for chars a cleaned text cell keeps: ASCII printable or Thai. */
+function isTextKeep(cp: number): boolean {
+  return (
+    (cp >= 0x21 && cp <= 0x7e) || (cp >= 0x0e01 && cp <= 0x0e7f) || TEXT_KEEP_EXTRA.has(cp)
+  );
+}
+
+/** True for whitespace-class code points (incl. NBSP and the U+2000–200A spaces). */
+function isSpaceClass(cp: number): boolean {
+  return (
+    cp === 0x20 || cp === 0x09 || cp === 0x0a || cp === 0x0d || cp === 0xa0 ||
+    (cp >= 0x2000 && cp <= 0x200a)
+  );
+}
+
+/**
+ * Clean a TEXT field (name/address/phone/email): repair Malayalam→Thai, then
+ * DROP every char that is neither ASCII-printable, Thai, nor common
+ * punctuation (the row-concatenation binary noise — CJK/Tibetan/Latin-1
+ * clusters, ℡/⌀ separators, one-off code points — is unrecoverable, not a
+ * reversible transform), then collapse runs of whitespace. Digit-mojibake is
+ * intentionally NOT applied here (names/addresses aren't numeric).
+ */
+function cleanText(v: unknown): string {
+  let out = "";
+  const s = repairMalayalam(String(v ?? ""));
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.charCodeAt(i);
+    if (isSpaceClass(cp)) out += " ";
+    else if (isTextKeep(cp)) out += s[i];
+  }
+  return out.replace(/ {2,}/g, " ").trim();
+}
+
 /** Build a readable Thai address from the legacy address fragments. */
 function buildAddress(r: LegacyAlumni): string {
   const parts: string[] = [];
-  const street = clean(r.col_17);
+  const street = cleanText(r.col_17);
   if (street && street !== "-") parts.push(street);
-  const amphur = clean(r.AMPR);
+  const amphur = cleanText(r.AMPR);
   if (amphur && amphur !== "-" && amphur !== " -") parts.push(`อ.${amphur}`);
-  const prov = clean(r.PROV);
+  const prov = cleanText(r.PROV);
   if (prov && prov !== "-" && prov !== " -") parts.push(`จ.${prov}`);
-  const post = clean(r.POST);
+  const post = cleanText(r.POST);
   if (post && post !== "-" && post !== " -") parts.push(post);
   return parts.join(" ");
 }
@@ -207,16 +281,17 @@ function main() {
   let multiPhoneRows = 0;
   const outDegreeDist = new Map<string, number>();
   for (const r of byId.values()) {
-    const prefix = clean(r.PRENAME);
-    const firstName = clean(r.TFNAME);
-    const lastName = clean(r.TLNAME);
+    const prefix = cleanText(r.PRENAME);
+    const firstName = cleanText(r.TFNAME);
+    const lastName = cleanText(r.TLNAME);
     const degreeCode = clean(r.TypeEdu);
     const degreeLabel = degreeCode ? DEGREE_LABEL[degreeCode] ?? DEGREE_FALLBACK : DEGREE_FALLBACK;
     // Phone: keep only the mobile after "มือถือ" and split commas into a list;
     // emit comma-joined for the cell (the import re-splits into phones[]).
-    let phones = parsePhones(r.PHONE);
-    if (!phones.length) phones = parsePhones(r.mobile);
-    if (!phones.length) phones = parsePhones(r.phone_work);
+    // cleanText first so any leaked row-concatenation garbage is stripped.
+    let phones = parsePhones(cleanText(r.PHONE));
+    if (!phones.length) phones = parsePhones(cleanText(r.mobile));
+    if (!phones.length) phones = parsePhones(cleanText(r.phone_work));
     if (phones.length > 1) multiPhoneRows++;
     const address = buildAddress(r);
 
@@ -231,7 +306,7 @@ function main() {
       นามสกุล: lastName,
       "รุ่น/สาขา": "",
       ระดับการศึกษา: degreeLabel,
-      อีเมล: clean(r.email),
+      อีเมล: cleanText(r.email),
       เบอร์โทร: phones.join(", "),
       ที่อยู่ปัจจุบัน: address,
     });
