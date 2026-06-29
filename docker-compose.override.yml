@@ -1,0 +1,7 @@
+# Dev-only overrides — auto-merged by `docker compose up` (not used when
+# deploying with `-f docker-compose.yml`). Exposes the local Postgres
+# container to the host so `npm run dev` (running on the host) can connect.
+services:
+  db:
+    ports:
+      - "5432:5432"
