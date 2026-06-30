@@ -89,7 +89,7 @@ app/
 ├── layout.tsx                    # Root layout (fonts, <html lang="th">)
 ├── page.tsx                      # Root landing page
 ├── login/page.tsx                # Admin login (CMU OAuth / email–password testing)
-├── news/[id]/page.tsx            # News detail (public)
+├── news/[id]/page.tsx            # News detail — **PUBLIC in code, violates the no-public-browsing policy (see Key Constraints); to be gated behind login**
 ├── (admin)/                      # Route group — admin area (auth-guarded)
 │   ├── layout.tsx                # Admin auth guard + Header/Sidebar/Footer + RoleProvider
 │   └── management/               # All admin data pages
@@ -176,7 +176,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 - OAuth: `/api/auth/callback/` → dashboard on success, `/login?error=…` on failure; flow starts at `/api/auth/cmu-login`.
 
 **Entry points — legitimately have no in-app links (do NOT flag as unused):**
-- Public/landing: `/`, `/login`, `/news/[id]`, `/graduates/{signup,forgot-password,reset-password,tos}`.
+- Public/auth-only (no in-app links, and the **only** routes reachable without a session per the no-public-browsing policy): `/login`, `/graduates/{signup,forgot-password,reset-password,tos}`. (`/` and `/news/[id]` are currently public in code but **violate the policy** — to be gated; see Key Constraints.)
 - OAuth/callback: `/api/auth/callback/`, `/api/auth/cmu-login`.
 - Cron: `/api/auth/cleanup` (secured by `CLEANUP_SECRET` env var).
 
@@ -233,6 +233,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 
 ## Key Constraints
 
+- **No public/anonymous browsing (revised 2026-06-30).** The system serves only two audiences — **staff** (admin/superadmin/executive) and **graduates** (alumni). Every content page and data API requires an authenticated session. Only the login page, sign-up, password-reset, and the auth API endpoints (`/api/auth/*`, `/api/alumni-auth/{signup,login,forgot/reset-password}`) are reachable without a session; an anonymous visitor sees only `/login`. **Known code deviation (to be gated/removed):** the current routes still expose `/`, `/news/[id]`, and the entity GET/export APIs publicly (`app/page.tsx`, `app/news/[id]/page.tsx`, and the `GET` handlers under `app/api/{alumni,news,awards,potentials,associations,graduate-committee,model-representatives,alumni-agency}/` + their `/export`) — these contradict the policy and must be moved behind the auth guard. Do **not** depict a public/visitor path in diagrams, docs, or onboarding.
 - **Thai language** primary — all UI labels, column headers, validation messages, and enum values use Thai.
 - **Degree levels (5):** ปริญญาเอก, ปริญญาโท, ปริญญาตรี, อนุปริญญา (ASSOCIATE), หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล
 - **Award types:** รางวัลระดับนานาชาติ, รางวัลระดับชาติ, รางวัลระดับท้องถิ่น
@@ -316,6 +317,11 @@ Template for a ledger entry:
 - **Symptom:** Docker says the app is "running on :3000" and a Next.js server responds, but the app is broken — it serves at the root (`/login` returns 200) instead of under `basePath: "/alumni"` (`/alumni/login`), so every internal link/fetch (all written for `/alumni`) 404s/redirects wrong and the page won't load. Confirmed via curl: `/` → 307 `/login` (not the expected 308 → `/alumni`), and bare `/login` → 200.
 - **Root cause:** `basePath` is a **build-time** constant baked into the standalone image (`output: "standalone"`). `docker compose up -d` reuses an existing image of the same name — it does NOT rebuild from source. After pulling/merging code changes, an image built weeks earlier keeps running: `docker images` shows `fon-cmu-alumni-app:latest` created "4 weeks ago" while the container is minutes old. The host dev server (`npm run dev`) is NOT involved — `ps` shows no `next`/`node` process; the `*:3000` listener is the container's published port owned by the Docker Desktop VM.
 - **Prevention:** After any source change you want live in Docker, run `docker compose up -d --build app` (or `docker compose build app` then `up -d app`). Confirm the image is fresh (`docker images` → created "x minutes ago", new image id). Verify basePath with curl: `/` → 308 `/alumni`, `/alumni/login` → 200, bare `/login` → 404. `next.config.ts`'s `basePath` is NOT runtime-overridable, so a wrong basePath always means a stale build, never an env tweak.
+
+### Dev container hot-reloads via `docker-compose.override.yml` (HMR) — but only after a `--build`
+- **What:** `docker compose up` (no `-f`) auto-merges `docker-compose.override.yml`, which overrides the `app` service to build the Dockerfile **`deps`** stage (full deps, incl. devDependencies) and run `next dev` with the source **bind-mounted** (`.:/app`) — so code changes hot-reload like a normal host `npm run dev`. Anonymous volumes protect `/app/node_modules`, `/app/.next`, and `/app/app/generated` from the bind mount (container-owned). The command runs `npx prisma generate` (the `deps` image has no generated client) then `npm run dev -- -H 0.0.0.0`.
+- **The catch:** the stale-image rule ABOVE still applies on the **first** switch to dev (or after any `package.json` change) — `docker compose up` alone reuses the old standalone image, so you MUST run `docker compose up -d --build app` once. After that, plain `docker compose up` reuses the dev image and source edits reload via HMR with no rebuild. To go back to the production standalone container, deploy with `docker compose -f docker-compose.yml up -d --build app` (the `-f` skips the override).
+- **Verify HMR:** the dev server logs `✓ Ready in …ms`; editing a host source file then requesting its route logs `○ Compiling /<route> …` (on-demand recompile). Confirm the container reads live source, not a baked copy: `docker compose exec app grep -c '<recentToken>' '/app/app/(admin)/management/alumni-agency/page.tsx'` (>0).
 
 ### App is deployed under `basePath: "/alumni"`
 - **Symptom:** Links, redirects, or fetches resolve to the wrong path in the deployed app.
