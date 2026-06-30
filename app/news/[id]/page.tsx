@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import sanitizeHtml from "sanitize-html";
 import prisma from "@/lib/prisma";
@@ -23,23 +23,28 @@ export default async function NewsDetailPage({
 }) {
   const { id } = await params;
 
+  // No public/anonymous browsing (PRD §1/§3.12): the staff news detail page is
+  // staff-only — alumni read news at /graduates/news/[id]. getSession() returns
+  // only ADMIN sessions; redirect unauthenticated/expired visitors to login
+  // (proxy.ts already cookie-gates this route, this is defense-in-depth). Staff
+  // can preview any status (DRAFT/DISCONTINUED cards render instead of 404ing).
+  const adminSession = await getSession();
+  if (!adminSession) {
+    redirect("/login");
+  }
+
   const news = await prisma.news.findUnique({
     where: { id },
   });
 
-  // Public visitors only see PUBLISHED news; an authenticated admin can preview
-  // any status (so clicking a DRAFT/DISCONTINUED card in manage mode renders
-  // instead of 404ing). getSession() returns only ADMIN sessions.
-  const adminSession = await getSession();
-  const isAdmin = !!adminSession;
-  if (!news || (!isAdmin && news.status !== "PUBLISHED")) {
+  if (!news) {
     notFound();
   }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
-        href="/news"
+        href="/management/news"
         className="mb-6 inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-light)]"
       >
         <svg

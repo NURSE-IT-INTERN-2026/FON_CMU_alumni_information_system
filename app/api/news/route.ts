@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, getAlumniSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
@@ -16,15 +16,30 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const statusParam = searchParams.get("status") || "";
 
-    const session = await getSession();
-    const isAdmin = !!session;
+    // No public/anonymous browsing (PRD §1/§3.12): news is readable only by
+    // authenticated staff (any status) or alumni (PUBLISHED only). proxy.ts only
+    // checks for a cookie, so enforce a valid session here too.
+    const [adminSession, alumniSession] = await Promise.all([
+      getSession(),
+      getAlumniSession(),
+    ]);
+    if (!adminSession && !alumniSession) {
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบ" },
+        { status: 401 }
+      );
+    }
 
     const where: Prisma.NewsWhereInput = {};
 
-    if (!isAdmin) {
+    if (adminSession) {
+      // Staff: honor an explicit status filter, otherwise return all statuses.
+      if (statusParam) {
+        where.status = statusParam as Prisma.EnumNewsStatusFilter["equals"];
+      }
+    } else {
+      // Alumni: published news only.
       where.status = "PUBLISHED";
-    } else if (statusParam) {
-      where.status = statusParam as Prisma.EnumNewsStatusFilter["equals"];
     }
 
     if (search) {

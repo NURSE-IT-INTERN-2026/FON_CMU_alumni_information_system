@@ -89,7 +89,7 @@ app/
 ├── layout.tsx                    # Root layout (fonts, <html lang="th">)
 ├── page.tsx                      # Root landing page
 ├── login/page.tsx                # Admin login (CMU OAuth / email–password testing)
-├── news/[id]/page.tsx            # News detail — **PUBLIC in code, violates the no-public-browsing policy (see Key Constraints); to be gated behind login**
+├── news/[id]/page.tsx            # Staff news detail — session-gated (redirects to /login without a staff session); reached from dashboard latest-news + management cards
 ├── (admin)/                      # Route group — admin area (auth-guarded)
 │   ├── layout.tsx                # Admin auth guard + Header/Sidebar/Footer + RoleProvider
 │   └── management/               # All admin data pages
@@ -176,7 +176,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 - OAuth: `/api/auth/callback/` → dashboard on success, `/login?error=…` on failure; flow starts at `/api/auth/cmu-login`.
 
 **Entry points — legitimately have no in-app links (do NOT flag as unused):**
-- Public/auth-only (no in-app links, and the **only** routes reachable without a session per the no-public-browsing policy): `/login`, `/graduates/{signup,forgot-password,reset-password,tos}`. (`/` and `/news/[id]` are currently public in code but **violate the policy** — to be gated; see Key Constraints.)
+- Public/auth-only (no in-app links, and the **only** routes reachable without a session per the no-public-browsing policy): `/login`, `/graduates/{signup,forgot-password,reset-password,tos}`. (`/` redirects to `/management/dashboard` → `/login` when unauthenticated; `/news/[id]` is staff-session-gated.)
 - OAuth/callback: `/api/auth/callback/`, `/api/auth/cmu-login`.
 - Cron: `/api/auth/cleanup` (secured by `CLEANUP_SECRET` env var).
 
@@ -233,7 +233,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 
 ## Key Constraints
 
-- **No public/anonymous browsing (revised 2026-06-30).** The system serves only two audiences — **staff** (admin/superadmin/executive) and **graduates** (alumni). Every content page and data API requires an authenticated session. Only the login page, sign-up, password-reset, and the auth API endpoints (`/api/auth/*`, `/api/alumni-auth/{signup,login,forgot/reset-password}`) are reachable without a session; an anonymous visitor sees only `/login`. **Known code deviation (to be gated/removed):** the current routes still expose `/`, `/news/[id]`, and the entity GET/export APIs publicly (`app/page.tsx`, `app/news/[id]/page.tsx`, and the `GET` handlers under `app/api/{alumni,news,awards,potentials,associations,graduate-committee,model-representatives,alumni-agency}/` + their `/export`) — these contradict the policy and must be moved behind the auth guard. Do **not** depict a public/visitor path in diagrams, docs, or onboarding.
+- **No public/anonymous browsing (revised 2026-06-30).** The system serves only two audiences — **staff** (admin/superadmin/executive) and **graduates** (alumni). Every content page and data API requires an authenticated session. Only the login page, sign-up, password-reset, and the auth API endpoints (`/api/auth/*`, `/api/alumni-auth/{signup,login,forgot/reset-password}`) are reachable without a session; an anonymous visitor sees only `/login`. **Known code deviation (to be gated/removed):** the entity GET/export APIs are still public — the `GET` handlers under `app/api/{alumni,awards,potentials,associations,graduate-committee,model-representatives,alumni-agency}/` + their `/export` are reachable without a session and must be moved behind the auth guard. (News is now session-gated: `app/news/[id]/page.tsx` redirects to `/login` without a staff session, and `GET /api/news` + `GET /api/news/[id]` return 401 to anonymous — staff see all statuses, alumni see PUBLISHED only. `/` redirects to the auth-guarded dashboard.) Do **not** depict a public/visitor path in diagrams, docs, or onboarding.
 - **Thai language** primary — all UI labels, column headers, validation messages, and enum values use Thai.
 - **Degree levels (5):** ปริญญาเอก, ปริญญาโท, ปริญญาตรี, อนุปริญญา (ASSOCIATE), หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล
 - **Award types:** รางวัลระดับนานาชาติ, รางวัลระดับชาติ, รางวัลระดับท้องถิ่น

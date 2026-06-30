@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
+import { assetUrl } from "@/lib/asset-url";
 import { DEGREE_COLORS } from "@/lib/constants";
 import {
   LineChart,
@@ -504,7 +505,7 @@ export default function DashboardPage() {
                   <div className="aspect-video w-full overflow-hidden bg-gray-100">
                     {item.coverImageUrl ? (
                       <img
-                        src={item.coverImageUrl}
+                        src={assetUrl(item.coverImageUrl)}
                         alt={item.title}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       />
