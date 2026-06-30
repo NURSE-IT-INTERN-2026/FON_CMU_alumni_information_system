@@ -114,6 +114,9 @@ export default function ModelRepresentativesPage() {
     isAllSelected,
     getSelectedArray,
   } = useBulkSelection();
+  const [selectMode, setSelectMode] = useState(false);
+  const enterSelect = () => setSelectMode(true);
+  const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -498,6 +501,15 @@ export default function ModelRepresentativesPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           รายชื่อเครือข่ายศิษย์เก่าทุกรุ่นทุกหลักสูตร
         </h1>
+        {selectMode ? (
+          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+            เสร็จสิ้น
+          </button>
+        ) : (
+          <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+            เลือก
+          </button>
+        )}
       </div>
 
       {/* Error toast */}
@@ -764,6 +776,7 @@ export default function ModelRepresentativesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
+                  {selectMode && (
                   <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
@@ -775,6 +788,7 @@ export default function ModelRepresentativesPage() {
                       className="h-4 w-4 rounded border-gray-300"
                     />
                   </th>
+                  )}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
@@ -794,9 +808,10 @@ export default function ModelRepresentativesPage() {
                 {managePageItems.map((a, i) => (
                   <tr
                     key={a.id}
-                    onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
+                    onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
                     className="cursor-pointer transition-colors hover:bg-gray-50"
                   >
+                    {selectMode && (
                     <td className="px-4 py-3 text-center">
                       <input
                         type="checkbox"
@@ -805,6 +820,7 @@ export default function ModelRepresentativesPage() {
                         className="h-4 w-4 rounded border-gray-300"
                       />
                     </td>
+                    )}
                     <td className="px-4 py-3 text-center text-gray-500">{manageStart + i + 1}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="cohort" value={a.cohort} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center text-gray-500">

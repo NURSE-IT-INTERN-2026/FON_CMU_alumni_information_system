@@ -212,6 +212,9 @@ export default function AlumniAgencyPage() {
     isAllSelected,
     getSelectedArray,
   } = useBulkSelection();
+  const [selectMode, setSelectMode] = useState(false);
+  const enterSelect = () => setSelectMode(true);
+  const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -440,6 +443,15 @@ export default function AlumniAgencyPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           ต้นสังกัดศิษย์เก่า
         </h1>
+        {mode === "abroad" && (selectMode ? (
+          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+            เสร็จสิ้น
+          </button>
+        ) : (
+          <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+            เลือก
+          </button>
+        ))}
       </div>
 
       {/* Thailand / Abroad mode toggle (PRD §3.9) */}
@@ -675,7 +687,7 @@ export default function AlumniAgencyPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  {(
+                  {selectMode && (
                     <th className="px-4 py-3 w-12">
                       <input
                         type="checkbox"
@@ -707,8 +719,8 @@ export default function AlumniAgencyPage() {
               </thead>
               <tbody>
                 {pagedAlumni.map((a, idx) => (
-                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {(
+                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
+                    {selectMode && (
                       <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
