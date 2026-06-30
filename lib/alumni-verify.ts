@@ -268,18 +268,32 @@ export const DEGREE_RANK: Record<DegreeLevelValue, number> = {
 export function dedupeCmuGraduatesByPerson(
   graduates: CmuGraduate[],
 ): CmuGraduate[] {
+  // Keep the highest-degree record per person (normalized first+last name +
+  // birthday). Also collect ALL of the person's student_ids and attach them to
+  // the kept record as `student_ids`, so consumers bridging on student_id (e.g.
+  // the all-alumni table linking a local alumni to its CMU person) can match on
+  // any of the person's degrees — not just the kept (highest) one. Without this,
+  // a multi-degree person whose kept record kept a different student_id than the
+  // degree a local alumni holds can't be linked → duplicate row.
   const bestByKey = new Map<string, CmuGraduate>();
+  const sidsByKey = new Map<string, Set<string>>();
   const unkeyed: CmuGraduate[] = []; // incomplete identity — kept verbatim
 
   for (const g of graduates) {
     const firstName = normalizeName(g.name_th);
     const lastName = normalizeName(g.surname_th);
     const birthday = normalizeCmuBirthday(g.birthday);
+    const sid = String(g.student_id ?? "").trim();
     if (!firstName || !lastName || !birthday) {
-      unkeyed.push(g);
+      unkeyed.push(sid ? { ...g, student_ids: [sid] } : g);
       continue;
     }
     const key = `${firstName}\u0000${lastName}\u0000${birthday}`;
+    if (sid) {
+      let sids = sidsByKey.get(key);
+      if (!sids) { sids = new Set(); sidsByKey.set(key, sids); }
+      sids.add(sid);
+    }
     const prev = bestByKey.get(key);
     if (!prev) {
       bestByKey.set(key, g);
@@ -292,5 +306,9 @@ export function dedupeCmuGraduatesByPerson(
     if (curRank > prevRank) bestByKey.set(key, g);
   }
 
-  return [...bestByKey.values(), ...unkeyed];
+  const keyed: CmuGraduate[] = [];
+  for (const [key, g] of bestByKey) {
+    keyed.push({ ...g, student_ids: [...(sidsByKey.get(key) ?? [])] });
+  }
+  return [...keyed, ...unkeyed];
 }

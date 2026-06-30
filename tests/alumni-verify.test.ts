@@ -270,6 +270,24 @@ describe("dedupeCmuGraduatesByPerson", () => {
   it("handles an empty list", () => {
     expect(dedupeCmuGraduatesByPerson([])).toEqual([]);
   });
+
+  it("attaches all of a person's student_ids to the kept record", () => {
+    const bachelor = grad({ student_id: "3600001", level_id: "1" });
+    const doctoral = grad({ student_id: "9900001", level_id: "5" });
+    const out = dedupeCmuGraduatesByPerson([bachelor, doctoral]);
+    expect(out).toHaveLength(1);
+    // Kept record carries BOTH student_ids (one per degree) so a consumer can
+    // bridge the person on either degree, not just the kept (doctoral) one.
+    expect(out[0].student_ids?.slice().sort()).toEqual(["3600001", "9900001"]);
+  });
+
+  it("attaches an incomplete-identity record's own student_id", () => {
+    const out = dedupeCmuGraduatesByPerson([
+      grad({ student_id: "3600001", level_id: "1", birthday: "" }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].student_ids).toEqual(["3600001"]);
+  });
 });
 
 describe("bachelorCohortFromGradYear", () => {
