@@ -292,9 +292,14 @@ export default function PotentialsPage() {
           ศักยภาพ
         </h1>
         {selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(potentials.map((p) => p.id)) ? deselectAll() : selectAll(potentials.map((p) => p.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -503,19 +508,6 @@ export default function PotentialsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
-                {selectMode && (
-                  <th className="px-4 py-3 w-12">
-                    <input
-                      type="checkbox"
-                      checked={potentials.length > 0 && isAllSelected(potentials.map((item) => item.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) selectAll(potentials.map((item) => item.id));
-                        else deselectAll();
-                      }}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                  </th>
-                )}
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                   ลำดับ
                 </th>
@@ -550,17 +542,7 @@ export default function PotentialsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {potentials.map((p, i) => (
-                <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(p.id); else if (p.studentId) router.push(`/management/alumni/${p.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                  {selectMode && (
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </td>
-                  )}
+                <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(p.id); else if (p.studentId) router.push(`/management/alumni/${p.studentId}`); }} className={`cursor-pointer transition-colors ${isSelected(p.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                   <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
                   <td className="px-4 py-3">{p.prefix || "-"}</td>
