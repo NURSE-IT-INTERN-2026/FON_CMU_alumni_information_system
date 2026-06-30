@@ -90,8 +90,7 @@ export function parseOriginalFormat(
 
 export function parseExportFormat(
   rows: Record<string, string>[]
-): { data: ParsedAlumniAgencyRow; rowNumber: number }[] {
-  const result: { data: ParsedAlumniAgencyRow; rowNumber: number }[] = [];
+): { data: ParsedAlumniAgencyRow; rowNumber: number }[] {  const result: { data: ParsedAlumniAgencyRow; rowNumber: number }[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const country = row["ประเทศ"]?.toString().trim();
@@ -135,4 +134,43 @@ export function parseExportFormat(
     });
   }
   return result;
+}
+
+/**
+ * Build the Prisma `where` for finding an existing ACTIVE AlumniAgency row to
+ * UPDATE on (re-)import — so imports are idempotent and don't duplicate.
+ *
+ * Matches by the resolved id (linked `studentId`, or `pendingStudentId`) OR by
+ * firstName+lastName when the existing row carries NO id at all. That name
+ * fallback is what stops a re-import from duplicating: e.g. importing the mock
+ * fixtures (rows now carrying a pending id) over the real name-only records
+ * UPDATES those records instead of creating a second row per person.
+ *
+ * The name clause is restricted to id-less rows (`studentId: null,
+ * pendingStudentId: null`) so two DIFFERENT id'd people who happen to share a
+ * name are never merged into one row.
+ */
+export function alumniAgencyMatchWhere(data: {
+  studentId: string | null;
+  pendingStudentId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}): Record<string, unknown> {
+  const idClause = data.studentId
+    ? { studentId: data.studentId }
+    : data.pendingStudentId
+      ? { pendingStudentId: data.pendingStudentId }
+      : null;
+  return {
+    deletedAt: null,
+    OR: [
+      ...(idClause ? [idClause] : []),
+      {
+        firstName: data.firstName ?? null,
+        lastName: data.lastName ?? null,
+        studentId: null,
+        pendingStudentId: null,
+      },
+    ],
+  };
 }
