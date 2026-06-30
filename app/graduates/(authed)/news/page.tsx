@@ -38,7 +38,7 @@ export default function AlumniNewsPage() {
   const [search, setSearch] = useState("");
 
   const { data: newsData, isPending: loading, isError } = useQuery({
-    queryKey: queryKeys.news.list({ page, search, statusFilter: "PUBLISHED", manageMode: false }),
+    queryKey: queryKeys.news.list({ page, search, statusFilter: "PUBLISHED" }),
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), status: "PUBLISHED" });
       if (search) params.set("search", search);

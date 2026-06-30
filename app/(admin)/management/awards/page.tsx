@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
-import { useCanWrite } from "@/lib/role-context";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
@@ -80,7 +79,6 @@ const recipientDisplay = (a: { prefix: string | null; firstName: string; lastNam
   [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "ไม่ระบุชื่อ";
 
 export default function AwardsPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -110,7 +108,6 @@ export default function AwardsPage() {
   });
   const typeCounts = typeCountsData ?? {};
 
-  const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
@@ -342,15 +339,6 @@ export default function AwardsPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รางวัลที่ได้รับ</h1>
-        {!manageMode ? (
-          canWrite && (<button onClick={() => { setManageMode(true); deselectAll(); }} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
-            จัดการข้อมูล
-          </button>)
-        ) : (
-          <button onClick={() => { setManageMode(false); closeForm(); deselectAll(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {errorMsg && (
@@ -380,7 +368,7 @@ export default function AwardsPage() {
         </div>
       )}
 
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูลรางวัล" : "เพิ่มข้อมูลรางวัล"}
@@ -470,8 +458,8 @@ export default function AwardsPage() {
         </div>
       )}
 
-      {/* Award type summary cards - only in view mode */}
-      {!manageMode && Object.keys(typeCounts).length > 0 && (
+      {/* Award type summary cards */}
+      {Object.keys(typeCounts).length > 0 && (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[
             {
@@ -545,7 +533,7 @@ export default function AwardsPage() {
         <FacetFilter entity="awards" field="awardType" label="ประเภท" selected={filters.awardType ?? []} onChange={(v) => setFilter("awardType", v)} valueLabels={AWARD_TYPE_LABELS} />
       </div>
 
-      {manageMode && !showForm && (
+      {!showForm && (
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -587,7 +575,7 @@ export default function AwardsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
@@ -632,7 +620,7 @@ export default function AwardsPage() {
                 <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("description")}>
                   รายละเอียด {renderSortIcon("description")}
                 </th>
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                 )}
               </tr>
@@ -640,7 +628,7 @@ export default function AwardsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center">
+                  <td colSpan={14} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                     </div>
@@ -648,16 +636,16 @@ export default function AwardsPage() {
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
+                  <td colSpan={14} className="px-4 py-12 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</td>
                 </tr>
               ) : awards.length === 0 ? (
                 <tr>
-                  <td colSpan={manageMode ? 14 : 12} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
+                  <td colSpan={14} className="px-4 py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</td>
                 </tr>
               ) : (
                 awards.map((award, i) => (
                   <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {manageMode && (
+                    {(
                       <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
@@ -695,7 +683,7 @@ export default function AwardsPage() {
                       ) : "-"}
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="award" recordId={award.id} field="description" value={award.description || "-"} hotFields={hot[award.id]} /></td>
-                    {manageMode && (
+                    {(
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => openEdit(award)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
@@ -713,7 +701,7 @@ export default function AwardsPage() {
             </tbody>
           </table>
         </div>
-        {manageMode && (
+        {(
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
             <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
             <div className="flex items-center gap-1 flex-wrap justify-center">
@@ -728,21 +716,6 @@ export default function AwardsPage() {
           </div>
         )}
       </div>
-
-      {!manageMode && totalPages > 1 && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-          <div className="flex items-center gap-1 flex-wrap justify-center">
-            <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-            {paginationNumbers.map((p, i) =>
-              p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
-                <button key={p} onClick={() => setPage(p as number)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-              )
-            )}
-            <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
-          </div>
-        </div>
-      )}
 
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

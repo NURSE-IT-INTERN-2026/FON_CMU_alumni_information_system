@@ -5,7 +5,6 @@ import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
-import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,7 +49,6 @@ type FormValues = PotentialPageFormData & { studentId: string; major: string };
 const FORM_DEFAULTS: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", career: "", position: "", recordedYear: "" };
 
 export default function PotentialsPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -68,7 +66,6 @@ export default function PotentialsPage() {
     { sortKey: "sortBy" },
   );
 
-  const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
@@ -291,21 +288,6 @@ export default function PotentialsPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           ศักยภาพ
         </h1>
-        {!manageMode ? (
-          canWrite && (<button
-            onClick={() => { setManageMode(true); deselectAll(); }}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
-          >
-            จัดการข้อมูล
-          </button>)
-        ) : (
-          <button
-            onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }}
-            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
-          >
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {errorMsg && (
@@ -335,7 +317,7 @@ export default function PotentialsPage() {
         </div>
       )}
 
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูลศักยภาพ" : "เพิ่มข้อมูลศักยภาพ"}
@@ -426,7 +408,7 @@ export default function PotentialsPage() {
         </div>
       )}
 
-      {manageMode && (
+      {(
         <div className="mb-4 flex flex-wrap gap-2">
           {/* keep existing add button but update the wrapper */}
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
@@ -509,7 +491,7 @@ export default function PotentialsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
@@ -549,7 +531,7 @@ export default function PotentialsPage() {
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                 )}
               </tr>
@@ -557,7 +539,7 @@ export default function PotentialsPage() {
             <tbody className="divide-y divide-gray-100">
               {potentials.map((p, i) => (
                 <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (p.studentId) router.push(`/management/alumni/${p.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                  {manageMode && (
+                  {(
                     <td className="px-4 py-3 text-center">
                       <input
                         type="checkbox"
@@ -576,7 +558,7 @@ export default function PotentialsPage() {
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="position" value={p.position} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3">{p.major || "-"}</td>
                   <td className="px-4 py-3 text-center"><OrangeCell resourceType="potential" recordId={p.id} field="recordedYear" value={p.recordedYear} hotFields={hot[p.id]} /></td>
-                  {manageMode && (
+                  {(
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEdit(p)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
@@ -592,7 +574,7 @@ export default function PotentialsPage() {
               ))}
             </tbody>
           </table>
-          {manageMode && (
+          {(
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
               <div className="flex items-center gap-1">
@@ -606,19 +588,6 @@ export default function PotentialsPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {!manageMode && totalPages > 1 && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${p === page ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-            ))}
-            <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
-          </div>
         </div>
       )}
 

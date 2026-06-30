@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
@@ -50,7 +49,6 @@ type FormValues = AssociationPageFormData & { studentId: string; major: string }
 const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", associationName: "", position: "", recordedYear: "" };
 
 export default function AssociationsPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -71,7 +69,6 @@ export default function AssociationsPage() {
     resolver: zodResolver(associationPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: DEFAULT_FORM_VALUES,
   });
-  const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -293,21 +290,6 @@ export default function AssociationsPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           สมาคม/ชมรมศิษย์เก่า
         </h1>
-        {!manageMode ? (
-          canWrite && (<button
-            onClick={() => { setManageMode(true); deselectAll(); }}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
-          >
-            จัดการข้อมูล
-          </button>)
-        ) : (
-          <button
-            onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }}
-            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
-          >
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {/* Error toast */}
@@ -340,7 +322,7 @@ export default function AssociationsPage() {
       )}
 
       {/* Create/Edit form */}
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูลสมาคม/ชมรมศิษย์เก่า" : "เพิ่มข้อมูลสมาคม/ชมรมศิษย์เก่า"}
@@ -428,7 +410,7 @@ export default function AssociationsPage() {
       )}
 
       {/* Add button */}
-      {manageMode && (
+      {(
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -511,7 +493,7 @@ export default function AssociationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
@@ -551,7 +533,7 @@ export default function AssociationsPage() {
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("recordedYear")}>
                   ปีที่บันทึก {sortField === "recordedYear" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                 </th>
-                {manageMode && (
+                {(
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                 )}
               </tr>
@@ -559,7 +541,7 @@ export default function AssociationsPage() {
             <tbody className="divide-y divide-gray-100">
               {items.map((item, i) => (
                 <tr key={item.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (item.studentId) router.push(`/management/alumni/${item.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                  {manageMode && (
+                  {(
                     <td className="px-4 py-3 text-center">
                       <input
                         type="checkbox"
@@ -578,7 +560,7 @@ export default function AssociationsPage() {
                   <td className="px-4 py-3"><OrangeCell resourceType="association" recordId={item.id} field="position" value={item.position} hotFields={hot[item.id]} /></td>
                   <td className="px-4 py-3">{item.major || "-"}</td>
                   <td className="px-4 py-3 text-center"><OrangeCell resourceType="association" recordId={item.id} field="recordedYear" value={item.recordedYear} hotFields={hot[item.id]} /></td>
-                  {manageMode && (
+                  {(
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEdit(item)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
@@ -594,7 +576,7 @@ export default function AssociationsPage() {
               ))}
             </tbody>
           </table>
-          {manageMode && (
+          {(
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
               <div className="flex items-center gap-1">
@@ -608,47 +590,6 @@ export default function AssociationsPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* View mode pagination */}
-      {!manageMode && !loading && items.length > 0 && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="text-sm text-gray-500">
-            แสดง {pageStart}-{pageEnd} จาก {total} รายการ
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ก่อนหน้า
-            </button>
-            {paginationNumbers.map((p, i) =>
-              p === "..." ? (
-                <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    page === p ? "text-white" : "text-gray-600 bg-white hover:bg-gray-100"
-                  }`}
-                  style={page === p ? { backgroundColor: "var(--primary)" } : {}}
-                >
-                  {p}
-                </button>
-              )
-            )}
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ถัดไป
-            </button>
-          </div>
         </div>
       )}
 

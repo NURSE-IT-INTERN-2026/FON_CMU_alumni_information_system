@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
@@ -76,7 +75,6 @@ function compareNetwork(a: string, b: string): number {
 }
 
 export default function ModelRepresentativesPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
@@ -96,14 +94,9 @@ export default function ModelRepresentativesPage() {
   // re-running the sort memos below on every render — react-hooks/exhaustive-deps).
   const alumni = useMemo(() => alumniData?.data ?? [], [alumniData]);
 
-  const [viewSortField, setViewSortField] = useState<SortField>("network");
-  const [viewSortDir, setViewSortDir] = useState<SortDir>("asc");
-  const [viewPage, setViewPage] = useState(1);
-
   const [mgmtSortField, setMgmtSortField] = useState<SortField>("network");
   const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("asc");
 
-  const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
@@ -146,22 +139,12 @@ export default function ModelRepresentativesPage() {
     setSearchField(null);
   };
 
-  const handleSort = (field: SortField, isManage: boolean) => {
-    if (isManage) {
-      if (mgmtSortField === field) {
-        setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
-      } else {
-        setMgmtSortField(field);
-        setMgmtSortDir("asc");
-      }
+  const handleSort = (field: SortField) => {
+    if (mgmtSortField === field) {
+      setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
     } else {
-      if (viewSortField === field) {
-        setViewSortDir((d) => d === "asc" ? "desc" : "asc");
-      } else {
-        setViewSortField(field);
-        setViewSortDir("asc");
-      }
-      setViewPage(1);
+      setMgmtSortField(field);
+      setMgmtSortDir("asc");
     }
   };
 
@@ -202,7 +185,6 @@ export default function ModelRepresentativesPage() {
 
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
-    setViewPage(1);
     setManagePage(1);
   };
 
@@ -242,10 +224,6 @@ export default function ModelRepresentativesPage() {
   const filteredAlumni = useMemo(() => {
     return search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
   }, [alumni, search, matchesSearch]);
-
-  const viewSorted = useMemo(() => {
-    return sortItems(filteredAlumni, viewSortField, viewSortDir);
-  }, [filteredAlumni, viewSortField, viewSortDir, sortItems]);
 
   const mgmtSorted = useMemo(() => {
     return sortItems(filteredAlumni, mgmtSortField, mgmtSortDir);
@@ -396,14 +374,6 @@ export default function ModelRepresentativesPage() {
     }
   };
 
-  // ── View mode pagination ──
-  const viewTotalPages = Math.max(1, Math.ceil(viewSorted.length / PAGE_SIZE));
-  const currentViewPage = Math.min(viewPage, viewTotalPages);
-  const viewStart = (currentViewPage - 1) * PAGE_SIZE;
-  const viewPageItems = viewSorted.slice(viewStart, viewStart + PAGE_SIZE);
-  const viewPageStart = viewSorted.length === 0 ? 0 : viewStart + 1;
-  const viewPageEnd = Math.min(viewStart + PAGE_SIZE, viewSorted.length);
-
   // ── Manage mode pagination ──
   const manageTotalPages = Math.max(1, Math.ceil(mgmtSorted.length / PAGE_SIZE));
   const currentManagePage = Math.min(managePage, manageTotalPages);
@@ -508,15 +478,15 @@ export default function ModelRepresentativesPage() {
     );
   };
 
-  const tableHeader = (field: SortField, label: string, isManage: boolean, align: "left" | "center" = "left") => (
+  const tableHeader = (field: SortField, label: string, align: "left" | "center" = "left") => (
     <th
-      onClick={() => handleSort(field, isManage)}
+      onClick={() => handleSort(field)}
       className={`cursor-pointer select-none px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10`}
     >
       {label}{" "}
       <SortIcon
-        active={(isManage ? mgmtSortField : viewSortField) === field}
-        dir={isManage ? mgmtSortDir : viewSortDir}
+        active={mgmtSortField === field}
+        dir={mgmtSortDir}
       />
     </th>
   );
@@ -528,27 +498,6 @@ export default function ModelRepresentativesPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           รายชื่อเครือข่ายศิษย์เก่าทุกรุ่นทุกหลักสูตร
         </h1>
-        {!manageMode ? (
-          canWrite && (
-          <button
-            onClick={() => { setManageMode(true); deselectAll(); }}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
-          >
-            จัดการข้อมูล
-          </button>
-          )
-        ) : (
-          <button
-            onClick={() => {
-              setManageMode(false);
-              setShowForm(false);
-              deselectAll();
-            }}
-            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
-          >
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {/* Error toast */}
@@ -586,7 +535,7 @@ export default function ModelRepresentativesPage() {
       )}
 
       {/* Manage mode: create/edit form */}
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
@@ -715,7 +664,7 @@ export default function ModelRepresentativesPage() {
       )}
 
       {/* Manage mode: action buttons */}
-      {manageMode && (
+      {(
         <div className="mb-4 flex flex-wrap gap-2">
           <button
             onClick={openCreate}
@@ -785,8 +734,7 @@ export default function ModelRepresentativesPage() {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            if (manageMode) setManagePage(1);
-            else setViewPage(1);
+            setManagePage(1);
           }}
           className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
         />
@@ -805,7 +753,7 @@ export default function ModelRepresentativesPage() {
         </div>
       ) : isError ? (
         <div className="flex justify-center py-16 text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
-      ) : manageMode ? (
+      ) : (
         /* ===== MANAGE MODE: flat table ===== */
         filteredAlumni.length === 0 ? (
           <div className="rounded-lg bg-white py-16 text-center shadow-sm">
@@ -830,13 +778,13 @@ export default function ModelRepresentativesPage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
-                  {tableHeader("network", "เครือข่าย", true)}
-                  {tableHeader("generation", "รุ่นที่", true, "center")}
-                  {tableHeader("studentId", "รหัสนักศึกษา", true)}
-                  {tableHeader("major", "สาขาวิชา", true)}
-                  {tableHeader("prefix", "คำนำหน้า", true)}
-                  {tableHeader("firstName", "ชื่อ", true)}
-                  {tableHeader("lastName", "นามสกุล", true)}
+                  {tableHeader("network", "เครือข่าย")}
+                  {tableHeader("generation", "รุ่นที่", "center")}
+                  {tableHeader("studentId", "รหัสนักศึกษา")}
+                  {tableHeader("major", "สาขาวิชา")}
+                  {tableHeader("prefix", "คำนำหน้า")}
+                  {tableHeader("firstName", "ชื่อ")}
+                  {tableHeader("lastName", "นามสกุล")}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     จัดการ
                   </th>
@@ -916,52 +864,6 @@ export default function ModelRepresentativesPage() {
             {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); deselectAll(); }, managePageStart, managePageEnd, mgmtSorted.length)}
           </div>
         )
-      ) : /* ===== VIEW MODE: single merged table ===== */
-      viewSorted.length === 0 ? (
-        <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr
-                className="text-white text-left"
-                style={{ backgroundColor: "#5b21b6" }}
-              >
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                  ลำดับ
-                </th>
-                {tableHeader("network", "เครือข่าย", false)}
-                {tableHeader("generation", "รุ่นที่", false, "center")}
-                {tableHeader("studentId", "รหัสนักศึกษา", false)}
-                {tableHeader("major", "สาขาวิชา", false)}
-                {tableHeader("prefix", "คำนำหน้า", false)}
-                {tableHeader("firstName", "ชื่อ", false)}
-                {tableHeader("lastName", "นามสกุล", false)}
-              </tr>
-            </thead>
-            <tbody>
-              {viewPageItems.map((a, i) => (
-                <tr
-                  key={a.id}
-                  onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
-                  className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
-                >
-                  <td className="px-4 py-3 text-center text-gray-500">{viewStart + i + 1}</td>
-                  <td className="px-4 py-3">{a.cohort}</td>
-                  <td className="px-4 py-3 text-center">
-                    {a.generation}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
-                  <td className="px-4 py-3">{a.major || "-"}</td>
-                  <td className="px-4 py-3">{a.prefix || "-"}</td>
-                  <td className="px-4 py-3">{a.firstName}</td>
-                  <td className="px-4 py-3">{a.lastName}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {renderPagination(viewTotalPages, currentViewPage, setViewPage, viewPageStart, viewPageEnd, viewSorted.length)}
-        </div>
       )}
 
       {/* Delete confirmation dialog */}

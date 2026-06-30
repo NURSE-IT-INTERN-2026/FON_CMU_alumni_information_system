@@ -8,7 +8,6 @@ import { apiFetch } from "@/lib/api-client";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCanWrite } from "@/lib/role-context";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
@@ -174,7 +173,6 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 }
 
 export default function AlumniAgencyPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
@@ -182,9 +180,7 @@ export default function AlumniAgencyPage() {
   // "รอเชื่อมโยง" toggle — show only rows flagged with no Alumni to link to.
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
-  const [manageMode, setManageMode] = useState(false);
   const [mgmtPage, setMgmtPage] = useState(1);
-  const [viewPage, setViewPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
@@ -225,8 +221,6 @@ export default function AlumniAgencyPage() {
 
   const [mgmtSortField, setMgmtSortField] = useState<SortField>("country");
   const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("desc");
-  const [viewSortField, setViewSortField] = useState<SortField>("cohort");
-  const [viewSortDir, setViewSortDir] = useState<SortDir>("desc");
 
   // Thailand mode (PRD §3.9) — in-country view sourced from alumni-agency
   const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
@@ -280,7 +274,6 @@ export default function AlumniAgencyPage() {
     if (next === mode) return;
     setMode(next);
     setThailandPage(1);
-    setViewPage(1);
     setMgmtPage(1);
   };
 
@@ -296,19 +289,6 @@ export default function AlumniAgencyPage() {
   const alumni = useMemo(() => abroadData?.data ?? [], [abroadData]);
   const countries = abroadData?.countries ?? [];
 
-  // View mode: flat sorted list
-  const viewSortedAlumni = useMemo(() =>
-    [...alumni].sort((a, b) => {
-      const va = getFieldValue(a, viewSortField);
-      const vb = getFieldValue(b, viewSortField);
-      const cmp = va.localeCompare(vb, "th");
-      return viewSortDir === "asc" ? cmp : -cmp;
-    }),
-    [alumni, viewSortField, viewSortDir]
-  );
-  const viewTotalPages = Math.max(1, Math.ceil(viewSortedAlumni.length / PAGE_SIZE));
-  const pagedViewAlumni = viewSortedAlumni.slice((viewPage - 1) * PAGE_SIZE, viewPage * PAGE_SIZE);
-
   // Management mode: flat sorted list
   const sortedAlumni = useMemo(() =>
     [...alumni].sort((a, b) => {
@@ -321,7 +301,7 @@ export default function AlumniAgencyPage() {
   );
   const mgmtTotalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
-  const visibleAbroad = manageMode ? pagedAlumni : pagedViewAlumni;
+  const visibleAbroad = pagedAlumni;
   const visibleAgencyIds = (mode === "thailand" ? pagedThailand : visibleAbroad).map((a) => a.id);
   const hot = useHotFields("alumni_agency", visibleAgencyIds);
 
@@ -460,15 +440,6 @@ export default function AlumniAgencyPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           ต้นสังกัดศิษย์เก่า
         </h1>
-        {mode === "abroad" && (!manageMode ? (
-          canWrite && (<button onClick={() => { setManageMode(true); deselectAll(); }} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
-            จัดการข้อมูล
-          </button>)
-        ) : (
-          <button onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            กลับหน้าเดิม
-          </button>
-        ))}
       </div>
 
       {/* Thailand / Abroad mode toggle (PRD §3.9) */}
@@ -525,7 +496,7 @@ export default function AlumniAgencyPage() {
         </div>
       )}
 
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูล" : "เพิ่มข้อมูล"}
@@ -655,7 +626,7 @@ export default function AlumniAgencyPage() {
         </button>
       </div>
 
-      {manageMode && (
+      {(
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -697,14 +668,14 @@ export default function AlumniAgencyPage() {
         </div>
       ) : alumni.length === 0 ? (
         <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
-      ) : manageMode ? (
+      ) : (
         /* Management mode: single flat table */
         <div className="overflow-hidden rounded-lg bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  {manageMode && (
+                  {(
                     <th className="px-4 py-3 w-12">
                       <input
                         type="checkbox"
@@ -737,7 +708,7 @@ export default function AlumniAgencyPage() {
               <tbody>
                 {pagedAlumni.map((a, idx) => (
                   <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {manageMode && (
+                    {(
                       <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
@@ -784,67 +755,6 @@ export default function AlumniAgencyPage() {
                   <button key={p} onClick={() => { setMgmtPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${mgmtPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
                 ))}
                 <button onClick={() => { setMgmtPage(Math.min(mgmtTotalPages, mgmtPage + 1)); deselectAll(); }} disabled={mgmtPage === mgmtTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* View mode: single flat table */
-        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[var(--primary)] text-white">
-                  <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                  {VIEW_SORT_FIELDS.map(({ field, label }) => (
-                    <th
-                      key={field}
-                      onClick={() => {
-                        if (viewSortField === field) setViewSortDir((d) => d === "asc" ? "desc" : "asc");
-                        else { setViewSortField(field); setViewSortDir("asc"); }
-                      }}
-                      className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                    >
-                      {label}
-                      <SortIcon active={viewSortField === field} dir={viewSortField === field ? viewSortDir : "asc"} />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedViewAlumni.map((a, idx) => (
-                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3">{a.prefix || "-"}</td>
-                    <td className="px-4 py-3">{a.firstName || "-"}</td>
-                    <td className="px-4 py-3">{a.lastName || "-"}</td>
-                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3">
-                      {a.notes ? (
-                        <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
-                      ) : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {viewTotalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-              <span className="text-sm text-gray-500">แสดง {viewSortedAlumni.length === 0 ? 0 : (viewPage - 1) * PAGE_SIZE + 1}-{Math.min(viewPage * PAGE_SIZE, viewSortedAlumni.length)} จาก {viewSortedAlumni.length} รายการ</span>
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => setViewPage(Math.max(1, viewPage - 1))} disabled={viewPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                {getPageNumbers(viewPage, viewTotalPages).map((p, i) => (
-                  p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
-                  <button key={p} onClick={() => setViewPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${viewPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-                ))}
-                <button onClick={() => setViewPage(Math.min(viewTotalPages, viewPage + 1))} disabled={viewPage === viewTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
               </div>
             </div>
           )}

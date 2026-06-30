@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCanWrite } from "@/lib/role-context";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQueryClient } from "@tanstack/react-query";
@@ -52,7 +51,6 @@ type FormValues = CommitteePageFormData & { studentId: string; major: string };
 const DEFAULT_FORM_VALUES: FormValues = { studentId: "", major: "", prefix: "", firstName: "", lastName: "", termYear: "", cohort: "", position: "", remarks: "" };
 
 export default function GraduateCommitteePage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -70,7 +68,6 @@ export default function GraduateCommitteePage() {
     { sortKey: "sortBy" },
   );
 
-  const [manageMode, setManageMode] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
@@ -297,17 +294,6 @@ export default function GraduateCommitteePage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กรรมการบัณฑิต</h1>
-        {!manageMode ? (
-          canWrite && (
-          <button onClick={() => { setManageMode(true); deselectAll(); }} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
-            จัดการข้อมูล
-          </button>
-          )
-        ) : (
-          <button onClick={() => { setManageMode(false); setShowForm(false); deselectAll(); }} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {errorMsg && (
@@ -337,7 +323,7 @@ export default function GraduateCommitteePage() {
         </div>
       )}
 
-      {manageMode && showForm && (
+      {showForm && (
         <div className="mb-6 rounded-xl bg-white p-6 shadow-sm border border-gray-100">
           <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
             {editingId ? "แก้ไขข้อมูลกรรมการบัณฑิต" : "เพิ่มข้อมูลกรรมการบัณฑิต"}
@@ -433,7 +419,7 @@ export default function GraduateCommitteePage() {
         </div>
       )}
 
-      {manageMode && (
+      {(
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -516,7 +502,7 @@ export default function GraduateCommitteePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
-                  {manageMode && (
+                  {(
                     <th className="px-4 py-3 w-12">
                       <input
                         type="checkbox"
@@ -559,7 +545,7 @@ export default function GraduateCommitteePage() {
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none hover:bg-white/10" onClick={() => handleSort("remarks")}>
                     หมายเหตุ {sortField === "remarks" ? (sortDir === "asc" ? "▲" : "▼") : "▽"}
                   </th>
-                  {manageMode && (
+                  {(
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                   )}
                 </tr>
@@ -567,7 +553,7 @@ export default function GraduateCommitteePage() {
               <tbody>
                 {committees.map((c, i) => (
                   <tr key={c.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (c.studentId) router.push(`/management/alumni/${c.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {manageMode && (
+                    {(
                       <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
@@ -587,7 +573,7 @@ export default function GraduateCommitteePage() {
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="position" value={c.position} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3">{c.major || "-"}</td>
                     <td className="px-4 py-3 text-gray-500">{c.remarks || "-"}</td>
-                    {manageMode && (
+                    {(
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => openEdit(c)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
@@ -608,19 +594,19 @@ export default function GraduateCommitteePage() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => { setPage(Math.max(1, page - 1)); if (manageMode) deselectAll(); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
                 {paginationNumbers.map((p, i) =>
                   p === "..." ? (
                     <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
                   ) : (
-                    <button key={p} onClick={() => { setPage(p); if (manageMode) deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${
+                    <button key={p} onClick={() => { setPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${
                       page === p
                         ? "bg-[var(--primary)] text-white"
                         : "border border-[var(--border)] bg-white hover:bg-gray-100"
                     }`}>{p}</button>
                   )
                 )}
-                <button onClick={() => { setPage(Math.min(totalPages, page + 1)); if (manageMode) deselectAll(); }} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                <button onClick={() => { setPage(Math.min(totalPages, page + 1)); deselectAll(); }} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
               </div>
             </div>
           )}
