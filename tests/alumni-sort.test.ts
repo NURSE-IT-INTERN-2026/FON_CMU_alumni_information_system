@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { compareAlumni, sortAlumni } from "@/lib/alumni-sort";
 
 /** Concrete test row — a plain interface (no index signature), like the page's
- *  Alumni type, that still satisfies the SortableAlumni constraint. */
+ *  Alumni type. `graduationYear` is present so the numeric-sort branch is
+ *  exercised (the functions are now unconstrained, but the field still hooks
+ *  numeric comparison when named explicitly). */
 interface TestRow {
   id: string;
   birthDate?: string | null;

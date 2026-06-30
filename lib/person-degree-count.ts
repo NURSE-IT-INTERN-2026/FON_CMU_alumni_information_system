@@ -14,12 +14,12 @@
  *      (a local education whose studentId matches a CMU record joins that CMU
  *      person — the same studentId denotes the same degree enrollment).
  *
- * The dashboard count is scoped to the **CMU registrar universe** (the same set
- * the all-alumni table shows): local education upgrades a CMU person's degree,
- * but a local-only person with no CMU record is excluded — otherwise legacy/junk
- * local imports that the registrar doesn't know about would inflate the total
- * above the all-alumni count. `groupPersonsByDegree` flags each person with
- * `hasCmu`; `getPersonDegreeBreakdown` counts only those in the CMU universe.
+ * The dashboard count includes EVERY person — CMU registrar persons AND
+ * local-only persons (alumni in the local DB whose studentId isn't in CMU, e.g.
+ * admin-created or legacy-Excel-imported). The all-alumni table shows local-only
+ * alumni too, so the dashboard counts them to stay consistent with the table
+ * total. `groupPersonsByDegree` still flags each person with `hasCmu` (kept for
+ * observability); `getPersonDegreeBreakdown` no longer filters on it.
  */
 import prisma from "@/lib/prisma";
 import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
@@ -63,7 +63,8 @@ function parseYear(v: string | null | undefined): number | null {
  * their highest degree (null if none recognized), that degree's representative
  * year (most recent among their highest-degree entities), and `hasCmu` — whether
  * the group includes any CMU record (i.e. the person is in the registrar
- * universe). `getPersonDegreeBreakdown` counts only `hasCmu` persons.
+ * universe). `hasCmu` is informational only; `getPersonDegreeBreakdown` counts
+ * all persons (CMU + local-only) to match the all-alumni table.
  */
 export function groupPersonsByDegree(
   cmu: CmuGraduate[],
@@ -210,11 +211,11 @@ export async function getPersonDegreeBreakdown(): Promise<PersonDegreeBreakdown>
   const byYearDegree: Record<string, Record<string, number>> = {};
   let total = 0;
   for (const p of persons) {
-    // Count only the CMU registrar universe (matches the all-alumni table).
-    // Local education still upgrades a CMU person's degree via the merge above;
-    // a local-only person (no CMU record) is excluded so the graph isn't
-    // inflated by legacy/junk local imports the table doesn't show.
-    if (!p.hasCmu) continue;
+    // Count EVERY person — CMU registrar persons AND local-only persons (no CMU
+    // record). The all-alumni table shows local-only alumni too, so the
+    // dashboard must count them to stay consistent with the table total. Local
+    // education still upgrades a CMU person's degree via the merge above; the
+    // `hasCmu` flag is retained for observability but no longer filters.
     total++;
     if (!p.degree) continue; // unrecognized degree → counts toward total only
     byDegree[p.degree] = (byDegree[p.degree] ?? 0) + 1;

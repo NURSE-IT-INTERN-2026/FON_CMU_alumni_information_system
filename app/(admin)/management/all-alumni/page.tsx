@@ -75,11 +75,35 @@ interface CmuAlumni {
   cohort?: string | null;
   // Local overlay: คำนำหน้า (prefix) from the local Alumni record — CMU has none.
   prefix?: string | null;
+  // Local overlay: pre-resolved Thai degree label for local-ONLY rows (alumni
+  // with no CMU record). CMU rows leave this undefined and derive the label
+  // from level_id via getLevelLabel; local-only rows can't round-trip through
+  // level_id losslessly, so they carry the label directly.
+  degreeLabel?: string | null;
   // CMU Registrar birthday, raw "MM-DD-YYYY" (passed through by /api/cmu-alumni).
   birthday?: string | null;
   // Normalized "YYYY-MM-DD" for display + chronological sort.
   birthDate?: string | null;
 }
+
+/** Local DegreeLevel enum (DOCTORAL/MASTER/…) → Thai label, for local-only rows. */
+const DEGREE_LABEL_BY_LEVEL: Record<string, string> = Object.fromEntries(
+  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+/** Map a View sort field to the CmuAlumni property used to compare rows, so the
+ *  client-side sort (which now also reorders local-only rows) reads the right
+ *  field on the CmuAlumni shape. */
+const VIEW_SORT_FIELD_MAP: Record<ViewSortField, keyof CmuAlumni> = {
+  studentId: "student_id",
+  name: "name_th",
+  surname: "surname_th",
+  degreeLevel: "level_id",
+  major: "major_name_th",
+  year: "grad_year",
+  cohort: "cohort",
+  birthDate: "birthDate",
+};
 
 // Map CMU registrar level_id to Thai degree labels
 const CMU_LEVEL_LABELS: Record<string, string> = {
@@ -154,7 +178,7 @@ export default function AlumniCountPage() {
         cmuData = cmuJson.data || [];
       } catch {}
 
-      const localParams = new URLSearchParams({ pageSize: "9999", includeDeleted: "true" });
+      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true" });
       facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
       const localMap: Record<string, Alumni> = {};
       const deletedStudentIds = new Set<string>();
@@ -275,11 +299,17 @@ export default function AlumniCountPage() {
         cmu = { data: [], total: 0 };
       }
 
-      // Fetch local alumni (including soft-deleted) for overlay and filtering
+      // Fetch local alumni (including soft-deleted) for overlay, filtering, and
+      // the local-only pass. pageSize 50000 = no truncation (there are >11k
+      // local alumni; the old 9999 silently dropped ~1,600). Facet filters are
+      // applied server-side so local-only rows respect them, mirroring manage
+      // mode; search is applied client-side below on the local-only rows.
+      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true" });
+      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
       const localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
       const deletedStudentIds = new Set<string>();
       try {
-        const localData = await apiFetch<AlumniApiResponse>(`/api/alumni?pageSize=9999&includeDeleted=true`);
+        const localData = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
         for (const a of localData.data) {
           if (a.studentId) {
             localMap[a.studentId] = a;
@@ -288,10 +318,12 @@ export default function AlumniCountPage() {
         }
       } catch {}
 
-      // Merge: overlay local data on CMU records, skip soft-deleted
+      // Merge: overlay local data on CMU records, skip soft-deleted.
       const merged: CmuAlumni[] = [];
+      const localStudentIdsUsed = new Set<string>();
       for (const a of cmu.data) {
         if (deletedStudentIds.has(a.student_id)) continue;
+        localStudentIdsUsed.add(a.student_id);
         const local = localMap[a.student_id];
         // CMU returns no cohort. For Bachelor graduates (level_id "1") derive
         // "DN{YY}" from grad_year (YY = last two digits of grad_year - 3), used
@@ -313,9 +345,50 @@ export default function AlumniCountPage() {
           merged.push({ ...a, prefix: null, cohort: derivedCohort, birthDate: normalizeCmuBirthday(a.birthday) });
         }
       }
-      // `merged.length` is the authoritative row count (CMU records minus the
-      // soft-deleted overlay) — matches what we actually render/paginate.
-      return { merged, total: merged.length };
+      // Local-only pass: alumni in the local DB whose studentId is NOT in CMU.
+      // These are real alumni (admin-created or imported, e.g. the legacy Excel
+      // import) the registrar has no record for — without this pass they'd be
+      // invisible in the default view. Facets already filtered them server-side;
+      // apply search client-side so typing a name/studentId still finds them.
+      const q = search.trim().toLowerCase();
+      const matchesSearch = (a: Alumni): boolean => {
+        if (!q) return true;
+        return [a.prefix, a.firstName, a.lastName, a.studentId]
+          .some((v) => v && v.toLowerCase().includes(q));
+      };
+      for (const a of Object.values(localMap)) {
+        if (localStudentIdsUsed.has(a.studentId) || deletedStudentIds.has(a.studentId)) continue;
+        if (!matchesSearch(a)) continue;
+        const derivedLocal =
+          a.degreeLevel === "BACHELOR" && a.graduationYear ? bachelorCohortFromGradYear(a.graduationYear) : null;
+        merged.push({
+          student_id: a.studentId,
+          name_th: a.firstName || "",
+          middle_name_th: "",
+          surname_th: a.lastName || "",
+          name_en: "",
+          surname_en: "",
+          level_id: "",
+          major_name_th: a.major || "",
+          major_sub_name_th: "",
+          grad_year: a.graduationYear != null ? String(a.graduationYear) : "",
+          grad_semester: "",
+          std_mobile: "",
+          adm_type: "",
+          cohort: a.cohort || derivedLocal,
+          prefix: a.prefix || null,
+          degreeLabel: DEGREE_LABEL_BY_LEVEL[a.degreeLevel ?? ""] || null,
+          birthday: null,
+          birthDate: a.birthDate || null,
+        });
+      }
+      // Sort the full merged set client-side so local-only rows interleave with
+      // CMU rows correctly (the CMU proxy's server-side order can't place them).
+      const sortProp = VIEW_SORT_FIELD_MAP[sortField as ViewSortField] ?? "student_id";
+      const sorted = sortAlumni(merged, sortProp, sortDir);
+      // `sorted.length` is the authoritative row count (CMU records + local-only,
+      // minus the soft-deleted overlay) — matches what we actually render/paginate.
+      return { merged: sorted, total: sorted.length };
     },
   });
   // View mode paginates the full merged set on the client. `allViewMerged`
@@ -1158,7 +1231,7 @@ export default function AlumniCountPage() {
                     </tr>
                   ) : (
                     cmuAlumni.map((a, idx) => {
-                      const levelLabel = getLevelLabel(a.level_id, a.major_name_th);
+                      const levelLabel = a.degreeLabel || getLevelLabel(a.level_id, a.major_name_th);
                       return (
                         <tr
                           key={a.student_id}
