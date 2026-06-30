@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse } from "@/lib/excel-export";
+import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -18,8 +19,21 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
+    // Mirror the GET list's region split (PRD §3.9) so an abroad export never
+    // includes Thailand-valued records and vice versa.
+    const region = searchParams.get("region");
+    const thailandCountryFilter = {
+      country: { in: [...THAILAND_COUNTRY_VALUES], mode: "insensitive" as const },
+    };
+
     const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "cohort"];
     const where: Record<string, unknown> = {};
+
+    if (region === "thailand") {
+      Object.assign(where, thailandCountryFilter);
+    } else if (region === "abroad") {
+      where.NOT = thailandCountryFilter;
+    }
 
     if (country) {
       where.country = country;

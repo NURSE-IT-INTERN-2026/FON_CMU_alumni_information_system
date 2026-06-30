@@ -5,6 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { handleZodError, alumniAgencyCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
+import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -53,8 +54,31 @@ export async function GET(request: NextRequest) {
 
     const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort"];
 
+    // PRD §3.9 — the in-country (Thailand) and abroad tabs share this model;
+    // `country` is the discriminator. `region=thailand` keeps only Thailand
+    // records, `region=abroad` keeps everything else. Omitted => all records.
+    const region = searchParams.get("region");
+    const thailandCountryFilter = {
+      country: { in: [...THAILAND_COUNTRY_VALUES], mode: "insensitive" as const },
+    };
+
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["alumni-agency"]));
+
+    if (region === "thailand") {
+      Object.assign(where, thailandCountryFilter);
+    } else if (region === "abroad") {
+      where.NOT = thailandCountryFilter;
+    }
+
+    // The distinct country list (abroad dropdown) is scoped the same way so a
+    // Thailand-valued country never appears among the abroad filter choices.
+    const countryListWhere: Record<string, unknown> = { deletedAt: null };
+    if (region === "thailand") {
+      Object.assign(countryListWhere, thailandCountryFilter);
+    } else if (region === "abroad") {
+      countryListWhere.NOT = thailandCountryFilter;
+    }
 
     if (search) {
       if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
@@ -80,7 +104,7 @@ export async function GET(request: NextRequest) {
         orderBy: [{ country: "asc" }, { order: "asc" }],
       }),
       prisma.alumniAgency.findMany({
-        where: { deletedAt: null },
+        where: countryListWhere,
         select: { country: true },
         distinct: ["country"],
         orderBy: { country: "asc" },

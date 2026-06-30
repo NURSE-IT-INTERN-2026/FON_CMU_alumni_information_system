@@ -55,7 +55,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | `GraduateCommittee` | `graduate_committees` | Committee memberships |
 | `Potential` | `potentials` | Notable alumni potentials |
 | `ModelRepresentative` | `model_representatives` | Model representative entries |
-| `AlumniAgency` | `alumni_agency` | Alumni agency (Thailand + Abroad toggle) — renamed from `AbroadAlumni` |
+| `AlumniAgency` | `alumni_agency` | Alumni agency (ต้นสังกัดศิษย์เก่า). The page's Thailand + Abroad tabs are the **same model split by `country`** (NOT two models, and the Thailand tab is NOT the `alumni` table): a Thailand-valued country (ไทย/ประเทศไทย/Thailand/Thai via `isThailandCountry`, `lib/alumni-agency-region.ts`) → in-country tab, everything else → abroad tab. `GET`/`export` accept `?region=thailand|abroad`. Renamed from `AbroadAlumni`. |
 | `News` | `news` | News articles (status, rich-text body, cover + up to 4 images) |
 | `AdminUser` | `admin_users` | System users with roles |
 | `ActivityLog` | `activity_logs` | Audit trail (JSON details) |
@@ -98,7 +98,7 @@ app/
 │       ├── all-alumni/           # All-alumni table
 │       ├── new-alumni/           # Alumni creation (full-form with related records)
 │       ├── alumni/[id]/          # Admin alumni profile VIEW — orange edit-history, edit mode, data-logs toggle (param = UUID or studentId)
-│       ├── alumni-agency/        # Thailand/Abroad toggle table
+│       ├── alumni-agency/        # Thailand/Abroad toggle — BOTH tabs read `alumni-agency` split by country (in-country is NOT the `alumni` table)
 │       ├── associations/
 │       ├── graduate-committee/
 │       ├── model-representatives/
@@ -116,7 +116,7 @@ app/
 │       └── news/ + news/[id]/    # Alumni news (read-only)
 ├── api/                          # REST API routes
 │   ├── alumni/                   # CRUD + import/export/bulk-delete + create-with-related + update-with-related/[id] + [id]/activity (merged change timeline; [id] GET resolves UUID or studentId)
-│   ├── alumni-agency/            # CRUD + import/export/bulk-delete (renamed from abroad-alumni)
+│   ├── alumni-agency/            # CRUD + import/export/bulk-delete; GET + export accept `?region=thailand|abroad` (country split — see `lib/alumni-agency-region.ts`)
 │   ├── alumni-accounts/[id]/     # Admin alumni-account mgmt (+ /suspend, /approve, /reject, /reverify)
 │   ├── alumni-auth/              # signup, login-email, forgot/reset-password, accept-tos, logout
 │   ├── alumni-profile/           # Logged-in alumni's own profile (GET/PUT) + /educations (GET/POST — alumni-self education records)
@@ -457,5 +457,10 @@ Template for a ledger entry:
 - **Symptom:** The Prisma Postgres DB hit `planLimitReached` (the "Total Operations" 100k/month query-count quota) and locked — reads *and* writes refused. Operations are a **query-count** quota, so the lever is *fewer Prisma calls*, not less data.
 - **Root cause:** `GET /api/dashboard` ran ~17 queries on every load (and `GET /api/alumni-count` re-ran the person-degree breakdown); repeated admin page-loads burned ops redundantly on data that changes rarely.
 - **Prevention:** Wrap read-heavy, rarely-changing payloads in `withTtlCache(key, ttlMs, fn)` (`lib/cache.ts`, server-only — a module-level `Map`, so it persists per Node process; the app is `output: "standalone"` Docker, NOT serverless/edge). Dashboard + alumni-count are cached 60s (TTL-only — no write-route busting; 60s eventual consistency is fine for a summary view; errors aren't cached since `fn` throws before `store.set`). To force freshness after a write, call `bustCache("dashboard")` / `bustCachePrefix("alumni")`. The bigger op spikes are **imports** (~6–9 ops/row); batching them is the next lever (deferred until the DB is unblocked so the education/snapshot path can be live-tested).
+
+### alumni-agency in-country (Thailand) tab is the SAME model split by `country` — NOT the `alumni` table
+- **Symptom:** The in-country (`ข้อมูลในประเทศ`) tab was missing the **สถานที่ทำงาน (workplace)** column that PRD §3.9 lists for it, and looked like a different dataset from the abroad tab.
+- **Root cause:** An older version sourced the in-country tab from `/api/alumni` (the `alumni` table) as a read-only alumni list — but `Alumni` has **no workplace field** (`currentWorkplace` was dropped), so the column couldn't exist there. The abroad tab uses `AlumniAgency`, which *does* have `workplace`. Two tabs, two models, only one with the field.
+- **Prevention:** Both tabs read the **same** `/api/alumni-agency` model; `country` is the discriminator. `?region=thailand` keeps Thailand-valued countries, `?region=abroad` keeps the rest (`NOT`), via `isThailandCountry` / `THAILAND_COUNTRY_VALUES` (`lib/alumni-agency-region.ts`, client-safe — ไทย/ประเทศไทย/Thailand/Thai, case-insensitive, trimmed; used by both the API where-clause and the page). The in-country tab is the abroad VIEW columns **minus `country`** (it includes `workplace`). Filter is applied in `GET` + `export` (POST bulk-export is id-based, so no region). Note: because no `alumni-agency` row currently has a Thailand country, the in-country tab is empty until one is created (a Thailand record is created in the abroad manage form by setting country to a Thailand value — it then appears in the in-country tab). The model is **not** renamed — `AlumniAgency` is already generic enough for domestic + abroad.
 
 
