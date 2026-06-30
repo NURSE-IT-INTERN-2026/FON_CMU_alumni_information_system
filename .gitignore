@@ -43,6 +43,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local diagrams / scratch
+app-flowchart.html
+
 /app/generated/prisma
 
 /reference

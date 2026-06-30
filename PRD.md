@@ -16,6 +16,8 @@ A web-based alumni information system for the Faculty of Nursing, Chiang Mai Uni
 
 **Primary goal:** let admins export/import Excel tables of alumni, display the data in tables that can be filtered and sorted, and perform CRUD actions on alumni data — plus an alumni side where alumni log in, update their own data, and interact with other alumni.
 
+> **Access policy (revised 2026-06-30):** There is **no public/anonymous browsing** — the system serves only the two audiences above. Every content page and data API requires an authenticated session (a staff member: admin/superadmin/executive, or a graduate/alumni). Only the **login page, sign-up, password-reset, and the authentication API endpoints** (`/api/auth/*`, `/api/alumni-auth/{signup,login,forgot/reset-password}`) are reachable without logging in. The previously-listed "Public" pages and GET endpoints are now **gated behind login**; an anonymous visitor sees only the login page.
+
 ---
 
 ## 2. Users & Roles
@@ -189,6 +191,7 @@ Each admin page that displays alumni data has a **management mode toggle**. Afte
 ### 3.12 News Page
 
 - Route: `/news`
+- **Access:** viewable only by **logged-in staff and alumni** (alumni see it read-only at `/alumni/news`, §3.17). **Not** accessible to anonymous/visitor traffic — there is no public news page.
 - Displays **published** news cards, ordered by **published date** from latest to oldest.
 - Each news card can be clicked to see the details (at `/news/[id]`).
 - **3 news statuses** used to create and filter news:
@@ -238,7 +241,7 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 
 ### 3.17 Alumni News Page
 
-- Alumni can **view news** created by admins (published news cards, same display as the admin/public news page), but cannot create or edit news.
+- Alumni can **view news** created by admins (published news cards, same display as the admin news page), but cannot create or edit news.
 
 ### 3.18 Admin Alumni Profile View
 
@@ -499,21 +502,23 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 
 ## 8. Page Route Summary
 
+> **Auth policy (revised 2026-06-30):** no anonymous/public browsing (see §1). "Public" below applies **only** to `/login` and the sign-up/password-reset auth surfaces — every content page requires a staff or alumni session.
+
 ### 8.1 Admin Routes
 
 | Route | Auth Required | Description |
 |-------|--------------|-------------|
 | `/login` | Public | Login page with **Admin/Alumni toggle**. Admin uses CMU OAuth (email–password in testing) |
-| `/` | Public | Main dashboard — summarized cards + line graph + latest news |
-| `/news` | Public | News cards (published), 9 per page |
-| `/news/[id]` | Public | Full news article |
-| `/alumni-count` | Public | All-alumni table (filters: degree level, major, graduation year) + dashboard graph |
-| `/awards` | Public | 3 award-type count cards + awards table |
-| `/potentials` | Public | Potentials table |
-| `/associations` | Public | Associations/clubs table |
-| `/graduate-committee` | Public | Graduate committee table |
-| `/model-representatives` | Public | Model representatives table |
-| `/alumni-agency` | Public | Alumni-agency page with **Thailand/Abroad toggle** (columns now shared; Abroad adds ประเทศ) |
+| `/` | Admin session | Main dashboard — summarized cards + line graph + latest news |
+| `/news` | Admin session | News cards (published), 9 per page |
+| `/news/[id]` | Admin session | Full news article |
+| `/alumni-count` | Admin session | All-alumni table (filters: degree level, major, graduation year) + dashboard graph |
+| `/awards` | Admin session | 3 award-type count cards + awards table |
+| `/potentials` | Admin session | Potentials table |
+| `/associations` | Admin session | Associations/clubs table |
+| `/graduate-committee` | Admin session | Graduate committee table |
+| `/model-representatives` | Admin session | Model representatives table |
+| `/alumni-agency` | Admin session | Alumni-agency page with **Thailand/Abroad toggle** (columns now shared; Abroad adds ประเทศ) |
 | `/settings/profile` | Any admin | My account — ชื่อ, นามสกุล, CMU account, ตำแหน่ง |
 | `/settings/users` | Superadmin/Admin | Account management (admin/exec accounts + alumni accounts); suspend accounts, change alumni email, view alumni profile |
 | `/management/alumni/[id]` | Any admin (write for edit) | Individual alumni profile view — orange edit-history indicators, edit mode, and ประวัติการเปลี่ยนแปลง toggle (replaces the old `/settings/alumni/[id]`) |
@@ -568,44 +573,44 @@ Each entity follows the pattern: `/` (GET list / POST create), `/[id]` (GET/PUT/
 
 | Endpoint | Methods | Auth | Description |
 |----------|---------|------|-------------|
-| `/api/alumni` | GET, POST | GET public, POST admin | List/create alumni (POST supports create-with-related for the full-form) |
-| `/api/alumni/[id]` | GET, PUT, DELETE | GET public, PUT/DELETE admin | Read/update/soft-delete alumni |
+| `/api/alumni` | GET, POST | Admin | List/create alumni (POST supports create-with-related for the full-form) |
+| `/api/alumni/[id]` | GET, PUT, DELETE | Admin | Read/update/soft-delete alumni |
 | `/api/alumni/import` | POST | Admin | Import alumni from Excel |
-| `/api/alumni/export` | GET | Public | Export alumni to Excel |
+| `/api/alumni/export` | GET | Admin | Export alumni to Excel |
 | `/api/alumni/bulk-delete` | POST | Admin | Soft-delete alumni by IDs |
-| `/api/alumni-count` | GET | Public | Alumni counts grouped by degree level (dashboard graph + cards) |
-| `/api/news` | GET, POST | GET public, POST admin | List/create news |
-| `/api/news/[id]` | GET, PUT, DELETE | GET public, PUT/DELETE admin | Read/update/delete (delete → DISCONTINUED status) |
+| `/api/alumni-count` | GET | Admin | Alumni counts grouped by degree level (dashboard graph + cards) |
+| `/api/news` | GET, POST | Admin | List/create news |
+| `/api/news/[id]` | GET, PUT, DELETE | Admin | Read/update/delete (delete → DISCONTINUED status) |
 | `/api/news/bulk-delete` | POST | Admin | Bulk set news to DISCONTINUED |
-| `/api/awards` | GET, POST | GET public, POST admin | List/create awards |
+| `/api/awards` | GET, POST | Admin | List/create awards |
 | `/api/awards/[id]` | PUT, DELETE | Admin | Update/soft-delete award |
 | `/api/awards/import` | POST | Admin | Import awards from Excel |
-| `/api/awards/export` | GET | Public | Export awards to Excel |
+| `/api/awards/export` | GET | Admin | Export awards to Excel |
 | `/api/awards/bulk-delete` | POST | Admin | Soft-delete awards by IDs |
-| `/api/potentials` | GET, POST | GET public, POST admin | List/create potentials |
+| `/api/potentials` | GET, POST | Admin | List/create potentials |
 | `/api/potentials/[id]` | PUT, DELETE | Admin | Update/soft-delete potential |
 | `/api/potentials/import` | POST | Admin | Import potentials from Excel |
-| `/api/potentials/export` | GET | Public | Export potentials to Excel |
+| `/api/potentials/export` | GET | Admin | Export potentials to Excel |
 | `/api/potentials/bulk-delete` | POST | Admin | Soft-delete potentials by IDs |
-| `/api/associations` | GET, POST | GET public, POST admin | List/create associations |
+| `/api/associations` | GET, POST | Admin | List/create associations |
 | `/api/associations/[id]` | PUT, DELETE | Admin | Update/soft-delete association |
 | `/api/associations/import` | POST | Admin | Import associations from Excel |
-| `/api/associations/export` | GET | Public | Export associations to Excel |
+| `/api/associations/export` | GET | Admin | Export associations to Excel |
 | `/api/associations/bulk-delete` | POST | Admin | Soft-delete associations by IDs |
-| `/api/graduate-committee` | GET, POST | GET public, POST admin | List/create committees |
+| `/api/graduate-committee` | GET, POST | Admin | List/create committees |
 | `/api/graduate-committee/[id]` | PUT, DELETE | Admin | Update/soft-delete committee |
 | `/api/graduate-committee/import` | POST | Admin | Import committees from Excel |
-| `/api/graduate-committee/export` | GET | Public | Export committees to Excel |
+| `/api/graduate-committee/export` | GET | Admin | Export committees to Excel |
 | `/api/graduate-committee/bulk-delete` | POST | Admin | Soft-delete committees by IDs |
-| `/api/model-representatives` | GET, POST | GET public, POST admin | List/create model reps |
+| `/api/model-representatives` | GET, POST | Admin | List/create model reps |
 | `/api/model-representatives/[id]` | PUT, DELETE | Admin | Update/soft-delete model rep |
 | `/api/model-representatives/import` | POST | Admin | Import model reps from Excel |
-| `/api/model-representatives/export` | GET | Public | Export model reps to Excel |
+| `/api/model-representatives/export` | GET | Admin | Export model reps to Excel |
 | `/api/model-representatives/bulk-delete` | POST | Admin | Soft-delete model reps by IDs |
-| `/api/alumni-agency` | GET, POST | GET public, POST admin | List/create alumni-agency (Thailand + abroad) records |
+| `/api/alumni-agency` | GET, POST | Admin | List/create alumni-agency (Thailand + abroad) records |
 | `/api/alumni-agency/[id]` | PUT, DELETE | Admin | Update/soft-delete alumni-agency record |
 | `/api/alumni-agency/import` | POST | Admin | Import alumni-agency records from Excel |
-| `/api/alumni-agency/export` | GET | Public | Export alumni-agency records to Excel |
+| `/api/alumni-agency/export` | GET | Admin | Export alumni-agency records to Excel |
 | `/api/alumni-agency/bulk-delete` | POST | Admin | Soft-delete alumni-agency records by IDs |
 | `/api/users` | GET, POST | Admin | List/create user accounts |
 | `/api/users/[id]` | GET, PUT, DELETE | Admin | Read/update/delete user account |
