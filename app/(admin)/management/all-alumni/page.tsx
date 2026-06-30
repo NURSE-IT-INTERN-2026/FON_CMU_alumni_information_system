@@ -576,9 +576,14 @@ export default function AlumniCountPage() {
           จำนวนนักศึกษาเก่าตามระดับการศึกษา
         </h1>
         {selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(alumni.map((a) => a.id)) ? deselectAll() : selectAll(alumni.map((a) => a.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -833,19 +838,6 @@ export default function AlumniCountPage() {
                     className="text-white text-left"
                     style={{ backgroundColor: "#5b21b6" }}
                   >
-                    {selectMode && (
-                    <th className="px-4 py-3 w-12">
-                      <input
-                        type="checkbox"
-                        checked={alumni.length > 0 && isAllSelected(alumni.map((a) => a.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) selectAll(alumni.map((a) => a.id));
-                          else deselectAll();
-                        }}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </th>
-                    )}
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
@@ -907,18 +899,8 @@ export default function AlumniCountPage() {
                       <tr
                         key={a.id}
                         onClick={() => { if (selectMode) toggleSelect(a.id); else router.push(`/management/alumni/${a.id}`); }}
-                        className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
+                        className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}
                       >
-                        {selectMode && (
-                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected(a.id)}
-                            onChange={() => toggleSelect(a.id)}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                        </td>
-                        )}
                         <td className="px-4 py-3 text-center">
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>

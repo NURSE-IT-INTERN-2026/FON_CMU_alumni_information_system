@@ -502,9 +502,14 @@ export default function ModelRepresentativesPage() {
           รายชื่อเครือข่ายศิษย์เก่าทุกรุ่นทุกหลักสูตร
         </h1>
         {selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(managePageItems.map((i) => i.id)) ? deselectAll() : selectAll(managePageItems.map((i) => i.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -776,19 +781,6 @@ export default function ModelRepresentativesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  {selectMode && (
-                  <th className="px-4 py-3 w-12">
-                    <input
-                      type="checkbox"
-                      checked={managePageItems.length > 0 && isAllSelected(managePageItems.map((item) => item.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) selectAll(managePageItems.map((item) => item.id));
-                        else deselectAll();
-                      }}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                  </th>
-                  )}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
@@ -809,18 +801,8 @@ export default function ModelRepresentativesPage() {
                   <tr
                     key={a.id}
                     onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }}
-                    className="cursor-pointer transition-colors hover:bg-gray-50"
+                    className={`cursor-pointer transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}
                   >
-                    {selectMode && (
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected(a.id)}
-                        onChange={() => toggleSelect(a.id)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </td>
-                    )}
                     <td className="px-4 py-3 text-center text-gray-500">{manageStart + i + 1}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="cohort" value={a.cohort} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center text-gray-500">

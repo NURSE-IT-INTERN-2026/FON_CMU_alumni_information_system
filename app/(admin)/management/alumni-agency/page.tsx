@@ -444,9 +444,14 @@ export default function AlumniAgencyPage() {
           ต้นสังกัดศิษย์เก่า
         </h1>
         {mode === "abroad" && (selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(pagedAlumni.map((i) => i.id)) ? deselectAll() : selectAll(pagedAlumni.map((i) => i.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -687,19 +692,6 @@ export default function AlumniAgencyPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  {selectMode && (
-                    <th className="px-4 py-3 w-12">
-                      <input
-                        type="checkbox"
-                        checked={pagedAlumni.length > 0 && isAllSelected(pagedAlumni.map((item) => item.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) selectAll(pagedAlumni.map((item) => item.id));
-                          else deselectAll();
-                        }}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </th>
-                  )}
                   <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
                   {MGMT_SORT_FIELDS.map(({ field, label }) => (
                     <th
@@ -719,17 +711,7 @@ export default function AlumniAgencyPage() {
               </thead>
               <tbody>
                 {pagedAlumni.map((a, idx) => (
-                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {selectMode && (
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(a.id)}
-                          onChange={() => toggleSelect(a.id)}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                      </td>
-                    )}
+                  <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>

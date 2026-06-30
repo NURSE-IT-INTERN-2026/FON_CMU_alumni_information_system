@@ -371,9 +371,14 @@ export default function NewsListPage() {
           ข่าวสารและกิจกรรม
         </h1>
         {selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(news.map((n) => n.id)) ? deselectAll() : selectAll(news.map((n) => n.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -864,24 +869,11 @@ export default function NewsListPage() {
       ) : (
         /* Management mode: cards with edit/delete (PRD §3.12 — not a table) */
         <div>
-          {selectMode && (
-          <div className="mb-3 flex items-center justify-end">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={news.length > 0 && isAllSelected(news.map((n) => n.id))}
-                onChange={(e) => { if (e.target.checked) selectAll(news.map((n) => n.id)); else deselectAll(); }}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              เลือกทั้งหมดในหน้านี้
-            </label>
-          </div>
-          )}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {news.map((item) => {
               const summary = stripHtml(item.body).slice(0, 150);
               return (
-                <div key={item.id} className="group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md">
+                <div key={item.id} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : ""}`}>
                   <div className="absolute right-2 top-2 z-10">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
                       {STATUS_LABELS[item.status]}
@@ -905,13 +897,7 @@ export default function NewsListPage() {
                       {summary && <p className="line-clamp-3 text-sm text-[var(--muted)]">{summary}{stripHtml(item.body).length > 150 ? "..." : ""}</p>}
                     </div>
                   </Link>
-                  <div className="mt-auto flex items-center justify-between border-t border-gray-100 px-4 py-2.5">
-                    {selectMode && (
-                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-500">
-                      <input type="checkbox" checked={isSelected(item.id)} onChange={() => toggleSelect(item.id)} className="h-3.5 w-3.5 rounded border-gray-300" />
-                      เลือก
-                    </label>
-                    )}
+                  <div className="mt-auto flex items-center justify-end border-t border-gray-100 px-4 py-2.5">
                     <div className="flex items-center gap-1">
                       <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>

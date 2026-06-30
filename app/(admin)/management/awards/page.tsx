@@ -343,9 +343,14 @@ export default function AwardsPage() {
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รางวัลที่ได้รับ</h1>
         {selectMode ? (
-          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-            เสร็จสิ้น
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => (isAllSelected(awards.map((a) => a.id)) ? deselectAll() : selectAll(awards.map((a) => a.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              เลือกทั้งหมดในหน้านี้
+            </button>
+            <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+              เสร็จสิ้น
+            </button>
+          </div>
         ) : (
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
@@ -587,19 +592,6 @@ export default function AwardsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
-                {selectMode && (
-                  <th className="px-4 py-3 w-12">
-                    <input
-                      type="checkbox"
-                      checked={awards.length > 0 && isAllSelected(awards.map((a) => a.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) selectAll(awards.map((a) => a.id));
-                        else deselectAll();
-                      }}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                  </th>
-                )}
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                   ลำดับ
                 </th>
@@ -656,17 +648,7 @@ export default function AwardsPage() {
                 </tr>
               ) : (
                 awards.map((award, i) => (
-                  <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(award.id); else if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                    {selectMode && (
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(award.id)}
-                          onChange={() => toggleSelect(award.id)}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                      </td>
-                    )}
+                  <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(award.id); else if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(award.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{award.studentId || "-"}</td>
                     <td className="px-4 py-3">{award.major || "-"}</td>
