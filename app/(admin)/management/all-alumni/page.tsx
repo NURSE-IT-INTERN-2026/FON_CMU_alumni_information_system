@@ -6,7 +6,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCanWrite } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
@@ -87,34 +86,14 @@ interface CmuAlumni {
   // CMU person's kept/highest degree id) isn't the alumni's primary studentId.
   localId?: string | null;
   // Local overlay: pre-resolved Thai degree label for local-ONLY rows (alumni
-  // with no CMU record). CMU rows leave this undefined and derive the label
-  // from level_id via getLevelLabel; local-only rows can't round-trip through
-  // level_id losslessly, so they carry the label directly.
+  // with no CMU record); local-only rows can't round-trip their degree level
+  // through CMU's level_id losslessly, so they carry the label directly.
   degreeLabel?: string | null;
   // CMU Registrar birthday, raw "MM-DD-YYYY" (passed through by /api/cmu-alumni).
   birthday?: string | null;
   // Normalized "YYYY-MM-DD" for display + chronological sort.
   birthDate?: string | null;
 }
-
-/** Local DegreeLevel enum (DOCTORAL/MASTER/…) → Thai label, for local-only rows. */
-const DEGREE_LABEL_BY_LEVEL: Record<string, string> = Object.fromEntries(
-  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
-);
-
-/** Map a View sort field to the CmuAlumni property used to compare rows, so the
- *  client-side sort (which now also reorders local-only rows) reads the right
- *  field on the CmuAlumni shape. */
-const VIEW_SORT_FIELD_MAP: Record<ViewSortField, keyof CmuAlumni> = {
-  studentId: "student_id",
-  name: "name_th",
-  surname: "surname_th",
-  degreeLevel: "level_id",
-  major: "major_name_th",
-  year: "grad_year",
-  cohort: "cohort",
-  birthDate: "birthDate",
-};
 
 /** Build a studentId → Alumni map covering EVERY education studentId of each
  *  local alumni (plus its primary snapshot), so a CMU record can be bridged to a
@@ -172,23 +151,6 @@ function buildUsedAlumniIds(local: Alumni[], cmuSidSet: Set<string>, deletedStud
   return used;
 }
 
-// Map CMU registrar level_id to Thai degree labels
-const CMU_LEVEL_LABELS: Record<string, string> = {
-  "0": "อนุปริญญา",
-  "1": "ปริญญาตรี",
-  "2": "ผู้ช่วยพยาบาล",
-  "3": "ปริญญาโท",
-  "5": "ปริญญาเอก",
-};
-
-/** Resolve display label for level_id, accounting for the special case where
- *  level_id=0 + major_name_th='ประกาศนียบัตรผู้ช่วยพยาบาล' → ประกาศนียบัตรบัณฑิต. */
-function getLevelLabel(level_id: string, major_name_th: string): string {
-  if (level_id === "0" && major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล") {
-    return "ประกาศนียบัตรบัณฑิต";
-  }
-  return CMU_LEVEL_LABELS[level_id] || level_id;
-}
 
 const EMPTY_EDIT_FORM: AlumniEditFormData = {
   studentId: "",
@@ -209,11 +171,9 @@ function isLocalRecordId(id: string): boolean {
 }
 
 export default function AlumniCountPage() {
-  const canWrite = useCanWrite();
   const router = useRouter();
 
   // State
-  const [manageMode, setManageMode] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -229,7 +189,6 @@ export default function AlumniCountPage() {
   // be sorted/paginated correctly once the full set is assembled.
   const manageQuery = useQuery({
     queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir }],
-    enabled: manageMode,
     queryFn: async () => {
       // Fetch the FULL CMU list (not a single page) so the client can merge,
       // sort, and paginate the complete set. `fetchCmuGraduates` caches the
@@ -347,145 +306,9 @@ export default function AlumniCountPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // CMU Registrar data (view mode only) — merge CMU + local overlay.
-  // Like manage mode, the query is keyed WITHOUT `page`: we fetch the FULL
-  // merged set once (per search/filter/sort) and paginate it on the client by
-  // slicing `allViewMerged`. Navigating pages is therefore instant — no
-  // per-page refetch of the CMU proxy or the local-alumni DB scan. The CMU
-  // proxy still sorts server-side (every view field is CMU-sortable), so we
-  // keep its returned order and just slice it.
-  const viewQuery = useQuery({
-    queryKey: ["alumni", "view", { search, filtersKey, sortField, sortDir }],
-    enabled: !manageMode,
-    queryFn: async () => {
-      // Fetch the FULL CMU list (not a single page) so the client can overlay
-      // local data and paginate the complete set. `fetchCmuGraduates` caches
-      // the upstream call for 5 min, so this is one request per search/filter/sort.
-      const params = new URLSearchParams({
-        page: "1", pageSize: "50000", search,
-        sortField: sortField as string, sortDir,
-      });
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      let cmu: { data: CmuAlumni[]; total: number };
-      try {
-        cmu = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${params}`);
-      } catch {
-        cmu = { data: [], total: 0 };
-      }
+  const tableLoading = manageQuery.isPending;
 
-      // Fetch local alumni (including soft-deleted) for overlay, filtering, and
-      // the local-only pass. pageSize 50000 = no truncation (there are >11k
-      // local alumni; the old 9999 silently dropped ~1,600). Facet filters are
-      // applied server-side so local-only rows respect them, mirroring manage
-      // mode; search is applied client-side below on the local-only rows.
-      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true" });
-      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      const localMap: Record<string, Alumni & { deletedAt?: string | null }> = {};
-      const deletedStudentIds = new Set<string>();
-      try {
-        const localData = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
-        for (const a of localData.data) {
-          if (a.studentId) {
-            localMap[a.studentId] = a;
-            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) deletedStudentIds.add(a.studentId);
-          }
-        }
-      } catch {}
-
-      // Merge: overlay local data on CMU records, skip soft-deleted. Bridge on
-      // ANY of the CMU person's student_ids (not just the kept one) so a
-      // multi-degree alumni overlays its CMU row instead of duplicating as a
-      // local-only row — collapsing each person to one row, like the dashboard.
-      const merged: CmuAlumni[] = [];
-      const eduSidToLocal = buildEduSidToLocalMap(
-        Object.values(localMap).filter((a) => !deletedStudentIds.has(a.studentId)),
-      );
-      // An alumni is represented by a CMU row (excluded from local-only) when ANY
-      // of its education studentIds is in CMU — collapsing multi-degree alumni
-      // AND duplicate local rows for the same CMU person to one row, like the
-      // dashboard. The overlay below picks which alumni's data a CMU row shows.
-      const usedAlumni = buildUsedAlumniIds(Object.values(localMap), buildCmuSidSet(cmu.data), deletedStudentIds);
-      for (const a of cmu.data) {
-        if (deletedStudentIds.has(a.student_id)) continue;
-        const local = findLocalByCmuRecord(a, eduSidToLocal);
-        // CMU returns no cohort. For Bachelor graduates (level_id "1") derive
-        // "DN{YY}" from grad_year (YY = last two digits of grad_year - 3), used
-        // as a fallback when no local cohort is set so the column isn't blank.
-        const derivedCohort =
-          a.level_id === "1" && a.grad_year
-            ? bachelorCohortFromGradYear(a.grad_year)
-            : null;
-        if (local) {
-          merged.push({
-            ...a,
-            prefix: local.prefix || null,
-            name_th: local.firstName || a.name_th,
-            surname_th: local.lastName || a.surname_th,
-            cohort: local.cohort || derivedCohort,
-            birthDate: normalizeCmuBirthday(a.birthday) ?? local.birthDate,
-            localId: local.id,
-          });
-        } else {
-          merged.push({ ...a, prefix: null, cohort: derivedCohort, birthDate: normalizeCmuBirthday(a.birthday) });
-        }
-      }
-      // Local-only pass: alumni in the local DB with NO CMU record (none of their
-      // education studentIds is in CMU). These are real alumni (admin-created or
-      // imported, e.g. the legacy Excel import) the registrar has no record for —
-      // without this pass they'd be invisible in the default view. Facets already
-      // filtered them server-side; apply search client-side so typing a
-      // name/studentId still finds them.
-      const q = search.trim().toLowerCase();
-      const matchesSearch = (a: Alumni): boolean => {
-        if (!q) return true;
-        return [a.prefix, a.firstName, a.lastName, a.studentId]
-          .some((v) => v && v.toLowerCase().includes(q));
-      };
-      for (const a of Object.values(localMap)) {
-        if (usedAlumni.has(a.id) || deletedStudentIds.has(a.studentId)) continue;
-        if (!matchesSearch(a)) continue;
-        const derivedLocal =
-          a.degreeLevel === "BACHELOR" && a.graduationYear ? bachelorCohortFromGradYear(a.graduationYear) : null;
-        merged.push({
-          student_id: a.studentId,
-          name_th: a.firstName || "",
-          middle_name_th: "",
-          surname_th: a.lastName || "",
-          name_en: "",
-          surname_en: "",
-          level_id: "",
-          major_name_th: a.major || "",
-          major_sub_name_th: "",
-          grad_year: a.graduationYear != null ? String(a.graduationYear) : "",
-          grad_semester: "",
-          std_mobile: "",
-          adm_type: "",
-          cohort: a.cohort || derivedLocal,
-          prefix: a.prefix || null,
-          degreeLabel: DEGREE_LABEL_BY_LEVEL[a.degreeLevel ?? ""] || null,
-          localId: a.id,
-          birthday: null,
-          birthDate: a.birthDate || null,
-        });
-      }
-      // Sort the full merged set client-side so local-only rows interleave with
-      // CMU rows correctly (the CMU proxy's server-side order can't place them).
-      const sortProp = VIEW_SORT_FIELD_MAP[sortField as ViewSortField] ?? "student_id";
-      const sorted = sortAlumni(merged, sortProp, sortDir);
-      // `sorted.length` is the authoritative row count (CMU records + local-only,
-      // minus the soft-deleted overlay) — matches what we actually render/paginate.
-      return { merged: sorted, total: sorted.length };
-    },
-  });
-  // View mode paginates the full merged set on the client. `allViewMerged`
-  // holds every row; `cmuAlumni` is the current page's slice that the table
-  // renders. Since the query is keyed without `page`, navigating pages is
-  // instant (no refetch).
-  const allViewMerged = viewQuery.data?.merged ?? [];
-  const cmuAlumni = allViewMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const cmuTotal = viewQuery.data?.total ?? 0;
-  const tableLoading = manageMode ? manageQuery.isPending : viewQuery.isPending;
-
-  const activeTotal = manageMode ? totalAlumni : cmuTotal;
+  const activeTotal = totalAlumni;
   const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE));
 
   const paginationNumbers = (() => {
@@ -711,24 +534,6 @@ export default function AlumniCountPage() {
     }
   };
 
-  const enterManageMode = () => {
-    setManageMode(true);
-    setPage(1);
-    setSearch("");
-    setFilters({});
-    setSortField("studentId");
-    setSortDir("asc");
-    setEditingId(null);
-    deselectAll();
-  };
-
-  const exitManageMode = () => {
-    setManageMode(false);
-    setEditingId(null);
-    setErrorMsg("");
-    deselectAll();
-  };
-
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
@@ -767,23 +572,6 @@ export default function AlumniCountPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           จำนวนนักศึกษาเก่าตามระดับการศึกษา
         </h1>
-        {!manageMode ? (
-          canWrite && (
-          <button
-            onClick={enterManageMode}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
-          >
-            จัดการข้อมูล
-          </button>
-          )
-        ) : (
-          <button
-            onClick={exitManageMode}
-            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
-          >
-            กลับหน้าเดิม
-          </button>
-        )}
       </div>
 
       {/* Error toast */}
@@ -835,8 +623,6 @@ export default function AlumniCountPage() {
         </div>
       )}
 
-      {manageMode ? (
-        <>
           {/* Edit form */}
           {editingId && (
             <div className="mb-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -1230,173 +1016,6 @@ export default function AlumniCountPage() {
               </div>
             )}
           </div>
-        </>
-      ) : (
-        /* View mode: read-only alumni table */
-        <>
-          {/* Search */}
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-            />
-          </div>
-
-          {/* Facet filters */}
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} />
-            <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
-            <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} />
-          </div>
-
-          {/* Alumni table (read-only, CMU Registrar data) */}
-          <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr
-                    className="text-white text-left"
-                    style={{ backgroundColor: "#5b21b6" }}
-                  >
-                    <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                      ลำดับ
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                      รหัสนักศึกษา {renderSortIcon("studentId")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น {renderSortIcon("cohort")}
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      คำนำหน้า
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
-                      ชื่อ {renderSortIcon("name")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("surname")}>
-                      นามสกุล {renderSortIcon("surname")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
-                      ระดับการศึกษา {renderSortIcon("degreeLevel")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                      สาขาวิชา {renderSortIcon("major")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
-                      ปีที่สำเร็จการศึกษา {renderSortIcon("year")}
-                    </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
-                      วันเกิด {renderSortIcon("birthDate")}
-                    </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
-                      หมายเหตุ
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableLoading ? (
-                    <tr>
-                      <td colSpan={11} className="px-4 py-12 text-center">
-                        <div className="flex justify-center">
-                          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
-                        </div>
-                      </td>
-                    </tr>
-                  ) : cmuAlumni.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={11}
-                        className="px-4 py-12 text-center text-[var(--muted)]"
-                      >
-                        ไม่พบข้อมูล
-                      </td>
-                    </tr>
-                  ) : (
-                    cmuAlumni.map((a, idx) => {
-                      const levelLabel = a.degreeLabel || getLevelLabel(a.level_id, a.major_name_th);
-                      return (
-                        <tr
-                          key={a.student_id}
-                          onClick={() => router.push(`/management/alumni/${a.localId || a.student_id}`)}
-                          className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
-                        >
-                          <td className="px-4 py-3 text-center">
-                            {(page - 1) * PAGE_SIZE + idx + 1}
-                          </td>
-                          <td className="px-4 py-3">{a.student_id}</td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.cohort || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.prefix || "-"}
-                          </td>
-                          <td className="px-4 py-3">{a.name_th || "-"}</td>
-                          <td className="px-4 py-3">{a.surname_th || "-"}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "#5b21b615", color: "#5b21b6" }}>
-                              {levelLabel}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.major_name_th || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">
-                            {a.grad_year || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted)]">{formatBirthDateThai(a.birthDate) || "-"}</td>
-                          <td className="px-4 py-3 text-[var(--muted)]">-</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                <span className="text-sm text-gray-500">แสดง {activeTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, activeTotal)} จาก {activeTotal} รายการ</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                    className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
-                  >
-                    ก่อนหน้า
-                  </button>
-                  {paginationNumbers.map((p, i) =>
-                    p === "..." ? (
-                      <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
-                    ) : (
-                      <button
-                        key={p}
-                        onClick={() => setPage(p)}
-                        className={`rounded-md px-3 py-1.5 text-sm ${
-                          page === p
-                            ? "bg-[var(--primary)] text-white"
-                            : "border border-[var(--border)] bg-white hover:bg-gray-100"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                  <button
-                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                    disabled={page === totalPages}
-                    className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
-                  >
-                    ถัดไป
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
 
       {/* Delete confirmation dialog */}
       {deleteId && (

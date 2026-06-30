@@ -38,7 +38,6 @@ export const queryKeys = {
       page: number;
       search: string;
       statusFilter: string;
-      manageMode: boolean;
     }) => ["news", "list", o] as const,
   },
   logs: {
