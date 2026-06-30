@@ -118,7 +118,6 @@ interface CardConfig {
   color: string;
   icon: React.ReactNode;
   getCount: (d: DashboardData) => number;
-  getSubStat: (d: DashboardData) => string;
 }
 
 const DEGREE_MINI_CARDS = [
@@ -147,10 +146,6 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.potentials.total,
-    getSubStat: (d) =>
-      d.potentials.latestYear
-        ? `ปี ${d.potentials.latestYear}: ${d.potentials.latestYearCount.toLocaleString()} รายการ`
-        : "ยังไม่มีข้อมูล",
   },
   {
     label: "สมาคม/ชมรม",
@@ -162,7 +157,6 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.associations.total,
-    getSubStat: (d) => `${d.associations.distinctAssociationCount.toLocaleString()} สมาคม`,
   },
   {
     label: "กรรมการบัณฑิต",
@@ -174,7 +168,6 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.graduateCommittee.total,
-    getSubStat: () => "",
   },
   {
     label: "ผู้แทนรุ่น",
@@ -186,7 +179,6 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.modelRepresentatives.total,
-    getSubStat: (d) => `${d.modelRepresentatives.distinctCohorts.toLocaleString()} รุ่น`,
   },
   {
     label: "ต้นสังกัดศิษย์เก่า",
@@ -198,7 +190,6 @@ const CARDS: CardConfig[] = [
       </svg>
     ),
     getCount: (d) => d.alumniAgency.total,
-    getSubStat: (d) => `${d.alumniAgency.distinctCountries.toLocaleString()} ประเทศ`,
   },
 ];
 
@@ -438,7 +429,6 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3">
         {CARDS.map((card) => {
           const count = card.getCount(data);
-          const subStat = card.getSubStat(data);
 
           return (
             <Link
@@ -462,13 +452,9 @@ export default function DashboardPage() {
                 className="mt-1 text-2xl font-bold sm:text-3xl"
                 style={{ color: card.color }}
               >
-                {count.toLocaleString()}
+                {count.toLocaleString()}{" "}
+                <span className="text-base font-normal text-[var(--muted)]">รายการ</span>
               </p>
-              {subStat && (
-                <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
-                  {subStat}
-                </p>
-              )}
             </Link>
           );
         })}
