@@ -21,6 +21,9 @@ import FormTextarea from "@/components/form/FormTextarea";
 interface AlumniAgency {
   id: string;
   studentId: string | null;
+  // "No Alumni to link to" flag — the attempted studentId when no matching
+  // Alumni exists. Display the effective id as `studentId ?? pendingStudentId`.
+  pendingStudentId: string | null;
   cohort: string | null;
   prefix: string | null;
   firstName: string | null;
@@ -123,7 +126,7 @@ const THAILAND_SEARCH_FIELDS: { value: SearchField; label: string }[] = SEARCH_F
 
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
-    case "studentId": return a.studentId || "";
+    case "studentId": return a.studentId || a.pendingStudentId || "";
     case "cohort": return a.cohort || "";
     case "major": return a.major || "";
     case "prefix": return a.prefix || "";
@@ -176,6 +179,8 @@ export default function AlumniAgencyPage() {
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState("");
+  // "รอเชื่อมโยง" toggle — show only rows flagged with no Alumni to link to.
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
   const [manageMode, setManageMode] = useState(false);
   const [mgmtPage, setMgmtPage] = useState(1);
@@ -215,7 +220,7 @@ export default function AlumniAgencyPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const [mgmtSortField, setMgmtSortField] = useState<SortField>("country");
@@ -233,13 +238,14 @@ export default function AlumniAgencyPage() {
 
   // In-country tab: same alumni-agency model, country-discriminated to Thailand.
   const { data: thailandData, isPending: thailandLoading } = useQuery({
-    queryKey: ["alumniAgency", "thailand", { thailandSearch, thailandSearchField }],
+    queryKey: ["alumniAgency", "thailand", { thailandSearch, thailandSearchField, unlinkedOnly }],
     queryFn: () => {
       const params = new URLSearchParams({ region: "thailand" });
       if (thailandSearch.trim()) {
         params.set("search", thailandSearch.trim());
         params.set("searchField", thailandSearchField);
       }
+      if (unlinkedOnly) params.set("unlinked", "true");
       return apiFetch<ApiResponse>(`/api/alumni-agency?${params}`);
     },
     enabled: mode === "thailand",
@@ -280,9 +286,9 @@ export default function AlumniAgencyPage() {
 
   const qc = useQueryClient();
   const { data: abroadData, isPending: loading } = useQuery({
-    queryKey: ["alumniAgency", "abroad", { search, searchField, countryFilter }],
+    queryKey: ["alumniAgency", "abroad", { search, searchField, countryFilter, unlinkedOnly }],
     queryFn: () =>
-      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ region: "abroad", search, country: countryFilter, searchField })}`),
+      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ region: "abroad", search, country: countryFilter, searchField, unlinked: unlinkedOnly ? "true" : "" })}`),
     enabled: mode === "abroad",
   });
   // Wrap in useMemo so the array identity is stable across renders (avoids
@@ -433,7 +439,7 @@ export default function AlumniAgencyPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const data = await apiFetch<{ imported: number; updated: number; errors: { row: number; message: string }[] }>(
+      const data = await apiFetch<{ imported: number; updated: number; pending?: number; errors: { row: number; message: string }[] }>(
         `/api/alumni-agency/import`,
         { method: "POST", body: formData },
       );
@@ -502,7 +508,7 @@ export default function AlumniAgencyPage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}</span>
+            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
             <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
@@ -639,6 +645,14 @@ export default function AlumniAgencyPage() {
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setUnlinkedOnly((v) => !v)}
+          className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+          title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+        >
+          รอเชื่อมโยง
+        </button>
       </div>
 
       {manageMode && (
@@ -734,7 +748,7 @@ export default function AlumniAgencyPage() {
                       </td>
                     )}
                     <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
@@ -801,7 +815,7 @@ export default function AlumniAgencyPage() {
                 {pagedViewAlumni.map((a, idx) => (
                   <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">{(viewPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
@@ -889,6 +903,14 @@ export default function AlumniAgencyPage() {
               onChange={(e) => { setThailandSearch(e.target.value); setThailandPage(1); }}
               className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
+            <button
+              type="button"
+              onClick={() => setUnlinkedOnly((v) => !v)}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+              title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+            >
+              รอเชื่อมโยง
+            </button>
           </div>
 
           {/* In-country table — abroad view columns minus country (PRD §3.9) */}
@@ -921,7 +943,7 @@ export default function AlumniAgencyPage() {
                     {pagedThailand.map((a, idx) => (
                       <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                         <td className="px-4 py-3 text-center">{(thailandPage - 1) * PAGE_SIZE + idx + 1}</td>
-                        <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                         <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                         <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                         <td className="px-4 py-3">{a.prefix || "-"}</td>

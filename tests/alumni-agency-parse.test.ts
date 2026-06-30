@@ -196,4 +196,42 @@ describe("parseExportFormat", () => {
     expect(result[0].data.workplace).toBeNull();
     expect(result[0].data.notes).toBeNull();
   });
+
+  it("reads รหัสนักศึกษา + สาขาวิชา and leaves pendingStudentId null", () => {
+    const rows = [
+      {
+        ประเทศ: "สหรัฐอเมริกา",
+        ชื่อ: "สมหญิง",
+        นามสกุล: "ดี",
+        รหัสนักศึกษา: "511231004",
+        สาขาวิชา: "พยาบาลศาสตร์",
+      },
+    ];
+    const result = parseExportFormat(rows);
+    expect(result[0].data.studentId).toBe("511231004");
+    expect(result[0].data.major).toBe("พยาบาลศาสตร์");
+    // The parser never decides pending-vs-linked — the import route does.
+    expect(result[0].data.pendingStudentId).toBeNull();
+  });
+
+  it("defaults studentId/major to null when absent", () => {
+    const rows = [{ ประเทศ: "สหรัฐอเมริกา", ชื่อ: "สมหญิง" }];
+    const result = parseExportFormat(rows);
+    expect(result[0].data.studentId).toBeNull();
+    expect(result[0].data.major).toBeNull();
+    expect(result[0].data.pendingStudentId).toBeNull();
+  });
+});
+
+describe("pendingStudentId (parser invariant)", () => {
+  it("parseOriginalFormat always sets pendingStudentId null", () => {
+    const rows = [
+      ["รุ่น", "คำนำหน้า", "ชื่อไทย", "ชื่ออังกฤษ", "ที่ทำงาน", "หมายเหตุ"],
+      ["1", "นางสาว", "สมหญิง ดี", "Somying", "USA Hospital", ""],
+    ];
+    const result = parseOriginalFormat(rows);
+    expect(result[0].data.studentId).toBeNull();
+    expect(result[0].data.major).toBeNull();
+    expect(result[0].data.pendingStudentId).toBeNull();
+  });
 });

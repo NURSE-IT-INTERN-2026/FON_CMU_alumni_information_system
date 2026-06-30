@@ -30,7 +30,13 @@ export async function PUT(
     if (validated.notes !== undefined) updateData.notes = validated.notes?.trim() || null;
     if (validated.order !== undefined) updateData.order = validated.order;
     if (validated.major !== undefined) updateData.major = validated.major?.trim() || null;
-    if (validated.studentId !== undefined) updateData.studentId = validated.studentId?.trim() || null;
+    if (validated.studentId !== undefined) {
+      updateData.studentId = validated.studentId?.trim() || null;
+      // Linking a real alumni supersedes any pending flag (the manual form only
+      // ever picks existing alumni via useAlumniSearch, so a non-empty id is a
+      // real link). pendingStudentId is otherwise never written from the form.
+      if (validated.studentId && validated.studentId.trim()) updateData.pendingStudentId = null;
+    }
 
     const old = await prisma.alumniAgency.findUnique({ where: { id } });
 
