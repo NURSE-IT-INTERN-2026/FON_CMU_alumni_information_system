@@ -10,9 +10,12 @@ export interface ParsedAlumniAgencyRow {
   notes: string | null;
   order: number;
   /** Optional studentId — when present, the import links the row to an alumni
-   *  record and auto-fills `major` from the CMU Registrar API. */
+   *  record (if one exists) and back-fills `major` from it. */
   studentId: string | null;
   major: string | null;
+  /** Set by the IMPORT route (not the parser) when `studentId` has no matching
+   *  `Alumni` row — the "no Alumni to link to" flag. Always null from the parser. */
+  pendingStudentId: string | null;
 }
 
 export function inferCountry(wp: string): string {
@@ -78,7 +81,7 @@ export function parseOriginalFormat(
     const notes = String(r[6] || "").trim() || null;
     const country = inferCountry(workplace || "");
     result.push({
-      data: { cohort, prefix, firstName, lastName, englishName, workplace, homeAddress, country, notes, order: i, studentId: null, major: null },
+      data: { cohort, prefix, firstName, lastName, englishName, workplace, homeAddress, country, notes, order: i, studentId: null, major: null, pendingStudentId: null },
       rowNumber: i + 1,
     });
   }
@@ -126,6 +129,7 @@ export function parseExportFormat(
         order: isNaN(order) ? 0 : order,
         studentId: row["รหัสนักศึกษา"]?.toString().trim() || null,
         major: row["สาขาวิชา"]?.toString().trim() || null,
+        pendingStudentId: null,
       },
       rowNumber: i + 2,
     });

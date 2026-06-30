@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ensureAlumni } from "@/lib/ensure-alumni";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows, readExcelRawRows } from "@/lib/excel-import";
 
@@ -41,8 +40,10 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const errors: { row: number; message: string }[] = [];
+    const warnings: { row: number; message: string }[] = [];
     let imported = 0;
     let updated = 0;
+    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
     const importedRecords: ImportedRecord[] = [];
 
     // Read raw rows to detect format
@@ -69,31 +70,50 @@ export async function POST(request: NextRequest) {
           data.englishName ||
           data.studentId ||
           "—";
-        // Sync with CMU when a studentId is provided: link the alumni record
-        // and auto-fill major from the Registrar API (backfill only).
-        if (data.studentId) {
-          const alumni = await ensureAlumni(data.studentId, displayName);
-          data.studentId = alumni.studentId;
-          if (!data.major) data.major = alumni.major;
+        // Resolve the studentId against EXISTING Alumni only — we do NOT auto-
+        // create a stub alumni (the old ensureAlumni behavior). If no Alumni has
+        // this id, the row is FLAGGED via `pendingStudentId` ("no Alumni to link
+        // to"). `studentId` is a FK to Alumni.studentId, so it must stay null
+        // while the id is only pending.
+        const attemptedId = data.studentId;
+        if (attemptedId) {
+          const linked = await prisma.alumni.findUnique({ where: { studentId: attemptedId } });
+          if (linked) {
+            data.studentId = linked.studentId;
+            data.pendingStudentId = null;
+            if (!data.major) data.major = linked.major ?? null;
+          } else {
+            data.pendingStudentId = attemptedId;
+            data.studentId = null;
+            pending++;
+            warnings.push({
+              row: rowNumber,
+              message: `รหัสนักศึกษา ${attemptedId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
+            });
+          }
+        } else {
+          data.pendingStudentId = null;
         }
-        // No DB unique — match by studentId (or firstName+lastName when unlinked)
-        // among active rows so re-importing updates an existing entry, not duplicates.
-        const existing = await prisma.alumniAgency.findFirst({
-          where: {
-            deletedAt: null,
-            ...(data.studentId
-              ? { studentId: data.studentId }
-              : { firstName: data.firstName ?? null, lastName: data.lastName ?? null }),
-          },
-        });
+        // No DB unique — match by the resolved id (studentId OR pendingStudentId),
+        // or by firstName+lastName only when the row carries no id at all. Each
+        // branch is exclusive so a pending row is matched by its pendingId, not
+        // re-matched by name into a different row.
+        const existing = data.studentId
+          ? await prisma.alumniAgency.findFirst({ where: { deletedAt: null, studentId: data.studentId } })
+          : data.pendingStudentId
+            ? await prisma.alumniAgency.findFirst({ where: { deletedAt: null, pendingStudentId: data.pendingStudentId } })
+            : await prisma.alumniAgency.findFirst({
+                where: { deletedAt: null, firstName: data.firstName ?? null, lastName: data.lastName ?? null, studentId: null, pendingStudentId: null },
+              });
+        const effectiveId = data.studentId ?? data.pendingStudentId ?? null;
         if (existing) {
           await prisma.alumniAgency.update({ where: { id: existing.id }, data });
           updated++;
-          importedRecords.push({ id: data.studentId ?? null, name: displayName, op: "updated" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
         } else {
           await prisma.alumniAgency.create({ data });
           imported++;
-          importedRecords.push({ id: data.studentId ?? null, name: displayName, op: "created" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
         }
       } catch (err) {
         console.error("Import row error:", err);
@@ -116,7 +136,7 @@ export async function POST(request: NextRequest) {
       errors,
     });
 
-    return NextResponse.json({ imported, updated, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/alumni-agency/import error:", error);
     return NextResponse.json(

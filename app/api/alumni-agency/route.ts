@@ -71,6 +71,12 @@ export async function GET(request: NextRequest) {
       where.NOT = thailandCountryFilter;
     }
 
+    // `?unlinked=true` — show only rows flagged as having no Alumni to link to
+    // (studentId is null but pendingStudentId is set).
+    if (searchParams.get("unlinked") === "true") {
+      where.pendingStudentId = { not: null };
+    }
+
     // The distinct country list (abroad dropdown) is scoped the same way so a
     // Thailand-valued country never appears among the abroad filter choices.
     const countryListWhere: Record<string, unknown> = { deletedAt: null };
@@ -81,11 +87,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
+      if (searchFieldParam === "studentId") {
+        // Search the effective id — linked `studentId` OR pending `pendingStudentId`.
+        where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { pendingStudentId: { contains: search, mode: "insensitive" } },
+        ];
+      } else if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
         where[searchFieldParam] = { contains: search, mode: "insensitive" };
       } else {
         where.OR = [
           { studentId: { contains: search, mode: "insensitive" } },
+          { pendingStudentId: { contains: search, mode: "insensitive" } },
           { major: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
