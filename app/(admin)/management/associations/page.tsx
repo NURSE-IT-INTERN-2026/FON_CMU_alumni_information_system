@@ -82,6 +82,9 @@ export default function AssociationsPage() {
     isAllSelected,
     getSelectedArray,
   } = useBulkSelection();
+  const [selectMode, setSelectMode] = useState(false);
+  const enterSelect = () => setSelectMode(true);
+  const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -290,6 +293,15 @@ export default function AssociationsPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           สมาคม/ชมรมศิษย์เก่า
         </h1>
+        {selectMode ? (
+          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+            เสร็จสิ้น
+          </button>
+        ) : (
+          <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+            เลือก
+          </button>
+        )}
       </div>
 
       {/* Error toast */}
@@ -493,7 +505,7 @@ export default function AssociationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
-                {(
+                {selectMode && (
                   <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
@@ -540,8 +552,8 @@ export default function AssociationsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((item, i) => (
-                <tr key={item.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (item.studentId) router.push(`/management/alumni/${item.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                  {(
+                <tr key={item.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(item.id); else if (item.studentId) router.push(`/management/alumni/${item.studentId}`); }} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                  {selectMode && (
                     <td className="px-4 py-3 text-center">
                       <input
                         type="checkbox"

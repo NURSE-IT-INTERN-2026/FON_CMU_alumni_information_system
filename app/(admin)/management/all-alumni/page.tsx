@@ -302,6 +302,9 @@ export default function AlumniCountPage() {
     isAllSelected,
     getSelectedArray,
   } = useBulkSelection();
+  const [selectMode, setSelectMode] = useState(false);
+  const enterSelect = () => setSelectMode(true);
+  const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -572,6 +575,15 @@ export default function AlumniCountPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           จำนวนนักศึกษาเก่าตามระดับการศึกษา
         </h1>
+        {selectMode ? (
+          <button onClick={exitSelect} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+            เสร็จสิ้น
+          </button>
+        ) : (
+          <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+            เลือก
+          </button>
+        )}
       </div>
 
       {/* Error toast */}
@@ -821,6 +833,7 @@ export default function AlumniCountPage() {
                     className="text-white text-left"
                     style={{ backgroundColor: "#5b21b6" }}
                   >
+                    {selectMode && (
                     <th className="px-4 py-3 w-12">
                       <input
                         type="checkbox"
@@ -832,6 +845,7 @@ export default function AlumniCountPage() {
                         className="h-4 w-4 rounded border-gray-300"
                       />
                     </th>
+                    )}
                     <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
@@ -892,9 +906,10 @@ export default function AlumniCountPage() {
                     alumni.map((a, idx) => (
                       <tr
                         key={a.id}
-                        onClick={() => router.push(`/management/alumni/${a.id}`)}
+                        onClick={() => { if (selectMode) toggleSelect(a.id); else router.push(`/management/alumni/${a.id}`); }}
                         className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                       >
+                        {selectMode && (
                         <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
@@ -903,6 +918,7 @@ export default function AlumniCountPage() {
                             className="h-4 w-4 rounded border-gray-300"
                           />
                         </td>
+                        )}
                         <td className="px-4 py-3 text-center">
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
