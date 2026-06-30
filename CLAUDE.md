@@ -312,6 +312,11 @@ Template for a ledger entry:
 
 *(Append-only ledger of project-specific traps. See "Self-Improvement Loop" for when to add an entry.)*
 
+### `docker compose up` reuses a stale cached app image — rebuild with `--build` or the app serves old code
+- **Symptom:** Docker says the app is "running on :3000" and a Next.js server responds, but the app is broken — it serves at the root (`/login` returns 200) instead of under `basePath: "/alumni"` (`/alumni/login`), so every internal link/fetch (all written for `/alumni`) 404s/redirects wrong and the page won't load. Confirmed via curl: `/` → 307 `/login` (not the expected 308 → `/alumni`), and bare `/login` → 200.
+- **Root cause:** `basePath` is a **build-time** constant baked into the standalone image (`output: "standalone"`). `docker compose up -d` reuses an existing image of the same name — it does NOT rebuild from source. After pulling/merging code changes, an image built weeks earlier keeps running: `docker images` shows `fon-cmu-alumni-app:latest` created "4 weeks ago" while the container is minutes old. The host dev server (`npm run dev`) is NOT involved — `ps` shows no `next`/`node` process; the `*:3000` listener is the container's published port owned by the Docker Desktop VM.
+- **Prevention:** After any source change you want live in Docker, run `docker compose up -d --build app` (or `docker compose build app` then `up -d app`). Confirm the image is fresh (`docker images` → created "x minutes ago", new image id). Verify basePath with curl: `/` → 308 `/alumni`, `/alumni/login` → 200, bare `/login` → 404. `next.config.ts`'s `basePath` is NOT runtime-overridable, so a wrong basePath always means a stale build, never an env tweak.
+
 ### App is deployed under `basePath: "/alumni"`
 - **Symptom:** Links, redirects, or fetches resolve to the wrong path in the deployed app.
 - **Root cause:** `next.config.ts` sets `basePath: "/alumni"`. Route files define paths relative to it; some API helpers auto-prepend `BASE_PATH`, others need it manually.
