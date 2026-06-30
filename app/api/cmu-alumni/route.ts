@@ -124,10 +124,19 @@ export async function GET(request: NextRequest) {
       return va.localeCompare(vb, "th") * dir;
     });
 
-    // 6. Paginate
+    // 6. Paginate. Trim `student_id` on the way out — CMU ids ship with
+    // surrounding spaces, and list consumers (the all-alumni table, the alumni
+    // search hook) join/merge on student_id against local ids that are already
+    // clean. Untrimmed ids break the CMU↔local overlay (so local data never
+    // lands on its CMU row) and the same person is double-counted (a CMU-only
+    // row AND a local-only row). `ensure-alumni` / `fetchCmuGraduateById` / the
+    // dashboard already trim defensively; trimming here keeps the list output
+    // consistent so those consumers' keys line up.
     const total = filtered.length;
     const start = (page - 1) * pageSize;
-    const data = filtered.slice(start, start + pageSize);
+    const data = filtered
+      .slice(start, start + pageSize)
+      .map((g: CmuGraduate) => ({ ...g, student_id: String(g.student_id ?? "").trim() }));
 
     return NextResponse.json({ data, total, page, pageSize });
   } catch (error) {
