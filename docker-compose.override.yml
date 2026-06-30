@@ -1,7 +1,33 @@
-# Dev-only overrides — auto-merged by `docker compose up` (not used when
-# deploying with `-f docker-compose.yml`). Exposes the local Postgres
-# container to the host so `npm run dev` (running on the host) can connect.
+# Dev-only overrides — auto-merged by `docker compose up` (NOT applied when
+# deploying with `docker compose -f docker-compose.yml ...`).
+#
+# db: expose local Postgres (5432) so a host-side `npm run dev` can also connect.
+#
+# app: run the Next.js DEV server (HMR) instead of the production standalone
+#   build, with the project source bind-mounted so code changes hot-reload just
+#   like a normal `npm run dev`. It reuses the Dockerfile `deps` stage (full
+#   dependency set — `npm ci` keeps devDependencies). The anonymous volumes keep
+#   node_modules / .next / the generated Prisma client container-owned so the
+#   bind-mount doesn't shadow them.
+#
+#   First run (or after a dependency change) MUST rebuild the image once:
+#     docker compose up -d --build app
+#   Plain `docker compose up` afterward reuses the built dev image; source edits
+#   are picked up by HMR with no rebuild (see CLAUDE.md "stale cached app image").
 services:
   db:
     ports:
       - "5432:5432"
+
+  app:
+    build:
+      context: .
+      target: deps
+    command: sh -c "npx prisma generate && npm run dev -- -H 0.0.0.0"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - /app/app/generated
