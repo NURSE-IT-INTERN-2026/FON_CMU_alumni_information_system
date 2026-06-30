@@ -12,26 +12,28 @@
  * from the client page component and unit-tested directly.
  */
 
-/** Minimal constraint: a row only needs `graduationYear` for numeric sorting. */
+/** Optional shape: a row that carries `graduationYear` gets numeric sorting
+ *  for that field. Other fields always fall back to th-locale string compare,
+ *  so a row type does NOT have to satisfy this — it's a documentation hook. */
 export interface SortableAlumni {
   graduationYear?: number | null;
 }
 
 /**
- * Compare two alumni rows by a manage-sort field, mirroring the CMU proxy's
- * th-locale ordering. Nulls / empty values sort first in ascending order
- * (consistent with how the CMU proxy treats missing strings).
+ * Compare two rows by a sort field, mirroring the CMU proxy's th-locale
+ * ordering. Nulls / empty values sort first in ascending order (consistent with
+ * how the CMU proxy treats missing strings). `graduationYear` is compared
+ * numerically; every other field uses th-locale string comparison.
  *
- * Generic over the concrete row type so callers keep their full type (no
- * widening); dynamic field access is handled by an internal cast.
+ * Generic over the concrete row type (manage mode's `Alumni`, view mode's
+ * `CmuAlumni`, …) so callers keep their full type — no widening, and no need to
+ * satisfy `SortableAlumni`. Dynamic field access is handled by an internal cast.
  */
-export function compareAlumni<T extends SortableAlumni>(
-  a: T,
-  b: T,
-  field: string,
-): number {
+export function compareAlumni<T>(a: T, b: T, field: string): number {
   if (field === "graduationYear") {
-    return (a.graduationYear ?? -Infinity) - (b.graduationYear ?? -Infinity);
+    const ga = (a as unknown as Record<string, unknown>)["graduationYear"];
+    const gb = (b as unknown as Record<string, unknown>)["graduationYear"];
+    return (typeof ga === "number" ? ga : -Infinity) - (typeof gb === "number" ? gb : -Infinity);
   }
   const val = (x: T): string => {
     const v = (x as unknown as Record<string, unknown>)[field];
@@ -44,11 +46,7 @@ export function compareAlumni<T extends SortableAlumni>(
  * Return a new array sorted by the given field/direction (does not mutate).
  * Use this on the merged CMU+local result so local-only fields reorder rows.
  */
-export function sortAlumni<T extends SortableAlumni>(
-  arr: T[],
-  field: string,
-  dir: "asc" | "desc",
-): T[] {
+export function sortAlumni<T>(arr: T[], field: string, dir: "asc" | "desc"): T[] {
   return [...arr].sort((a, b) => {
     const cmp = compareAlumni(a, b, field);
     return dir === "desc" ? -cmp : cmp;
