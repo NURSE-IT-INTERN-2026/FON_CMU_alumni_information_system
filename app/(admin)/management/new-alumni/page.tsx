@@ -28,6 +28,7 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   lastName: "",
   degreeLevel: "" as AlumniWithRelatedFormData["degreeLevel"],
   cohort: "",
+  graduationYear: "",
   birthDate: "",
   awards: [],
   associations: [],
@@ -186,6 +187,7 @@ export default function NewAlumniPage() {
       lastName: data.lastName.trim(),
       birthDate: data.birthDate,
       cohort: data.cohort?.trim() || undefined,
+      graduationYear: Number(data.graduationYear),
       degreeLevel: data.degreeLevel,
     };
 
@@ -323,6 +325,16 @@ export default function NewAlumniPage() {
             </FormField>
             <FormField label="รุ่น/สาขา">
               <FormInput registration={register("cohort")} placeholder="รุ่น/สาขา" />
+            </FormField>
+            <FormField label="ปีที่สำเร็จการศึกษา (พ.ศ.)" required error={errors.graduationYear?.message}>
+              <FormInput
+                registration={register("graduationYear")}
+                error={errors.graduationYear?.message}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="2569"
+              />
             </FormField>
             <FormField label="ระดับการศึกษา" required error={errors.degreeLevel?.message}>
               <FormSelect registration={register("degreeLevel")} error={errors.degreeLevel?.message}>

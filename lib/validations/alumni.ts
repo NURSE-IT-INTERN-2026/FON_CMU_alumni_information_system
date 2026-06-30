@@ -10,6 +10,8 @@ const MSG = {
   birthDateFormat: "รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY",
   degreeLevelRequired: "กรุณาเลือกระดับการศึกษา",
   degreeLevelInvalid: "ระดับการศึกษาไม่ถูกต้อง",
+  graduationYearRequired: "กรุณากรอกปีที่สำเร็จการศึกษา",
+  graduationYearFormat: "ปีที่สำเร็จการศึกษาต้องเป็นตัวเลข 4 หลัก (พ.ศ.)",
 };
 
 export const DEGREE_LEVEL_VALUES = [
@@ -38,6 +40,12 @@ export const alumniFormSchema = z.object({
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES, {
     message: MSG.degreeLevelRequired,
   }),
+  // Buddhist-era graduation year (e.g. 2569) — 4 digits. Mirrored onto the
+  // Alumni snapshot's graduationYear + the primary Education row on create.
+  graduationYear: z
+    .string()
+    .min(1, MSG.graduationYearRequired)
+    .regex(/^\d{4}$/, MSG.graduationYearFormat),
   cohort: z.string().optional().default(""),
 });
 
@@ -54,6 +62,9 @@ export const alumniCreateSchema = z.object({
     .optional()
     .nullable(),
   degreeLevel: z.enum(DEGREE_LEVEL_VALUES).optional().default("BACHELOR"),
+  // Optional on the API so import (which has no graduation-year column) and
+  // the base POST still validate; the new-alumni form requires it.
+  graduationYear: z.coerce.number().int().optional().nullable(),
   cohort: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   contactEmail: z.string().optional().nullable(),
