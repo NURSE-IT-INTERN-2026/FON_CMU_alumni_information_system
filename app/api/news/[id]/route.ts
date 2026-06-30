@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, getAlumniSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, newsUpdateSchema } from "@/lib/validations";
@@ -13,9 +13,29 @@ export async function GET(
   try {
     const { id } = await params;
 
+    // No public/anonymous browsing: require a staff or alumni session.
+    const [adminSession, alumniSession] = await Promise.all([
+      getSession(),
+      getAlumniSession(),
+    ]);
+    if (!adminSession && !alumniSession) {
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบ" },
+        { status: 401 }
+      );
+    }
+
     const news = await prisma.news.findUnique({ where: { id } });
 
     if (!news) {
+      return NextResponse.json(
+        { error: "ไม่พบข่าวสาร" },
+        { status: 404 }
+      );
+    }
+
+    // Alumni can only read published news; staff can preview any status.
+    if (!adminSession && news.status !== "PUBLISHED") {
       return NextResponse.json(
         { error: "ไม่พบข่าวสาร" },
         { status: 404 }
