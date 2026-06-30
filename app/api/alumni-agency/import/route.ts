@@ -10,6 +10,7 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
+  alumniAgencyMatchWhere,
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
 import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
@@ -94,17 +95,14 @@ export async function POST(request: NextRequest) {
         } else {
           data.pendingStudentId = null;
         }
-        // No DB unique — match by the resolved id (studentId OR pendingStudentId),
-        // or by firstName+lastName only when the row carries no id at all. Each
-        // branch is exclusive so a pending row is matched by its pendingId, not
-        // re-matched by name into a different row.
-        const existing = data.studentId
-          ? await prisma.alumniAgency.findFirst({ where: { deletedAt: null, studentId: data.studentId } })
-          : data.pendingStudentId
-            ? await prisma.alumniAgency.findFirst({ where: { deletedAt: null, pendingStudentId: data.pendingStudentId } })
-            : await prisma.alumniAgency.findFirst({
-                where: { deletedAt: null, firstName: data.firstName ?? null, lastName: data.lastName ?? null, studentId: null, pendingStudentId: null },
-              });
+        // Find an existing active row to UPDATE (not duplicate): by the resolved
+        // id (studentId OR pendingStudentId), OR by name when the existing row is
+        // id-less — so re-importing data that now has an id (e.g. a mock fixture
+        // over the real name-only records) updates the existing row instead of
+        // creating a duplicate. See alumniAgencyMatchWhere for the exact clauses.
+        const existing = await prisma.alumniAgency.findFirst({
+          where: alumniAgencyMatchWhere(data),
+        });
         const effectiveId = data.studentId ?? data.pendingStudentId ?? null;
         if (existing) {
           await prisma.alumniAgency.update({ where: { id: existing.id }, data });

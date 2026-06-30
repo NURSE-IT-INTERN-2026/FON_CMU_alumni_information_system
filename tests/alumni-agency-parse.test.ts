@@ -4,6 +4,7 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
+  alumniAgencyMatchWhere,
 } from "@/lib/alumni-agency-parse";
 
 describe("inferCountry", () => {
@@ -233,5 +234,64 @@ describe("pendingStudentId (parser invariant)", () => {
     expect(result[0].data.studentId).toBeNull();
     expect(result[0].data.major).toBeNull();
     expect(result[0].data.pendingStudentId).toBeNull();
+  });
+});
+
+describe("alumniAgencyMatchWhere (import idempotency — no duplication)", () => {
+  it("a pending row ALSO matches a same-name id-less row (the duplicate bug)", () => {
+    // Importing the mock (pending id) over the real name-only records must
+    // match the existing real row by name and UPDATE it, not create a 2nd row.
+    const w = alumniAgencyMatchWhere({
+      studentId: null,
+      pendingStudentId: "511231004",
+      firstName: "สุปรียา",
+      lastName: "เอแวนส์",
+    });
+    expect(w.OR).toEqual([
+      { pendingStudentId: "511231004" },
+      { firstName: "สุปรียา", lastName: "เอแวนส์", studentId: null, pendingStudentId: null },
+    ]);
+  });
+
+  it("a linked row matches by studentId plus a name fallback", () => {
+    const w = alumniAgencyMatchWhere({
+      studentId: "137828",
+      pendingStudentId: null,
+      firstName: "สมหญิง",
+      lastName: "ดี",
+    });
+    expect(w.OR).toEqual([
+      { studentId: "137828" },
+      { firstName: "สมหญิง", lastName: "ดี", studentId: null, pendingStudentId: null },
+    ]);
+  });
+
+  it("a name-only row matches only id-less rows (no id clause)", () => {
+    const w = alumniAgencyMatchWhere({
+      studentId: null,
+      pendingStudentId: null,
+      firstName: "สมหญิง",
+      lastName: "ดี",
+    });
+    expect(w.OR).toEqual([
+      { firstName: "สมหญิง", lastName: "ดี", studentId: null, pendingStudentId: null },
+    ]);
+  });
+
+  it("the name clause never matches an id'd row (no cross-person merge)", () => {
+    // Both clauses require null ids, so a pending row can't merge into a
+    // DIFFERENT pending/linked row that merely shares a name.
+    const pending = alumniAgencyMatchWhere({ studentId: null, pendingStudentId: "X", firstName: "A", lastName: "B" });
+    for (const clause of pending.OR as Record<string, unknown>[]) {
+      if ("studentId" in clause) expect(clause.studentId).toBeNull();
+      if ("pendingStudentId" in clause && clause.studentId === undefined) {
+        // the id clause carries the real id — that's fine; the NAME clause is the null one
+      }
+    }
+  });
+
+  it("always scopes to non-deleted rows", () => {
+    const w = alumniAgencyMatchWhere({ studentId: "1", pendingStudentId: null, firstName: "A", lastName: "B" });
+    expect(w.deletedAt).toBeNull();
   });
 });
