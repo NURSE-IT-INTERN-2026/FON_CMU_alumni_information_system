@@ -14,7 +14,6 @@ import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
-import { facetQueryParams } from "@/lib/filter-facets";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
@@ -40,58 +39,12 @@ interface ApiResponse {
   countries: string[];
 }
 
-// Thailand mode (PRD §3.9) — read-only view sourced from the `alumni` table
-interface ThailandAlumni {
-  id: string;
-  studentId: string | null;
-  cohort: string | null;
-  major: string | null;
-  prefix: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  englishName: string | null;
-  homeAddress: string | null;
-  remarks: string | null;
-}
-
-interface ThailandApiResponse {
-  data: ThailandAlumni[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-type ThailandSortField =
-  | "studentId"
-  | "cohort"
-  | "major"
-  | "prefix"
-  | "firstName"
-  | "lastName"
-  | "englishName"
-  | "homeAddress"
-  | "remarks";
-type ThailandSortDir = "asc" | "desc";
-
-const THAILAND_SORT_FIELDS: { field: ThailandSortField; label: string }[] = [
-  { field: "studentId", label: "รหัสนักศึกษา" },
-  { field: "cohort", label: "รุ่น" },
-  { field: "major", label: "สาขาวิชา" },
-  { field: "prefix", label: "คำนำหน้า" },
-  { field: "firstName", label: "ชื่อ" },
-  { field: "lastName", label: "นามสกุล" },
-  { field: "englishName", label: "ชื่ออังกฤษ" },
-  { field: "homeAddress", label: "ที่อยู่บ้าน" },
-  { field: "remarks", label: "หมายเหตุ" },
-];
-
-type ThailandSearchField = "all" | "studentId" | "firstName";
-
-const THAILAND_SEARCH_FIELDS: { value: ThailandSearchField; label: string }[] = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "firstName", label: "ชื่อ" },
-];
+// Thailand (in-country) mode (PRD §3.9) reuses the SAME `AlumniAgency` model and
+// the abroad view's sort/search machinery — see THAILAND_VIEW_SORT_FIELDS /
+// THAILAND_SEARCH_FIELDS below. It differs only in that it sources
+// /api/alumni-agency?region=thailand (country-discriminated) and hides the
+// country column. Sourced from alumni-agency, NOT the `alumni` table, so it
+// shares workplace/homeAddress/etc. with the abroad tab.
 
 const abroadFormSchema = z.object({
   studentId: z.string(),
@@ -157,6 +110,16 @@ const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "homeAddress", label: "ที่อยู่บ้าน" },
   { field: "notes", label: "หมายเหตุ" },
 ];
+
+// In-country tab: abroad view columns MINUS country (PRD §3.9 line 167:
+// รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, สถานที่ทำงาน,
+// ที่อยู่บ้าน, หมายเหตุ). workplace is included here — it was the missing column.
+const THAILAND_VIEW_SORT_FIELDS: { field: SortField; label: string }[] = VIEW_SORT_FIELDS.filter(
+  (f) => f.field !== "country"
+);
+const THAILAND_SEARCH_FIELDS: { value: SearchField; label: string }[] = SEARCH_FIELDS.filter(
+  (f) => f.value !== "country"
+);
 
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
@@ -260,34 +223,44 @@ export default function AlumniAgencyPage() {
   const [viewSortField, setViewSortField] = useState<SortField>("cohort");
   const [viewSortDir, setViewSortDir] = useState<SortDir>("desc");
 
-  // Thailand mode (PRD §3.9) — read-only view sourced from the alumni table
+  // Thailand mode (PRD §3.9) — in-country view sourced from alumni-agency
   const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
   const [thailandPage, setThailandPage] = useState(1);
   const [thailandSearch, setThailandSearch] = useState("");
-  const [thailandSearchField, setThailandSearchField] = useState<ThailandSearchField>("all");
-  const [thailandSortField, setThailandSortField] = useState<ThailandSortField>("studentId");
-  const [thailandSortDir, setThailandSortDir] = useState<ThailandSortDir>("asc");
-  const [filters] = useState<Record<string, string[]>>({});
-  const filtersKey = facetQueryParams(filters).toString();
+  const [thailandSearchField, setThailandSearchField] = useState<SearchField>("all");
+  const [thailandSortField, setThailandSortField] = useState<SortField>("studentId");
+  const [thailandSortDir, setThailandSortDir] = useState<SortDir>("asc");
 
+  // In-country tab: same alumni-agency model, country-discriminated to Thailand.
   const { data: thailandData, isPending: thailandLoading } = useQuery({
-    queryKey: ["alumniAgency", "thailand", { thailandPage, thailandSearch, thailandSearchField, thailandSortField, thailandSortDir, filtersKey }],
+    queryKey: ["alumniAgency", "thailand", { thailandSearch, thailandSearchField }],
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(thailandPage), pageSize: String(PAGE_SIZE), sortField: thailandSortField, sortOrder: thailandSortDir });
+      const params = new URLSearchParams({ region: "thailand" });
       if (thailandSearch.trim()) {
         params.set("search", thailandSearch.trim());
         params.set("searchField", thailandSearchField);
       }
-      facetQueryParams(filters).forEach((v, k) => params.set(k, v));
-      return apiFetch<ThailandApiResponse>(`/api/alumni?${params}`);
+      return apiFetch<ApiResponse>(`/api/alumni-agency?${params}`);
     },
     enabled: mode === "thailand",
   });
-  const thailandAlumni = thailandData?.data ?? [];
-  const thailandTotal = thailandData?.total ?? 0;
-  const thailandTotalPages = Math.max(1, Math.ceil(thailandTotal / (thailandData?.pageSize ?? PAGE_SIZE)));
+  const thailandAlumni = useMemo(() => thailandData?.data ?? [], [thailandData]);
+  // Sort + paginate the Thailand set client-side (alumni-agency returns the full
+  // matching list, same as the abroad view; the set is small).
+  const thailandSorted = useMemo(() =>
+    [...thailandAlumni].sort((a, b) => {
+      const va = getFieldValue(a, thailandSortField);
+      const vb = getFieldValue(b, thailandSortField);
+      const cmp = va.localeCompare(vb, "th");
+      return thailandSortDir === "asc" ? cmp : -cmp;
+    }),
+    [thailandAlumni, thailandSortField, thailandSortDir]
+  );
+  const thailandTotal = thailandSorted.length;
+  const thailandTotalPages = Math.max(1, Math.ceil(thailandTotal / PAGE_SIZE));
+  const pagedThailand = thailandSorted.slice((thailandPage - 1) * PAGE_SIZE, thailandPage * PAGE_SIZE);
 
-  const handleThailandSort = (field: ThailandSortField) => {
+  const handleThailandSort = (field: SortField) => {
     if (thailandSortField === field) {
       setThailandSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -309,7 +282,7 @@ export default function AlumniAgencyPage() {
   const { data: abroadData, isPending: loading } = useQuery({
     queryKey: ["alumniAgency", "abroad", { search, searchField, countryFilter }],
     queryFn: () =>
-      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ search, country: countryFilter, searchField })}`),
+      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ region: "abroad", search, country: countryFilter, searchField })}`),
     enabled: mode === "abroad",
   });
   // Wrap in useMemo so the array identity is stable across renders (avoids
@@ -343,7 +316,8 @@ export default function AlumniAgencyPage() {
   const mgmtTotalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
   const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
   const visibleAbroad = manageMode ? pagedAlumni : pagedViewAlumni;
-  const hot = useHotFields("alumni_agency", visibleAbroad.map((a) => a.id));
+  const visibleAgencyIds = (mode === "thailand" ? pagedThailand : visibleAbroad).map((a) => a.id);
+  const hot = useHotFields("alumni_agency", visibleAgencyIds);
 
   const openCreate = () => {
     formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
@@ -894,14 +868,14 @@ export default function AlumniAgencyPage() {
       )}
       </>)}
 
-      {/* Thailand mode (PRD §3.9) — read-only alumni view */}
+      {/* Thailand (in-country) mode (PRD §3.9) — alumni-agency, country=Thailand */}
       {mode === "thailand" && (
         <>
-          {/* Filters: search + workplace facet */}
+          {/* Filters: search */}
           <div className="mb-6 flex flex-col gap-3 sm:flex-row">
             <select
               value={thailandSearchField}
-              onChange={(e) => { setThailandSearchField(e.target.value as ThailandSearchField); setThailandSearch(""); setThailandPage(1); }}
+              onChange={(e) => { setThailandSearchField(e.target.value as SearchField); setThailandSearch(""); setThailandPage(1); }}
               className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             >
               {THAILAND_SEARCH_FIELDS.map((f) => (
@@ -917,7 +891,7 @@ export default function AlumniAgencyPage() {
             />
           </div>
 
-          {/* Thailand table */}
+          {/* In-country table — abroad view columns minus country (PRD §3.9) */}
           {thailandLoading ? (
             <div className="flex justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
@@ -931,11 +905,11 @@ export default function AlumniAgencyPage() {
                   <thead>
                     <tr className="bg-[var(--primary)] text-white">
                       <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                      {THAILAND_SORT_FIELDS.map(({ field, label }) => (
+                      {THAILAND_VIEW_SORT_FIELDS.map(({ field, label }) => (
                         <th
                           key={field}
                           onClick={() => handleThailandSort(field)}
-                          className="cursor-pointer select-none px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                          className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                         >
                           {label}
                           <SortIcon active={thailandSortField === field} dir={thailandSortField === field ? thailandSortDir : "asc"} />
@@ -944,18 +918,23 @@ export default function AlumniAgencyPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {thailandAlumni.map((a, idx) => (
+                    {pagedThailand.map((a, idx) => (
                       <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
                         <td className="px-4 py-3 text-center">{(thailandPage - 1) * PAGE_SIZE + idx + 1}</td>
-                        <td className="px-4 py-3 font-mono text-gray-700">{a.studentId || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]">{a.cohort || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]">{a.major || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]">{a.prefix || "-"}</td>
-                        <td className="px-4 py-3">{a.firstName || "-"}</td>
-                        <td className="px-4 py-3">{a.lastName || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]">{a.englishName || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate">{a.homeAddress || "-"}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]">{a.remarks || "-"}</td>
+                        <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3">{a.prefix || "-"}</td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
+                        <td className="px-4 py-3">
+                          {a.notes ? (
+                            <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
+                          ) : "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
