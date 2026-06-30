@@ -9,6 +9,11 @@
 
 export interface CmuGraduate {
   student_id: string;
+  // ALL of this person's student_ids (one per FON degree), populated by
+  // dedupeCmuGraduatesByPerson on the KEPT (highest-degree) record so consumers
+  // can bridge the person on any of their degrees — not just the kept one.
+  // Raw fetchCmuGraduates() records leave this undefined.
+  student_ids?: string[];
   birthday: string;
   cmuitaccount: string;
   sex_id: string;

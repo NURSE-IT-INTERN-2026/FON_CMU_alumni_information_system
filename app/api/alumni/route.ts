@@ -66,6 +66,10 @@ export async function GET(request: NextRequest) {
           graduateCommittees: true,
           potentials: true,
           modelRepresentatives: true,
+          // Education studentIds let the all-alumni table bridge a local alumni
+          // to its CMU person on ANY of its degrees (not just the primary), so a
+          // multi-degree alumni collapses to one row. See all-alumni page merge.
+          educations: { select: { studentId: true } },
         },
         orderBy: { [validSortField]: validSortOrder },
         skip: (page - 1) * pageSize,
