@@ -16,12 +16,16 @@ export async function GET(request: NextRequest) {
   const field = searchParams.get("field") || "";
   const page = parseInt(searchParams.get("page") || "1", 10);
   const search = searchParams.get("search") || undefined;
+  // `?dedupe=false` makes alumni CMU-backed facets count every degree record
+  // (matching the all-alumni "show all degrees" view). Default (absent/"true")
+  // counts collapsed persons.
+  const dedupe = searchParams.get("dedupe") !== "false";
   try {
     // Alumni facets that have a CMU Registrar counterpart merge CMU + local
     // counts so the dropdowns reflect the merged table the user sees.
     const result =
       entity === "alumni" && isAlumniCmuBackedField(field)
-        ? await getAlumniFacetValues(field, { page, search })
+        ? await getAlumniFacetValues(field, { page, search, dedupe })
         : await getFacetValues(entity, field, { page, search });
     return NextResponse.json(result);
   } catch {

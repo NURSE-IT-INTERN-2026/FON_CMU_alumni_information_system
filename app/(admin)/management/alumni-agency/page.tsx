@@ -16,6 +16,7 @@ import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
+import SearchInput from "@/components/ui/search-input";
 
 interface AlumniAgency {
   id: string;
@@ -176,6 +177,7 @@ export default function AlumniAgencyPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
+  const applySearch = (value: string) => setSearch(value);
   const [countryFilter, setCountryFilter] = useState("");
   // "รอเชื่อมโยง" toggle — show only rows flagged with no Alumni to link to.
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
@@ -230,6 +232,10 @@ export default function AlumniAgencyPage() {
   const [thailandPage, setThailandPage] = useState(1);
   const [thailandSearch, setThailandSearch] = useState("");
   const [thailandSearchField, setThailandSearchField] = useState<SearchField>("all");
+  const applyThailandSearch = (value: string) => {
+    setThailandSearch(value);
+    setThailandPage(1);
+  };
   const [thailandSortField, setThailandSortField] = useState<SortField>("studentId");
   const [thailandSortDir, setThailandSortDir] = useState<SortDir>("asc");
 
@@ -616,12 +622,11 @@ export default function AlumniAgencyPage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+        <SearchInput
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          onSearch={applySearch}
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          formClassName="flex-1"
         />
         <select
           value={countryFilter}
@@ -800,12 +805,11 @@ export default function AlumniAgencyPage() {
                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
-            <input
-              type="text"
-              placeholder={`ค้นหา${THAILAND_SEARCH_FIELDS.find((f) => f.value === thailandSearchField)?.label}...`}
+            <SearchInput
               value={thailandSearch}
-              onChange={(e) => { setThailandSearch(e.target.value); setThailandPage(1); }}
-              className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+              onSearch={applyThailandSearch}
+              placeholder={`ค้นหา${THAILAND_SEARCH_FIELDS.find((f) => f.value === thailandSearchField)?.label}...`}
+              formClassName="flex-1"
             />
             <button
               type="button"

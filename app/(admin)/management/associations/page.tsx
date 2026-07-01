@@ -15,6 +15,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import { associationPageFormSchema, type AssociationPageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -125,10 +126,6 @@ export default function AssociationsPage() {
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
     setPage(1);
-  };
-
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") setPage(1);
   };
 
   const rowNumber = (index: number) => (page - 1) * PAGE_SIZE + index + 1;
@@ -474,13 +471,11 @@ export default function AssociationsPage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+        <SearchInput
           value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          onKeyDown={handleSearchKeyDown}
-          className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
+          onSearch={handleSearch}
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          formClassName="w-full sm:max-w-md"
         />
       </div>
 

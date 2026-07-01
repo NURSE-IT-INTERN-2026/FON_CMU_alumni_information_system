@@ -25,6 +25,10 @@ interface FacetFilterProps {
   /** Optional display labels for raw values (e.g. enum keys -> Thai). */
   valueLabels?: Record<string, string>;
   disabled?: boolean;
+  /** Extra query params forwarded to /api/filter-facets on every fetch (e.g.
+   *  `{ dedupe: "false" }` so alumni facets match the all-alumni "show all
+   *  degrees" view). */
+  queryParams?: Record<string, string>;
 }
 
 export default function FacetFilter({
@@ -35,6 +39,7 @@ export default function FacetFilter({
   onChange,
   valueLabels,
   disabled,
+  queryParams,
 }: FacetFilterProps) {
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<FacetValue[]>([]);
@@ -43,6 +48,10 @@ export default function FacetFilter({
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Stable key for the extra params so an inline `queryParams` object (new each
+  // render) doesn't churn the fetchValues identity / debounce timer. Only the
+  // param CONTENT matters.
+  const extraParamsKey = queryParams ? new URLSearchParams(queryParams).toString() : "";
 
   // Fetch all facet values (optionally narrowed by a search term). The endpoint
   // returns every matching value in one shot — no client-side pagination.
@@ -52,6 +61,9 @@ export default function FacetFilter({
       try {
         const params = new URLSearchParams({ entity, field });
         if (searchTerm) params.set("search", searchTerm);
+        if (queryParams) {
+          for (const [k, v] of Object.entries(queryParams)) params.set(k, v);
+        }
         const res = await fetch(`${BASE_PATH}/api/filter-facets?${params}`);
         if (!res.ok) return;
         const data: FacetResponse = await res.json();
@@ -63,7 +75,8 @@ export default function FacetFilter({
         setLoading(false);
       }
     },
-    [entity, field]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entity, field, extraParamsKey]
   );
 
   // Debounced search.

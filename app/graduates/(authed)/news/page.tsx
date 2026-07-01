@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { assetUrl } from "@/lib/asset-url";
+import SearchInput from "@/components/ui/search-input";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -79,12 +80,11 @@ export default function AlumniNewsPage() {
 
       {/* Search */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <input
-          type="text"
-          placeholder="ค้นหาข่าว..."
+        <SearchInput
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          onSearch={(v) => { setSearch(v); setPage(1); }}
+          placeholder="ค้นหาข่าว..."
+          formClassName="flex-1"
         />
       </div>
 

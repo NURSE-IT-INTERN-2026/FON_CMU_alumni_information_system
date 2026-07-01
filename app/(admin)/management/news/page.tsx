@@ -15,6 +15,7 @@ import { newsFormSchema, type NewsFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+import SearchInput from "@/components/ui/search-input";
 
 // PRD §3.12: news lists show at most 9 cards per page.
 const NEWS_PAGE_SIZE = 9;
@@ -812,12 +813,11 @@ export default function NewsListPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <input
-          type="text"
-          placeholder="ค้นหาข่าว..."
+        <SearchInput
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          onSearch={(v) => { setSearch(v); setPage(1); }}
+          placeholder="ค้นหาข่าว..."
+          formClassName="flex-1"
         />
         {(
           <select

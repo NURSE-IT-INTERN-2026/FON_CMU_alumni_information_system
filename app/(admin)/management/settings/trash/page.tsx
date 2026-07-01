@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useRole } from "@/lib/role-context";
+import SearchInput from "@/components/ui/search-input";
 
 interface TrashRecord {
   id: string;
@@ -156,12 +157,11 @@ export default function TrashPage() {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder="ค้นหา..."
+        <SearchInput
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
+          onSearch={(v) => { setSearch(v); setPage(1); }}
+          placeholder="ค้นหา..."
+          formClassName="w-full sm:max-w-md"
         />
       </div>
 
