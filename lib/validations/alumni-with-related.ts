@@ -44,6 +44,8 @@ export const alumniWithRelatedCreateSchema = alumniCreateSchema.extend({
         awardName: z.string().min(1, "กรุณากรอกชื่อรางวัล"),
         awardType: z.string().min(1, "กรุณาเลือกประเภทรางวัล"),
         year: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
+        link: z.string().optional().nullable(),
+        imageUrl: z.string().optional().nullable(),
         description: z.string().optional().default(""),
       }),
     )

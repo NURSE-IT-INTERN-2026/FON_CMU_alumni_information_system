@@ -11,6 +11,19 @@ export const AWARD_TYPE_OPTIONS = Object.entries(AWARD_TYPE_LABELS).map(([value,
   label,
 }));
 
+// The 5 model-representative networks (เครือข่าย). Stored on
+// ModelRepresentative.cohort — single source of truth (the model-reps page
+// sort + the new-alumni เครือข่าย dropdown both read this). Plain `string[]`
+// (not `as const`) so consumers can call `.indexOf(string)` like the old local
+// NETWORK_ORDER did.
+export const MODEL_REP_NETWORKS: string[] = [
+  "ปริญญาพยาบาล",
+  "ผู้ช่วยพยาบาล",
+  "อนุปริญญาพยาบาล",
+  "ปริญญาโท",
+  "ปริญญาเอก",
+];
+
 export const PREFIX_OPTIONS = [
   { value: "นางสาว", label: "นางสาว" },
   { value: "นาง", label: "นาง" },

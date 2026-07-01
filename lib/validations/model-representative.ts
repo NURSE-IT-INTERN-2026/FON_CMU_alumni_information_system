@@ -3,9 +3,9 @@ import { editReasonField } from "./helpers";
 
 const MSG = {
   studentIdRequired: "กรุณาระบุรหัสนักศึกษา",
-  cohortRequired: "กรุณากรอกรุ่น",
-  generationRequired: "กรุณากรอกลำดับรุ่น",
-  generationInvalid: "ลำดับรุ่นต้องเป็นตัวเลข",
+  cohortRequired: "กรุณาเลือกเครือข่าย",
+  generationRequired: "กรุณากรอกรุ่นที่",
+  generationInvalid: "รุ่นที่ต้องเป็นตัวเลข",
   firstNameRequired: "กรุณากรอกชื่อ",
   lastNameRequired: "กรุณากรอกนามสกุล",
 };

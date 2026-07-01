@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE, BASE_PATH } from "@/lib/constants";
+import { PAGE_SIZE, BASE_PATH, MODEL_REP_NETWORKS as NETWORK_ORDER } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
@@ -28,14 +28,6 @@ interface ModelRepresentative {
   generation: number;
   major?: string | null;
 }
-
-const NETWORK_ORDER = [
-  "ปริญญาพยาบาล",
-  "ผู้ช่วยพยาบาล",
-  "อนุปริญญาพยาบาล",
-  "ปริญญาโท",
-  "ปริญญาเอก",
-];
 
 type SortField = "network" | "generation" | "studentId" | "prefix" | "firstName" | "lastName" | "major";
 type SortDir = "asc" | "desc";

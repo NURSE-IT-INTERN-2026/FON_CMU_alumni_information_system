@@ -5,7 +5,7 @@ import { useCanWrite } from "@/lib/role-context";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
+import { AWARD_TYPE_OPTIONS, DEGREE_LEVEL_OPTIONS, MODEL_REP_NETWORKS, BASE_PATH } from "@/lib/constants";
 import {
   alumniWithRelatedFormSchema,
   type AlumniWithRelatedFormData,
@@ -21,6 +21,15 @@ function formatBirthDate(value: string): string {
   return value.replace(/\D/g, "").slice(0, 8);
 }
 
+// เครือข่าย select options for the model-representative section. The leading
+// blank option is required: RepeatableFieldArray's select renders only these
+// options (no built-in placeholder), and emptyRow.cohort === "" must map to it
+// or the UI would silently show the first network while the value stays "".
+const MODEL_REP_NETWORK_OPTIONS = [
+  { value: "", label: "-- เลือกเครือข่าย --" },
+  ...MODEL_REP_NETWORKS.map((n) => ({ value: n, label: n })),
+];
+
 const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   studentId: "",
   prefix: "",
@@ -28,6 +37,7 @@ const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   lastName: "",
   degreeLevel: "" as AlumniWithRelatedFormData["degreeLevel"],
   cohort: "",
+  major: "",
   graduationYear: "",
   birthDate: "",
   awards: [],
@@ -187,6 +197,7 @@ export default function NewAlumniPage() {
       lastName: data.lastName.trim(),
       birthDate: data.birthDate,
       cohort: data.cohort?.trim() || undefined,
+      major: data.major?.trim() || undefined,
       graduationYear: Number(data.graduationYear),
       degreeLevel: data.degreeLevel,
     };
@@ -196,6 +207,8 @@ export default function NewAlumniPage() {
         awardName: r.awardName,
         awardType: r.awardType,
         year: Number(r.year),
+        link: r.link,
+        imageUrl: r.imageUrl,
         description: r.description,
       }));
     }
@@ -323,8 +336,11 @@ export default function NewAlumniPage() {
                 <p className="mt-1 text-xs text-gray-400">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
               )}
             </FormField>
-            <FormField label="รุ่น/สาขา">
-              <FormInput registration={register("cohort")} placeholder="รุ่น/สาขา" />
+            <FormField label="รุ่น">
+              <FormInput registration={register("cohort")} placeholder="รุ่น" />
+            </FormField>
+            <FormField label="สาขา">
+              <FormInput registration={register("major")} placeholder="สาขา" />
             </FormField>
             <FormField label="ปีที่สำเร็จการศึกษา (พ.ศ.)" required error={errors.graduationYear?.message}>
               <FormInput
@@ -360,7 +376,7 @@ export default function NewAlumniPage() {
             register={register}
             errors={errors}
             name="awards"
-            emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }}
+            emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", link: "", imageUrl: "", description: "" }}
             fields={[
               { key: "awardName", label: "ชื่อรางวัล", required: true },
               {
@@ -371,6 +387,8 @@ export default function NewAlumniPage() {
                 options: AWARD_TYPE_OPTIONS,
               },
               { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
+              { key: "link", label: "ลิงค์" },
+              { key: "imageUrl", label: "รูปภาพ" },
               { key: "description", label: "รายละเอียด", type: "textarea", required: true },
             ]}
           />
@@ -450,8 +468,8 @@ export default function NewAlumniPage() {
             emptyRow={{ cohort: "", generation: "" }}
             singleRow
             fields={[
-              { key: "cohort", label: "รุ่น", required: true },
-              { key: "generation", label: "ลำดับรุ่น", type: "number", required: true },
+              { key: "cohort", label: "เครือข่าย", type: "select", required: true, options: MODEL_REP_NETWORK_OPTIONS },
+              { key: "generation", label: "รุ่นที่", type: "number", required: true },
             ]}
           />
         </SectionToggle>
