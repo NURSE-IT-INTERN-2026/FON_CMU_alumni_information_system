@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         firstName: validated.firstName,
         lastName: validated.lastName,
         cohort: validated.cohort || null,
+        major: validated.major ?? null,
         graduationYear: validated.graduationYear ?? null,
         degreeLevel: validated.degreeLevel,
         email: validated.email || null,

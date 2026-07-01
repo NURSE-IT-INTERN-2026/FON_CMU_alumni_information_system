@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
           firstName: validated.firstName,
           lastName: validated.lastName,
           cohort: validated.cohort || null,
+          major: validated.major || null,
           graduationYear: validated.graduationYear ?? null,
           degreeLevel: validated.degreeLevel || "BACHELOR",
           email: validated.email || null,
@@ -63,6 +64,8 @@ export async function POST(request: NextRequest) {
             awardName: a.awardName,
             awardType: a.awardType as AwardType,
             year: a.year,
+            link: a.link || null,
+            imageUrl: a.imageUrl || null,
             description: a.description || null,
           })),
         });

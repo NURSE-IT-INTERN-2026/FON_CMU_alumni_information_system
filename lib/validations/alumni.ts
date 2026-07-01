@@ -47,6 +47,10 @@ export const alumniFormSchema = z.object({
     .min(1, MSG.graduationYearRequired)
     .regex(/^\d{4}$/, MSG.graduationYearFormat),
   cohort: z.string().optional().default(""),
+  // สาขา (major) — distinct from รุ่น (cohort). The legacy "รุ่น/สาขา" label
+  // conflated them; major is its own snapshot field, mirrored onto the primary
+  // Education row by ensurePrimaryEducationFromSnapshot.
+  major: z.string().optional().default(""),
 });
 
 // --- API schemas ---
@@ -66,6 +70,7 @@ export const alumniCreateSchema = z.object({
   // the base POST still validate; the new-alumni form requires it.
   graduationYear: z.coerce.number().int().optional().nullable(),
   cohort: z.string().optional().nullable(),
+  major: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   contactEmail: z.string().optional().nullable(),
   phones: z.array(z.string()).optional().nullable(),
