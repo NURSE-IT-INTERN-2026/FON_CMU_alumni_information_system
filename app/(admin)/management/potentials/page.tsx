@@ -22,7 +22,9 @@ import { potentialPageFormSchema, type PotentialPageFormData } from "@/lib/valid
 
 interface Potential {
   id: string;
-  studentId: string;
+  studentId: string | null;
+  // "No Alumni to link to" flag — display the effective id as `studentId ?? pendingStudentId`.
+  pendingStudentId: string | null;
   prefix: string | null;
   firstName: string;
   lastName: string;
@@ -47,13 +49,14 @@ export default function PotentialsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
   const qc = useQueryClient();
   const { items: potentials, total, totalPages, isPending: loading, isError } = useEntityList<Potential>(
     "potentials",
     "/api/potentials",
     { page, search, sortField, sortDir, filters, filtersKey },
-    { sortKey: "sortBy" },
+    { sortKey: "sortBy", unlinked: unlinkedOnly },
   );
 
   const [showForm, setShowForm] = useState(false);
@@ -80,7 +83,7 @@ export default function PotentialsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
@@ -130,7 +133,7 @@ export default function PotentialsPage() {
 
   const openEdit = (p: Potential) => {
     formReset({
-      studentId: p.studentId,
+      studentId: p.studentId ?? "",
       prefix: p.prefix ?? "",
       firstName: p.firstName,
       lastName: p.lastName,
@@ -240,7 +243,7 @@ export default function PotentialsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const data = await apiFetch<{ imported: number; updated: number; errors: { row: number; message: string }[] }>(
+      const data = await apiFetch<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] }>(
         `/api/potentials/import`,
         { method: "POST", body: formData },
       );
@@ -306,7 +309,7 @@ export default function PotentialsPage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}</span>
+            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
             <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
@@ -430,6 +433,14 @@ export default function PotentialsPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
             {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
           </button>
+          <button
+            type="button"
+            onClick={() => setUnlinkedOnly((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+            title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+          >
+            รอเชื่อมโยง
+          </button>
           {selectedCount > 0 && (
             <>
               <button
@@ -523,7 +534,12 @@ export default function PotentialsPage() {
               {potentials.map((p, i) => (
                 <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(p.id); else if (p.studentId) router.push(`/management/alumni/${p.studentId}`); }} className={`cursor-pointer transition-colors ${isSelected(p.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                   <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
-                  <td className="px-4 py-3 font-mono text-gray-700">{p.studentId}</td>
+                  <td className="px-4 py-3 font-mono text-gray-700">
+                    {p.studentId || p.pendingStudentId || "-"}
+                    {p.pendingStudentId && !p.studentId ? (
+                      <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">{p.prefix || "-"}</td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="firstName" value={p.firstName} hotFields={hot[p.id]} /></td>
                   <td className="px-4 py-3"><OrangeCell resourceType="potential" recordId={p.id} field="lastName" value={p.lastName} hotFields={hot[p.id]} /></td>

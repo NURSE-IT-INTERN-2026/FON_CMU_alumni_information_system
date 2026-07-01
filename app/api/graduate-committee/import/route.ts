@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ensureAlumni } from "@/lib/ensure-alumni";
+import { resolveAlumniLink, buildAlumniEntityMatchWhere } from "@/lib/alumni-link";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
 import { splitFullName } from "@/lib/parse-name";
@@ -80,36 +80,47 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
     let updated = 0;
+    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
+    const warnings: { row: number; message: string }[] = [];
     const importedRecords: ImportedRecord[] = [];
     for (const record of records) {
       try {
         const displayName = [record.prefix, record.firstName, record.lastName].filter(Boolean).join(" ");
-        const alumni = await ensureAlumni(record.studentId, displayName || record.studentId);
-        const studentId = alumni.studentId;
-        const major = alumni.major ?? null;
-        // Upsert on (studentId + termYear + position) so re-importing updates
-        // existing rows instead of creating duplicates.
-        const existing = await prisma.graduateCommittee.findUnique({
+        // Resolve against EXISTING Alumni only — no stub creation. An unknown id
+        // is flagged via `pendingStudentId` (รอเชื่อมโยง).
+        const link = await resolveAlumniLink(record.studentId, null);
+        if (!link.linked && record.studentId) {
+          pending++;
+          warnings.push({
+            row: -1,
+            message: `รหัสนักศึกษา ${record.studentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
+          });
+        }
+        const { studentId, pendingStudentId, major } = link;
+        // Match by the resolved person AND the natural key (termYear + position)
+        // so re-importing updates instead of duplicating.
+        const existing = await prisma.graduateCommittee.findFirst({
           where: {
-            studentId_termYear_position: {
-              studentId,
-              termYear: record.termYear,
-              position: record.position,
-            },
+            AND: [
+              buildAlumniEntityMatchWhere({ studentId, pendingStudentId, firstName: record.firstName, lastName: record.lastName }),
+              { termYear: record.termYear, position: record.position },
+            ],
           },
         });
+        const effectiveId = studentId ?? pendingStudentId;
         if (existing) {
           await prisma.graduateCommittee.update({
             where: { id: existing.id },
-            data: { prefix: record.prefix || null, firstName: record.firstName, lastName: record.lastName, cohort: record.cohort, remarks: record.remarks ?? null, major },
+            data: { studentId, pendingStudentId, prefix: record.prefix || null, firstName: record.firstName, lastName: record.lastName, cohort: record.cohort, remarks: record.remarks ?? null, major },
           });
           updated++;
-          importedRecords.push({ id: studentId, name: displayName || studentId, op: "updated" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
         } else {
           await prisma.graduateCommittee.create({
             data: {
               termYear: record.termYear,
               studentId,
+              pendingStudentId,
               prefix: record.prefix || null,
               firstName: record.firstName,
               lastName: record.lastName,
@@ -120,7 +131,7 @@ export async function POST(request: NextRequest) {
             },
           });
           imported++;
-          importedRecords.push({ id: studentId, name: displayName || studentId, op: "created" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
         }
       } catch (err) {
         console.error("Import row error:", err);
@@ -141,7 +152,7 @@ export async function POST(request: NextRequest) {
       errors,
     });
 
-    return NextResponse.json({ imported, updated, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/graduate-committee/import error:", error);
     return NextResponse.json(

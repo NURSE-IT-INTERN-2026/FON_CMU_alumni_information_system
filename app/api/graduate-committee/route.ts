@@ -25,6 +25,11 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS["graduate-committee"]));
 
+    // `?unlinked=true` — show only rows flagged รอเชื่อมโยง (no Alumni to link).
+    if (searchParams.get("unlinked") === "true") {
+      where.pendingStudentId = { not: null };
+    }
+
     const andConditions: Record<string, unknown>[] = [];
 
     if (search) {
@@ -38,6 +43,14 @@ export async function GET(request: NextRequest) {
               { lastName: { contains: search, mode: "insensitive" } },
             ],
           });
+        } else if (searchField === "studentId") {
+          // Search the effective id — linked `studentId` OR pending `pendingStudentId`.
+          andConditions.push({
+            OR: [
+              { studentId: { contains: search, mode: "insensitive" } },
+              { pendingStudentId: { contains: search, mode: "insensitive" } },
+            ],
+          });
         } else {
           andConditions.push({ [searchField]: { contains: search, mode: "insensitive" } });
         }
@@ -45,6 +58,7 @@ export async function GET(request: NextRequest) {
         andConditions.push({
           OR: [
             { studentId: { contains: search, mode: "insensitive" } },
+            { pendingStudentId: { contains: search, mode: "insensitive" } },
             { firstName: { contains: search, mode: "insensitive" } },
             { lastName: { contains: search, mode: "insensitive" } },
             { position: { contains: search, mode: "insensitive" } },
@@ -94,7 +108,7 @@ export async function POST(request: NextRequest) {
     const committee = await prisma.graduateCommittee.create({
       data: {
         termYear: Number(validated.termYear),
-        studentId: validated.studentId.trim(),
+        studentId: validated.studentId?.trim() || null,
         prefix: validated.prefix?.trim() || null,
         firstName: validated.firstName.trim(),
         lastName: validated.lastName.trim(),

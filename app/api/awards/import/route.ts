@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { AwardType } from "@/app/generated/prisma/client";
-import { ensureAlumni } from "@/lib/ensure-alumni";
+import { resolveAlumniLink, buildAlumniEntityMatchWhere } from "@/lib/alumni-link";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
 
@@ -38,8 +38,10 @@ export async function POST(request: NextRequest) {
     const rows = await readExcelRows(buffer);
 
     const errors: { row: number; message: string }[] = [];
+    const warnings: { row: number; message: string }[] = [];
     let imported = 0;
     let updated = 0;
+    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
     const importedRecords: ImportedRecord[] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -52,20 +54,24 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Sync with CMU by studentId; copy the resolved major onto the row.
-        let major: string | null = null;
-        let studentId = data!.studentId;
         const displayName = [data!.prefix, data!.firstName, data!.lastName]
           .filter(Boolean)
           .join(" ") || data!.awardName;
-        if (studentId) {
-          const alumni = await ensureAlumni(studentId, displayName || studentId);
-          studentId = alumni.studentId;
-          major = alumni.major;
+        // Resolve the studentId against EXISTING Alumni only — no stub creation.
+        // An unknown id is flagged via `pendingStudentId` (รอเชื่อมโยง).
+        const link = await resolveAlumniLink(data!.studentId, null);
+        if (!link.linked && data!.studentId) {
+          pending++;
+          warnings.push({
+            row: rowNumber,
+            message: `รหัสนักศึกษา ${data!.studentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
+          });
         }
+        const { studentId, pendingStudentId, major } = link;
 
         const payload = {
           studentId,
+          pendingStudentId,
           prefix: data!.prefix,
           firstName: data!.firstName,
           lastName: data!.lastName,
@@ -78,25 +84,26 @@ export async function POST(request: NextRequest) {
           major,
         };
 
-        // Awards have no DB unique — match by natural key (studentId +
-        // awardName + year) among active rows so re-importing updates instead
-        // of duplicating.
+        // No DB unique — match by the resolved person (studentId OR
+        // pendingStudentId, OR name for id-less rows) AND the natural key
+        // (awardName + year) so re-importing updates instead of duplicating.
         const existing = await prisma.award.findFirst({
           where: {
-            awardName: data!.awardName,
-            year: data!.year,
-            deletedAt: null,
-            studentId: studentId ?? null,
+            AND: [
+              buildAlumniEntityMatchWhere({ studentId, pendingStudentId, firstName: data!.firstName, lastName: data!.lastName }),
+              { awardName: data!.awardName, year: data!.year },
+            ],
           },
         });
+        const effectiveId = studentId ?? pendingStudentId ?? null;
         if (existing) {
           await prisma.award.update({ where: { id: existing.id }, data: payload });
           updated++;
-          importedRecords.push({ id: studentId ?? null, name: displayName, op: "updated" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
         } else {
           await prisma.award.create({ data: payload });
           imported++;
-          importedRecords.push({ id: studentId ?? null, name: displayName, op: "created" });
+          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
         }
       } catch {
         errors.push({
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
       errors,
     });
 
-    return NextResponse.json({ imported, updated, skipped: 0, errors });
+    return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/awards/import error:", error);
     return NextResponse.json(

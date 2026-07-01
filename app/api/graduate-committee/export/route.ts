@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     const rows = items.map((a) => ({
       "ปี พ.ศ.": a.termYear,
-      "รหัสนักศึกษา": a.studentId,
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "รุ่นที่": a.cohort,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     const rows = items.map((a) => ({
       "ปี พ.ศ.": a.termYear,
-      "รหัสนักศึกษา": a.studentId,
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "รุ่นที่": a.cohort,

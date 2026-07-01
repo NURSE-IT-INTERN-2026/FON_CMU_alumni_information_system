@@ -24,7 +24,8 @@ export async function PUT(
       where: { id },
       data: {
         termYear: Number(validated.termYear),
-        studentId: validated.studentId!.trim(),
+        studentId: validated.studentId?.trim() || null,
+        ...(validated.studentId?.trim() ? { pendingStudentId: null } : {}),
         prefix: validated.prefix?.trim() || null,
         firstName: validated.firstName!.trim(),
         lastName: validated.lastName!.trim(),

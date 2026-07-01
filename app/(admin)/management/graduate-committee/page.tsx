@@ -23,7 +23,9 @@ import FormInput from "@/components/form/FormInput";
 interface Committee {
   id: string;
   termYear: number;
-  studentId: string;
+  studentId: string | null;
+  // "No Alumni to link to" flag — display the effective id as `studentId ?? pendingStudentId`.
+  pendingStudentId: string | null;
   prefix: string | null;
   firstName: string;
   lastName: string;
@@ -48,13 +50,14 @@ export default function GraduateCommitteePage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
   const qc = useQueryClient();
   const { items: committees, total, totalPages, isPending: loading, isError } = useEntityList<Committee>(
     "graduateCommittee",
     "/api/graduate-committee",
     { page, search, sortField, sortDir, filters, filtersKey },
-    { sortKey: "sortBy" },
+    { sortKey: "sortBy", unlinked: unlinkedOnly },
   );
 
   const [showForm, setShowForm] = useState(false);
@@ -81,7 +84,7 @@ export default function GraduateCommitteePage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
@@ -129,7 +132,7 @@ export default function GraduateCommitteePage() {
   const openEdit = (c: Committee) => {
     formReset({
       termYear: String(c.termYear),
-      studentId: c.studentId,
+      studentId: c.studentId ?? "",
       prefix: c.prefix ?? "",
       firstName: c.firstName,
       lastName: c.lastName,
@@ -252,7 +255,7 @@ export default function GraduateCommitteePage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const data = await apiFetch<{ imported: number; updated: number; errors: { row: number; message: string }[] }>(
+      const data = await apiFetch<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] }>(
         `/api/graduate-committee/import`,
         { method: "POST", body: formData },
       );
@@ -316,7 +319,7 @@ export default function GraduateCommitteePage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}</span>
+            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
             <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
@@ -444,6 +447,14 @@ export default function GraduateCommitteePage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
             {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
           </button>
+          <button
+            type="button"
+            onClick={() => setUnlinkedOnly((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+            title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+          >
+            รอเชื่อมโยง
+          </button>
           {selectedCount > 0 && (
             <>
               <button
@@ -541,7 +552,12 @@ export default function GraduateCommitteePage() {
                 {committees.map((c, i) => (
                   <tr key={c.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(c.id); else if (c.studentId) router.push(`/management/alumni/${c.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(c.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
-                    <td className="px-4 py-3 font-mono">{c.studentId}</td>
+                    <td className="px-4 py-3 font-mono">
+                      {c.studentId || c.pendingStudentId || "-"}
+                      {c.pendingStudentId && !c.studentId ? (
+                        <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3">{c.prefix || "-"}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="firstName" value={c.firstName} hotFields={hot[c.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="graduate_committee" recordId={c.id} field="lastName" value={c.lastName} hotFields={hot[c.id]} /></td>

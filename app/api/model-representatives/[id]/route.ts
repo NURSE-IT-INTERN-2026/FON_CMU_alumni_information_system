@@ -23,7 +23,8 @@ export async function PUT(
     const item = await prisma.modelRepresentative.update({
       where: { id },
       data: {
-        studentId: validated.studentId!.trim(),
+        studentId: validated.studentId?.trim() || null,
+        ...(validated.studentId?.trim() ? { pendingStudentId: null } : {}),
         prefix: validated.prefix?.trim() || null,
         firstName: validated.firstName!.trim(),
         lastName: validated.lastName!.trim(),

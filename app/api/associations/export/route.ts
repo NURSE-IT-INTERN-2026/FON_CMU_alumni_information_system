@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId,
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "ชื่อสมาคม/ชมรม": a.associationName,
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId,
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "ชื่อสมาคม/ชมรม": a.associationName,

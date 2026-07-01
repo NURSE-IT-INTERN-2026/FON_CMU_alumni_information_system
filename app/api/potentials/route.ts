@@ -25,6 +25,11 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.potentials));
 
+    // `?unlinked=true` — show only rows flagged รอเชื่อมโยง (no Alumni to link).
+    if (searchParams.get("unlinked") === "true") {
+      where.pendingStudentId = { not: null };
+    }
+
     if (search) {
       if (searchField && validSearchFields.includes(searchField)) {
         if (searchField === "recordedYear") {
@@ -34,12 +39,19 @@ export async function GET(request: NextRequest) {
             { firstName: { contains: search, mode: "insensitive" } },
             { lastName: { contains: search, mode: "insensitive" } },
           ];
+        } else if (searchField === "studentId") {
+          // Search the effective id — linked `studentId` OR pending `pendingStudentId`.
+          where.OR = [
+            { studentId: { contains: search, mode: "insensitive" } },
+            { pendingStudentId: { contains: search, mode: "insensitive" } },
+          ];
         } else {
           where[searchField] = { contains: search, mode: "insensitive" };
         }
       } else {
         where.OR = [
           { studentId: { contains: search, mode: "insensitive" } },
+          { pendingStudentId: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
           { career: { contains: search, mode: "insensitive" } },
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     const potential = await prisma.potential.create({
       data: {
-        studentId: validated.studentId.trim(),
+        studentId: validated.studentId?.trim() || null,
         prefix: validated.prefix?.trim() || null,
         firstName: validated.firstName.trim(),
         lastName: validated.lastName.trim(),

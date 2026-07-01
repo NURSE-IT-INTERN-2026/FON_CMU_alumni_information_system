@@ -145,6 +145,10 @@ model Education {
 model Award {
   id            String    @id @default(uuid())
   studentId     String?
+  // Attempted studentId that has no matching `Alumni` row yet — the "no Alumni
+  // to link to" flag (see lib/alumni-link). `studentId` (FK below) stays null
+  // while this is set; import moves it to `studentId` once a real Alumni appears.
+  pendingStudentId String?
   prefix        String?
   firstName     String
   lastName      String
@@ -164,12 +168,16 @@ model Award {
   @@index([awardType])
   @@index([year])
   @@index([major])
+  @@index([pendingStudentId])
   @@map("awards")
 }
 
 model Association {
   id              String    @id @default(uuid())
-  studentId       String
+  // Attempted studentId that has no matching `Alumni` row yet — the "no Alumni
+  // to link to" flag (see lib/alumni-link). Import links it once a real Alumni appears.
+  studentId       String?
+  pendingStudentId String?
   prefix          String?
   firstName       String
   lastName        String
@@ -181,17 +189,21 @@ model Association {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, associationName, position, recordedYear])
   @@index([major])
+  @@index([pendingStudentId])
   @@map("associations")
 }
 
 model GraduateCommittee {
   id        String    @id @default(uuid())
   termYear  Int
-  studentId String
+  // Attempted studentId that has no matching `Alumni` row yet — the "no Alumni
+  // to link to" flag (see lib/alumni-link). Import links it once a real Alumni appears.
+  studentId String?
+  pendingStudentId String?
   prefix    String?
   firstName String
   lastName  String
@@ -203,10 +215,11 @@ model GraduateCommittee {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, termYear, position])
   @@index([major])
+  @@index([pendingStudentId])
   @@map("graduate_committees")
 }
 
@@ -226,7 +239,10 @@ model News {
 
 model Potential {
   id           String    @id @default(uuid())
-  studentId    String
+  // Attempted studentId that has no matching `Alumni` row yet — the "no Alumni
+  // to link to" flag (see lib/alumni-link). Import links it once a real Alumni appears.
+  studentId    String?
+  pendingStudentId String?
   prefix       String?
   firstName    String
   lastName     String
@@ -238,16 +254,20 @@ model Potential {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, recordedYear])
   @@index([major])
+  @@index([pendingStudentId])
   @@map("potentials")
 }
 
 model ModelRepresentative {
   id         String    @id @default(uuid())
-  studentId  String
+  // Attempted studentId that has no matching `Alumni` row yet — the "no Alumni
+  // to link to" flag (see lib/alumni-link). Import links it once a real Alumni appears.
+  studentId  String?
+  pendingStudentId String?
   prefix     String?
   firstName  String
   lastName   String
@@ -258,10 +278,11 @@ model ModelRepresentative {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  alumni Alumni @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  alumni Alumni? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
 
   @@unique([studentId, cohort, generation])
   @@index([major])
+  @@index([pendingStudentId])
   @@map("model_representatives")
 }
 

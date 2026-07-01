@@ -19,7 +19,13 @@ export async function PUT(
     const validated = awardUpdateSchema.parse(body);
 
     const updateData: Record<string, unknown> = {};
-    if (validated.studentId !== undefined) updateData.studentId = validated.studentId || null;
+    if (validated.studentId !== undefined) {
+      updateData.studentId = validated.studentId || null;
+      // Linking a real alumni supersedes any pending flag (the manual form only
+      // ever picks existing alumni via the typeahead). pendingStudentId is
+      // otherwise never written from the form.
+      if (validated.studentId && validated.studentId.trim()) updateData.pendingStudentId = null;
+    }
     if (validated.prefix !== undefined) updateData.prefix = validated.prefix?.trim() || null;
     if (validated.firstName !== undefined) updateData.firstName = validated.firstName;
     if (validated.lastName !== undefined) updateData.lastName = validated.lastName;
