@@ -42,12 +42,17 @@ interface ApiResponse {
   countries: string[];
 }
 
-// Thailand (in-country) mode (PRD §3.9) reuses the SAME `AlumniAgency` model and
-// the abroad view's sort/search machinery — see THAILAND_VIEW_SORT_FIELDS /
-// THAILAND_SEARCH_FIELDS below. It differs only in that it sources
-// /api/alumni-agency?region=thailand (country-discriminated) and hides the
-// country column. Sourced from alumni-agency, NOT the `alumni` table, so it
-// shares workplace/homeAddress/etc. with the abroad tab.
+// Both tabs (ข้อมูลในประเทศ / ข้อมูลต่างประเทศ, PRD §3.9) read the SAME
+// `AlumniAgency` model — `country` is the discriminator (`region=thailand` vs
+// `region=abroad` on /api/alumni-agency). They are a single CRUD table; `mode`
+// only switches the dataset, the country column/filter, and the create form's
+// country default. See CLAUDE.md "Management table pages are single-table CRUD".
+
+// Canonical Thailand value written to `country` when an in-country record is
+// created (the form hides the country field in thailand mode). It is one of
+// THAILAND_COUNTRY_VALUES (lib/alumni-agency-region.ts) so the record lands in
+// the in-country tab.
+const THAILAND_DEFAULT_COUNTRY = "ประเทศไทย";
 
 const abroadFormSchema = z.object({
   studentId: z.string(),
@@ -86,7 +91,8 @@ const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
 type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
-const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
+// Abroad sort columns (includes country).
+const ABROAD_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "studentId", label: "รหัสนักศึกษา" },
   { field: "cohort", label: "รุ่น" },
   { field: "major", label: "สาขาวิชา" },
@@ -100,24 +106,10 @@ const MGMT_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "notes", label: "หมายเหตุ" },
 ];
 
-const VIEW_SORT_FIELDS: { field: SortField; label: string }[] = [
-  { field: "studentId", label: "รหัสนักศึกษา" },
-  { field: "cohort", label: "รุ่น" },
-  { field: "major", label: "สาขาวิชา" },
-  { field: "prefix", label: "คำนำหน้า" },
-  { field: "firstName", label: "ชื่อ" },
-  { field: "lastName", label: "นามสกุล" },
-  { field: "englishName", label: "ชื่ออังกฤษ" },
-  { field: "country", label: "ประเทศ" },
-  { field: "workplace", label: "สถานที่ทำงาน" },
-  { field: "homeAddress", label: "ที่อยู่บ้าน" },
-  { field: "notes", label: "หมายเหตุ" },
-];
-
-// In-country tab: abroad view columns MINUS country (PRD §3.9 line 167:
+// In-country tab: abroad columns MINUS country (PRD §3.9 line 167:
 // รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, สถานที่ทำงาน,
 // ที่อยู่บ้าน, หมายเหตุ). workplace is included here — it was the missing column.
-const THAILAND_VIEW_SORT_FIELDS: { field: SortField; label: string }[] = VIEW_SORT_FIELDS.filter(
+const THAILAND_SORT_FIELDS: { field: SortField; label: string }[] = ABROAD_SORT_FIELDS.filter(
   (f) => f.field !== "country"
 );
 const THAILAND_SEARCH_FIELDS: { value: SearchField; label: string }[] = SEARCH_FIELDS.filter(
@@ -175,14 +167,25 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export default function AlumniAgencyPage() {
   const router = useRouter();
+
+  // Single-table CRUD driven by `mode` (PRD §3.9). Both tabs share the model;
+  // region=mode picks the dataset (country=Thailand → in-country, else abroad).
+  const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
+  const isThailand = mode === "thailand";
+  const sortFields = isThailand ? THAILAND_SORT_FIELDS : ABROAD_SORT_FIELDS;
+  const searchFields = isThailand ? THAILAND_SEARCH_FIELDS : SEARCH_FIELDS;
+
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
-  const applySearch = (value: string) => setSearch(value);
-  const [countryFilter, setCountryFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState(""); // abroad only
   // "รอเชื่อมโยง" toggle — show only rows flagged with no Alumni to link to.
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
-  const [mgmtPage, setMgmtPage] = useState(1);
+  const [page, setPage] = useState(1);
+  const applySearch = (value: string) => { setSearch(value); setPage(1); };
+  const [sortField, setSortField] = useState<SortField>("country");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
@@ -224,98 +227,67 @@ export default function AlumniAgencyPage() {
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  const [mgmtSortField, setMgmtSortField] = useState<SortField>("country");
-  const [mgmtSortDir, setMgmtSortDir] = useState<SortDir>("desc");
-
-  // Thailand mode (PRD §3.9) — in-country view sourced from alumni-agency
-  const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
-  const [thailandPage, setThailandPage] = useState(1);
-  const [thailandSearch, setThailandSearch] = useState("");
-  const [thailandSearchField, setThailandSearchField] = useState<SearchField>("all");
-  const applyThailandSearch = (value: string) => {
-    setThailandSearch(value);
-    setThailandPage(1);
-  };
-  const [thailandSortField, setThailandSortField] = useState<SortField>("studentId");
-  const [thailandSortDir, setThailandSortDir] = useState<SortDir>("asc");
-
-  // In-country tab: same alumni-agency model, country-discriminated to Thailand.
-  const { data: thailandData, isPending: thailandLoading } = useQuery({
-    queryKey: ["alumniAgency", "thailand", { thailandSearch, thailandSearchField, unlinkedOnly }],
+  const qc = useQueryClient();
+  const { data, isPending: loading } = useQuery({
+    queryKey: ["alumniAgency", mode, { search, searchField, countryFilter, unlinkedOnly }],
     queryFn: () => {
-      const params = new URLSearchParams({ region: "thailand" });
-      if (thailandSearch.trim()) {
-        params.set("search", thailandSearch.trim());
-        params.set("searchField", thailandSearchField);
-      }
-      if (unlinkedOnly) params.set("unlinked", "true");
+      const params = new URLSearchParams({ region: mode, search, searchField, unlinked: unlinkedOnly ? "true" : "" });
+      // The country filter dropdown only exists on the abroad tab.
+      if (!isThailand) params.set("country", countryFilter);
       return apiFetch<ApiResponse>(`/api/alumni-agency?${params}`);
     },
-    enabled: mode === "thailand",
   });
-  const thailandAlumni = useMemo(() => thailandData?.data ?? [], [thailandData]);
-  // Sort + paginate the Thailand set client-side (alumni-agency returns the full
-  // matching list, same as the abroad view; the set is small).
-  const thailandSorted = useMemo(() =>
-    [...thailandAlumni].sort((a, b) => {
-      const va = getFieldValue(a, thailandSortField);
-      const vb = getFieldValue(b, thailandSortField);
-      const cmp = va.localeCompare(vb, "th");
-      return thailandSortDir === "asc" ? cmp : -cmp;
-    }),
-    [thailandAlumni, thailandSortField, thailandSortDir]
-  );
-  const thailandTotal = thailandSorted.length;
-  const thailandTotalPages = Math.max(1, Math.ceil(thailandTotal / PAGE_SIZE));
-  const pagedThailand = thailandSorted.slice((thailandPage - 1) * PAGE_SIZE, thailandPage * PAGE_SIZE);
+  // Wrap in useMemo so the array identity is stable across renders (avoids
+  // re-running the sort memo below on every render — react-hooks/exhaustive-deps).
+  const alumni = useMemo(() => data?.data ?? [], [data]);
+  const countries = data?.countries ?? [];
 
-  const handleThailandSort = (field: SortField) => {
-    if (thailandSortField === field) {
-      setThailandSortDir((d) => (d === "asc" ? "desc" : "asc"));
+  // Single flat sorted list, sliced client-side (alumni-agency returns the full
+  // matching list; the set is small).
+  const sortedAlumni = useMemo(() =>
+    [...alumni].sort((a, b) => {
+      const va = getFieldValue(a, sortField);
+      const vb = getFieldValue(b, sortField);
+      const cmp = va.localeCompare(vb, "th");
+      return sortDir === "asc" ? cmp : -cmp;
+    }),
+    [alumni, sortField, sortDir]
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
+  const pagedAlumni = sortedAlumni.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleAgencyIds = pagedAlumni.map((a) => a.id);
+  const hot = useHotFields("alumni_agency", visibleAgencyIds);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
-      setThailandSortField(field);
-      setThailandSortDir("asc");
+      setSortField(field);
+      setSortDir("asc");
     }
-    setThailandPage(1);
+    setPage(1);
   };
 
   const switchMode = (next: "abroad" | "thailand") => {
     if (next === mode) return;
+    const th = next === "thailand";
     setMode(next);
-    setThailandPage(1);
-    setMgmtPage(1);
+    // Reset view state — the two datasets are disjoint (country-discriminated),
+    // so a stale search/sort/page from the other tab is meaningless here.
+    setPage(1);
+    setSearch("");
+    setSearchField("all");
+    setSortField(th ? "studentId" : "country");
+    setSortDir(th ? "asc" : "desc");
+    exitSelect();
   };
 
-  const qc = useQueryClient();
-  const { data: abroadData, isPending: loading } = useQuery({
-    queryKey: ["alumniAgency", "abroad", { search, searchField, countryFilter, unlinkedOnly }],
-    queryFn: () =>
-      apiFetch<ApiResponse>(`/api/alumni-agency?${new URLSearchParams({ region: "abroad", search, country: countryFilter, searchField, unlinked: unlinkedOnly ? "true" : "" })}`),
-    enabled: mode === "abroad",
-  });
-  // Wrap in useMemo so the array identity is stable across renders (avoids
-  // re-running the sort memos below on every render — react-hooks/exhaustive-deps).
-  const alumni = useMemo(() => abroadData?.data ?? [], [abroadData]);
-  const countries = abroadData?.countries ?? [];
-
-  // Management mode: flat sorted list
-  const sortedAlumni = useMemo(() =>
-    [...alumni].sort((a, b) => {
-      const va = getFieldValue(a, mgmtSortField);
-      const vb = getFieldValue(b, mgmtSortField);
-      const cmp = va.localeCompare(vb, "th");
-      return mgmtSortDir === "asc" ? cmp : -cmp;
-    }),
-    [alumni, mgmtSortField, mgmtSortDir]
-  );
-  const mgmtTotalPages = Math.max(1, Math.ceil(sortedAlumni.length / PAGE_SIZE));
-  const pagedAlumni = sortedAlumni.slice((mgmtPage - 1) * PAGE_SIZE, mgmtPage * PAGE_SIZE);
-  const visibleAbroad = pagedAlumni;
-  const visibleAgencyIds = (mode === "thailand" ? pagedThailand : visibleAbroad).map((a) => a.id);
-  const hot = useHotFields("alumni_agency", visibleAgencyIds);
+  // In-country records are always Thailand — the form hides the country field
+  // in thailand mode and writes THAILAND_DEFAULT_COUNTRY on create.
+  const defaultCountry = () => (isThailand ? THAILAND_DEFAULT_COUNTRY : "");
 
   const openCreate = () => {
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: defaultCountry(), major: "", notes: "", order: "0" });
     setEditingId(null);
     setShowForm(true);
   };
@@ -416,7 +388,9 @@ export default function AlumniAgencyPage() {
   };
 
   const handleExport = () => {
-    const params = new URLSearchParams({ search, country: countryFilter, searchField });
+    // Mirror the list's region split so an export never crosses tabs.
+    const params = new URLSearchParams({ region: mode, search, searchField });
+    if (!isThailand) params.set("country", countryFilter);
     window.location.href = `${BASE_PATH}/api/alumni-agency/export?${params}`;
   };
 
@@ -447,9 +421,9 @@ export default function AlumniAgencyPage() {
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          ต้นสังกัดศิษย์เก่า
+          ต้นสังกัดศิษย์เก่า{isThailand ? " (ในประเทศ)" : " (ต่างประเทศ)"}
         </h1>
-        {mode === "abroad" && (selectMode ? (
+        {selectMode ? (
           <div className="flex items-center gap-2">
             <button onClick={() => (isAllSelected(pagedAlumni.map((i) => i.id)) ? deselectAll() : selectAll(pagedAlumni.map((i) => i.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
               เลือกทั้งหมดในหน้านี้
@@ -462,7 +436,7 @@ export default function AlumniAgencyPage() {
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
           </button>
-        ))}
+        )}
       </div>
 
       {/* Thailand / Abroad mode toggle (PRD §3.9) */}
@@ -491,7 +465,6 @@ export default function AlumniAgencyPage() {
         </button>
       </div>
 
-      {mode === "abroad" && (<>
       {errorMsg && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
           <span>{errorMsg}</span>
@@ -589,12 +562,18 @@ export default function AlumniAgencyPage() {
             <FormField label="ที่อยู่บ้าน" className="sm:col-span-2">
               <FormTextarea registration={register("homeAddress")} rows={2} />
             </FormField>
-            <FormField label="ประเทศ" required error={errors.country?.message}>
-              <FormInput registration={register("country")} error={errors.country?.message} type="text" list="country-list" />
-              <datalist id="country-list">
-                {countries.map((c) => <option key={c} value={c} />)}
-              </datalist>
-            </FormField>
+            {isThailand ? (
+              // In-country records are always Thailand — keep the field
+              // registered (required by the schema) but hidden.
+              <input type="hidden" {...register("country")} />
+            ) : (
+              <FormField label="ประเทศ" required error={errors.country?.message}>
+                <FormInput registration={register("country")} error={errors.country?.message} type="text" list="country-list" />
+                <datalist id="country-list">
+                  {countries.map((c) => <option key={c} value={c} />)}
+                </datalist>
+              </FormField>
+            )}
             <FormField label="หมายเหตุ">
               <FormInput registration={register("notes")} type="text" />
             </FormField>
@@ -618,26 +597,28 @@ export default function AlumniAgencyPage() {
           onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); }}
           className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
         >
-          {SEARCH_FIELDS.map((f) => (
+          {searchFields.map((f) => (
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
         <SearchInput
           value={search}
           onSearch={applySearch}
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          placeholder={`ค้นหา${searchFields.find((f) => f.value === searchField)?.label}...`}
           formClassName="flex-1"
         />
-        <select
-          value={countryFilter}
-          onChange={(e) => setCountryFilter(e.target.value)}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          <option value="">ทุกประเทศ</option>
-          {countries.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        {!isThailand && (
+          <select
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          >
+            <option value="">ทุกประเทศ</option>
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={() => setUnlinkedOnly((v) => !v)}
@@ -648,41 +629,40 @@ export default function AlumniAgencyPage() {
         </button>
       </div>
 
-      {(
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            เพิ่มข้อมูล
-          </button>
-          <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-            ส่งออก Excel
-          </button>
-          <input type="file" accept=".xlsx,.xls" ref={importFileRef} onChange={handleImport} className="hidden" />
-          <button onClick={() => importFileRef.current?.click()} disabled={importing} className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
-            {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
-          </button>
-          {selectedCount > 0 && (
-            <>
-              <button
-                onClick={() => setShowBulkDeleteDialog(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                ลบที่เลือก ({selectedCount})
-              </button>
-              <button
-                onClick={handleBulkExport}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500 px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-500 hover:text-white transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                ส่งออกที่เลือก ({selectedCount})
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      {/* CRUD actions — always on for both tabs */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          เพิ่มข้อมูล
+        </button>
+        <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+          ส่งออก Excel
+        </button>
+        <input type="file" accept=".xlsx,.xls" ref={importFileRef} onChange={handleImport} className="hidden" />
+        <button onClick={() => importFileRef.current?.click()} disabled={importing} className="inline-flex items-center gap-1.5 rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
+          {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
+        </button>
+        {selectedCount > 0 && (
+          <>
+            <button
+              onClick={() => setShowBulkDeleteDialog(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+              ลบที่เลือก ({selectedCount})
+            </button>
+            <button
+              onClick={handleBulkExport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500 px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-500 hover:text-white transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              ส่งออกที่เลือก ({selectedCount})
+            </button>
+          </>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -691,24 +671,20 @@ export default function AlumniAgencyPage() {
       ) : alumni.length === 0 ? (
         <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
       ) : (
-        /* Management mode: single flat table */
         <div className="overflow-hidden rounded-lg bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
                   <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                  {MGMT_SORT_FIELDS.map(({ field, label }) => (
+                  {sortFields.map(({ field, label }) => (
                     <th
                       key={field}
-                      onClick={() => {
-                        if (mgmtSortField === field) setMgmtSortDir((d) => d === "asc" ? "desc" : "asc");
-                        else { setMgmtSortField(field); setMgmtSortDir("asc"); }
-                      }}
+                      onClick={() => handleSort(field)}
                       className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
                     >
                       {label}
-                      <SortIcon active={mgmtSortField === field} dir={mgmtSortField === field ? mgmtSortDir : "asc"} />
+                      <SortIcon active={sortField === field} dir={sortField === field ? sortDir : "asc"} />
                     </th>
                   ))}
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
@@ -717,7 +693,7 @@ export default function AlumniAgencyPage() {
               <tbody>
                 {pagedAlumni.map((a, idx) => (
                   <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
-                    <td className="px-4 py-3 text-center">{(mgmtPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 text-center">{(page - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
@@ -725,7 +701,9 @@ export default function AlumniAgencyPage() {
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
+                    {!isThailand && (
+                      <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
+                    )}
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="notes" value={a.notes || "-"} hotFields={hot[a.id]} /></td>
@@ -744,16 +722,16 @@ export default function AlumniAgencyPage() {
               </tbody>
             </table>
           </div>
-          {mgmtTotalPages > 1 && (
+          {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-              <span className="text-sm text-gray-500">แสดง {sortedAlumni.length === 0 ? 0 : (mgmtPage - 1) * PAGE_SIZE + 1}-{Math.min(mgmtPage * PAGE_SIZE, sortedAlumni.length)} จาก {sortedAlumni.length} รายการ</span>
+              <span className="text-sm text-gray-500">แสดง {sortedAlumni.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, sortedAlumni.length)} จาก {sortedAlumni.length} รายการ</span>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => { setMgmtPage(Math.max(1, mgmtPage - 1)); deselectAll(); }} disabled={mgmtPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                {getPageNumbers(mgmtPage, mgmtTotalPages).map((p, i) => (
+                <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                {getPageNumbers(page, totalPages).map((p, i) => (
                   p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
-                  <button key={p} onClick={() => { setMgmtPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${mgmtPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
+                  <button key={p} onClick={() => { setPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${page === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
                 ))}
-                <button onClick={() => { setMgmtPage(Math.min(mgmtTotalPages, mgmtPage + 1)); deselectAll(); }} disabled={mgmtPage === mgmtTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                <button onClick={() => { setPage(Math.min(totalPages, page + 1)); deselectAll(); }} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
               </div>
             </div>
           )}
@@ -788,104 +766,6 @@ export default function AlumniAgencyPage() {
             </div>
           </div>
         </div>
-      )}
-      </>)}
-
-      {/* Thailand (in-country) mode (PRD §3.9) — alumni-agency, country=Thailand */}
-      {mode === "thailand" && (
-        <>
-          {/* Filters: search */}
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-            <select
-              value={thailandSearchField}
-              onChange={(e) => { setThailandSearchField(e.target.value as SearchField); setThailandSearch(""); setThailandPage(1); }}
-              className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-            >
-              {THAILAND_SEARCH_FIELDS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
-              ))}
-            </select>
-            <SearchInput
-              value={thailandSearch}
-              onSearch={applyThailandSearch}
-              placeholder={`ค้นหา${THAILAND_SEARCH_FIELDS.find((f) => f.value === thailandSearchField)?.label}...`}
-              formClassName="flex-1"
-            />
-            <button
-              type="button"
-              onClick={() => setUnlinkedOnly((v) => !v)}
-              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
-              title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
-            >
-              รอเชื่อมโยง
-            </button>
-          </div>
-
-          {/* In-country table — abroad view columns minus country (PRD §3.9) */}
-          {thailandLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
-            </div>
-          ) : thailandAlumni.length === 0 ? (
-            <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
-          ) : (
-            <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[var(--primary)] text-white">
-                      <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
-                      {THAILAND_VIEW_SORT_FIELDS.map(({ field, label }) => (
-                        <th
-                          key={field}
-                          onClick={() => handleThailandSort(field)}
-                          className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
-                        >
-                          {label}
-                          <SortIcon active={thailandSortField === field} dir={thailandSortField === field ? thailandSortDir : "asc"} />
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedThailand.map((a, idx) => (
-                      <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50">
-                        <td className="px-4 py-3 text-center">{(thailandPage - 1) * PAGE_SIZE + idx + 1}</td>
-                        <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
-                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3">{a.prefix || "-"}</td>
-                        <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
-                        <td className="px-4 py-3">
-                          {a.notes ? (
-                            <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs text-red-700">{a.notes}</span>
-                          ) : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {thailandTotalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
-                  <span className="text-sm text-gray-500">แสดง {thailandTotal === 0 ? 0 : (thailandPage - 1) * PAGE_SIZE + 1}-{Math.min(thailandPage * PAGE_SIZE, thailandTotal)} จาก {thailandTotal} รายการ</span>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setThailandPage(Math.max(1, thailandPage - 1))} disabled={thailandPage === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
-                    {getPageNumbers(thailandPage, thailandTotalPages).map((p, i) => (
-                      p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :
-                      <button key={p} onClick={() => setThailandPage(p)} className={`rounded-md px-3 py-1.5 text-sm ${thailandPage === p ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"}`}>{p}</button>
-                    ))}
-                    <button onClick={() => setThailandPage(Math.min(thailandTotalPages, thailandPage + 1))} disabled={thailandPage === thailandTotalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </>
       )}
     </div>
   );
