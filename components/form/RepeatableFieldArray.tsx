@@ -39,7 +39,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
   fields: fieldDefs,
   singleRow = false,
 }: RepeatableFieldArrayProps<TFieldValues>) {
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control,
     name,
   });
@@ -55,10 +55,11 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
   const addRow = () => append(emptyRow as never);
 
   const resetRow = (index: number) => {
-    // Remove and re-add with empty values
-    remove(index);
-    // We need to insert at same position, but useFieldArray doesn't have insert easily
-    // Instead we just set values via register
+    // "ล้างข้อมูล" (singleRow) clears the row's values IN PLACE — the row is
+    // kept, only its fields are emptied. Previously this called remove(index),
+    // which deleted the row entirely. `update` swaps the row for emptyRow
+    // without changing the row count.
+    update(index, emptyRow as never);
   };
 
   return (
@@ -66,7 +67,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
       {fields.map((field, idx) => (
         <div
           key={field.id}
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end mb-3 p-3 bg-gray-50 rounded-lg"
+          className="flex flex-wrap items-end gap-3 mb-3 p-3 bg-gray-50 rounded-lg"
         >
           {fieldDefs.map((f) => {
             const fieldPath = `${name}.${idx}.${f.key}`;
@@ -74,7 +75,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
             const hasError = !!errorMsg;
 
             return (
-              <div key={f.key}>
+              <div key={f.key} className="flex-1 min-w-[140px]">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   {f.label}{" "}
                   {f.required && <span className="text-red-500">*</span>}
@@ -111,7 +112,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
               </div>
             );
           })}
-          <div className="flex items-end">
+          <div className="shrink-0">
             <button
               type="button"
               onClick={() => (singleRow ? resetRow(idx) : remove(idx))}
