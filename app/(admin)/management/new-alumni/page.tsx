@@ -30,6 +30,11 @@ const MODEL_REP_NETWORK_OPTIONS = [
   ...MODEL_REP_NETWORKS.map((n) => ({ value: n, label: n })),
 ];
 
+// Match the alumni-flow form (graduates profile + admin alumni edit) input /
+// label styling so this create form shares the same single-card section layout.
+const INPUT_CLASS = "px-4 py-2.5 text-[var(--foreground)] border-[var(--border)]";
+const LABEL_CLASS = "mb-1.5 block text-sm font-medium text-[var(--foreground)]";
+
 const DEFAULT_VALUES: AlumniWithRelatedFormData = {
   studentId: "",
   prefix: "",
@@ -272,248 +277,259 @@ export default function NewAlumniPage() {
     }
   };
 
-  const btnPrimary =
-    "bg-[var(--primary)] text-white px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50";
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">
-            เพิ่มข้อมูลศิษย์เก่า
-          </h1>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">เพิ่มข้อมูลศิษย์เก่า</h1>
+            <p className="text-sm text-[var(--muted)]">กรอกข้อมูลศิษย์เก่าและข้อมูลที่เกี่ยวข้อง</p>
+          </div>
           <button
             onClick={() => router.back()}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]"
           >
             &larr; กลับ
           </button>
         </div>
 
+        {/* Messages */}
         {errorMsg && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[var(--danger)]">
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
             {successMsg}
           </div>
         )}
 
-        {/* Alumni Core Form */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            ข้อมูลศิษย์เก่า
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message}>
-              <FormInput registration={register("studentId")} error={errors.studentId?.message} placeholder="รหัสนักศึกษา" />
-            </FormField>
-            <FormField label="คำนำหน้า" error={errors.prefix?.message}>
-              <FormInput registration={register("prefix")} error={errors.prefix?.message} placeholder="คำนำหน้า" />
-            </FormField>
-            <FormField label="ชื่อ" required error={errors.firstName?.message}>
-              <FormInput registration={register("firstName")} error={errors.firstName?.message} placeholder="ชื่อ" />
-            </FormField>
-            <FormField label="นามสกุล" required error={errors.lastName?.message}>
-              <FormInput registration={register("lastName")} error={errors.lastName?.message} placeholder="นามสกุล" />
-            </FormField>
-            <FormField label="วันเกิด (ววปปปป พ.ศ.)" required error={errors.birthDate?.message}>
-              <FormInput
-                registration={register("birthDate", {
-                  onChange: (e) => {
-                    e.target.value = formatBirthDate(e.target.value);
-                  },
-                })}
-                error={errors.birthDate?.message}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="01122540"
-              />
-              {!errors.birthDate && (
-                <p className="mt-1 text-xs text-gray-400">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
-              )}
-            </FormField>
-            <FormField label="รุ่น">
-              <FormInput registration={register("cohort")} placeholder="รุ่น" />
-            </FormField>
-            <FormField label="สาขา">
-              <FormInput registration={register("major")} placeholder="สาขา" />
-            </FormField>
-            <FormField label="ปีที่สำเร็จการศึกษา (พ.ศ.)" required error={errors.graduationYear?.message}>
-              <FormInput
-                registration={register("graduationYear")}
-                error={errors.graduationYear?.message}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="2569"
-              />
-            </FormField>
-            <FormField label="ระดับการศึกษา" required error={errors.degreeLevel?.message}>
-              <FormSelect registration={register("degreeLevel")} error={errors.degreeLevel?.message}>
-                <option value="">-- เลือกระดับการศึกษา --</option>
-                {DEGREE_LEVEL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </FormSelect>
-            </FormField>
-          </div>
-        </div>
+        {/* Single card holding the whole form — matches the alumni-flow form layout
+            (graduates profile + admin alumni edit): editable core grid, a
+            "ข้อมูลเพิ่มเติม" divider, the expandable sections grouped inside, and the
+            action buttons at the bottom of the card. */}
+        <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Core editable fields */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message} labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("studentId")} error={errors.studentId?.message} className={INPUT_CLASS} placeholder="รหัสนักศึกษา" />
+              </FormField>
+              <FormField label="คำนำหน้า" error={errors.prefix?.message} labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("prefix")} error={errors.prefix?.message} className={INPUT_CLASS} placeholder="คำนำหน้า" />
+              </FormField>
+              <FormField label="ชื่อ" required error={errors.firstName?.message} labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("firstName")} error={errors.firstName?.message} className={INPUT_CLASS} placeholder="ชื่อ" />
+              </FormField>
+              <FormField label="นามสกุล" required error={errors.lastName?.message} labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("lastName")} error={errors.lastName?.message} className={INPUT_CLASS} placeholder="นามสกุล" />
+              </FormField>
+              <FormField label="วันเกิด (ววปปปป พ.ศ.)" required error={errors.birthDate?.message} labelClassName={LABEL_CLASS}>
+                <FormInput
+                  registration={register("birthDate", {
+                    onChange: (e) => {
+                      e.target.value = formatBirthDate(e.target.value);
+                    },
+                  })}
+                  error={errors.birthDate?.message}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="01122540"
+                  className={INPUT_CLASS}
+                />
+                {!errors.birthDate && (
+                  <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
+                )}
+              </FormField>
+              <FormField label="รุ่น" labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("cohort")} className={INPUT_CLASS} placeholder="รุ่น" />
+              </FormField>
+              <FormField label="สาขา" labelClassName={LABEL_CLASS}>
+                <FormInput registration={register("major")} className={INPUT_CLASS} placeholder="สาขา" />
+              </FormField>
+              <FormField label="ปีที่สำเร็จการศึกษา (พ.ศ.)" required error={errors.graduationYear?.message} labelClassName={LABEL_CLASS}>
+                <FormInput
+                  registration={register("graduationYear")}
+                  error={errors.graduationYear?.message}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="2569"
+                  className={INPUT_CLASS}
+                />
+              </FormField>
+              <FormField label="ระดับการศึกษา" required error={errors.degreeLevel?.message} labelClassName={LABEL_CLASS}>
+                <FormSelect registration={register("degreeLevel")} error={errors.degreeLevel?.message} className={INPUT_CLASS}>
+                  <option value="">-- เลือกระดับการศึกษา --</option>
+                  {DEGREE_LEVEL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </FormSelect>
+              </FormField>
+            </div>
 
-        {/* Expandable Sections */}
-        <SectionToggle
-          title="รางวัล"
-          open={sections.awards}
-          onToggle={() => toggleSection("awards")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="awards"
-            emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", link: "", imageUrl: "", description: "" }}
-            fields={[
-              { key: "awardName", label: "ชื่อรางวัล", required: true },
-              {
-                key: "awardType",
-                label: "ประเภทรางวัล",
-                type: "select",
-                required: true,
-                options: AWARD_TYPE_OPTIONS,
-              },
-              { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
-              { key: "link", label: "ลิงค์" },
-              { key: "imageUrl", label: "รูปภาพ" },
-              { key: "description", label: "รายละเอียด", type: "textarea", required: true },
-            ]}
-          />
-        </SectionToggle>
+            {/* Divider + "ข้อมูลเพิ่มเติม" header — groups the expandable sections,
+                exactly like the alumni-flow form. */}
+            <div className="border-t border-[var(--border)] pt-4">
+              <h3 className="mb-1 text-sm font-semibold text-[var(--muted)]">ข้อมูลเพิ่มเติม</h3>
+              <p className="mb-3 text-xs text-[var(--muted)]">เปิดส่วนที่ต้องการเพื่อเพิ่มหรือแก้ไขข้อมูล หากไม่ต้องการสามารถปล่อยว่างได้</p>
+            </div>
 
-        <SectionToggle
-          title="สมาคม/ชมรม"
-          open={sections.associations}
-          onToggle={() => toggleSection("associations")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="associations"
-            emptyRow={{ associationName: "", position: "", recordedYear: "" }}
-            singleRow
-            fields={[
-              { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
-              { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
-            ]}
-          />
-        </SectionToggle>
-
-        <SectionToggle
-          title="กรรมการบัณฑิต"
-          open={sections.committees}
-          onToggle={() => toggleSection("committees")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="graduateCommittees"
-            emptyRow={{ termYear: "", cohort: "", position: "", remarks: "" }}
-            singleRow
-            fields={[
-              { key: "termYear", label: "ปี พ.ศ.", type: "number", required: true },
-              { key: "cohort", label: "รุ่นที่", required: true },
-              { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "remarks", label: "หมายเหตุ", type: "textarea", required: true },
-            ]}
-          />
-        </SectionToggle>
-
-        <SectionToggle
-          title="ศักยภาพ"
-          open={sections.potentials}
-          onToggle={() => toggleSection("potentials")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="potentials"
-            emptyRow={{ career: "", position: "", recordedYear: "" }}
-            singleRow
-            fields={[
-              { key: "career", label: "อาชีพ", required: true },
-              { key: "position", label: "ตำแหน่ง", required: true },
-              { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
-            ]}
-          />
-        </SectionToggle>
-
-        <SectionToggle
-          title="ผู้แทนรุ่น"
-          open={sections.modelReps}
-          onToggle={() => toggleSection("modelReps")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="modelRepresentatives"
-            emptyRow={{ cohort: "", generation: "" }}
-            singleRow
-            fields={[
-              { key: "cohort", label: "เครือข่าย", type: "select", required: true, options: MODEL_REP_NETWORK_OPTIONS },
-              { key: "generation", label: "รุ่นที่", type: "number", required: true },
-            ]}
-          />
-        </SectionToggle>
-
-        <SectionToggle
-          title="ต้นสังกัดศิษย์เก่า"
-          open={sections.abroad}
-          onToggle={() => toggleSection("abroad")}
-        >
-          <RepeatableFieldArray
-            control={control}
-            register={register}
-            errors={errors}
-            name="alumniAgency"
-            emptyRow={{ country: "", workplace: "", homeAddress: "", notes: "" }}
-            singleRow
-            fields={[
-              { key: "country", label: "ประเทศ", required: true },
-              { key: "workplace", label: "สถานที่ทำงาน" },
-              { key: "homeAddress", label: "ที่อยู่" },
-              { key: "notes", label: "หมายเหตุ", type: "textarea" },
-            ]}
-          />
-        </SectionToggle>
-
-        {/* Submit */}
-        <div className="mt-6 flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-6 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
-          >
-            ยกเลิก
-          </button>
-          {canWrite && (
-            <button
-              type="button"
-              onClick={handleSubmit(onSubmit)}
-              disabled={saving}
-              className={btnPrimary}
+            {/* Expandable sections */}
+            <SectionToggle
+              title="รางวัล"
+              open={sections.awards}
+              onToggle={() => toggleSection("awards")}
             >
-              {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-            </button>
-          )}
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="awards"
+                emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", link: "", imageUrl: "", description: "" }}
+                fields={[
+                  { key: "awardName", label: "ชื่อรางวัล", required: true },
+                  {
+                    key: "awardType",
+                    label: "ประเภทรางวัล",
+                    type: "select",
+                    required: true,
+                    options: AWARD_TYPE_OPTIONS,
+                  },
+                  { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
+                  { key: "link", label: "ลิงค์" },
+                  { key: "imageUrl", label: "รูปภาพ" },
+                  { key: "description", label: "รายละเอียด", type: "textarea", required: true },
+                ]}
+              />
+            </SectionToggle>
+
+            <SectionToggle
+              title="สมาคม/ชมรม"
+              open={sections.associations}
+              onToggle={() => toggleSection("associations")}
+            >
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="associations"
+                emptyRow={{ associationName: "", position: "", recordedYear: "" }}
+                singleRow
+                fields={[
+                  { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
+                  { key: "position", label: "ตำแหน่ง", required: true },
+                  { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
+                ]}
+              />
+            </SectionToggle>
+
+            <SectionToggle
+              title="กรรมการบัณฑิต"
+              open={sections.committees}
+              onToggle={() => toggleSection("committees")}
+            >
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="graduateCommittees"
+                emptyRow={{ termYear: "", cohort: "", position: "", remarks: "" }}
+                singleRow
+                fields={[
+                  { key: "termYear", label: "ปี พ.ศ.", type: "number", required: true },
+                  { key: "cohort", label: "รุ่นที่", required: true },
+                  { key: "position", label: "ตำแหน่ง", required: true },
+                  { key: "remarks", label: "หมายเหตุ", type: "textarea", required: true },
+                ]}
+              />
+            </SectionToggle>
+
+            <SectionToggle
+              title="ศักยภาพ"
+              open={sections.potentials}
+              onToggle={() => toggleSection("potentials")}
+            >
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="potentials"
+                emptyRow={{ career: "", position: "", recordedYear: "" }}
+                singleRow
+                fields={[
+                  { key: "career", label: "อาชีพ", required: true },
+                  { key: "position", label: "ตำแหน่ง", required: true },
+                  { key: "recordedYear", label: "ปีที่บันทึก (พ.ศ.)", type: "number", required: true },
+                ]}
+              />
+            </SectionToggle>
+
+            <SectionToggle
+              title="ผู้แทนรุ่น"
+              open={sections.modelReps}
+              onToggle={() => toggleSection("modelReps")}
+            >
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="modelRepresentatives"
+                emptyRow={{ cohort: "", generation: "" }}
+                singleRow
+                fields={[
+                  { key: "cohort", label: "เครือข่าย", type: "select", required: true, options: MODEL_REP_NETWORK_OPTIONS },
+                  { key: "generation", label: "รุ่นที่", type: "number", required: true },
+                ]}
+              />
+            </SectionToggle>
+
+            <SectionToggle
+              title="ต้นสังกัดศิษย์เก่า"
+              open={sections.abroad}
+              onToggle={() => toggleSection("abroad")}
+            >
+              <RepeatableFieldArray
+                control={control}
+                register={register}
+                errors={errors}
+                name="alumniAgency"
+                emptyRow={{ country: "", workplace: "", homeAddress: "", notes: "" }}
+                singleRow
+                fields={[
+                  { key: "country", label: "ประเทศ", required: true },
+                  { key: "workplace", label: "สถานที่ทำงาน" },
+                  { key: "homeAddress", label: "ที่อยู่" },
+                  { key: "notes", label: "หมายเหตุ", type: "textarea" },
+                ]}
+              />
+            </SectionToggle>
+
+            {/* Buttons — inside the card, matching the alumni-flow form */}
+            <div className="flex gap-3 pt-2">
+              {canWrite && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-[var(--primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)] disabled:opacity-60"
+                >
+                  {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="rounded-lg border border-[var(--border)] px-6 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
