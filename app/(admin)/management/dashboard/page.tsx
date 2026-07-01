@@ -16,6 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { AlertTriangle } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,6 +43,9 @@ function formatThaiDate(date: Date): string {
 // ---------------------------------------------------------------------------
 
 interface DashboardData {
+  // false when the CMU Registrar was unreachable — alumni totals then reflect
+  // local rows only (lower than normal); the page shows a warning banner.
+  cmuAvailable: boolean;
   alumni: {
     total: number;
     byDegreeLevel: Record<string, number>;
@@ -101,6 +105,7 @@ interface ChartSeries {
 interface ChartData {
   generations: string[];
   series: ChartSeries[];
+  cmuAvailable: boolean;
 }
 
 // Degree-level colors are shared via DEGREE_COLORS (@/lib/constants) so the
@@ -213,6 +218,10 @@ export default function DashboardPage() {
   const chartData = chartQuery.data ?? null;
   const loading = statsQuery.isPending || chartQuery.isPending;
   const error = statsQuery.error?.message || chartQuery.error?.message || null;
+  // CMU Registrar availability — either endpoint reports it. Default to true
+  // (optimistic) so no warning flashes before data loads (loading returns early).
+  const cmuAvailable =
+    statsQuery.data?.cmuAvailable ?? chartQuery.data?.cmuAvailable ?? true;
 
   // Defer chart render by one frame so the container has real dimensions
   // before ResponsiveContainer tries to measure it. This avoids the
@@ -297,6 +306,22 @@ export default function DashboardPage() {
           ภาพรวมข้อมูลระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
         </p>
       </div>
+
+      {/* CMU-unavailable warning — alumni totals then reflect local rows only. */}
+      {!cmuAvailable && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">
+              ไม่สามารถเชื่อมต่อระบบทะเบียนของมหาวิทยาลัย (CMU) ได้ในขณะนี้
+            </p>
+            <p className="mt-0.5 text-amber-700">
+              จำนวนศิษย์เก่าแสดงเฉพาะข้อมูลที่บันทึกในระบบเท่านั้น และอาจน้อยกว่าปกติ
+              — ระบบจะแสดงผลครบถ้วนเมื่อกลับมาใช้งานได้
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Featured Alumni Count Card */}
       <Link

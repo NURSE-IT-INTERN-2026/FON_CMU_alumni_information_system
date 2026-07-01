@@ -22,7 +22,7 @@
  * observability); `getPersonDegreeBreakdown` no longer filters on it.
  */
 import prisma from "@/lib/prisma";
-import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
+import { fetchCmuGraduatesOrEmpty, type CmuGraduate } from "@/lib/cmu-registrar";
 import {
   DEGREE_RANK,
   cmuLevelToDegree,
@@ -46,6 +46,13 @@ export interface PersonDegreeBreakdown {
   total: number;
   /** graduationYear (Buddhist, string) → degreeLevel → person count. */
   byYearDegree: Record<string, Record<string, number>>;
+  /**
+   * `false` when the CMU Registrar was unreachable for this computation — in
+   * that case `total`/`byDegree`/`byYearDegree` reflect the LOCAL `education`
+   * rows only (no registrar universe), so counts are lower than normal. The
+   * dashboard surfaces this as a warning banner instead of 500-ing.
+   */
+  cmuAvailable: boolean;
 }
 
 const RANK_TO_DEGREE = Object.fromEntries(
@@ -182,8 +189,11 @@ export function groupPersonsByDegree(
 
 /** Fetch both sources, group into persons, and aggregate for the dashboard. */
 export async function getPersonDegreeBreakdown(): Promise<PersonDegreeBreakdown> {
-  const [cmu, localAlumni] = await Promise.all([
-    fetchCmuGraduates(),
+  // CMU is fetched fail-safe: a Registrar outage degrades to local-only counts
+  // (`available: false`) instead of throwing and 500-ing the dashboard. The
+  // local DB query still throws on a real DB error (we want that surfaced).
+  const [{ graduates: cmu, available: cmuAvailable }, localAlumni] = await Promise.all([
+    fetchCmuGraduatesOrEmpty(),
     prisma.alumni.findMany({
       where: { deletedAt: null },
       select: {
@@ -225,5 +235,5 @@ export async function getPersonDegreeBreakdown(): Promise<PersonDegreeBreakdown>
       byYearDegree[y][p.degree] = (byYearDegree[y][p.degree] ?? 0) + 1;
     }
   }
-  return { byDegree, total, byYearDegree };
+  return { byDegree, total, byYearDegree, cmuAvailable };
 }
