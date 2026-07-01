@@ -24,6 +24,8 @@ import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 interface Award {
   id: string;
   studentId: string | null;
+  // "No Alumni to link to" flag — display the effective id as `studentId ?? pendingStudentId`.
+  pendingStudentId: string | null;
   prefix: string | null;
   firstName: string;
   lastName: string;
@@ -77,13 +79,14 @@ export default function AwardsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
   const qc = useQueryClient();
   const { items: awards, total, totalPages, isPending: loading, isError } = useEntityList<Award>(
     "awards",
     "/api/awards",
     { page, search, sortField, sortDir, filters, filtersKey },
-    { sortOrderKey: "sortDir" },
+    { sortOrderKey: "sortDir", unlinked: unlinkedOnly },
   );
   const { data: typeCountsData } = useQuery<Record<string, number>>({
     queryKey: ["awards", "counts"],
@@ -122,7 +125,7 @@ export default function AwardsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Alumni search for form
@@ -313,7 +316,7 @@ export default function AwardsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const data = await apiFetch<{ imported: number; updated: number; errors: { row: number; message: string }[] }>(
+      const data = await apiFetch<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] }>(
         `/api/awards/import`,
         { method: "POST", body: formData },
       );
@@ -357,7 +360,7 @@ export default function AwardsPage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}</span>
+            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
             <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
@@ -544,6 +547,14 @@ export default function AwardsPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
             {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
           </button>
+          <button
+            type="button"
+            onClick={() => setUnlinkedOnly((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+            title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+          >
+            รอเชื่อมโยง
+          </button>
           {selectedCount > 0 && (
             <>
               <button
@@ -629,7 +640,12 @@ export default function AwardsPage() {
                 awards.map((award, i) => (
                   <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(award.id); else if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(award.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{award.studentId || "-"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                      <OrangeCell resourceType="award" recordId={award.id} field="studentId" value={(award.studentId || award.pendingStudentId) || "-"} hotFields={hot[award.id]} />
+                      {award.pendingStudentId && !award.studentId ? (
+                        <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3">{award.major || "-"}</td>
                     <td className="px-4 py-3">{award.prefix || "-"}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="firstName" value={award.firstName} hotFields={hot[award.id]} /></td>

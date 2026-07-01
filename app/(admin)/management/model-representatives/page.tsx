@@ -21,7 +21,9 @@ import FormInput from "@/components/form/FormInput";
 
 interface ModelRepresentative {
   id: string;
-  studentId: string;
+  studentId: string | null;
+  // "No Alumni to link to" flag — display the effective id as `studentId ?? pendingStudentId`.
+  pendingStudentId: string | null;
   prefix: string | null;
   firstName: string;
   lastName: string;
@@ -72,12 +74,14 @@ export default function ModelRepresentativesPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
 
   const qc = useQueryClient();
   const { data: alumniData, isPending: loading, isError } = useQuery({
-    queryKey: ["modelRepresentatives", "list", { filtersKey }],
+    queryKey: ["modelRepresentatives", "list", { filtersKey, ...(unlinkedOnly ? { unlinked: true } : {}) }],
     queryFn: () => {
       const params = new URLSearchParams();
+      if (unlinkedOnly) params.set("unlinked", "true");
       facetQueryParams(filters).forEach((v, k) => params.set(k, v));
       return apiFetch<{ data: ModelRepresentative[] }>(`/api/model-representatives${params.toString() ? `?${params}` : ""}`);
     },
@@ -114,7 +118,7 @@ export default function ModelRepresentativesPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [managePage, setManagePage] = useState(1);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
@@ -157,7 +161,7 @@ export default function ModelRepresentativesPage() {
           cmp = a.generation - b.generation;
           break;
         case "studentId":
-          cmp = a.studentId.localeCompare(b.studentId, "th");
+          cmp = (a.studentId || a.pendingStudentId || "").localeCompare(b.studentId || b.pendingStudentId || "", "th");
           break;
         case "prefix":
           cmp = (a.prefix ?? "").localeCompare(b.prefix ?? "", "th");
@@ -202,10 +206,10 @@ export default function ModelRepresentativesPage() {
     if (!term) return true;
     const t = term.toLowerCase();
     const fullName = [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").toLowerCase();
-    // Search all fields (name, student id, generation, network).
+    // Search all fields (name, effective student id, generation, network).
     return (
       fullName.includes(t) ||
-      a.studentId.toLowerCase().includes(t) ||
+      (a.studentId || a.pendingStudentId || "").toLowerCase().includes(t) ||
       String(a.generation).includes(t) ||
       a.cohort.toLowerCase().includes(t)
     );
@@ -256,7 +260,7 @@ export default function ModelRepresentativesPage() {
 
   const openEdit = (item: ModelRepresentative) => {
     formReset({
-      studentId: item.studentId,
+      studentId: item.studentId ?? "",
       prefix: item.prefix ?? "",
       firstName: item.firstName,
       lastName: item.lastName,
@@ -387,7 +391,7 @@ export default function ModelRepresentativesPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const data = await apiFetch<{ imported: number; updated: number; errors: { row: number; message: string }[] }>(
+      const data = await apiFetch<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] }>(
         `/api/model-representatives/import`,
         { method: "POST", body: formData },
       );
@@ -521,7 +525,7 @@ export default function ModelRepresentativesPage() {
       {importResult && (
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
-            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}</span>
+            <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
             <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
@@ -698,6 +702,14 @@ export default function ModelRepresentativesPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
             {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
           </button>
+          <button
+            type="button"
+            onClick={() => setUnlinkedOnly((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${unlinkedOnly ? "border-amber-500 bg-amber-100 text-amber-700" : "border-[var(--border)] bg-white text-[var(--muted)] hover:bg-gray-50"}`}
+            title="แสดงเฉพาะรายการที่ยังไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง"
+          >
+            รอเชื่อมโยง
+          </button>
           {selectedCount > 0 && (
             <>
               <button
@@ -780,7 +792,12 @@ export default function ModelRepresentativesPage() {
                     <td className="px-4 py-3 text-center text-gray-500">
                       <OrangeCell resourceType="model_representative" recordId={a.id} field="generation" value={a.generation} hotFields={hot[a.id]} />
                     </td>
-                    <td className="px-4 py-3 font-mono text-sm">{a.studentId}</td>
+                    <td className="px-4 py-3 font-mono text-sm">
+                      {a.studentId || a.pendingStudentId || "-"}
+                      {a.pendingStudentId && !a.studentId ? (
+                        <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="firstName" value={a.firstName} hotFields={hot[a.id]} /></td>

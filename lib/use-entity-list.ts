@@ -46,6 +46,9 @@ export function useEntityList<T>(
     sortKey?: string;
     /** Query-string key for sort direction — "sortOrder" (most) vs "sortDir" (awards). */
     sortOrderKey?: string;
+    /** When true, appends `?unlinked=true` — filter to รอเชื่อมโยง rows
+     *  (pendingStudentId set, no linked Alumni). */
+    unlinked?: boolean;
   },
 ) {
   const { page, search, sortField, sortDir, filters, filtersKey } =
@@ -57,7 +60,7 @@ export function useEntityList<T>(
     queryKey: [
       scope,
       "list",
-      { page, search, sortField, sortDir, filtersKey },
+      { page, search, sortField, sortDir, filtersKey, ...(options?.unlinked ? { unlinked: true } : {}) },
     ],
     queryFn: () => {
       const p = new URLSearchParams({
@@ -67,6 +70,7 @@ export function useEntityList<T>(
         [sortOrderKeyName]: sortDir,
       });
       if (search.trim()) p.set("search", search.trim());
+      if (options?.unlinked) p.set("unlinked", "true");
       facetQueryParams(filters).forEach((v, k) => p.set(k, v));
       return apiFetch<EntityListResponse<T>>(`${entityPath}?${p}`);
     },

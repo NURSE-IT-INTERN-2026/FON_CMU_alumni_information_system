@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId ?? "",
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       "คำนำหน้า": a.prefix ?? "",
       "ชื่อ": a.firstName ?? "",
       "นามสกุล": a.lastName ?? "",
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     );
 
     const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId ?? "",
+      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       "คำนำหน้า": a.prefix ?? "",
       "ชื่อ": a.firstName ?? "",
       "นามสกุล": a.lastName ?? "",

@@ -34,7 +34,7 @@ export const committeePageFormSchema = committeeFormSchema.extend({
 
 export const committeeCreateSchema = z.object({
   termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข"),
-  studentId: z.string().min(1, MSG.studentIdRequired).trim(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired),
   lastName: z.string().trim().min(1, MSG.lastNameRequired),
@@ -46,7 +46,7 @@ export const committeeCreateSchema = z.object({
 
 export const committeeUpdateSchema = z.object({
   termYear: z.coerce.number().int("ปี พ.ศ. ต้องเป็นตัวเลข").optional(),
-  studentId: z.string().min(1, MSG.studentIdRequired).trim().optional(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired).optional(),
   lastName: z.string().trim().min(1, MSG.lastNameRequired).optional(),

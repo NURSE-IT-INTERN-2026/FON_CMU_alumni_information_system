@@ -75,6 +75,11 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = { deletedAt: null };
     Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.awards));
 
+    // `?unlinked=true` — show only rows flagged รอเชื่อมโยง (no Alumni to link).
+    if (searchParams.get("unlinked") === "true") {
+      where.pendingStudentId = { not: null };
+    }
+
     if (search) {
       if (searchFieldParam && validSearchFields.includes(searchFieldParam)) {
         if (searchFieldParam === "year") {
@@ -90,6 +95,8 @@ export async function GET(request: NextRequest) {
         }
       } else {
         where.OR = [
+          { studentId: { contains: search, mode: "insensitive" } },
+          { pendingStudentId: { contains: search, mode: "insensitive" } },
           { awardName: { contains: search, mode: "insensitive" } },
           { description: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },

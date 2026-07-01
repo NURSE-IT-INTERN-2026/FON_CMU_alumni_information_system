@@ -33,7 +33,7 @@ export const modelRepPageFormSchema = modelRepFormSchema.extend({
 // --- API schemas ---
 
 export const modelRepCreateSchema = z.object({
-  studentId: z.string().min(1, MSG.studentIdRequired).trim(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired),
   lastName: z.string().trim().min(1, MSG.lastNameRequired),
@@ -43,7 +43,7 @@ export const modelRepCreateSchema = z.object({
 });
 
 export const modelRepUpdateSchema = z.object({
-  studentId: z.string().min(1, MSG.studentIdRequired).trim().optional(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired).optional(),
   lastName: z.string().trim().min(1, MSG.lastNameRequired).optional(),

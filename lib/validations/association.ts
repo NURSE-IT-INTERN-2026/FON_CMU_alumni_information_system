@@ -30,7 +30,7 @@ export const associationPageFormSchema = associationFormSchema.extend({
 // --- API schemas ---
 
 export const associationCreateSchema = z.object({
-  studentId: z.string().min(1, MSG.studentIdRequired).trim(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired),
   lastName: z.string().trim().min(1, MSG.lastNameRequired),
@@ -41,7 +41,7 @@ export const associationCreateSchema = z.object({
 });
 
 export const associationUpdateSchema = z.object({
-  studentId: z.string().min(1, MSG.studentIdRequired).trim().optional(),
+  studentId: z.string().trim().optional().nullable(),
   prefix: z.string().trim().optional().nullable(),
   firstName: z.string().trim().min(1, MSG.firstNameRequired).optional(),
   lastName: z.string().trim().min(1, MSG.lastNameRequired).optional(),
