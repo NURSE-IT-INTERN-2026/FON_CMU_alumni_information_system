@@ -61,6 +61,12 @@ export const queryKeys = {
     chart: () => ["dashboard", "chart"] as const,
   },
 
+  // CMU Registrar sync (การดึงข้อมูล page) — compare + materialize.
+  cmuSync: {
+    all: ["cmuSync"] as const,
+    compare: () => ["cmuSync", "compare"] as const,
+  },
+
   // Alumni profile — graduates portal (me) + admin edit-by-id.
   alumniProfile: {
     all: ["alumniProfile"] as const,

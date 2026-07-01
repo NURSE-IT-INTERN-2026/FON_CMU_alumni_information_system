@@ -58,12 +58,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("GET /api/cmu-alumni/lookup error:", error);
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json(
-        { error: "ระบบทะเบียนมหาวิทยาลัยไม่ตอบสนอง กรุณาลองใหม่ภายหลัง" },
-        { status: 504 },
-      );
-    }
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการดึงข้อมูลจากระบบทะเบียน" },
       { status: 500 },

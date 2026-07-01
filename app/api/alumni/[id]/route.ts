@@ -5,7 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
-import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
+import { getCmuGraduatesLocal, type CmuGraduate } from "@/lib/cmu-registrar";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
 export async function GET(
@@ -113,16 +113,9 @@ export async function PUT(
       // record (we only get here when it differs from `existing.studentId`),
       // so any match is a different person. CMU `student_id` carries trailing
       // spaces — trim before comparing (same convention as `ensure-alumni`).
-      // `fetchCmuGraduates` caches the list for 5 min.
-      let cmuGraduates: CmuGraduate[];
-      try {
-        cmuGraduates = await fetchCmuGraduates();
-      } catch {
-        return NextResponse.json(
-          { error: "ระบบทะเบียนมหาวิทยาลัยไม่ตอบสนอง ไม่สามารถตรวจสอบรหัสนักศึกษาได้ กรุณาลองใหม่ภายหลัง" },
-          { status: 503 }
-        );
-      }
+      // Reads the LOCAL cmu_graduates table (refreshed on demand from
+      // /management/cmu-sync).
+      const cmuGraduates: CmuGraduate[] = await getCmuGraduatesLocal();
       const cmuDuplicate = cmuGraduates.some(
         (g) => String(g.student_id ?? "").trim() === newStudentId,
       );

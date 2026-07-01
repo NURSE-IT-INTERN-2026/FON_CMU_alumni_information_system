@@ -11,7 +11,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import ExcelJS from "exceljs";
-import { fetchCmuGraduates, type CmuGraduate } from "../lib/cmu-registrar";
+import { fetchCmuGraduatesLive, type CmuGraduate } from "../lib/cmu-registrar";
 
 const TESTING_DIR = "imports/testing";
 
@@ -20,7 +20,7 @@ const TESTING_DIR = "imports/testing";
 // ---------------------------------------------------------------------------
 
 async function buildPool(): Promise<CmuGraduate[]> {
-  const grads = await fetchCmuGraduates();
+  const grads = await fetchCmuGraduatesLive();
   const byId = new Map<string, CmuGraduate>();
   for (const g of grads) {
     const sid = String(g.student_id ?? "").trim();

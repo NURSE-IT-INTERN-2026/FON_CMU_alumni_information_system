@@ -255,8 +255,8 @@ export const DEGREE_RANK: Record<DegreeLevelValue, number> = {
  * which would silently break CMU enrichment on import and on the alumni
  * profile view. Apply it only in display/count surfaces (currently
  * `/api/cmu-alumni`, `lib/filter-facets-server.ts`, `/api/alumni-count`,
- * `/api/dashboard`). The raw `fetchCmuGraduates()` list stays un-deduped so
- * those studentId-keyed consumers keep working.
+ * `/api/dashboard`). The raw local list (`getCmuGraduatesLocal`) stays
+ * un-deduped so those studentId-keyed consumers keep working.
  *
  * Match key: normalized `name_th` + `surname_th` + canonical birthday. A record
  * missing its birthday or either name is never collapsed (kept verbatim in a

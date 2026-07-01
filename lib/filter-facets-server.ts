@@ -5,7 +5,7 @@
  */
 import prisma from "@/lib/prisma";
 import {
-  fetchCmuGraduates,
+  getCmuGraduatesLocal,
   cmuLevelToEnum,
   type CmuGraduate,
 } from "@/lib/cmu-registrar";
@@ -139,7 +139,7 @@ export async function getAlumniFacetValues(
   const dedupe = opts.dedupe !== false;
 
   const [cmuGraduatesRaw, localAlumni] = await Promise.all([
-    fetchCmuGraduates(),
+    getCmuGraduatesLocal(),
     prisma.alumni.findMany({
       select: {
         studentId: true,

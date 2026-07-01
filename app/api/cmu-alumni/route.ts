@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getIp } from "@/lib/activity-log";
-import { fetchCmuGraduates, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
+import { getCmuGraduatesLocal, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
 import { normalizeCmuBirthday, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -60,16 +60,16 @@ export async function GET(request: NextRequest) {
     const majors = facetList("major");
     const graduationYears = facetList("graduationYear");
 
-    // 4. Fetch from CMU Registrar API, then (by default) collapse a person's
-    //    multiple degree records into their HIGHEST degree (same first name +
-    //    last name + birthday). Done on the FULL list before
+    // 4. Read the LOCAL cmu_graduates table, then (by default) collapse a
+    //    person's multiple degree records into their HIGHEST degree (same first
+    //    name + last name + birthday). Done on the FULL list before
     //    search/facets/sort/pagination so two records that would land on
     //    different pages still collapse. `?dedupe=false` skips the collapse so
     //    the all-alumni "show all degrees" toggle can list every degree record
     //    (one row per degree); the dashboard count is unaffected (it uses a
     //    separate person-grouping path).
     const dedupe = searchParams.get("dedupe") !== "false";
-    const cmuRaw = await fetchCmuGraduates();
+    const cmuRaw = await getCmuGraduatesLocal();
     const graduates = dedupe ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
 
     // 5. Apply search filter
@@ -147,14 +147,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data, total, page, pageSize });
   } catch (error) {
     console.error("GET /api/cmu-alumni error:", error);
-
-    // Distinguish timeout vs other errors
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json(
-        { error: "ระบบทะเบียนมหาวิทยาลัยไม่ตอบสนอง กรุณาลองใหม่ภายหลัง" },
-        { status: 504 },
-      );
-    }
 
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการดึงข้อมูลศิษย์เก่าจากระบบทะเบียน" },

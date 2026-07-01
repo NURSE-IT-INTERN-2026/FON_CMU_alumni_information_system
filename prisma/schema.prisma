@@ -416,3 +416,40 @@ model Session {
   @@index([alumniId])
   @@map("sessions")
 }
+
+// Local materialization of the FON-filtered CMU Registrar graduate list.
+// One row per registrar DEGREE record, keyed by studentId (unique). Refreshed
+// on demand by an admin from /management/cmu-sync (POST /api/cmu-alumni/sync).
+// This is a faithful cache of the registrar response — the universe for the
+// all-alumni table, dashboard person counts, facets, and identity checks.
+// Alumni-table semantics are unchanged (Alumni = accounts / imported people).
+// `birthday` is stored RAW (e.g. "01-12-1997"); read-side normalizeCmuBirthday
+// canonicalizes it, identical to the live path — so dedupe/sort logic is
+// byte-identical to the former live-fetch flow.
+model CmuGraduate {
+  id           String   @id @default(uuid())
+  studentId    String   @unique
+  // Core 7 (always present on a FON record):
+  nameTh       String
+  surnameTh    String
+  birthday     String // raw registrar "DD-MM-YYYY"; normalized at read
+  levelId      String
+  majorNameTh  String
+  gradYear     String
+  // Optional enrichment (nullable — sparse in the registrar data):
+  sexId        String?
+  cmuitAccount String?
+  nameEn       String?
+  surnameEn    String?
+  gradDate     String? // raw registrar grad_date string
+  // Bookkeeping:
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([levelId])
+  @@index([gradYear])
+  @@index([majorNameTh])
+  @@index([deletedAt])
+  @@map("cmu_graduates")
+}

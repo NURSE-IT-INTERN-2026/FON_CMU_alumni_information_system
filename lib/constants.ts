@@ -42,6 +42,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/management/dashboard", label: "แผงควบคุม" },
   { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
+  { href: "/management/cmu-sync", label: "การดึงข้อมูล", adminOnly: true },
   { href: "/management/awards", label: "รางวัล" },
   { href: "/management/potentials", label: "ศักยภาพ" },
   { href: "/management/associations", label: "สมาคม/ชมรม" },

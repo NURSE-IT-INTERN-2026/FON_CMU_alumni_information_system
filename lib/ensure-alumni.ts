@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { fetchCmuGraduates, type CmuGraduate } from "@/lib/cmu-registrar";
+import { getCmuGraduatesLocal, type CmuGraduate } from "@/lib/cmu-registrar";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
 import {
   cmuLevelToDegree,
@@ -8,41 +8,31 @@ import {
 } from "@/lib/alumni-verify";
 
 // ---------------------------------------------------------------------------
-// CMU lookup map (cached per process; the underlying fetch is 5-min cached)
+// CMU lookup map (reads the local cmu_graduates table)
 // ---------------------------------------------------------------------------
 
-let cmuMapPromise: Promise<Map<string, CmuGraduate>> | null = null;
-
 /**
- * Build (once) and return a studentId → CmuGraduate map from the Registrar API.
- * On any error returns an empty map so imports never hard-fail when CMU is down
- * — the row simply imports without CMU enrichment.
+ * Build a studentId → CmuGraduate map from the LOCAL `cmu_graduates` table. On
+ * any error returns an empty map so imports never hard-fail — the row simply
+ * imports without CMU enrichment. No process cache: the DB is the cache, and
+ * this is a fast indexed scan.
  */
 export async function getCmuLookupMap(): Promise<Map<string, CmuGraduate>> {
-  if (!cmuMapPromise) {
-    cmuMapPromise = fetchCmuGraduates()
-      .then((grads) => {
-        const map = new Map<string, CmuGraduate>();
-        for (const g of grads) {
-          const sid = String(g.student_id ?? "").trim();
-          if (sid) map.set(sid, g);
-        }
-        return map;
-      })
-      .catch((err) => {
-        console.error(
-          "ensure-alumni: CMU lookup failed, continuing without sync",
-          err,
-        );
-        return new Map<string, CmuGraduate>();
-      });
+  try {
+    const grads = await getCmuGraduatesLocal();
+    const map = new Map<string, CmuGraduate>();
+    for (const g of grads) {
+      const sid = String(g.student_id ?? "").trim();
+      if (sid) map.set(sid, g);
+    }
+    return map;
+  } catch (err) {
+    console.error(
+      "ensure-alumni: local CMU lookup failed, continuing without sync",
+      err,
+    );
+    return new Map<string, CmuGraduate>();
   }
-  return cmuMapPromise;
-}
-
-/** Drop the cached map (mainly for long-lived dev sessions / manual testing). */
-export function resetCmuLookupCache(): void {
-  cmuMapPromise = null;
 }
 
 // ---------------------------------------------------------------------------

@@ -307,17 +307,18 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* CMU-unavailable warning — alumni totals then reflect local rows only. */}
+      {/* CMU data not yet synced — alumni totals then reflect local rows only. */}
       {!cmuAvailable && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div className="text-sm">
-            <p className="font-medium">
-              ไม่สามารถเชื่อมต่อระบบทะเบียนของมหาวิทยาลัย (CMU) ได้ในขณะนี้
-            </p>
+            <p className="font-medium">ยังไม่ได้ดึงข้อมูล CMU</p>
             <p className="mt-0.5 text-amber-700">
-              จำนวนศิษย์เก่าแสดงเฉพาะข้อมูลที่บันทึกในระบบเท่านั้น และอาจน้อยกว่าปกติ
-              — ระบบจะแสดงผลครบถ้วนเมื่อกลับมาใช้งานได้
+              จำนวนศิษย์เก่าแสดงเฉพาะที่บันทึกในระบบเท่านั้น —{" "}
+              <Link href="/management/cmu-sync" className="underline hover:text-amber-900">
+                ดึงข้อมูลจากระบบทะเบียน
+              </Link>{" "}
+              เพื่อแสดงผลครบถ้วน
             </p>
           </div>
         </div>
