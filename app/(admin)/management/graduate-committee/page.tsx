@@ -35,17 +35,6 @@ interface Committee {
 
 type SortField = "termYear" | "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "position" | "major" | "remarks";
 type SortDir = "asc" | "desc";
-type SearchField = "all" | "studentId" | "name" | "cohort" | "position" | "remarks" | "termYear";
-
-const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "name", label: "ชื่อ" },
-  { value: "cohort", label: "รุ่นที่" },
-  { value: "termYear", label: "ปี พ.ศ." },
-  { value: "position", label: "ตำแหน่ง" },
-  { value: "remarks", label: "หมายเหตุ" },
-];
 
 type FormValues = CommitteePageFormData & { studentId: string; major: string };
 
@@ -55,7 +44,6 @@ export default function GraduateCommitteePage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("cohort");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -65,7 +53,7 @@ export default function GraduateCommitteePage() {
   const { items: committees, total, totalPages, isPending: loading, isError } = useEntityList<Committee>(
     "graduateCommittee",
     "/api/graduate-committee",
-    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { page, search, sortField, sortDir, filters, filtersKey },
     { sortKey: "sortBy" },
   );
 
@@ -250,7 +238,6 @@ export default function GraduateCommitteePage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    if (searchField !== "all") params.set("searchField", searchField);
     facetQueryParams(filters).forEach((v, k) => params.set(k, v));
     params.set("sortBy", sortField);
     params.set("sortOrder", sortDir);
@@ -480,19 +467,10 @@ export default function GraduateCommitteePage() {
 
       {/* Search & Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3">
-        <select
-          value={searchField}
-          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
-          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          {SEARCH_FIELDS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
         <SearchInput
           value={search}
           onSearch={applySearch}
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          placeholder="ค้นหา..."
           formClassName="flex-1"
         />
       </div>

@@ -20,7 +20,6 @@ export interface EntityListResponse<T> {
 export interface EntityListParams {
   page: number;
   search: string;
-  searchField: string;
   sortField: string;
   sortDir: "asc" | "desc";
   filters: Record<string, string[]>;
@@ -49,7 +48,7 @@ export function useEntityList<T>(
     sortOrderKey?: string;
   },
 ) {
-  const { page, search, searchField, sortField, sortDir, filters, filtersKey } =
+  const { page, search, sortField, sortDir, filters, filtersKey } =
     params;
   const sortKeyName = options?.sortKey ?? "sortField";
   const sortOrderKeyName = options?.sortOrderKey ?? "sortOrder";
@@ -58,7 +57,7 @@ export function useEntityList<T>(
     queryKey: [
       scope,
       "list",
-      { page, search, searchField, sortField, sortDir, filtersKey },
+      { page, search, sortField, sortDir, filtersKey },
     ],
     queryFn: () => {
       const p = new URLSearchParams({
@@ -66,7 +65,6 @@ export function useEntityList<T>(
         pageSize: String(PAGE_SIZE),
         [sortKeyName]: sortField,
         [sortOrderKeyName]: sortDir,
-        searchField,
       });
       if (search.trim()) p.set("search", search.trim());
       facetQueryParams(filters).forEach((v, k) => p.set(k, v));
