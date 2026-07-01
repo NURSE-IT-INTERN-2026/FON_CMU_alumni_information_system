@@ -34,16 +34,6 @@ interface Association {
 
 type SortField = "studentId" | "prefix" | "firstName" | "lastName" | "associationName" | "position" | "recordedYear" | "major";
 type SortDir = "asc" | "desc";
-type SearchField = "all" | "studentId" | "name" | "associationName" | "position" | "recordedYear";
-
-const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "name", label: "ชื่อ" },
-  { value: "associationName", label: "สมาคม/ชมรม" },
-  { value: "position", label: "ตำแหน่ง" },
-  { value: "recordedYear", label: "ปีที่บันทึก" },
-];
 
 type FormValues = AssociationPageFormData & { studentId: string; major: string };
 
@@ -53,7 +43,6 @@ export default function AssociationsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("associationName");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -63,7 +52,7 @@ export default function AssociationsPage() {
   const { items, total, totalPages, isPending: loading, isError } = useEntityList<Association>(
     "associations",
     "/api/associations",
-    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { page, search, sortField, sortDir, filters, filtersKey },
   );
 
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
@@ -239,7 +228,6 @@ export default function AssociationsPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    if (searchField !== "all") params.set("searchField", searchField);
     params.set("sortField", sortField);
     params.set("sortOrder", sortDir);
     window.location.href = `${BASE_PATH}/api/associations/export?${params}`;
@@ -462,19 +450,10 @@ export default function AssociationsPage() {
 
       {/* Search */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row">
-        <select
-          value={searchField}
-          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
-          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          {SEARCH_FIELDS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
         <SearchInput
           value={search}
           onSearch={handleSearch}
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          placeholder="ค้นหา..."
           formClassName="w-full sm:max-w-md"
         />
       </div>

@@ -70,7 +70,6 @@ function compareNetwork(a: string, b: string): number {
 export default function ModelRepresentativesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [filterField, setFilterField] = useState<"all" | "name" | "studentId" | "generation" | "cohort">("all");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
 
@@ -203,24 +202,14 @@ export default function ModelRepresentativesPage() {
     if (!term) return true;
     const t = term.toLowerCase();
     const fullName = [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").toLowerCase();
-    switch (filterField) {
-      case "name":
-        return fullName.includes(t);
-      case "studentId":
-        return a.studentId.toLowerCase().includes(t);
-      case "generation":
-        return String(a.generation).includes(t);
-      case "cohort":
-        return a.cohort.toLowerCase().includes(t);
-      default:
-        return (
-          fullName.includes(t) ||
-          a.studentId.toLowerCase().includes(t) ||
-          String(a.generation).includes(t) ||
-          a.cohort.toLowerCase().includes(t)
-        );
-    }
-  }, [filterField]);
+    // Search all fields (name, student id, generation, network).
+    return (
+      fullName.includes(t) ||
+      a.studentId.toLowerCase().includes(t) ||
+      String(a.generation).includes(t) ||
+      a.cohort.toLowerCase().includes(t)
+    );
+  }, []);
 
   const filteredAlumni = useMemo(() => {
     return search ? alumni.filter((a) => matchesSearch(a, search)) : alumni;
@@ -732,17 +721,6 @@ export default function ModelRepresentativesPage() {
 
       {/* Search */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row">
-        <select
-          value={filterField}
-          onChange={(e) => setFilterField(e.target.value as typeof filterField)}
-          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          <option value="all">ทั้งหมด</option>
-          <option value="name">ชื่อ-นามสกุล</option>
-          <option value="studentId">รหัสนักศึกษา</option>
-          <option value="generation">รุ่นที่</option>
-          <option value="cohort">เครือข่าย</option>
-        </select>
         <SearchInput
           value={search}
           onSearch={applySearch}

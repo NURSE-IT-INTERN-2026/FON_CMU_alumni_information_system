@@ -66,16 +66,6 @@ const DEFAULT_FORM_VALUES: FormValues = {
   description: "",
 };
 
-type SearchField = "all" | "awardName" | "description" | "name" | "year";
-
-const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "name", label: "ชื่อ-นามสกุล" },
-  { value: "awardName", label: "ชื่อรางวัล" },
-  { value: "description", label: "รายละเอียด" },
-  { value: "year", label: "ปี พ.ศ." },
-];
-
 const recipientDisplay = (a: { prefix: string | null; firstName: string; lastName: string }) =>
   [a.prefix, a.firstName, a.lastName].filter(Boolean).join(" ").trim() || "ไม่ระบุชื่อ";
 
@@ -83,7 +73,6 @@ export default function AwardsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("all");
   const [sortField, setSortField] = useState<SortField>("year");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -93,7 +82,7 @@ export default function AwardsPage() {
   const { items: awards, total, totalPages, isPending: loading, isError } = useEntityList<Award>(
     "awards",
     "/api/awards",
-    { page, search, searchField, sortField, sortDir, filters, filtersKey },
+    { page, search, sortField, sortDir, filters, filtersKey },
     { sortOrderKey: "sortDir" },
   );
   const { data: typeCountsData } = useQuery<Record<string, number>>({
@@ -311,7 +300,6 @@ export default function AwardsPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
-    if (searchField !== "all") params.set("searchField", searchField);
     params.set("sortField", sortField);
     params.set("sortDir", sortDir);
     window.location.href = `${BASE_PATH}/api/awards/export?${params}`;
@@ -527,19 +515,10 @@ export default function AwardsPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <select
-          value={searchField}
-          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); setPage(1); }}
-          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          {SEARCH_FIELDS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
         <SearchInput
           value={search}
           onSearch={handleSearch}
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          placeholder="ค้นหา..."
           formClassName="flex-1"
         />
       </div>

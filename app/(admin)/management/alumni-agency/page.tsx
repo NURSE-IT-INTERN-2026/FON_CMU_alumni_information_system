@@ -73,21 +73,6 @@ const abroadFormSchema = z.object({
 });
 type AbroadFormValues = z.infer<typeof abroadFormSchema>;
 
-type SearchField = "all" | "studentId" | "major" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "cohort";
-
-const SEARCH_FIELDS: { value: SearchField; label: string }[] = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "studentId", label: "รหัสนักศึกษา" },
-  { value: "major", label: "สาขาวิชา" },
-  { value: "firstName", label: "ชื่อ" },
-  { value: "lastName", label: "นามสกุล" },
-  { value: "englishName", label: "ชื่ออังกฤษ" },
-  { value: "country", label: "ประเทศ" },
-  { value: "workplace", label: "สถานที่ทำงาน" },
-  { value: "homeAddress", label: "ที่อยู่บ้าน" },
-  { value: "cohort", label: "รุ่น" },
-];
-
 type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
@@ -111,9 +96,6 @@ const ABROAD_SORT_FIELDS: { field: SortField; label: string }[] = [
 // ที่อยู่บ้าน, หมายเหตุ). workplace is included here — it was the missing column.
 const THAILAND_SORT_FIELDS: { field: SortField; label: string }[] = ABROAD_SORT_FIELDS.filter(
   (f) => f.field !== "country"
-);
-const THAILAND_SEARCH_FIELDS: { value: SearchField; label: string }[] = SEARCH_FIELDS.filter(
-  (f) => f.value !== "country"
 );
 
 function getFieldValue(a: AlumniAgency, field: SortField): string {
@@ -173,10 +155,8 @@ export default function AlumniAgencyPage() {
   const [mode, setMode] = useState<"abroad" | "thailand">("abroad");
   const isThailand = mode === "thailand";
   const sortFields = isThailand ? THAILAND_SORT_FIELDS : ABROAD_SORT_FIELDS;
-  const searchFields = isThailand ? THAILAND_SEARCH_FIELDS : SEARCH_FIELDS;
 
   const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("all");
   const [countryFilter, setCountryFilter] = useState(""); // abroad only
   // "รอเชื่อมโยง" toggle — show only rows flagged with no Alumni to link to.
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
@@ -229,9 +209,9 @@ export default function AlumniAgencyPage() {
 
   const qc = useQueryClient();
   const { data, isPending: loading } = useQuery({
-    queryKey: ["alumniAgency", mode, { search, searchField, countryFilter, unlinkedOnly }],
+    queryKey: ["alumniAgency", mode, { search, countryFilter, unlinkedOnly }],
     queryFn: () => {
-      const params = new URLSearchParams({ region: mode, search, searchField, unlinked: unlinkedOnly ? "true" : "" });
+      const params = new URLSearchParams({ region: mode, search, unlinked: unlinkedOnly ? "true" : "" });
       // The country filter dropdown only exists on the abroad tab.
       if (!isThailand) params.set("country", countryFilter);
       return apiFetch<ApiResponse>(`/api/alumni-agency?${params}`);
@@ -276,7 +256,6 @@ export default function AlumniAgencyPage() {
     // so a stale search/sort/page from the other tab is meaningless here.
     setPage(1);
     setSearch("");
-    setSearchField("all");
     setSortField(th ? "studentId" : "country");
     setSortDir(th ? "asc" : "desc");
     exitSelect();
@@ -389,7 +368,7 @@ export default function AlumniAgencyPage() {
 
   const handleExport = () => {
     // Mirror the list's region split so an export never crosses tabs.
-    const params = new URLSearchParams({ region: mode, search, searchField });
+    const params = new URLSearchParams({ region: mode, search });
     if (!isThailand) params.set("country", countryFilter);
     window.location.href = `${BASE_PATH}/api/alumni-agency/export?${params}`;
   };
@@ -592,19 +571,10 @@ export default function AlumniAgencyPage() {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <select
-          value={searchField}
-          onChange={(e) => { setSearchField(e.target.value as SearchField); setSearch(""); }}
-          className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm bg-white focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
-        >
-          {searchFields.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
         <SearchInput
           value={search}
           onSearch={applySearch}
-          placeholder={`ค้นหา${searchFields.find((f) => f.value === searchField)?.label}...`}
+          placeholder="ค้นหา..."
           formClassName="flex-1"
         />
         {!isThailand && (
