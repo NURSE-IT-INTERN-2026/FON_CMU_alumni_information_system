@@ -198,6 +198,40 @@ export async function fetchCmuGraduates(): Promise<CmuGraduate[]> {
   return fonGraduates;
 }
 
+export interface CmuGraduatesResult {
+  graduates: CmuGraduate[];
+  /**
+   * `false` when the CMU Registrar API was unreachable (maintenance window,
+   * non-2xx response, timeout, or network error). Soft consumers (the dashboard
+   * person-count) can fall back to an empty list and surface a warning; strict
+   * CMU surfaces (the `/api/cmu-alumni` proxy, profile lookup, import) must keep
+   * using the throwing `fetchCmuGraduates()` so an outage isn't silently hidden.
+   */
+  available: boolean;
+}
+
+/**
+ * Fail-safe variant of `fetchCmuGraduates`: on any error (Registrar maintenance
+ * window, timeout, network) it returns `{ graduates: [], available: false }`
+ * instead of throwing. Used by the dashboard counting path
+ * (`getPersonDegreeBreakdown`) so a CMU outage degrades to local-only alumni
+ * counts instead of 500-ing the whole dashboard. A failure is NOT cached — the
+ * next call retries CMU, so the dashboard self-heals within its 60s TTL once the
+ * Registrar is back.
+ */
+export async function fetchCmuGraduatesOrEmpty(): Promise<CmuGraduatesResult> {
+  try {
+    const graduates = await fetchCmuGraduates();
+    return { graduates, available: true };
+  } catch (error) {
+    console.error(
+      "CMU Registrar unreachable — degrading to local-only counts:",
+      error instanceof Error ? error.message : error,
+    );
+    return { graduates: [], available: false };
+  }
+}
+
 /**
  * Fetch a single graduate by student ID from the CMU Registrar API.
  * Returns null if the student is not found or is not a FON graduate.

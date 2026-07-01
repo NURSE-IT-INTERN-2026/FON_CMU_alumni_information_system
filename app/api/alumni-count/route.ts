@@ -23,7 +23,8 @@ async function getAlumniCountData() {
   // Merge CMU + local Education into PERSONS (union-find by name+birthday,
   // alumniId, and shared studentId) so each person counts once under their
   // highest degree — a locally-added higher degree upgrades them.
-  const { byDegree, total, byYearDegree } = await getPersonDegreeBreakdown();
+  const { byDegree, total, byYearDegree, cmuAvailable } =
+    await getPersonDegreeBreakdown();
 
   // Sort years numerically
   const generations = Object.keys(byYearDegree).sort(
@@ -44,7 +45,7 @@ async function getAlumniCountData() {
     count: byDegree[degree] ?? 0,
   }));
 
-  return { generations, series, cards, totalCount: total };
+  return { generations, series, cards, totalCount: total, cmuAvailable };
 }
 
 export async function GET() {

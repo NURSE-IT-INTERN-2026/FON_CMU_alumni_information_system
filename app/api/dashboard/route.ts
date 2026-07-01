@@ -128,7 +128,7 @@ async function getDashboardData() {
   // Merge CMU + local Education into PERSONS (union-find by name+birthday,
   // alumniId, and shared studentId) so each person counts once under their
   // highest degree — a locally-added higher degree upgrades them.
-  const { byDegree: byDegreeLevel, total: alumniTotal } =
+  const { byDegree: byDegreeLevel, total: alumniTotal, cmuAvailable } =
     await getPersonDegreeBreakdown();
 
   // Format degree breakdown string for sub-stat
@@ -139,6 +139,9 @@ async function getDashboardData() {
     .join(", ");
 
   return {
+    // false when the CMU Registrar was unreachable — alumni totals then reflect
+    // local rows only. The dashboard renders a warning banner in that case.
+    cmuAvailable,
     alumni: {
       total: alumniTotal,
       byDegreeLevel,
