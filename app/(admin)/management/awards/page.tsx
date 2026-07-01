@@ -18,6 +18,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 
 interface Award {
@@ -535,12 +536,11 @@ export default function AwardsPage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+        <SearchInput
           value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          onSearch={handleSearch}
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          formClassName="flex-1"
         />
       </div>
 

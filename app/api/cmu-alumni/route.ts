@@ -60,11 +60,17 @@ export async function GET(request: NextRequest) {
     const majors = facetList("major");
     const graduationYears = facetList("graduationYear");
 
-    // 4. Fetch from CMU Registrar API, then collapse a person's multiple
-    //    degree records into their HIGHEST degree (same first name + last name
-    //    + birthday). Done on the FULL list before search/facets/sort/pagination
-    //    so two records that would land on different pages still collapse.
-    const graduates = dedupeCmuGraduatesByPerson(await fetchCmuGraduates());
+    // 4. Fetch from CMU Registrar API, then (by default) collapse a person's
+    //    multiple degree records into their HIGHEST degree (same first name +
+    //    last name + birthday). Done on the FULL list before
+    //    search/facets/sort/pagination so two records that would land on
+    //    different pages still collapse. `?dedupe=false` skips the collapse so
+    //    the all-alumni "show all degrees" toggle can list every degree record
+    //    (one row per degree); the dashboard count is unaffected (it uses a
+    //    separate person-grouping path).
+    const dedupe = searchParams.get("dedupe") !== "false";
+    const cmuRaw = await fetchCmuGraduates();
+    const graduates = dedupe ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
 
     // 5. Apply search filter
     let filtered = graduates;

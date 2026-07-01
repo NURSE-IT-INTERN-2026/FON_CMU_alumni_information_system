@@ -11,6 +11,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import { modelRepPageFormSchema, type ModelRepPageFormData } from "@/lib/validations";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
@@ -180,6 +181,11 @@ export default function ModelRepresentativesPage() {
 
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
+    setManagePage(1);
+  };
+
+  const applySearch = (value: string) => {
+    setSearch(value);
     setManagePage(1);
   };
 
@@ -737,15 +743,11 @@ export default function ModelRepresentativesPage() {
           <option value="generation">รุ่นที่</option>
           <option value="cohort">เครือข่าย</option>
         </select>
-        <input
-          type="text"
-          placeholder="ค้นหา..."
+        <SearchInput
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setManagePage(1);
-          }}
-          className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
+          onSearch={applySearch}
+          placeholder="ค้นหา..."
+          formClassName="w-full sm:max-w-md"
         />
       </div>
 

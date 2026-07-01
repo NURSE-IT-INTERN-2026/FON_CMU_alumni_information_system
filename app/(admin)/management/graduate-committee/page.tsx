@@ -15,6 +15,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import { committeePageFormSchema, type CommitteePageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
@@ -122,6 +123,11 @@ export default function GraduateCommitteePage() {
 
   const setFilter = (field: string, vals: string[]) => {
     setFilters((prev) => ({ ...prev, [field]: vals }));
+    setPage(1);
+  };
+
+  const applySearch = (value: string) => {
+    setSearch(value);
     setPage(1);
   };
 
@@ -483,12 +489,11 @@ export default function GraduateCommitteePage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+        <SearchInput
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          onSearch={applySearch}
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          formClassName="flex-1"
         />
       </div>
 

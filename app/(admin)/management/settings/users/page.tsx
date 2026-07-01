@@ -15,6 +15,7 @@ import { joinPhones } from "@/lib/parse-phone";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+import SearchInput from "@/components/ui/search-input";
 
 /* ───── Admin User types & tab ───── */
 interface AdminUser {
@@ -423,12 +424,11 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
 
       {/* Search + status filter */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input
-          type="text"
+        <SearchInput
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          onSearch={(v) => { setSearch(v); setPage(1); }}
           placeholder="ค้นหาชื่อ, รหัสนักศึกษา, อีเมล..."
-          className="w-full max-w-sm rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
+          formClassName="w-full max-w-sm"
         />
         <select
           value={statusFilter}

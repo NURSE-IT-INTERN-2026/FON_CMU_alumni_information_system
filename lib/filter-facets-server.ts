@@ -126,13 +126,17 @@ function cmuFieldValue(g: CmuGraduate, field: string): string | null {
  */
 export async function getAlumniFacetValues(
   field: string,
-  opts: { page?: number; search?: string } = {}
+  opts: { page?: number; search?: string; dedupe?: boolean } = {}
 ): Promise<FacetResult> {
   if (!isAlumniCmuBackedField(field)) {
     throw new Error(`Alumni field "${field}" is not CMU-backed`);
   }
   const isYear = YEAR_FIELDS.has(field);
   const search = opts.search?.trim().toLowerCase();
+  // `dedupe !== false` (default) collapses each person's degrees to their
+  // highest so counts match the all-alumni table. `dedupe === false` counts
+  // every degree record (the table's "show all degrees" view).
+  const dedupe = opts.dedupe !== false;
 
   const [cmuGraduatesRaw, localAlumni] = await Promise.all([
     fetchCmuGraduates(),
@@ -146,9 +150,7 @@ export async function getAlumniFacetValues(
       },
     }),
   ]);
-  // Collapse a person's multiple CMU degree records into their highest degree
-  // so facet counts match the all-alumni table (which dedups the same way).
-  const cmuGraduates = dedupeCmuGraduatesByPerson(cmuGraduatesRaw);
+  const cmuGraduates = dedupe ? dedupeCmuGraduatesByPerson(cmuGraduatesRaw) : cmuGraduatesRaw;
 
   const cmuStudentIds = new Set(cmuGraduates.map((g) => g.student_id));
   const deletedStudentIds = new Set<string>();
@@ -168,12 +170,14 @@ export async function getAlumniFacetValues(
     counts.set(s, (counts.get(s) ?? 0) + 1);
   };
 
-  // CMU records — local overlay wins where a local record exists.
+  // CMU records. When deduping, a local record overlays its CMU person (the
+  // local field value wins). When showing all degrees, count each degree
+  // record's own value — matching the table's per-degree rows.
   for (const g of cmuGraduates) {
     if (deletedStudentIds.has(g.student_id)) continue;
-    const local = localByStudentId.get(g.student_id);
-    if (local) {
-      tally(local[field]);
+    if (dedupe) {
+      const local = localByStudentId.get(g.student_id);
+      tally(local ? local[field] : cmuFieldValue(g, field));
     } else {
       tally(cmuFieldValue(g, field));
     }

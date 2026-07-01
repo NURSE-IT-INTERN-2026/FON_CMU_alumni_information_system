@@ -17,6 +17,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
 import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import { potentialPageFormSchema, type PotentialPageFormData } from "@/lib/validations";
 
 interface Potential {
@@ -473,12 +474,11 @@ export default function PotentialsPage() {
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+        <SearchInput
           value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] sm:max-w-md"
+          onSearch={handleSearch}
+          placeholder={`ค้นหา${SEARCH_FIELDS.find((f) => f.value === searchField)?.label}...`}
+          formClassName="w-full sm:max-w-md"
         />
       </div>
 

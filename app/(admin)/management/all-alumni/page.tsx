@@ -14,9 +14,10 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { normalizeCmuBirthday, formatBirthDateThai, bachelorCohortFromGradYear } from "@/lib/alumni-verify";
+import { normalizeCmuBirthday, formatBirthDateThai, bachelorCohortFromGradYear, cmuLevelToDegree } from "@/lib/alumni-verify";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import FacetFilter from "@/components/ui/facet-filter";
+import SearchInput from "@/components/ui/search-input";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
@@ -176,6 +177,11 @@ export default function AlumniCountPage() {
   // State
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  // dedupeView=true (default): collapse each person's degrees to their highest →
+  // the table matches the dashboard person-count. dedupeView=false ("show all
+  // degrees"): list every degree record (a multi-degree person shows one row per
+  // degree). The dashboard count is unaffected — it uses a separate path.
+  const [dedupeView, setDedupeView] = useState(true);
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
   const [sortField, setSortField] = useState<ManageSortField | ViewSortField>("studentId");
@@ -188,7 +194,7 @@ export default function AlumniCountPage() {
   // `allMerged`. This is required because the merged CMU+local result can only
   // be sorted/paginated correctly once the full set is assembled.
   const manageQuery = useQuery({
-    queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir }],
+    queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir, dedupeView }],
     queryFn: async () => {
       // Fetch the FULL CMU list (not a single page) so the client can merge,
       // sort, and paginate the complete set. `fetchCmuGraduates` caches the
@@ -196,6 +202,7 @@ export default function AlumniCountPage() {
       const cmuParams = new URLSearchParams({
         page: "1", pageSize: "50000", search,
         sortField: sortField as string, sortDir,
+        dedupe: dedupeView ? "true" : "false",
       });
       facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
       let cmuData: CmuAlumni[] = [];
@@ -238,7 +245,35 @@ export default function AlumniCountPage() {
         // both tables.
         const derivedCohort =
           c.level_id === "1" && c.grad_year ? bachelorCohortFromGradYear(c.grad_year) : null;
-        if (local) {
+        if (!dedupeView) {
+          // "Show all degrees": list every CMU degree record. Degree fields come
+          // from THIS record (a multi-degree person appears once per degree);
+          // local identity/contact is overlaid where the alumni exists, and the
+          // row id stays the local UUID so edit/delete/navigation treat it as the
+          // real alumni. The row key is made unique with the degree studentId so
+          // a person's degree rows don't collide.
+          const cmuDegreeLevel = cmuLevelToDegree(c.level_id, c.major_name_th);
+          if (local) {
+            merged.push({
+              ...local,
+              studentId: c.student_id,
+              degreeLevel: cmuDegreeLevel,
+              major: c.major_name_th || local.major,
+              graduationYear: c.grad_year ? Number(c.grad_year) : local.graduationYear,
+              cohort: local.cohort || derivedCohort,
+              birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate,
+            });
+          } else {
+            merged.push({
+              id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
+              lastName: c.surname_th || "", cohort: derivedCohort,
+              degreeLevel: cmuDegreeLevel, major: c.major_name_th || null,
+              graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
+              email: null, contactEmail: null, phones: [], homeAddress: null,
+              isPotential: false, isModelRepresentative: false, photoUrl: null,
+            });
+          }
+        } else if (local) {
           merged.push({ ...local, cohort: local.cohort || derivedCohort, birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate });
         } else {
           merged.push({
@@ -811,22 +846,33 @@ export default function AlumniCountPage() {
             </div>
           )}
 
-          {/* Search */}
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
+          {/* Search + view options */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchInput
               value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="flex-1 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+              onSearch={handleSearch}
+              placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
+              formClassName="sm:flex-1"
             />
+            <label
+              className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700"
+              title="เมื่อเลือก จะแสดงทุกรายวุฒิของผู้ที่มีหลายรายวุฒิเป็นคนละแถว (ไม่รวมรายวุฒิซ้ำเป็นคนเดียว)"
+            >
+              <input
+                type="checkbox"
+                checked={!dedupeView}
+                onChange={(e) => { setDedupeView(!e.target.checked); setPage(1); }}
+                className="h-4 w-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+              />
+              แยกรายการตามรายวุฒิ
+            </label>
           </div>
 
           {/* Facet filters */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} />
-            <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
-            <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} />
+            <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />
+            <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />
+            <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />
           </div>
 
           {/* Alumni table */}
@@ -897,7 +943,7 @@ export default function AlumniCountPage() {
                   ) : (
                     alumni.map((a, idx) => (
                       <tr
-                        key={a.id}
+                        key={`${a.id}-${a.studentId}`}
                         onClick={() => { if (selectMode) toggleSelect(a.id); else router.push(`/management/alumni/${a.id}`); }}
                         className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}
                       >
