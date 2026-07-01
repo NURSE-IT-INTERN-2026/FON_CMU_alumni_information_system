@@ -1,3 +1,16 @@
+# Base (production) Compose file. `app` builds the full Dockerfile and runs the
+# baked standalone server; the `db` port is NOT exposed to the host.
+#
+# A companion dev override — docker-compose.override.yml — is auto-merged on top
+# of THIS file by plain `docker compose up` (it swaps in the `next dev` server
+# with HMR + a source bind-mount, and exposes db:5432 for a host-side dev run).
+# The two files are intentionally separate so the invocation picks the runtime:
+#
+#   Dev (HMR):     docker compose up -d --build app                       # auto-merges the override
+#   Prod (deploy): docker compose -f docker-compose.yml up -d --build app  # skips the override
+#
+# See CLAUDE.md "Dev container hot-reloads via docker-compose.override.yml".
+
 services:
   db:
     image: postgres:17-alpine
