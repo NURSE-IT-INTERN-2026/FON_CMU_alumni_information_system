@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, Users } from "lucide-react";
+import { AlertTriangle, FileText } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,27 +38,28 @@ function formatThaiDate(date: Date): string {
   return `${day} ${month} ${year}`;
 }
 
-/** A small colored count pill for the alumni-accounts status strip. */
+// Soft pastel pill backgrounds for the alumni-accounts status strip (matches
+// the Lovable reference — dark-slate text on a light red/green tint).
+const PILL_BG: Record<"red" | "green", string> = {
+  red: "bg-red-100", // #FEE2E2
+  green: "bg-emerald-50", // #ECFDF5
+};
+
 function StatusPill({
   count,
   label,
-  color,
-  dot = false,
+  tone,
 }: {
   count: number;
   label: string;
-  color: string;
-  dot?: boolean;
+  tone: keyof typeof PILL_BG;
 }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-      style={{ backgroundColor: `${color}15`, color }}
+      className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-gray-900 ${PILL_BG[tone]}`}
     >
-      {dot && (
-        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      )}
-      {count.toLocaleString()} {label}
+      <span className="font-semibold tabular-nums">{count.toLocaleString()}</span>
+      {label}
     </span>
   );
 }
@@ -356,24 +357,27 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pending alumni accounts — compact status strip. Whole card opens the
-          approval queue; the pending pill is red to draw the eye. */}
+      {/* Pending alumni accounts — matches the Lovable stat-card reference.
+          Whole card opens the approval queue. */}
       <Link
         href="/management/settings/users?status=pending"
-        className="group mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:py-4"
+        className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
       >
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-[#1e3a5f10] p-2 text-[#1e3a5f]">
-            <Users className="h-5 w-5" />
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-gray-100 p-2 text-gray-500">
+            <FileText className="h-5 w-5" />
           </div>
-          <span className="text-sm font-semibold text-[var(--foreground)]">บัญชีศิษย์เก่า</span>
+          <div>
+            <p className="text-base font-semibold text-gray-900">บัญชีศิษย์เก่า</p>
+            <p className="text-xs text-gray-500">ตรวจสอบและจัดการบัญชีผู้ใช้ศิษย์เก่า</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#dc2626" dot />
-          <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" color="#16a34a" />
-          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#64748b" />
+          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" tone="red" />
+          <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" tone="green" />
+          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" tone="red" />
           <svg
-            className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-1"
+            className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-hover:translate-x-1"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={2}
