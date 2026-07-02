@@ -19,9 +19,6 @@ import SearchInput from "@/components/ui/search-input";
 
 // PRD §3.12: news lists show at most 9 cards per page.
 const NEWS_PAGE_SIZE = 9;
-const MAX_INLINE_IMAGES = 4;
-// CSS class toggled on a body image the admin has clicked to edit. Stripped before save.
-const IMG_SEL_CLASS = "__nimg-sel";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -107,7 +104,6 @@ export default function NewsListPage() {
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverDragOver, setCoverDragOver] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
-  const inlineImageRef = useRef<HTMLInputElement>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
@@ -115,11 +111,8 @@ export default function NewsListPage() {
   const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
   const tablePickerRef = useRef<HTMLDivElement>(null);
 
-  // News image editor: cover crop/resize + body image crop/resize/delete + px text size.
+  // Cover image crop/resize editor + px text size.
   const [coverEditing, setCoverEditing] = useState(false);
-  const [bodyEditSrc, setBodyEditSrc] = useState<string | null>(null);
-  const [selectedImgEl, setSelectedImgEl] = useState<HTMLImageElement | null>(null);
-  const [bodyImgWidth, setBodyImgWidth] = useState<number>(0);
   const [fontSizePx, setFontSizePx] = useState<string>("16");
 
   const updateToolbarState = useCallback(() => {
@@ -206,18 +199,6 @@ export default function NewsListPage() {
     setCoverUploading(false);
   };
 
-  // PRD §3.12: at most MAX_INLINE_IMAGES inline images per news body.
-  const inlineImageCount = () => editorRef.current?.querySelectorAll("img").length ?? 0;
-  const tryAddInlineImage = (file: File) => {
-    if (inlineImageCount() >= MAX_INLINE_IMAGES) {
-      setErrorMsg(`อนุญาตใส่รูปภาพในเนื้อหาได้สูงสุด ${MAX_INLINE_IMAGES} รูป`);
-      return;
-    }
-    uploadImage(file).then((url) => {
-      if (url) execFormat("insertHTML", `<img src="${assetUrl(url)}" style="max-width:100%;height:auto" /><br/>`);
-    });
-  };
-
   // react-hook-form's `watch()` opts this component out of the React Compiler
   // (benign — the component still works, it just isn't compiler-optimized).
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -284,19 +265,16 @@ export default function NewsListPage() {
     setShowForm(false);
     setEditingId(null);
     formReset(EMPTY_FORM);
-    setSelectedImgEl(null);
     setCoverEditing(false);
-    setBodyEditSrc(null);
   };
 
   const handleSave = async (data: NewsFormData) => {
     setSaving(true);
     setErrorMsg("");
     try {
-      // Drop transient body-image selection markers + serialize the live editor HTML
-      // (classList changes don't fire onInput, so read fresh rather than trusting data.body).
+      // Serialize the live editor HTML (some formatting changes don't fire onInput,
+      // so read fresh rather than trusting data.body).
       const editor = editorRef.current;
-      if (editor) editor.querySelectorAll(`img.${IMG_SEL_CLASS}`).forEach((el) => el.classList.remove(IMG_SEL_CLASS));
       const payload = {
         title: data.title.trim(),
         body: stripUploadsInHtml(editor ? editor.innerHTML : data.body),
@@ -521,11 +499,6 @@ export default function NewsListPage() {
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = prompt("URL:"); if (url) execFormat("createLink", url); }} title="แทรกลิงก์" className={`rounded p-1.5 ${activeStates.createLink ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 </button>
-                {/* Insert image */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => inlineImageRef.current?.click()} title="แทรกรูปภาพ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                </button>
-                <input ref={inlineImageRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) tryAddInlineImage(file); e.target.value = ""; }} />
                 <span className="mx-1 h-5 w-px bg-gray-300" />
                 {/* Bulleted list */}
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertUnorderedList")} title="รายการแบบ bullet" className={`rounded p-1.5 ${activeStates.insertUnorderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
@@ -659,45 +632,6 @@ export default function NewsListPage() {
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
               </div>
-              {/* Selected body-image toolbar: display width, crop/compress, delete */}
-              {selectedImgEl && (
-                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary)]/5 p-2 text-sm">
-                  <span className="text-xs font-medium text-[var(--primary)]">รูปที่เลือก</span>
-                  <label className="flex items-center gap-1 text-gray-600">
-                    ความกว้าง
-                    <input
-                      type="number"
-                      min={50}
-                      max={2000}
-                      step={1}
-                      value={bodyImgWidth || ""}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const n = Math.round(Number(e.target.value));
-                        if (Number.isFinite(n) && n > 0 && selectedImgEl) {
-                          const clamped = Math.max(50, Math.min(2000, n));
-                          selectedImgEl.style.width = `${clamped}px`;
-                          selectedImgEl.style.height = "auto";
-                          setBodyImgWidth(clamped);
-                          setFormValue("body", editorRef.current?.innerHTML || "");
-                        }
-                      }}
-                      className="w-20 rounded border border-gray-300 px-2 py-0.5 outline-none focus:border-[var(--primary)]"
-                    />
-                    px
-                  </label>
-                  <button type="button" onClick={() => setBodyEditSrc(selectedImgEl.getAttribute("src") || "")} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50">
-                    ครอป/บีบอัด
-                  </button>
-                  <button type="button" onClick={() => { selectedImgEl.remove(); setSelectedImgEl(null); setFormValue("body", editorRef.current?.innerHTML || ""); }} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">
-                    ลบ
-                  </button>
-                  <button type="button" onClick={() => { selectedImgEl.classList.remove(IMG_SEL_CLASS); setSelectedImgEl(null); }} className="ml-auto rounded-md px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">
-                    ยกเลิกเลือก
-                  </button>
-                </div>
-              )}
-              <style>{`img.${IMG_SEL_CLASS}{outline:3px solid var(--primary);outline-offset:2px}`}</style>
               {/* Editor area */}
               <div
                 ref={editorRef}
@@ -710,30 +644,6 @@ export default function NewsListPage() {
                 }}
                 onKeyUp={updateToolbarState}
                 onMouseUp={updateToolbarState}
-                onClick={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.tagName === "IMG") {
-                    const im = target as HTMLImageElement;
-                    editorRef.current?.querySelectorAll(`img.${IMG_SEL_CLASS}`).forEach((el) => el.classList.remove(IMG_SEL_CLASS));
-                    im.classList.add(IMG_SEL_CLASS);
-                    setSelectedImgEl(im);
-                    setBodyImgWidth(Math.round(im.getBoundingClientRect().width) || im.naturalWidth || 0);
-                  } else if (selectedImgEl) {
-                    selectedImgEl.classList.remove(IMG_SEL_CLASS);
-                    setSelectedImgEl(null);
-                  }
-                }}
-                onPaste={(e) => {
-                  const items = e.clipboardData.items;
-                  for (let i = 0; i < items.length; i++) {
-                    if (items[i].type.match(/^image\/(jpeg|png)$/)) {
-                      e.preventDefault();
-                      const file = items[i].getAsFile();
-                      if (file) tryAddInlineImage(file);
-                      return;
-                    }
-                  }
-                }}
                 className={`min-h-[240px] rounded-b-lg border p-6 sm:p-8 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] prose prose-sm sm:prose !max-w-none ${formErrors.body ? "border-red-400" : "border-gray-300"}`}
                 suppressContentEditableWarning
               />
@@ -751,28 +661,6 @@ export default function NewsListPage() {
                   const u = await uploadImage(file);
                   if (u) setFormValue("coverImageUrl", u);
                   setCoverEditing(false);
-                }}
-              />
-            )}
-            {/* Body image editor (free crop + resize) */}
-            {bodyEditSrc && (
-              <ImageEditorDialog
-                key={bodyEditSrc}
-                src={bodyEditSrc}
-                title="แก้ไขรูปในเนื้อหา"
-                onClose={() => setBodyEditSrc(null)}
-                onConfirm={async (file) => {
-                  const u = await uploadImage(file);
-                  if (u && selectedImgEl) {
-                    selectedImgEl.src = assetUrl(u);
-                    selectedImgEl.removeAttribute("width");
-                    selectedImgEl.removeAttribute("height");
-                    selectedImgEl.style.width = "";
-                    selectedImgEl.style.height = "";
-                    setBodyImgWidth(Math.round(selectedImgEl.getBoundingClientRect().width) || selectedImgEl.naturalWidth || 0);
-                    setFormValue("body", editorRef.current?.innerHTML || "");
-                  }
-                  setBodyEditSrc(null);
                 }}
               />
             )}
