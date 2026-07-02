@@ -114,8 +114,15 @@ export function formatBirthDateThai(
   input: string | null | undefined,
 ): string | null {
   if (!input) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(input).trim());
-  if (!m) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(input).trim());
+  // Stored Alumni.birthDate is raw Buddhist-era DDMMYYYY (8 digits, e.g.
+  // "01122540"); normalize to canonical YYYY-MM-DD before formatting.
+  if (!m) {
+    const norm = normalizeFormBirthDate(input); // null if unparseable
+    if (!norm) return null;
+    m = /^(\d{4})-(\d{2})-(\d{2})/.exec(norm);
+    if (!m) return null;
+  }
   const [, yyyy, mm, dd] = m;
   const be = parseInt(yyyy, 10) + 543;
   return `${dd}-${mm}-${be}`;
