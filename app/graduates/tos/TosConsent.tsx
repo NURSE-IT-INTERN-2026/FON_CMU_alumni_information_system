@@ -29,7 +29,7 @@ export default function TosConsent() {
         setAccepting(false);
         return;
       }
-      router.push("/graduates/profile");
+      router.push("/graduates/news");
     } catch {
       setError("เกิดข้อผิดพลาด กรุณาลองอีกครั้ง");
       setAccepting(false);
