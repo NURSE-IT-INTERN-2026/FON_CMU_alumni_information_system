@@ -37,6 +37,7 @@ async function getDashboardData() {
     newsTotal,
     newsPublishedCount,
     recentNews,
+    accountStatusGroups,
   ] = await Promise.all([
     // Awards total
     prisma.award.count(),
@@ -123,6 +124,15 @@ async function getDashboardData() {
         body: true,
       },
     }),
+
+    // Alumni signup accounts grouped by status (PENDING/ACTIVE/REJECTED) — drives
+    // the dashboard "pending approvals" card. Same "has an account" base where as
+    // GET /api/alumni-accounts so the card's totals match that table.
+    prisma.alumni.groupBy({
+      by: ["accountStatus"],
+      _count: true,
+      where: { passwordHash: { not: null }, deletedAt: null },
+    }),
   ]);
 
   // Merge CMU + local Education into PERSONS (union-find by name+birthday,
@@ -138,6 +148,14 @@ async function getDashboardData() {
     .map(([key, count]) => `${DEGREE_LABELS[key]} ${count.toLocaleString()}`)
     .join(", ");
 
+  // Alumni signup-account counts by status — same "has an account" definition as
+  // the alumni-accounts management table (passwordHash != null, not deleted).
+  const accountStatusCounts = Object.fromEntries(
+    (accountStatusGroups as { accountStatus: string; _count: number }[]).map(
+      (g) => [g.accountStatus, g._count],
+    ),
+  );
+
   return {
     // false when the CMU Registrar was unreachable — alumni totals then reflect
     // local rows only. The dashboard renders a warning banner in that case.
@@ -146,6 +164,11 @@ async function getDashboardData() {
       total: alumniTotal,
       byDegreeLevel,
       degreeBreakdown,
+    },
+    alumniAccounts: {
+      pending: accountStatusCounts.PENDING ?? 0,
+      active: accountStatusCounts.ACTIVE ?? 0,
+      rejected: accountStatusCounts.REJECTED ?? 0,
     },
     awards: {
       total: awardsTotal,

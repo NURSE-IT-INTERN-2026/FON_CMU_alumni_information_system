@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { sendSignupRejectedEmail } from "@/lib/email";
+import { bustCache } from "@/lib/cache";
 
 // Reject a pending signup → accountStatus REJECTED. The account is kept (visible
 // behind the status filter, re-approvable) but blocked from login, and any
@@ -43,6 +44,10 @@ export async function POST(
     // accounts shouldn't have any, but REJECT can also be re-applied to an
     // account that was since approved).
     await prisma.session.deleteMany({ where: { alumniId: id } });
+
+    // The dashboard "pending approvals" card counts accountStatus — bust so it's
+    // fresh right after a rejection.
+    bustCache("dashboard");
 
     await logActivity(
       {

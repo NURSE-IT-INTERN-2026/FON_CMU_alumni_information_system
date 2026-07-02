@@ -9,6 +9,7 @@ import { generateGraduationLogs } from "@/lib/graduation-log";
 import { sendSignupApprovedEmail } from "@/lib/email";
 import { cmuLevelToDegree } from "@/lib/alumni-verify";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
+import { bustCache } from "@/lib/cache";
 
 // Approve a pending (or previously rejected) alumni signup → accountStatus
 // ACTIVE. Creates the Education row + primary snapshot + graduation logs that
@@ -77,6 +78,10 @@ export async function POST(
       // signup degree. Idempotent on re-approve.
       await recomputePrimaryEducation(id, tx);
     });
+
+    // The dashboard "pending approvals" card counts accountStatus — bust so it's
+    // fresh right after an approval.
+    bustCache("dashboard");
 
     // Graduation logs do their own CMU fetches — run outside the txn (idempotent).
     await generateGraduationLogs(id);
