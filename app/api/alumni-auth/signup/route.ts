@@ -13,6 +13,7 @@ import {
 } from "@/lib/signup-verification";
 import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
 import { Prisma, type DegreeLevel } from "@/app/generated/prisma/client";
+import { bustCache } from "@/lib/cache";
 
 const alumniSignupApiSchema = z.object({
   studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
@@ -173,6 +174,10 @@ export async function POST(request: Request) {
       }
       throw error;
     }
+
+    // A new PENDING signup changes the dashboard "pending approvals" count — bust
+    // so the card is fresh when an admin next loads it.
+    bustCache("dashboard");
 
     await logActivity(
       {

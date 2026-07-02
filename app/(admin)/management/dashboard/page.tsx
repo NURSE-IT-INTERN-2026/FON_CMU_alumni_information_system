@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +50,13 @@ interface DashboardData {
     total: number;
     byDegreeLevel: Record<string, number>;
     degreeBreakdown: string;
+  };
+  // Signup-account counts by status (credential-bearing, non-deleted) — drives
+  // the "pending approvals" card.
+  alumniAccounts: {
+    pending: number;
+    active: number;
+    rejected: number;
   };
   awards: {
     total: number;
@@ -323,6 +330,40 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Pending alumni accounts — clicks straight into the approval queue. */}
+      <Link
+        href="/management/settings/users?status=pending"
+        className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
+        style={{ borderLeftColor: "#dc2626" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg p-2.5" style={{ backgroundColor: "#dc262610", color: "#dc2626" }}>
+            <Users className="h-7 w-7" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--muted)]">รออนุมัติบัญชีศิษย์เก่า</p>
+            <p className="text-3xl font-bold text-[#dc2626] sm:text-4xl">
+              {data.alumniAccounts.pending.toLocaleString()}{" "}
+              <span className="text-base font-normal text-[var(--muted)]">บัญชี</span>
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-lg p-3" style={{ backgroundColor: "#16a34a08", borderTop: "3px solid #16a34a" }}>
+            <p className="text-xs text-[var(--muted)]">ใช้งาน</p>
+            <p className="mt-0.5 text-lg font-bold text-[#16a34a]">
+              {data.alumniAccounts.active.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-lg p-3" style={{ backgroundColor: "#64748b08", borderTop: "3px solid #64748b" }}>
+            <p className="text-xs text-[var(--muted)]">ปฏิเสธ</p>
+            <p className="mt-0.5 text-lg font-bold text-[#64748b]">
+              {data.alumniAccounts.rejected.toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </Link>
 
       {/* Featured Alumni Count Card */}
       <Link

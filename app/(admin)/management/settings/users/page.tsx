@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCanWrite, useRole } from "@/lib/role-context";
@@ -80,7 +80,15 @@ const DEGREE_LABELS: Record<string, string> = {
 export default function UsersPage() {
   const canWrite = useCanWrite();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"admin" | "alumni">("admin");
+  const [activeTab, setActiveTab] = useState<"admin" | "alumni">("alumni");
+  // Deep-link: a `?status=pending|active|rejected` (e.g. from the dashboard
+  // "pending approvals" card) pre-filters the alumni tab on first load.
+  const searchParams = useSearchParams();
+  const statusParam = (searchParams.get("status") ?? "").toUpperCase();
+  const initialStatus: AccountStatus | null =
+    statusParam === "PENDING" || statusParam === "ACTIVE" || statusParam === "REJECTED"
+      ? statusParam
+      : null;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -117,7 +125,7 @@ export default function UsersPage() {
       {activeTab === "admin" ? (
         <AdminAccountsTab canWrite={canWrite} />
       ) : (
-        <AlumniAccountsTab canWrite={canWrite} router={router} />
+        <AlumniAccountsTab canWrite={canWrite} router={router} initialStatus={initialStatus} />
       )}
     </div>
   );
@@ -299,10 +307,18 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
 /* ═══════════════════════════════════════════
    Alumni Accounts Tab
    ═══════════════════════════════════════════ */
-function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: ReturnType<typeof useRouter> }) {
+function AlumniAccountsTab({
+  canWrite,
+  router,
+  initialStatus,
+}: {
+  canWrite: boolean;
+  router: ReturnType<typeof useRouter>;
+  initialStatus: AccountStatus | null;
+}) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | AccountStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | AccountStatus>(initialStatus ?? "all");
   const [errorMsg, setErrorMsg] = useState("");
   const [emailEdit, setEmailEdit] = useState<AlumniAccount | null>(null);
   const [emailValue, setEmailValue] = useState("");
