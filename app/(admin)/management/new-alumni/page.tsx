@@ -15,11 +15,7 @@ import RepeatableFieldArray from "@/components/form/RepeatableFieldArray";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
-
-// Birthday input is Buddhist-era DDMMYYYY (e.g. 01122540) — keep it digits-only.
-function formatBirthDate(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 8);
-}
+import BirthDateSelect from "@/components/form/BirthDateSelect";
 
 // เครือข่าย select options for the model-representative section. The leading
 // blank option is required: RepeatableFieldArray's select renders only these
@@ -331,22 +327,7 @@ export default function NewAlumniPage() {
                 <FormInput registration={register("lastName")} error={errors.lastName?.message} className={INPUT_CLASS} placeholder="นามสกุล" />
               </FormField>
               <FormField label="วันเกิด (ววปปปป พ.ศ.)" required error={errors.birthDate?.message} labelClassName={LABEL_CLASS}>
-                <FormInput
-                  registration={register("birthDate", {
-                    onChange: (e) => {
-                      e.target.value = formatBirthDate(e.target.value);
-                    },
-                  })}
-                  error={errors.birthDate?.message}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="01122540"
-                  className={INPUT_CLASS}
-                />
-                {!errors.birthDate && (
-                  <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
-                )}
+                <BirthDateSelect control={control} name="birthDate" error={errors.birthDate?.message} />
               </FormField>
               <FormField label="รุ่น" labelClassName={LABEL_CLASS}>
                 <FormInput registration={register("cohort")} className={INPUT_CLASS} placeholder="รุ่น" />
