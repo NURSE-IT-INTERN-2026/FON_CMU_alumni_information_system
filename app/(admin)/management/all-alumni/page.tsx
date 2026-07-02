@@ -52,7 +52,13 @@ interface Alumni {
   photoUrl: string | null;
   // Education studentIds (all of this alumni's degrees) — used to bridge the
   // alumni to its CMU person on ANY degree, not just the primary snapshot.
-  educations?: { studentId: string }[];
+  educations?: {
+    studentId: string;
+    degreeLevel: string;
+    graduationYear: number | null;
+    major: string | null;
+    cohort: string | null;
+  }[];
 }
 
 interface AlumniApiResponse {
@@ -232,7 +238,8 @@ export default function AlumniCountPage() {
       // of its education studentIds is in CMU — collapsing multi-degree alumni
       // AND duplicate local rows for the same CMU person to one row, like the
       // dashboard. The overlay below picks which alumni's data a CMU row shows.
-      const usedAlumni = buildUsedAlumniIds(Object.values(localMap), buildCmuSidSet(cmuData), deletedStudentIds);
+      const cmuSidSet = buildCmuSidSet(cmuData);
+      const usedAlumni = buildUsedAlumniIds(Object.values(localMap), cmuSidSet, deletedStudentIds);
       for (const c of cmuData) {
         if (deletedStudentIds.has(c.student_id)) continue;
         // Bridge on ANY of the CMU person's student_ids so a multi-degree alumni
@@ -287,12 +294,52 @@ export default function AlumniCountPage() {
           });
         }
       }
+      const q = search.trim().toLowerCase();
       for (const a of Object.values(localMap)) {
-        if (usedAlumni.has(a.id) || deletedStudentIds.has(a.studentId)) continue;
-        // No CMU record for this alumni — derive from the local snapshot instead.
+        if (deletedStudentIds.has(a.studentId)) continue;
+        // No CMU record for this alumni — derive cohort from the local snapshot.
         const derivedLocal =
           a.degreeLevel === "BACHELOR" && a.graduationYear ? bachelorCohortFromGradYear(a.graduationYear) : null;
-        merged.push({ ...a, cohort: a.cohort || derivedLocal });
+
+        if (dedupeView) {
+          // Highest-only (default): one row per alumni not already overlaid on a
+          // CMU row, using the primary snapshot.
+          if (usedAlumni.has(a.id)) continue;
+          merged.push({ ...a, cohort: a.cohort || derivedLocal });
+          continue;
+        }
+
+        // "Show all degrees": render one row per LOCAL education that the CMU
+        // loop hasn't already rendered (studentId not in CMU). Degree fields
+        // come from the education; identity/contact/birthDate from the alumni.
+        const eduList = (a.educations ?? []).filter((e) => e.studentId);
+        if (eduList.length === 0) {
+          // No education rows — fall back to the primary snapshot.
+          merged.push({ ...a, cohort: a.cohort || derivedLocal });
+          continue;
+        }
+        const firstNameLc = (a.firstName || "").toLowerCase();
+        const lastNameLc = (a.lastName || "").toLowerCase();
+        for (const e of eduList) {
+          if (cmuSidSet.has(e.studentId)) continue; // CMU loop rendered this degree
+          // When searching, keep only the degree row that matches (its studentId
+          // or the alumni's name) — mirrors CMU's server-side search.
+          if (q) {
+            const matches =
+              e.studentId.toLowerCase().includes(q) || firstNameLc.includes(q) || lastNameLc.includes(q);
+            if (!matches) continue;
+          }
+          const derivedEduCohort =
+            e.degreeLevel === "BACHELOR" && e.graduationYear ? bachelorCohortFromGradYear(e.graduationYear) : null;
+          merged.push({
+            ...a,
+            studentId: e.studentId,
+            degreeLevel: e.degreeLevel,
+            major: e.major ?? a.major,
+            graduationYear: e.graduationYear ?? a.graduationYear,
+            cohort: e.cohort || derivedEduCohort || a.cohort,
+          });
+        }
       }
       // Sort the full merged CMU+local result client-side so local-only fields
       // (birthDate, prefix, …) reorder correctly; the CMU proxy can't sort them.
@@ -855,18 +902,18 @@ export default function AlumniCountPage() {
               placeholder="ค้นหาชื่อ, นามสกุล, รหัสนักศึกษา..."
               formClassName="sm:flex-1"
             />
-            <label
-              className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700"
-              title="เมื่อเลือก จะแสดงทุกรายวุฒิของผู้ที่มีหลายรายวุฒิเป็นคนละแถว (ไม่รวมรายวุฒิซ้ำเป็นคนเดียว)"
+            <button
+              type="button"
+              onClick={() => { setDedupeView((v) => !v); setPage(1); }}
+              title={dedupeView ? "สลับไปแสดงทุกวุฒิของผู้ที่มีหลายวุฒิเป็นคนละแถว" : "สลับไปแสดงเฉพาะวุฒิสูงสุดของแต่ละคน"}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                dedupeView
+                  ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                  : "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
+              }`}
             >
-              <input
-                type="checkbox"
-                checked={!dedupeView}
-                onChange={(e) => { setDedupeView(!e.target.checked); setPage(1); }}
-                className="h-4 w-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
-              />
-              แยกรายการตามรายวุฒิ
-            </label>
+              {dedupeView ? "แสดงวุฒิสูงสุด" : "แสดงทุกวุฒิ"}
+            </button>
           </div>
 
           {/* Facet filters */}
