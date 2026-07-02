@@ -431,16 +431,18 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={rechartsData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="year"
                     tick={{ fontSize: 12 }}
+                    label={{ value: "ปีที่จบ", position: "insideBottom", offset: -2, fontSize: 12 }}
                   />
                   <YAxis
                     allowDecimals={false}
                     tick={{ fontSize: 12 }}
+                    label={{ value: "จำนวน", angle: -90, position: "insideLeft", fontSize: 12 }}
                   />
                   <Tooltip
                     formatter={(value, name) => {
