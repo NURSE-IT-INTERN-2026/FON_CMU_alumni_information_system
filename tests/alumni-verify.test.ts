@@ -3,6 +3,8 @@ import {
   normalizeFormBirthDate,
   normalizeCmuBirthday,
   formatBirthDateThai,
+  ddmmyyyyBeToDate,
+  dateToDdmmyyyyBe,
   birthDatesMatch,
   normalizeName,
   normalizeYear,
@@ -319,5 +321,26 @@ describe("bachelorCohortFromGradYear", () => {
     expect(bachelorCohortFromGradYear(null)).toBeNull();
     expect(bachelorCohortFromGradYear(undefined)).toBeNull();
     expect(bachelorCohortFromGradYear("abc")).toBeNull();
+  });
+});
+
+describe("birthday DDMMYYYY↔Date converters", () => {
+  it("parses Buddhist DDMMYYYY to a local Date", () => {
+    const d = ddmmyyyyBeToDate("01122540")!;
+    expect(d.getFullYear()).toBe(1997);
+    expect(d.getMonth()).toBe(11); // December (0-indexed)
+    expect(d.getDate()).toBe(1);
+  });
+  it("formats a local Date back to Buddhist DDMMYYYY", () => {
+    expect(dateToDdmmyyyyBe(new Date(1997, 11, 1))).toBe("01122540");
+  });
+  it("round-trips DDMMYYYY ↔ Date", () => {
+    const ddmmyyyy = "15072495";
+    expect(dateToDdmmyyyyBe(ddmmyyyyBeToDate(ddmmyyyy)!)).toBe(ddmmyyyy);
+  });
+  it("returns null for unparseable input", () => {
+    expect(ddmmyyyyBeToDate(null)).toBeNull();
+    expect(ddmmyyyyBeToDate("")).toBeNull();
+    expect(ddmmyyyyBeToDate("not-a-date")).toBeNull();
   });
 });
