@@ -198,7 +198,7 @@ export default function AlumniCountPage() {
     queryFn: async () => {
       // Fetch the FULL CMU list (not a single page) so the client can merge,
       // sort, and paginate the complete set. `/api/cmu-alumni` reads the local
-      // `cmu_graduates` table (refreshed from /management/cmu-sync), so this is
+      // `cmu_graduates` table (refreshed from /management/settings/cmu-sync), so this is
       // one request per search/filter/sort.
       const cmuParams = new URLSearchParams({
         page: "1", pageSize: "50000", search,

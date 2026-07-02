@@ -1,6 +1,6 @@
 /**
  * CMU Registrar graduate data — now a LOCAL materialized cache (table
- * `cmu_graduates`), refreshed on demand by an admin from /management/cmu-sync.
+ * `cmu_graduates`), refreshed on demand by an admin from /management/settings/cmu-sync.
  *
  * Historically this module fetched the registrar LIVE on every dashboard /
  * all-alumni-table load (virtual, never persisted). It now persists the

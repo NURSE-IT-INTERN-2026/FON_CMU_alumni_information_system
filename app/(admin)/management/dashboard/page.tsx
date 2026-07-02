@@ -322,7 +322,7 @@ export default function DashboardPage() {
             <p className="font-medium">ยังไม่ได้ดึงข้อมูล CMU</p>
             <p className="mt-0.5 text-amber-700">
               จำนวนศิษย์เก่าแสดงเฉพาะที่บันทึกในระบบเท่านั้น —{" "}
-              <Link href="/management/cmu-sync" className="underline hover:text-amber-900">
+              <Link href="/management/settings/cmu-sync" className="underline hover:text-amber-900">
                 ดึงข้อมูลจากระบบทะเบียน
               </Link>{" "}
               เพื่อแสดงผลครบถ้วน

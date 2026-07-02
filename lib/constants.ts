@@ -42,7 +42,6 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/management/dashboard", label: "แผงควบคุม" },
   { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
-  { href: "/management/cmu-sync", label: "การดึงข้อมูล", adminOnly: true },
   { href: "/management/awards", label: "รางวัล" },
   { href: "/management/potentials", label: "ศักยภาพ" },
   { href: "/management/associations", label: "สมาคม/ชมรม" },
@@ -56,6 +55,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { href: "/management/settings/profile", label: "ข้อมูลส่วนตัว" },
   { href: "/management/settings/users", label: "จัดการผู้ใช้งาน" },
   { href: "/management/settings/logs", label: "บันทึกกิจกรรม", adminOnly: true },
+  { href: "/management/settings/cmu-sync", label: "การดึงข้อมูล", adminOnly: true },
   { href: "/management/settings/trash", label: "รายการที่ถูกลบ", superAdminOnly: true },
 ];
 
