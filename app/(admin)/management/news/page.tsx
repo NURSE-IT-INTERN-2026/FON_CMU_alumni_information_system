@@ -106,6 +106,10 @@ export default function NewsListPage() {
   const coverFileRef = useRef<HTMLInputElement>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
+  // Last in-editor text selection. The px number input steals focus and discards the
+  // contentEditable selection, so we capture it on mouseup/keyup and restore it in
+  // applyFontSize before running execCommand.
+  const savedRangeRef = useRef<Range | null>(null);
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
@@ -141,6 +145,21 @@ export default function NewsListPage() {
     updateToolbarState();
   }, [updateToolbarState, setFormValue]);
 
+  // Remember the editor's current text selection so it survives the px input grabbing focus.
+  // Focusing the number input discards the contentEditable selection, so without this the
+  // font-size command would run on an empty selection and apply nothing.
+  const captureSelection = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+      const node = sel.anchorNode;
+      if (node && editor.contains(node)) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    }
+  }, []);
+
   // Apply an arbitrary pixel font size to the current selection. execCommand("fontSize")
   // only accepts the legacy 1–7 scale, so use "7" as a marker then swap each marker for a
   // px-sized <span style="font-size"> (sanitize-html allows style on all tags → survives render).
@@ -149,7 +168,12 @@ export default function NewsListPage() {
     if (!editor || !Number.isFinite(px) || px <= 0) return;
     editor.focus();
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
+    // Restore the last in-editor selection (captured on mouseup/keyup) — focusing the px input
+    // cleared the live selection. execCommand on a collapsed selection applies nothing.
+    if (savedRangeRef.current && editor.contains(savedRangeRef.current.commonAncestorContainer)) {
+      sel?.removeAllRanges();
+      sel?.addRange(savedRangeRef.current);
+    } else if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
       const range = document.createRange();
       range.selectNodeContents(editor);
       range.collapse(false);
@@ -642,8 +666,8 @@ export default function NewsListPage() {
                   }
                   updateToolbarState();
                 }}
-                onKeyUp={updateToolbarState}
-                onMouseUp={updateToolbarState}
+                onKeyUp={() => { captureSelection(); updateToolbarState(); }}
+                onMouseUp={() => { captureSelection(); updateToolbarState(); }}
                 className={`min-h-[240px] rounded-b-lg border p-6 sm:p-8 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] prose prose-sm sm:prose !max-w-none ${formErrors.body ? "border-red-400" : "border-gray-300"}`}
                 suppressContentEditableWarning
               />
