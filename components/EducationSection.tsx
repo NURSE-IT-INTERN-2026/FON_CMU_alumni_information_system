@@ -88,7 +88,9 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<EducationFormState>(EMPTY_FORM);
   const [editForm, setEditForm] = useState<EducationFormState>(EMPTY_FORM);
-  const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [sectionMessage, setSectionMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [addMessage, setAddMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [editMessage, setEditMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -120,9 +122,10 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       onChanged?.();
       setAddOpen(false);
       setAddForm(EMPTY_FORM);
-      setMessage({ kind: "success", text: "เพิ่มหลักสูตรเรียบร้อยแล้ว" });
+      setAddMessage(null);
+      setSectionMessage({ kind: "success", text: "เพิ่มหลักสูตรเรียบร้อยแล้ว" });
     },
-    onError: (e) => setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
+    onError: (e) => setAddMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
   });
 
   const editMutation = useMutation({
@@ -143,14 +146,16 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       await qc.invalidateQueries({ queryKey: queryKeys.education.list(alumniId) });
       onChanged?.();
       setEditOpen(false);
-      setMessage({ kind: "success", text: "บันทึกการแก้ไขเรียบร้อยแล้ว" });
+      setEditMessage(null);
+      setSectionMessage({ kind: "success", text: "บันทึกการแก้ไขเรียบร้อยแล้ว" });
     },
-    onError: (e) => setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
+    onError: (e) => setEditMessage({ kind: "error", text: e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล" }),
   });
 
   async function lookupCmu(studentId: string, target: "add" | "edit") {
     const sid = studentId.trim();
     if (!sid) return;
+    const setMsg = target === "add" ? setAddMessage : setEditMessage;
     setLookingUp(true);
     try {
       const res = await apiFetch<{
@@ -174,12 +179,12 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       if (target === "add") setAddForm(patch);
       else setEditForm((f) => ({ ...patch, studentId: f.studentId }));
       if (res.samePersonWarning) {
-        setMessage({ kind: "error", text: res.samePersonWarning });
+        setMsg({ kind: "error", text: res.samePersonWarning });
       } else {
-        setMessage({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
+        setMsg({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
       }
     } catch (e) {
-      setMessage({ kind: "error", text: e instanceof ApiError ? e.message : "ไม่พบข้อมูลในระบบทะเบียน" });
+      setMsg({ kind: "error", text: e instanceof ApiError ? e.message : "ไม่พบข้อมูลในระบบทะเบียน" });
     } finally {
       setLookingUp(false);
     }
@@ -196,13 +201,15 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       firstName: edu.firstName ?? "",
       lastName: edu.lastName ?? "",
     });
-    setMessage(null);
+    setEditMessage(null);
+    setSectionMessage(null);
     setEditOpen(true);
   }
 
   function openAdd() {
     setAddForm(EMPTY_FORM);
-    setMessage(null);
+    setAddMessage(null);
+    setSectionMessage(null);
     setAddOpen(true);
   }
 
@@ -271,9 +278,9 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
         </div>
       )}
 
-      {message && (
-        <p className={`mt-3 text-center text-sm ${message.kind === "error" ? "text-red-600" : "text-green-600"}`}>
-          {message.text}
+      {sectionMessage && (
+        <p className={`mt-3 text-center text-sm ${sectionMessage.kind === "error" ? "text-red-600" : "text-green-600"}`}>
+          {sectionMessage.text}
         </p>
       )}
 
@@ -292,6 +299,11 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
             lookingUp={lookingUp}
             onLookup={() => lookupCmu(addForm.studentId, "add")}
           />
+          {addMessage && (
+            <p className={`text-sm ${addMessage.kind === "error" ? "text-red-600" : "text-green-600"}`}>
+              {addMessage.text}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)} disabled={addMutation.isPending}>
               ยกเลิก
@@ -323,6 +335,11 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
             lookingUp={lookingUp}
             onLookup={() => lookupCmu(editForm.studentId, "edit")}
           />
+          {editMessage && (
+            <p className={`text-sm ${editMessage.kind === "error" ? "text-red-600" : "text-green-600"}`}>
+              {editMessage.text}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editMutation.isPending}>
               ยกเลิก
