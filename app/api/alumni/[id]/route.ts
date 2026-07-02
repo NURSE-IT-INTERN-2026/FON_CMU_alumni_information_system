@@ -114,7 +114,7 @@ export async function PUT(
       // so any match is a different person. CMU `student_id` carries trailing
       // spaces — trim before comparing (same convention as `ensure-alumni`).
       // Reads the LOCAL cmu_graduates table (refreshed on demand from
-      // /management/cmu-sync).
+      // /management/settings/cmu-sync).
       const cmuGraduates: CmuGraduate[] = await getCmuGraduatesLocal();
       const cmuDuplicate = cmuGraduates.some(
         (g) => String(g.student_id ?? "").trim() === newStudentId,

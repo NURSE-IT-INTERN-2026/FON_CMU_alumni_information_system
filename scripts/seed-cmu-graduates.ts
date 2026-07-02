@@ -1,6 +1,6 @@
 /**
  * One-off / dev seed: materialize the CMU Registrar graduate list into the local
- * `cmu_graduates` table. Equivalent to clicking "ดึงข้อมูล" on /management/cmu-sync,
+ * `cmu_graduates` table. Equivalent to clicking "ดึงข้อมูล" on /management/settings/cmu-sync,
  * but runnable from the CLI — to prime a fresh DB, or when you'd rather not drive
  * the UI. Requires the CMU env vars and a reachable Registrar.
  *
