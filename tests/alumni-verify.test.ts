@@ -65,6 +65,13 @@ describe("formatBirthDateThai", () => {
     expect(formatBirthDateThai("")).toBeNull();
     expect(formatBirthDateThai("not-a-date")).toBeNull();
   });
+  it("also formats raw stored DDMMYYYY (Buddhist) — the DB format", () => {
+    // Alumni.birthDate is stored as Buddhist-era DDMMYYYY (8 digits); the
+    // formatter must normalize it, not return null. Regression for the blank
+    // birthday on the profile / all-alumni table.
+    expect(formatBirthDateThai("01122540")).toBe("01-12-2540");
+    expect(formatBirthDateThai("11072495")).toBe("11-07-2495");
+  });
 });
 
 describe("birthDatesMatch", () => {
