@@ -173,23 +173,27 @@ export default function NewAlumniPage() {
     reset({ ...DEFAULT_VALUES, ...overrides });
   }, [searchParams, reset]);
 
-  const toggleSection = (key: keyof typeof sections) =>
-    setSections((prev) => {
-      const next = !prev[key];
-      if (next) {
-        if (key === "associations" && associationArray.fields.length === 0)
-          associationArray.append({ associationName: "", position: "", recordedYear: "" });
-        if (key === "committees" && committeeArray.fields.length === 0)
-          committeeArray.append({ termYear: "", cohort: "", position: "", remarks: "" });
-        if (key === "potentials" && potentialArray.fields.length === 0)
-          potentialArray.append({ career: "", position: "", recordedYear: "" });
-        if (key === "modelReps" && modelRepArray.fields.length === 0)
-          modelRepArray.append({ cohort: "", generation: "" });
-        if (key === "abroad" && abroadArray.fields.length === 0)
-          abroadArray.append({ country: "", workplace: "", homeAddress: "", notes: "" });
-      }
-      return { ...prev, [key]: next };
-    });
+  const toggleSection = (key: keyof typeof sections) => {
+    const willOpen = !sections[key];
+    if (willOpen) {
+      // Ensure singleRow sections show one editable row when first opened.
+      // These appends MUST run in the event-handler body, NOT inside the
+      // setSections updater below: React StrictMode (on by default in dev)
+      // double-invokes setState updater functions, which would append the row
+      // twice and render duplicated rows. Event handlers are invoked once.
+      if (key === "associations" && associationArray.fields.length === 0)
+        associationArray.append({ associationName: "", position: "", recordedYear: "" });
+      if (key === "committees" && committeeArray.fields.length === 0)
+        committeeArray.append({ termYear: "", cohort: "", position: "", remarks: "" });
+      if (key === "potentials" && potentialArray.fields.length === 0)
+        potentialArray.append({ career: "", position: "", recordedYear: "" });
+      if (key === "modelReps" && modelRepArray.fields.length === 0)
+        modelRepArray.append({ cohort: "", generation: "" });
+      if (key === "abroad" && abroadArray.fields.length === 0)
+        abroadArray.append({ country: "", workplace: "", homeAddress: "", notes: "" });
+    }
+    setSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const onSubmit = async (data: AlumniWithRelatedFormData) => {
     setSaving(true);
