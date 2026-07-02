@@ -140,6 +140,31 @@ export function formatBirthDateThaiSlash(
   return dashed ? dashed.replaceAll("-", "/") : null;
 }
 
+/**
+ * Parse a stored Buddhist-era DDMMYYYY birthday into a local Date (midnight),
+ * e.g. "01122540" → 1 Dec 1997. Returns null if unparseable. Local time so
+ * getDate()/getMonth()/getFullYear() round-trip without a TZ day-shift — used
+ * by the calendar picker.
+ */
+export function ddmmyyyyBeToDate(input: string | null | undefined): Date | null {
+  const norm = normalizeFormBirthDate(input); // → "YYYY-MM-DD" CE or null
+  if (!norm) return null;
+  const [yyyy, mm, dd] = norm.split("-").map(Number);
+  if (!yyyy || !mm || !dd) return null;
+  return new Date(yyyy, mm - 1, dd);
+}
+
+/**
+ * Inverse of {@link ddmmyyyyBeToDate}: a local Date → Buddhist DDMMYYYY,
+ * e.g. 1 Dec 1997 → "01122540".
+ */
+export function dateToDdmmyyyyBe(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const be = date.getFullYear() + 543;
+  return `${dd}${mm}${be}`;
+}
+
 /** True when the form birthDate and CMU birthday refer to the same Gregorian day. */
 export function birthDatesMatch(
   formInput: string | null | undefined,
