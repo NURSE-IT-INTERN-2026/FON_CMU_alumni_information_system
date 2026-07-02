@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, CircleCheck } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,6 +36,31 @@ function formatThaiDate(date: Date): string {
   const month = months[d.getMonth()];
   const year = d.getFullYear() + 543;
   return `${day} ${month} ${year}`;
+}
+
+/** A small colored count pill for the alumni-accounts status strip. */
+function StatusPill({
+  count,
+  label,
+  color,
+  dot = false,
+}: {
+  count: number;
+  label: string;
+  color: string;
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+      style={{ backgroundColor: `${color}15`, color }}
+    >
+      {dot && (
+        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      )}
+      {count.toLocaleString()} {label}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -230,12 +255,6 @@ export default function DashboardPage() {
   const cmuAvailable =
     statsQuery.data?.cmuAvailable ?? chartQuery.data?.cmuAvailable ?? true;
 
-  // Pending-alumni card is reactive: red "action needed" when accounts await
-  // approval, calm green when the queue is empty.
-  const pendingCount = data?.alumniAccounts.pending ?? 0;
-  const hasPending = pendingCount > 0;
-  const pendingAccent = hasPending ? "#dc2626" : "#16a34a";
-
   // Defer chart render by one frame so the container has real dimensions
   // before ResponsiveContainer tries to measure it. This avoids the
   // "width(-1) and height(-1)" warning from recharts. The setChartReady call
@@ -337,50 +356,32 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pending alumni accounts — reactive alert: red "action needed" when
-          accounts await approval, calm green when the queue is empty. */}
+      {/* Pending alumni accounts — compact status strip. Whole card opens the
+          approval queue; the pending pill is red to draw the eye. */}
       <Link
         href="/management/settings/users?status=pending"
-        className="group mb-4 flex items-center justify-between gap-4 rounded-xl border-l-4 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-6"
-        style={{ borderLeftColor: pendingAccent }}
+        className="group mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:py-4"
       >
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg p-2.5" style={{ backgroundColor: `${pendingAccent}10`, color: pendingAccent }}>
-            {hasPending ? (
-              <AlertTriangle className="h-7 w-7" />
-            ) : (
-              <CircleCheck className="h-7 w-7" />
-            )}
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-[#1e3a5f10] p-2 text-[#1e3a5f]">
+            <Users className="h-5 w-5" />
           </div>
-          <div>
-            {hasPending ? (
-              <>
-                <p className="text-sm font-medium text-[var(--muted)]">บัญชีรออนุมัติ</p>
-                <p className="text-2xl font-bold sm:text-3xl" style={{ color: pendingAccent }}>
-                  {pendingCount.toLocaleString()}{" "}
-                  <span className="text-base font-normal text-[var(--muted)]">บัญชี</span>
-                </p>
-              </>
-            ) : (
-              <p className="text-lg font-bold sm:text-xl" style={{ color: pendingAccent }}>
-                ไม่มีบัญชีรอการอนุมัติ
-              </p>
-            )}
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
-              ใช้งาน {data.alumniAccounts.active.toLocaleString()} · ปฏิเสธ{" "}
-              {data.alumniAccounts.rejected.toLocaleString()}
-            </p>
-          </div>
+          <span className="text-sm font-semibold text-[var(--foreground)]">บัญชีศิษย์เก่า</span>
         </div>
-        <svg
-          className="h-5 w-5 shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-1"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-        </svg>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#dc2626" dot />
+          <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" color="#16a34a" />
+          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#64748b" />
+          <svg
+            className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+          </svg>
+        </div>
       </Link>
 
       {/* Featured Alumni Count Card */}
