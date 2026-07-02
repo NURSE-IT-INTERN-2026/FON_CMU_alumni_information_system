@@ -468,7 +468,13 @@ function AlumniAccountsTab({ canWrite, router }: { canWrite: boolean; router: Re
                 alumni.map((a, i) => (
                   <tr
                     key={a.id}
-                    onClick={() => router.push(`/management/alumni/${a.id}`)}
+                    // Pending/rejected accounts aren't confirmed alumni — route them to the
+                    // review modal (same as the eye icon) instead of a sparse profile page.
+                    onClick={() =>
+                      a.accountStatus === "ACTIVE"
+                        ? router.push(`/management/alumni/${a.id}`)
+                        : setReviewAccount(a)
+                    }
                     className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                   >
                     <td className="px-4 py-3 text-center text-gray-500">{(page - 1) * pageSize + i + 1}</td>
