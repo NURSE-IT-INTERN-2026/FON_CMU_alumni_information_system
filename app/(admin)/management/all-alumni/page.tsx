@@ -27,7 +27,7 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
   DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "remarks";
+type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "contactEmail" | "phones" | "remarks";
 type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort" | "birthDate";
 type SortDir = "asc" | "desc";
 
@@ -915,6 +915,12 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
                       วันเกิด {renderSortIcon("birthDate")}
                     </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("contactEmail")}>
+                      อีเมลติดต่อ {renderSortIcon("contactEmail")}
+                    </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("phones")}>
+                      เบอร์โทร {renderSortIcon("phones")}
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
                       หมายเหตุ {renderSortIcon("remarks")}
                     </th>
@@ -926,7 +932,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-12 text-center">
+                      <td colSpan={14} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -935,7 +941,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={13}
+                        colSpan={14}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -969,6 +975,15 @@ export default function AlumniCountPage() {
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
                           {formatBirthDateThai(a.birthDate) || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
+                          {/* Contact email, falling back to the login email so the
+                              column is populated whenever either exists. CMU has
+                              no email field, so CMU-only rows show "-". */}
+                          {a.contactEmail || a.email || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
+                          {joinPhones(a.phones) || "-"}
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />

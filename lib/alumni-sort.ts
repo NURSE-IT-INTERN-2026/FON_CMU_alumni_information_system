@@ -35,6 +35,17 @@ export function compareAlumni<T>(a: T, b: T, field: string): number {
     const gb = (b as unknown as Record<string, unknown>)["graduationYear"];
     return (typeof ga === "number" ? ga : -Infinity) - (typeof gb === "number" ? gb : -Infinity);
   }
+  // The all-alumni "อีเมลติดต่อ" column shows `contactEmail` with a fallback to
+  // the login `email` (an alumni may have only one or the other). Sort by that
+  // same effective value so a row shown via fallback sorts with its displayed
+  // value — sorting on raw `contactEmail` alone would strand those rows as empty.
+  if (field === "contactEmail") {
+    const eff = (x: T): string => {
+      const r = x as unknown as Record<string, unknown>;
+      return String(r.contactEmail || r.email || "");
+    };
+    return eff(a).localeCompare(eff(b), "th");
+  }
   const val = (x: T): string => {
     const v = (x as unknown as Record<string, unknown>)[field];
     return v == null ? "" : String(v);

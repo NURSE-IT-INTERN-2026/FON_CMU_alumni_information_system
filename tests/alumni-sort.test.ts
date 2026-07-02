@@ -10,6 +10,8 @@ interface TestRow {
   birthDate?: string | null;
   graduationYear?: number | null;
   firstName?: string;
+  contactEmail?: string | null;
+  email?: string | null;
 }
 
 const row = (over: TestRow): TestRow => ({ ...over });
@@ -76,5 +78,19 @@ describe("sortAlumni", () => {
       (r) => r.firstName,
     );
     expect(sorted).toEqual(["กานดา", "ขนุน", "จันทรา"]);
+  });
+
+  it("sorts contactEmail by the effective value (contactEmail || email)", () => {
+    // The all-alumni "อีเมลติดต่อ" column shows contactEmail with a fallback to
+    // the login email; sort must follow that same effective value so a row shown
+    // via fallback isn't stranded with the empty rows.
+    const rows: TestRow[] = [
+      row({ id: "login-only", contactEmail: null, email: "zoe@x.com" }),
+      row({ id: "neither", contactEmail: null, email: null }),
+      row({ id: "contact", contactEmail: "amy@x.com", email: "other@x.com" }),
+    ];
+    const sorted = sortAlumni(rows, "contactEmail", "asc").map((r) => r.id);
+    // ascending: empty first, then amy@x.com (contact), then zoe@x.com (login)
+    expect(sorted).toEqual(["neither", "contact", "login-only"]);
   });
 });
