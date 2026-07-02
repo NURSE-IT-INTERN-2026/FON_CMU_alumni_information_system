@@ -56,7 +56,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | `Potential` | `potentials` | Notable alumni potentials |
 | `ModelRepresentative` | `model_representatives` | Model representative entries |
 | `AlumniAgency` | `alumni_agency` | Alumni agency (ต้นสังกัดศิษย์เก่า). The page's Thailand + Abroad tabs are the **same model split by `country`** (NOT two models, and the Thailand tab is NOT the `alumni` table): a Thailand-valued country (ไทย/ประเทศไทย/Thailand/Thai via `isThailandCountry`, `lib/alumni-agency-region.ts`) → in-country tab, everything else → abroad tab. `GET`/`export` accept `?region=thailand|abroad`. `studentId` is a nullable **FK to `Alumni.studentId`**; the import links it ONLY when a matching `Alumni` exists — otherwise the id is stored in `pendingStudentId` (the "no Alumni to link to" flag; `GET ?unlinked=true` filters these; **no stub Alumni is created** — see the FK pitfall). Renamed from `AbroadAlumni`. |
-| `News` | `news` | News articles (status, rich-text body, cover + up to 4 images) |
+| `News` | `news` | News articles (status, rich-text body, cover image). The body editor is text-only — image upload inside the body was removed (2026-07); only the `coverImageUrl` thumbnail upload remains (any images already inside old body HTML still render) |
 | `AdminUser` | `admin_users` | System users with roles |
 | `ActivityLog` | `activity_logs` | Audit trail (JSON details) |
 | `FieldChangeHistory` | `field_change_history` | Per-field old/new history — drives the orange update indicators (singular table) |
