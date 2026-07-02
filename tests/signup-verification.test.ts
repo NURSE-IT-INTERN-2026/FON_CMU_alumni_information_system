@@ -126,4 +126,57 @@ describe("buildSignupVerification", () => {
     expect(v.fields.studentId.match).toBe(true);
     expect(v.fields.firstName.match).toBe(true);
   });
+
+  // ── Local-alumni fallback (CMU has no record, studentId exists locally) ──
+
+  const localMatch = {
+    studentId: "51204567",
+    firstName: "สมหญิง",
+    lastName: "รักเรียน",
+    birthDate: "01122540", // Buddhist DDMMYYYY, same form format as submitted
+    cohort: "2560",
+    degreeLevel: "BACHELOR" as const,
+  };
+
+  it("falls back to the LOCAL record when CMU has no record, all match → green", () => {
+    const v = buildSignupVerification(submitted, null, true, localMatch);
+    expect(v.source).toBe("local");
+    expect(v.cmuFound).toBe(false);
+    expect(v.cmuConsulted).toBe(true);
+    expect(v.fields.studentId.match).toBe(true);
+    expect(v.fields.firstName.match).toBe(true);
+    expect(v.fields.lastName.match).toBe(true);
+    expect(v.fields.birthDate.match).toBe(true);
+    expect(v.fields.cohort.match).toBe(true);
+    expect(v.fields.degreeLevel.match).toBe(true);
+    expect(v.allMatchableMatch).toBe(true);
+  });
+
+  it("flags mismatches against the LOCAL record (case 4)", () => {
+    const v = buildSignupVerification(submitted, null, true, {
+      ...localMatch,
+      firstName: "สมชาย",
+      cohort: "2559",
+    });
+    expect(v.source).toBe("local");
+    expect(v.fields.firstName.match).toBe(false);
+    expect(v.fields.cohort.match).toBe(false);
+    expect(v.fields.lastName.match).toBe(true);
+    expect(v.allMatchableMatch).toBe(false);
+    // The authoritative column shows the LOCAL record's value.
+    expect(v.fields.firstName.authoritative).toBe("สมชาย");
+  });
+
+  it("prefers CMU over local when both are available", () => {
+    const v = buildSignupVerification(submitted, makeCmu(), true, localMatch);
+    expect(v.source).toBe("cmu");
+    expect(v.cmuFound).toBe(true);
+  });
+
+  it("returns source=null when CMU has no record AND no local record is passed", () => {
+    const v = buildSignupVerification(submitted, null, true);
+    expect(v.source).toBeNull();
+    expect(v.cmuFound).toBe(false);
+    expect(v.allMatchableMatch).toBeNull();
+  });
 });
