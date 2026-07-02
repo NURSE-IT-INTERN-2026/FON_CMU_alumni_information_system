@@ -648,10 +648,9 @@ export default function NewsListPage() {
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   </button>
                   <input
-                    type="number"
-                    min={8}
-                    max={96}
-                    step={1}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={fontSizePx}
                     onMouseDown={(e) => e.stopPropagation()}
                     onChange={(e) => setFontSizePx(e.target.value)}
