@@ -7,7 +7,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
-import { buildSignupVerification } from "@/lib/signup-verification";
+import {
+  buildSignupVerification,
+  localAuthoritativeFromAlumni,
+} from "@/lib/signup-verification";
 import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
 import { Prisma, type DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -110,6 +113,11 @@ export async function POST(request: Request) {
       },
       cmuGrad,
       cmuConsulted,
+      // When this is a pre-existing local alumni (no CMU record), compare the
+      // applicant's submitted data against the LOCAL record's identity instead
+      // of showing a bare "not found". localAlumni still holds its pre-update
+      // identity here (the update happens below).
+      localAlumni ? localAuthoritativeFromAlumni(localAlumni) : null,
     );
 
     // 4. Upsert a PENDING account. No auto-login, no session/cookie, no

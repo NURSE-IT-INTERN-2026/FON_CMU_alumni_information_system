@@ -4,6 +4,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import {
   buildSignupVerification,
+  localAuthoritativeFromAlumni,
   type SignupVerification,
 } from "@/lib/signup-verification";
 import { Prisma } from "@/app/generated/prisma/client";
@@ -47,7 +48,22 @@ export async function POST(
       cmuConsulted = false;
     }
 
-    const verification = buildSignupVerification(submitted, cmuGrad, cmuConsulted);
+    // Re-use the local alumni record as the authoritative source ONLY when this
+    // was originally a local-source signup (a pre-existing alumni). A freshly
+    // created account's identity came from the submitted data, so comparing it
+    // against itself would falsely show "all match". If CMU has since been
+    // synced and now finds the record, buildSignupVerification prefers CMU.
+    const local =
+      stored?.source === "local"
+        ? localAuthoritativeFromAlumni(alumni)
+        : null;
+
+    const verification = buildSignupVerification(
+      submitted,
+      cmuGrad,
+      cmuConsulted,
+      local,
+    );
     await prisma.alumni.update({
       where: { id },
       data: { signupVerification: verification as unknown as Prisma.InputJsonValue },
