@@ -126,7 +126,7 @@ function LoginForm() {
         return;
       }
 
-      router.push("/graduates/profile");
+      router.push("/graduates/news");
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {

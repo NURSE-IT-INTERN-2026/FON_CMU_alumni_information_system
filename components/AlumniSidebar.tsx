@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
   { href: "/graduates/news", label: "ข่าวสาร" },
+  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
 ];
 
 // Desktop left navigation for the authenticated alumni portal.

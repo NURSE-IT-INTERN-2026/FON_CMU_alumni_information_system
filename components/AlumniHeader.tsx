@@ -14,8 +14,8 @@ interface AlumniHeaderProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
   { href: "/graduates/news", label: "ข่าวสาร" },
+  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
 ];
 
 export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
