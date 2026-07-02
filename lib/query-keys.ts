@@ -52,7 +52,12 @@ export const queryKeys = {
 
   // Non-paginated collections.
   users: { all: ["users"] as const },
-  alumniAccounts: { all: ["alumniAccounts"] as const },
+  alumniAccounts: {
+    all: ["alumniAccounts"] as const,
+    // Just the PENDING count — drives the red badge on the sidebar accounts
+    // menu item. Separate from `.all` so it isn't wiped by list invalidations.
+    pendingCount: () => ["alumniAccounts", "pendingCount"] as const,
+  },
 
   // Dashboard aggregation endpoints.
   dashboard: {
