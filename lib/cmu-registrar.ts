@@ -39,9 +39,14 @@ export interface CmuGraduate {
   major_name_th: string;
   grad_date: string;
   grad_year: string;
-  // --- NOT persisted (present on LIVE records, undefined when read locally).
-  //     No consumer reads these — declared optional so `cmuGraduateRowToShape`
-  //     can omit them. `fetchCmuGraduatesLive` still filters on `faculty_id`. ---
+  // --- NOT persisted (declared optional so `cmuGraduateRowToShape` can omit
+  //     them; `fetchCmuGraduatesLive` filters on `faculty_id`). Verified live
+  //     (2026-07): the `student_grad` API carries NO phone or email field —
+  //     `std_phone`/`std_mobile` below are retained for fixture compatibility
+  //     but are NEVER populated by the real API. Contact email/phone for the
+  //     all-alumni table come ONLY from local `Alumni` data (legacy import →
+  //     contactEmail/phones; signup → email). `cmuitaccount` is a CMU IT
+  //     account, not a contact email. ---
   middle_name_th?: string;
   middle_name_en?: string;
   faculty_id?: string;
