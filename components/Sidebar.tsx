@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS } from "@/lib/constants";
 import { useCanWrite, useIsAdmin, useRole } from "@/lib/role-context";
+import { apiFetch } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -23,10 +26,21 @@ export default function Sidebar() {
       })
     : NAV_ITEMS;
 
+  // Pending alumni-account count — drives the red badge on the accounts menu
+  // item so admins notice pending signups. Cached 30s (query default); only
+  // fetched in the main-menu view (the item isn't rendered inside settings).
+  const pendingQuery = useQuery({
+    queryKey: queryKeys.alumniAccounts.pendingCount(),
+    queryFn: () =>
+      apiFetch<{ total: number }>("/api/alumni-accounts?status=pending&pageSize=1"),
+    enabled: !showSettings,
+  });
+  const pendingCount = pendingQuery.data?.total ?? 0;
+
   return (
     <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--card-bg)] lg:block">
       <nav className="sticky top-[4.5rem] flex h-[calc(100vh-4.5rem)] flex-col justify-between p-4">
-        <ul className="space-y-1">
+        <ul className="flex-1 space-y-1">
           {items.map((item) => {
             const isActive =
               item.href === "/"
@@ -49,6 +63,32 @@ export default function Sidebar() {
             );
           })}
         </ul>
+        {!showSettings && (
+          <Link
+            href="/management/settings/users"
+            className="mb-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--background)]"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+              />
+            </svg>
+            <span>บัญชีศิษย์เก่า</span>
+            {pendingCount > 0 && (
+              <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white tabular-nums">
+                {pendingCount}
+              </span>
+            )}
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => router.push(showSettings ? "/management/dashboard" : "/management/settings/profile")}
