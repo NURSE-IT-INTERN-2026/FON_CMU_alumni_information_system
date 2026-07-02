@@ -405,9 +405,11 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <svg className="h-5 w-5 text-[var(--muted)] transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-          </svg>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5b21b6] text-white transition-transform group-hover:translate-x-0.5">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+            </svg>
+          </span>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {DEGREE_MINI_CARDS.map((deg) => (
