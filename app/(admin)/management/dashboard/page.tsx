@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, FileText } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,32 +36,6 @@ function formatThaiDate(date: Date): string {
   const month = months[d.getMonth()];
   const year = d.getFullYear() + 543;
   return `${day} ${month} ${year}`;
-}
-
-// Soft pastel pill backgrounds for the alumni-accounts status strip (matches
-// the Lovable reference — dark-slate text on a light red/green tint).
-const PILL_BG: Record<"red" | "green", string> = {
-  red: "bg-red-100", // #FEE2E2
-  green: "bg-emerald-50", // #ECFDF5
-};
-
-function StatusPill({
-  count,
-  label,
-  tone,
-}: {
-  count: number;
-  label: string;
-  tone: keyof typeof PILL_BG;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-gray-900 ${PILL_BG[tone]}`}
-    >
-      <span className="font-semibold tabular-nums">{count.toLocaleString()}</span>
-      {label}
-    </span>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -357,34 +331,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pending alumni accounts — matches the Lovable stat-card reference.
-          Whole card opens the approval queue. */}
+      {/* Pending alumni accounts — minimalist/airy: whitespace, hairline, one
+          navy accent on the pending count. Whole card opens the approval queue. */}
       <Link
         href="/management/settings/users?status=pending"
-        className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="group mb-6 block rounded-2xl border border-gray-100 bg-white p-8 transition-all duration-200 hover:border-gray-200 hover:shadow-sm sm:p-10"
       >
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-gray-100 p-2 text-gray-500">
-            <FileText className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-base font-semibold text-gray-900">บัญชีศิษย์เก่า</p>
-            <p className="text-xs text-gray-500">ตรวจสอบและจัดการบัญชีผู้ใช้ศิษย์เก่า</p>
-          </div>
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-xs tracking-wide text-gray-400">บัญชีรออนุมัติ</span>
+          <span className="text-3xl font-normal tabular-nums text-[#1e3a5f] sm:text-4xl">
+            {data.alumniAccounts.pending.toLocaleString()}
+          </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" tone="red" />
-          <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" tone="green" />
-          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" tone="red" />
-          <svg
-            className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-hover:translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-          </svg>
+        <div className="my-6 h-px bg-gray-100" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6 text-sm text-gray-400">
+            <span>
+              ใช้งาน <span className="text-gray-600 tabular-nums">{data.alumniAccounts.active.toLocaleString()}</span>
+            </span>
+            <span>
+              ปฏิเสธ <span className="text-gray-600 tabular-nums">{data.alumniAccounts.rejected.toLocaleString()}</span>
+            </span>
+          </div>
+          <span className="text-xs text-gray-400 transition-colors group-hover:text-gray-700">
+            ตรวจสอบ <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          </span>
         </div>
       </Link>
 
