@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,6 +36,31 @@ function formatThaiDate(date: Date): string {
   const month = months[d.getMonth()];
   const year = d.getFullYear() + 543;
   return `${day} ${month} ${year}`;
+}
+
+/** A small colored count pill for the alumni-accounts status strip. */
+function StatusPill({
+  count,
+  label,
+  color,
+  dot = false,
+}: {
+  count: number;
+  label: string;
+  color: string;
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+      style={{ backgroundColor: `${color}15`, color }}
+    >
+      {dot && (
+        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      )}
+      {count.toLocaleString()} {label}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -331,31 +356,32 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pending alumni accounts — minimalist/airy: whitespace, hairline, one
-          navy accent on the pending count. Whole card opens the approval queue. */}
+      {/* Pending alumni accounts — compact status strip. Whole card opens the
+          approval queue; the pending pill is red to draw the eye. Purple icon
+          tint harmonizes with the alumni-count card below. */}
       <Link
         href="/management/settings/users?status=pending"
-        className="group mb-6 block rounded-2xl border border-gray-100 bg-white p-8 transition-all duration-200 hover:border-gray-200 hover:shadow-sm sm:p-10"
+        className="group mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:py-4"
       >
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="text-xs tracking-wide text-gray-400">บัญชีรออนุมัติ</span>
-          <span className="text-3xl font-normal tabular-nums text-[#1e3a5f] sm:text-4xl">
-            {data.alumniAccounts.pending.toLocaleString()}
-          </span>
-        </div>
-        <div className="my-6 h-px bg-gray-100" />
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6 text-sm text-gray-400">
-            <span>
-              ใช้งาน <span className="text-gray-600 tabular-nums">{data.alumniAccounts.active.toLocaleString()}</span>
-            </span>
-            <span>
-              ปฏิเสธ <span className="text-gray-600 tabular-nums">{data.alumniAccounts.rejected.toLocaleString()}</span>
-            </span>
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-[#5b21b610] p-2 text-[#5b21b6]">
+            <Users className="h-5 w-5" />
           </div>
-          <span className="text-xs text-gray-400 transition-colors group-hover:text-gray-700">
-            ตรวจสอบ <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
-          </span>
+          <span className="text-sm font-semibold text-[var(--foreground)]">บัญชีศิษย์เก่า</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#dc2626" dot />
+          <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" color="#16a34a" />
+          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#64748b" />
+          <svg
+            className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+          </svg>
         </div>
       </Link>
 
