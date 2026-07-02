@@ -16,7 +16,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, Users } from "lucide-react";
+import { AlertTriangle, User } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -356,32 +356,32 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Pending alumni accounts — compact status strip. Whole card opens the
-          approval queue; the pending pill is red to draw the eye. Purple icon
-          tint harmonizes with the alumni-count card below. */}
+      {/* Pending alumni accounts — summary banner. Purple left border + purple
+          circular arrow; whole card opens the approval queue. Pills are colored
+          by status: yellow=pending, green=active, red=rejected. */}
       <Link
         href="/management/settings/users?status=pending"
-        className="group mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:py-4"
+        className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border-l-4 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        style={{ borderLeftColor: "#5b21b6" }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div className="rounded-lg bg-[#5b21b610] p-2 text-[#5b21b6]">
-            <Users className="h-5 w-5" />
+            <User className="h-5 w-5" />
           </div>
-          <span className="text-sm font-semibold text-[var(--foreground)]">บัญชีศิษย์เก่า</span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">บัญชีศิษย์เก่า</p>
+            <p className="text-xs text-gray-500">ตรวจสอบและจัดการบัญชีผู้ใช้ศิษย์เก่า</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#dc2626" dot />
+          <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#ca8a04" />
           <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" color="#16a34a" />
-          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#64748b" />
-          <svg
-            className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-hover:translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-          </svg>
+          <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#dc2626" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5b21b6] text-white transition-transform group-hover:translate-x-0.5">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+            </svg>
+          </span>
         </div>
       </Link>
 
