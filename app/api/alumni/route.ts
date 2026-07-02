@@ -52,6 +52,9 @@ export async function GET(request: NextRequest) {
         { firstName: { contains: search, mode: "insensitive" } },
         { lastName: { contains: search, mode: "insensitive" } },
         { studentId: { contains: search, mode: "insensitive" } },
+        // Also match an education's studentId so a lower-degree id (not the
+        // primary snapshot) is findable — see all-alumni show-all search.
+        { educations: { some: { studentId: { contains: search, mode: "insensitive" } } } },
       ];
     }
 
@@ -69,7 +72,15 @@ export async function GET(request: NextRequest) {
           // Education studentIds let the all-alumni table bridge a local alumni
           // to its CMU person on ANY of its degrees (not just the primary), so a
           // multi-degree alumni collapses to one row. See all-alumni page merge.
-          educations: { select: { studentId: true } },
+          educations: {
+            select: {
+              studentId: true,
+              degreeLevel: true,
+              graduationYear: true,
+              major: true,
+              cohort: true,
+            },
+          },
         },
         orderBy: { [validSortField]: validSortOrder },
         skip: (page - 1) * pageSize,
