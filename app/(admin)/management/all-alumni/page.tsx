@@ -212,7 +212,7 @@ export default function AlumniCountPage() {
         cmuData = cmuJson.data || [];
       } catch {}
 
-      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true" });
+      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true", search });
       facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
       const localMap: Record<string, Alumni> = {};
       const deletedStudentIds = new Set<string>();
