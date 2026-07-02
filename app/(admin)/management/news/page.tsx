@@ -110,6 +110,9 @@ export default function NewsListPage() {
   // contentEditable selection, so we capture it on mouseup/keyup and restore it in
   // applyFontSize before running execCommand.
   const savedRangeRef = useRef<Range | null>(null);
+  // The last size we actually applied, so a guarded commit (Enter/blur) after a +/− click
+  // doesn't re-apply the same size and double-wrap the selection.
+  const lastAppliedPxRef = useRef<number | null>(null);
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
@@ -160,36 +163,61 @@ export default function NewsListPage() {
     }
   }, []);
 
-  // Apply an arbitrary pixel font size to the current selection. execCommand("fontSize")
+  // Apply an arbitrary pixel font size to the CURRENT SELECTION ONLY. execCommand("fontSize")
   // only accepts the legacy 1–7 scale, so use "7" as a marker then swap each marker for a
   // px-sized <span style="font-size"> (sanitize-html allows style on all tags → survives render).
+  // If nothing is selected, this is a no-op — we never silently restyle the whole body.
   const applyFontSize = useCallback((px: number) => {
     const editor = editorRef.current;
     if (!editor || !Number.isFinite(px) || px <= 0) return;
     editor.focus();
     const sel = window.getSelection();
-    // Restore the last in-editor selection (captured on mouseup/keyup) — focusing the px input
-    // cleared the live selection. execCommand on a collapsed selection applies nothing.
-    if (savedRangeRef.current && editor.contains(savedRangeRef.current.commonAncestorContainer)) {
-      sel?.removeAllRanges();
-      sel?.addRange(savedRangeRef.current);
-    } else if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
+    // Prefer a live, non-collapsed in-editor selection (the toolbar still has focus, e.g. a
+    // +/− button). Otherwise restore the selection captured on mouseup/keyup — focusing the px
+    // input discards the live selection, so we need the cached range back.
+    const hasLiveSel = !!(sel && sel.rangeCount && !sel.isCollapsed && editor.contains(sel.anchorNode));
+    if (!hasLiveSel) {
+      if (savedRangeRef.current && editor.contains(savedRangeRef.current.commonAncestorContainer)) {
+        sel?.removeAllRanges();
+        sel?.addRange(savedRangeRef.current);
+      } else {
+        return; // nothing selected → leave the body untouched
+      }
     }
     document.execCommand("fontSize", false, "7");
+    const created: HTMLSpanElement[] = [];
     editor.querySelectorAll('font[size="7"]').forEach((f) => {
       const span = document.createElement("span");
       span.style.fontSize = `${px}px`;
       while (f.firstChild) span.appendChild(f.firstChild);
       f.replaceWith(span);
+      created.push(span);
     });
+    lastAppliedPxRef.current = px;
     setFormValue("body", editor.innerHTML);
+    // execCommand collapses/invalidates the prior selection, so a second +/− click would target
+    // a stale range. Re-select the span(s) we just created and cache THAT range — it references
+    // live nodes, so the next adjustment keeps targeting the same text.
+    if (created.length && sel) {
+      const range = document.createRange();
+      range.setStartBefore(created[0]);
+      range.setEndAfter(created[created.length - 1]);
+      savedRangeRef.current = range.cloneRange();
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
     updateToolbarState();
   }, [updateToolbarState, setFormValue]);
+
+  // Bump the font size by `delta` and apply IMMEDIATELY. Used by the toolbar −/+ buttons,
+  // which call preventDefault on mousedown so the editor never loses focus/selection —
+  // applyFontSize then runs on the live selection with no focus juggling.
+  const stepFontSize = useCallback((delta: number) => {
+    const base = lastAppliedPxRef.current ?? (Math.round(Number(fontSizePx)) || 16);
+    const next = Math.max(8, Math.min(96, base + delta));
+    setFontSizePx(String(next));
+    applyFontSize(next);
+  }, [fontSizePx, applyFontSize]);
 
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) {
@@ -606,9 +634,19 @@ export default function NewsListPage() {
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("strikeThrough")} title="ขีดทับ" className={`rounded p-1.5 ${activeStates.strikeThrough ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H9a3 3 0 0 0-3 3 3 3 0 0 0 3 3h6"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M15 12a3 3 0 1 1 0 6H8"/></svg>
                 </button>
-                {/* Font size (px) */}
-                <label title="ขนาดตัวอักษร (px)" className="flex cursor-pointer items-center gap-0.5 rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                {/* Font size (px) — −/+ buttons apply immediately to the selection; the number
+                    field is for exact entry and commits on Enter/blur. */}
+                <div className="flex items-center gap-0.5 rounded p-1 text-gray-600" title="ขนาดตัวอักษร (px)">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepFontSize(-1)}
+                    title="ลดขนาดตัวอักษร"
+                    className="rounded p-1 hover:bg-gray-200"
+                    aria-label="ลดขนาดตัวอักษร"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
                   <input
                     type="number"
                     min={8}
@@ -621,23 +659,31 @@ export default function NewsListPage() {
                       if (e.key === "Enter") {
                         e.preventDefault();
                         (e.target as HTMLInputElement).blur();
-                        const n = Math.round(Number(fontSizePx));
-                        if (Number.isFinite(n) && n > 0) applyFontSize(Math.max(8, Math.min(96, n)));
                       }
                     }}
                     onBlur={() => {
                       const n = Math.round(Number(fontSizePx));
-                      if (Number.isFinite(n) && n > 0) {
-                        const clamped = Math.max(8, Math.min(96, n));
-                        setFontSizePx(String(clamped));
-                        applyFontSize(clamped);
-                      }
+                      const clamped = Number.isFinite(n) ? Math.max(8, Math.min(96, n)) : 16;
+                      setFontSizePx(String(clamped));
+                      // Commit the typed value. Guarded so re-focusing/blurring without changing
+                      // the value doesn't re-apply and double-wrap the selection.
+                      if (clamped !== lastAppliedPxRef.current) applyFontSize(clamped);
                     }}
-                    className="w-12 border-none bg-transparent text-xs text-gray-600 outline-none"
+                    className="w-10 border-none bg-transparent text-center text-xs text-gray-600 outline-none"
                     aria-label="ขนาดตัวอักษร (px)"
                   />
                   <span className="text-[10px] text-gray-400">px</span>
-                </label>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepFontSize(1)}
+                    title="เพิ่มขนาดตัวอักษร"
+                    className="rounded p-1 hover:bg-gray-200"
+                    aria-label="เพิ่มขนาดตัวอักษร"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
+                </div>
                 <span className="mx-1 h-5 w-px bg-gray-300" />
                 {/* Align left */}
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyLeft")} title="ชิดซ้าย" className={`rounded p-1.5 ${activeStates.justifyLeft ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
@@ -666,8 +712,8 @@ export default function NewsListPage() {
                   }
                   updateToolbarState();
                 }}
-                onKeyUp={() => { captureSelection(); updateToolbarState(); }}
-                onMouseUp={() => { captureSelection(); updateToolbarState(); }}
+                onKeyUp={() => { lastAppliedPxRef.current = null; captureSelection(); updateToolbarState(); }}
+                onMouseUp={() => { lastAppliedPxRef.current = null; captureSelection(); updateToolbarState(); }}
                 className={`min-h-[240px] rounded-b-lg border p-6 sm:p-8 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] prose prose-sm sm:prose !max-w-none ${formErrors.body ? "border-red-400" : "border-gray-300"}`}
                 suppressContentEditableWarning
               />
@@ -694,7 +740,12 @@ export default function NewsListPage() {
               <FormSelect registration={register("status")}>
                 <option value="DRAFT">ฉบับร่าง</option>
                 <option value="PUBLISHED">เผยแพร่</option>
-                <option value="DISCONTINUED">ยุติการเผยแพร่</option>
+                {/* DISCONTINUED ("ยุติการเผยแพร่") is only reachable via the dedicated ยุติการเผยแพร่
+                    action on a published item — not a choice when creating/editing. Kept here only
+                    so an already-discontinued item's status still renders instead of going blank. */}
+                {watch("status") === "DISCONTINUED" && (
+                  <option value="DISCONTINUED">ยุติการเผยแพร่</option>
+                )}
               </FormSelect>
             </FormField>
           </div>
