@@ -623,7 +623,12 @@ const VERIFICATION_FIELDS: {
   { key: "degreeLevel", label: "ระดับการศึกษา", fmt: (x) => (x ? DEGREE_LABELS[x] ?? x : null) },
 ];
 
-/** Renders the field-by-field comparison for a pending signup (CMU or local source). */
+/**
+ * Renders what the applicant submitted, always ("ที่กรอก"). When an
+ * authoritative source exists (CMU/local), also shows the comparison columns
+ * + per-field verdict; when none was found (wrong studentId), only the
+ * submitted values are shown so the admin can still see what was entered.
+ */
 function VerificationFields({ v }: { v: SignupVerification }) {
   // `source` is which authoritative record we compared against: "cmu" | "local" | null.
   const hasAuthoritative = v.source !== null;
@@ -645,42 +650,44 @@ function VerificationFields({ v }: { v: SignupVerification }) {
   return (
     <div>
       <div className="mb-4">{summary}</div>
-      {hasAuthoritative ? (
-        <>
-          {v.source === "local" && (
-            <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
-              ไม่พบรหัสนักศึกษานี้ในระบบทะเบียน CMU — เปรียบเทียบกับข้อมูลศิษย์เก่าที่บันทึกไว้ในระบบแทน
-            </p>
-          )}
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
-                  <th className="px-3 py-2 font-semibold">รายการ</th>
-                  <th className="px-3 py-2 font-semibold">ที่กรอก</th>
-                  <th className="px-3 py-2 font-semibold">{sourceLabel}</th>
-                  <th className="px-3 py-2 text-center font-semibold">ผล</th>
-                </tr>
-              </thead>
-              <tbody>
-                {VERIFICATION_FIELDS.map((f) => {
-                  const verdict = v.fields[f.key];
-                  return (
-                    <tr key={f.key} className="border-t border-gray-100">
-                      <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">{f.label}</td>
-                      <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.submitted) ?? "—"}</td>
-                      <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.authoritative) ?? "—"}</td>
-                      <td className="px-3 py-2 text-center"><VerdictIcon match={verdict.match} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-gray-500">ไม่สามารถเปรียบเทียบรายละเอียดได้เนื่องจากไม่พบข้อมูลในระบบทะเบียนและไม่มีข้อมูลในระบบ</p>
+      {v.source === "local" && (
+        <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
+          ไม่พบรหัสนักศึกษานี้ในระบบทะเบียน CMU — เปรียบเทียบกับข้อมูลศิษย์เก่าที่บันทึกไว้ในระบบแทน
+        </p>
       )}
+      {/*
+        The submitted values ("ที่กรอก") are ALWAYS rendered — even when no
+        authoritative record was found (source === null, e.g. a wrong studentId
+        that matches neither CMU nor a local alumni). In that case the
+        comparison columns ("{sourceLabel}" / ผล) are simply hidden; the admin
+        still sees exactly what the applicant entered. `v.fields[*].submitted`
+        is populated by `buildSignupVerification` in every branch.
+      */}
+      <div className="overflow-hidden rounded-lg border border-gray-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-2 font-semibold">รายการ</th>
+              <th className="px-3 py-2 font-semibold">ที่กรอก</th>
+              {hasAuthoritative && <th className="px-3 py-2 font-semibold">{sourceLabel}</th>}
+              {hasAuthoritative && <th className="px-3 py-2 text-center font-semibold">ผล</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {VERIFICATION_FIELDS.map((f) => {
+              const verdict = v.fields[f.key];
+              return (
+                <tr key={f.key} className="border-t border-gray-100">
+                  <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">{f.label}</td>
+                  <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.submitted) ?? "—"}</td>
+                  {hasAuthoritative && <td className="px-3 py-2 text-gray-900">{f.fmt(verdict.authoritative) ?? "—"}</td>}
+                  {hasAuthoritative && <td className="px-3 py-2 text-center"><VerdictIcon match={verdict.match} /></td>}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <p className="mt-3 text-xs text-gray-400">ตรวจสอบล่าสุดเมื่อ {new Date(v.comparedAt).toLocaleString("th-TH")}</p>
     </div>
   );
