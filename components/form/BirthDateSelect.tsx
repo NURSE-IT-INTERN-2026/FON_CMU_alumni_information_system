@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type SelectHTMLAttributes } from "react";
 import {
   useController,
   type Control,
   type FieldPath,
   type FieldValues,
 } from "react-hook-form";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -28,6 +28,77 @@ const THAI_MONTHS = [
 // Sun–Sat short labels (getDay(): 0 = Sunday).
 const THAI_WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
+type DropdownOption = { value: number; label: string; disabled: boolean };
+
+/**
+ * Custom calendar caption dropdown (replaces react-day-picker's native
+ * `<select>`). The native select's open-popup height is browser-controlled, so
+ * the ~120-year list dropped very tall; this renders a height-capped, scrollable
+ * panel instead. Only the long lists (year) get capped — the 12-month list shows
+ * in full. Calls the same `onChange` react-day-picker expects (it reads
+ * `Number(e.target.value)`), via a synthetic change event.
+ */
+function CalendarDropdown({
+  options = [],
+  value,
+  onChange,
+  name,
+}: { options?: DropdownOption[] } & SelectHTMLAttributes<HTMLSelectElement>) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => String(o.value) === String(value));
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // Cap height only when there are many options (the year list); let the short
+  // month list render in full.
+  const listMax = options.length > 12 ? "max-h-56 overflow-y-auto" : "";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2 text-sm font-medium hover:bg-accent"
+      >
+        {selected?.label}
+        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+      </button>
+      {open && (
+        <div
+          className={`absolute left-0 top-full z-50 mt-1 min-w-full rounded-md border bg-popover p-1 text-popover-foreground shadow-md ${listMax}`}
+        >
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              disabled={o.disabled}
+              onClick={() => {
+                onChange?.({
+                  target: { value: String(o.value), name },
+                } as ChangeEvent<HTMLSelectElement>);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center rounded-sm px-2 py-1 text-left text-sm hover:bg-accent ${
+                selected?.value === o.value ? "bg-accent font-semibold" : ""
+              } ${o.disabled ? "pointer-events-none opacity-40" : ""}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface BirthDateSelectProps<T extends FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
@@ -40,8 +111,7 @@ interface BirthDateSelectProps<T extends FieldValues> {
  * Thai months/weekdays (native `<input type="date">` can't show Buddhist
  * years). Emits the DDMMYYYY string the alumni schemas expect (via
  * `dateToDdmmyyyyBe`), so storage + the `formatBirthDateThai` display stay
- * unchanged. Same props/output as the previous 3-select version, so the
- * new-alumni + signup call-sites are unchanged.
+ * unchanged.
  */
 export default function BirthDateSelect<T extends FieldValues>({
   control,
@@ -56,7 +126,8 @@ export default function BirthDateSelect<T extends FieldValues>({
   const now = new Date();
   const currentCe = now.getFullYear();
   // ~120 years back → suitable for birthdays; the year dropdown tops at the
-  // current พ.ศ. year (e.g. 2569) and never goes stale.
+  // current พ.ศ. year (e.g. 2569) and never goes stale. (The dropdown list
+  // height itself is capped by the custom CalendarDropdown.)
   const startMonth = new Date(currentCe - 120, 0, 1);
   const endMonth = new Date(currentCe, 11, 31);
 
@@ -82,6 +153,7 @@ export default function BirthDateSelect<T extends FieldValues>({
           endMonth={endMonth}
           selected={selected ?? undefined}
           defaultMonth={selected ?? now}
+          components={{ Dropdown: CalendarDropdown }}
           formatters={{
             formatCaption: (month) =>
               `${THAI_MONTHS[month.getMonth()]} ${month.getFullYear() + 543}`,
