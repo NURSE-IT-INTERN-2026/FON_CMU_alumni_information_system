@@ -8,6 +8,7 @@ import { alumniSignupSchema, type AlumniSignupData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+import BirthDateSelect from "@/components/form/BirthDateSelect";
 
 export default function AlumniSignupPage() {
   return (
@@ -22,12 +23,9 @@ function AlumniSignupForm() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  function formatBirthDate(value: string): string {
-    return value.replace(/\D/g, "").slice(0, 8);
-  }
-
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<AlumniSignupData>({
@@ -222,23 +220,7 @@ function AlumniSignupForm() {
             </div>
 
             <FormField label="วันเกิด (ววปปปป พ.ศ.)" error={errors.birthDate?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-              <FormInput
-                registration={register("birthDate", {
-                  onChange: (e) => {
-                    e.target.value = formatBirthDate(e.target.value);
-                  },
-                })}
-                error={errors.birthDate?.message}
-                id="birthDate"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="01122540"
-                className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
-              />
-              {!errors.birthDate && (
-                <p className="mt-1 text-xs text-[var(--muted)]">รูปแบบ: วันที่(2หลัก) เดือน(2หลัก) ปี พ.ศ.(4หลัก) เช่น 01122540</p>
-              )}
+              <BirthDateSelect control={control} name="birthDate" error={errors.birthDate?.message} />
             </FormField>
 
             {/* Divider */}
