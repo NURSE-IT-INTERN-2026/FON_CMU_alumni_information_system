@@ -30,6 +30,7 @@ interface NewsItem {
   coverImageUrl: string | null;
   status: "DRAFT" | "PUBLISHED";
   publishedAt: string | null;
+  pinnedAt: string | null;
   createdAt: string;
 }
 
@@ -50,6 +51,18 @@ export default function AlumniNewsPage() {
   const total = newsData?.total ?? 0;
   const totalPages = newsData?.totalPages ?? 1;
 
+  // Pinned "ประชาสัมพันธ์สำคัญ" section — only fetched on page 1 with no search
+  // (the section is hidden otherwise). The server already forces PUBLISHED-only.
+  const { data: pinnedData } = useQuery({
+    queryKey: queryKeys.news.pinned(),
+    enabled: page === 1 && !search,
+    queryFn: () =>
+      apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(
+        `/api/news?${new URLSearchParams({ pinned: "true", pageSize: "100" })}`
+      ),
+  });
+  const pinnedItems = pinnedData?.data ?? [];
+
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
@@ -69,6 +82,43 @@ export default function AlumniNewsPage() {
     return pages;
   })();
 
+  // Shared read-only card renderer — used by the pinned section and the grid.
+  const renderNewsCard = (item: NewsItem) => {
+    const summary = stripHtml(item.body).slice(0, 150);
+    return (
+      <Link
+        key={item.id}
+        href={`/graduates/news/${item.id}`}
+        className="group overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="aspect-video w-full overflow-hidden bg-gray-100">
+          {item.coverImageUrl ? (
+            <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
+              <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+              </svg>
+            </div>
+          )}
+        </div>
+        <div className="p-4">
+          <h3 className="mb-2 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">
+            {item.title}
+          </h3>
+          <p className="mb-2 text-xs text-[var(--muted)]">
+            {item.publishedAt ? formatThaiDate(item.publishedAt) : ""}
+          </p>
+          {summary && (
+            <p className="line-clamp-3 text-sm text-[var(--muted)]">
+              {summary}{stripHtml(item.body).length > 150 ? "..." : ""}
+            </p>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -77,6 +127,21 @@ export default function AlumniNewsPage() {
           ข่าวสารและกิจกรรม
         </h1>
       </div>
+
+      {/* Pinned — ประชาสัมพันธ์สำคัญ */}
+      {pinnedItems.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+            </span>
+            <h2 className="text-lg font-bold text-[var(--primary)]">ประชาสัมพันธ์สำคัญ</h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {pinnedItems.map(renderNewsCard)}
+          </div>
+        </section>
+      )}
 
       {/* Search */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
@@ -106,41 +171,7 @@ export default function AlumniNewsPage() {
       ) : (
         /* Card grid — same as admin view mode */
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {news.map((item) => {
-            const summary = stripHtml(item.body).slice(0, 150);
-            return (
-              <Link
-                key={item.id}
-                href={`/graduates/news/${item.id}`}
-                className="group overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="aspect-video w-full overflow-hidden bg-gray-100">
-                  {item.coverImageUrl ? (
-                    <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
-                      <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h3 className="mb-2 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">
-                    {item.title}
-                  </h3>
-                  <p className="mb-2 text-xs text-[var(--muted)]">
-                    {item.publishedAt ? formatThaiDate(item.publishedAt) : ""}
-                  </p>
-                  {summary && (
-                    <p className="line-clamp-3 text-sm text-[var(--muted)]">
-                      {summary}{stripHtml(item.body).length > 150 ? "..." : ""}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+          {news.map(renderNewsCard)}
         </div>
       )}
 

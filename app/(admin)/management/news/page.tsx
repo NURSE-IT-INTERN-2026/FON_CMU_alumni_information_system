@@ -41,6 +41,7 @@ interface NewsItem {
   coverImageUrl: string | null;
   status: "DRAFT" | "PUBLISHED" | "DISCONTINUED";
   publishedAt: string | null;
+  pinnedAt: string | null;
   createdAt: string;
 }
 
@@ -278,6 +279,19 @@ export default function NewsListPage() {
   const total = newsData?.total ?? 0;
   const totalPages = newsData?.totalPages ?? 1;
 
+  // Pinned "ประชาสัมพันธ์สำคัญ" section — only fetched on page 1 with no
+  // search/status filter (the section is hidden otherwise). PUBLISHED-only so
+  // it mirrors exactly what alumni see at the top of their news page.
+  const { data: pinnedData } = useQuery({
+    queryKey: queryKeys.news.pinned(),
+    enabled: page === 1 && !search && !statusFilter,
+    queryFn: () =>
+      apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(
+        `/api/news?${new URLSearchParams({ pinned: "true", status: "PUBLISHED", pageSize: "100" })}`
+      ),
+  });
+  const pinnedItems = pinnedData?.data ?? [];
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (tablePickerRef.current && !tablePickerRef.current.contains(e.target as Node)) {
@@ -358,6 +372,19 @@ export default function NewsListPage() {
     }
   };
 
+  const togglePin = async (item: NewsItem) => {
+    setErrorMsg("");
+    try {
+      await apiFetch(`/api/news/${item.id}/pin`, {
+        method: "POST",
+        json: { pinned: !item.pinnedAt },
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการปักหมุดข่าวสาร");
+    }
+  };
+
   const handleBulkDelete = async () => {
     const ids = getSelectedArray();
     if (ids.length === 0) return;
@@ -393,6 +420,63 @@ export default function NewsListPage() {
     }
     return pages;
   })();
+
+  // Shared card renderer — used by BOTH the pinned "ประชาสัมพันธ์สำคัญ" section
+  // and the regular grid. Pinned items are excluded from the grid, so they must
+  // stay fully manageable (pin/edit/delete) from the pinned section too.
+  const renderNewsCard = (item: NewsItem) => {
+    const summary = stripHtml(item.body).slice(0, 150);
+    const pinned = !!item.pinnedAt;
+    return (
+      <div key={item.id} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : pinned ? "ring-2 ring-amber-400" : ""}`}>
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          {pinned && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 shadow-sm" title="ปักหมุดแล้ว">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+              ปักหมุด
+            </span>
+          )}
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
+            {STATUS_LABELS[item.status]}
+          </span>
+        </div>
+        <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); toggleSelect(item.id); } }}>
+          <div className="aspect-video w-full overflow-hidden bg-gray-100">
+            {item.coverImageUrl ? (
+              <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+            ) : (
+              <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
+                <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <div className="p-4">
+            <h3 className="mb-2 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{item.title}</h3>
+            <p className="mb-2 text-xs text-[var(--muted)]">{item.publishedAt ? formatThaiDate(item.publishedAt) : ""}</p>
+            {summary && <p className="line-clamp-3 text-sm text-[var(--muted)]">{summary}{stripHtml(item.body).length > 150 ? "..." : ""}</p>}
+          </div>
+        </Link>
+        <div className="mt-auto flex items-center justify-end border-t border-gray-100 px-4 py-2.5">
+          <div className="flex items-center gap-1">
+            <button onClick={() => togglePin(item)} className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium ${pinned ? "bg-amber-50 text-amber-700" : "text-gray-400 hover:bg-gray-100 hover:text-amber-600"}`} title={pinned ? "ยกเลิกปักหมุด" : "ปักหมุดเป็นประชาสัมพันธ์สำคัญ"}>
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pinned ? 1 : 1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+              {pinned ? "ปักหมุดแล้ว" : "ปักหมุด"}
+            </button>
+            <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+              แก้ไข
+            </button>
+            <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+              ยุติการเผยแพร่
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -773,6 +857,22 @@ export default function NewsListPage() {
         </div>
       )}
 
+      {/* Pinned — ประชาสัมพันธ์สำคัญ (admin pin control lives on each card; the
+          alumni news page shows this same section read-only) */}
+      {pinnedItems.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+            </span>
+            <h2 className="text-lg font-bold text-[var(--primary)]">ประชาสัมพันธ์สำคัญ</h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {pinnedItems.map(renderNewsCard)}
+          </div>
+        </section>
+      )}
+
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <SearchInput
@@ -832,48 +932,7 @@ export default function NewsListPage() {
         /* Management mode: cards with edit/delete (PRD §3.12 — not a table) */
         <div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {news.map((item) => {
-              const summary = stripHtml(item.body).slice(0, 150);
-              return (
-                <div key={item.id} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : ""}`}>
-                  <div className="absolute right-2 top-2 z-10">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
-                      {STATUS_LABELS[item.status]}
-                    </span>
-                  </div>
-                  <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); toggleSelect(item.id); } }}>
-                    <div className="aspect-video w-full overflow-hidden bg-gray-100">
-                      {item.coverImageUrl ? (
-                        <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-[var(--primary)]/5">
-                          <svg className="h-12 w-12 text-[var(--primary)]/30" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="mb-2 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{item.title}</h3>
-                      <p className="mb-2 text-xs text-[var(--muted)]">{item.publishedAt ? formatThaiDate(item.publishedAt) : ""}</p>
-                      {summary && <p className="line-clamp-3 text-sm text-[var(--muted)]">{summary}{stripHtml(item.body).length > 150 ? "..." : ""}</p>}
-                    </div>
-                  </Link>
-                  <div className="mt-auto flex items-center justify-end border-t border-gray-100 px-4 py-2.5">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                        แก้ไข
-                      </button>
-                      <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                        ยุติการเผยแพร่
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {news.map(renderNewsCard)}
           </div>
           {totalPages > 1 && (
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">

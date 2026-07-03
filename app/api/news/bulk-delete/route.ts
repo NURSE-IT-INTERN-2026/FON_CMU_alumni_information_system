@@ -20,9 +20,10 @@ export async function POST(request: NextRequest) {
       );
     }
     // PRD §3.12: bulk news "delete" discontinues the articles (sets status), it does not hard-delete.
+    // Discontinuing also clears the pin (pinned ⇒ not-discontinued).
     const result = await prisma.news.updateMany({
       where: { id: { in: ids } },
-      data: { status: "DISCONTINUED" },
+      data: { status: "DISCONTINUED", pinnedAt: null },
     });
     return NextResponse.json({ updated: result.count });
   } catch (error) {
