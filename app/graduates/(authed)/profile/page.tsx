@@ -656,7 +656,7 @@ export default function AlumniProfilePage() {
                 />
               </SectionToggle>
 
-              <SectionToggle title="ต้นสังกัดศิษย์เก่า" open={sections.abroad} onToggle={() => toggleSection("abroad")}>
+              <SectionToggle title="ข้อมูลการทำงานศิษย์เก่า" open={sections.abroad} onToggle={() => toggleSection("abroad")}>
                 <RepeatableFieldArray
                   control={control}
                   register={register}
@@ -800,7 +800,7 @@ export default function AlumniProfilePage() {
               {alumni.alumniAgency && alumni.alumniAgency.length > 0 && (
                 <>
                   <div className="h-px bg-[var(--border)]" />
-                  <RelatedSection title="ต้นสังกัดศิษย์เก่า">
+                  <RelatedSection title="ข้อมูลการทำงานศิษย์เก่า">
                     {alumni.alumniAgency.map((a) => (
                       <RelatedItem
                         key={a.id}

@@ -400,7 +400,7 @@ export default function AlumniAgencyPage() {
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          ต้นสังกัดศิษย์เก่า{isThailand ? " (ในประเทศ)" : " (ต่างประเทศ)"}
+          ข้อมูลการทำงานศิษย์เก่า{isThailand ? " (ในประเทศ)" : " (ต่างประเทศ)"}
         </h1>
         {selectMode ? (
           <div className="flex items-center gap-2">

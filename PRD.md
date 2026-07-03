@@ -161,7 +161,7 @@ The login page has **two separate login sections — Admin and Alumni** — and 
 - Table columns: เครือข่าย, รุ่นที่ *(model-representative-exclusive cohort value)*, รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, หมายเหตุ
 - **Filters:** เครือข่าย, รุ่นที่ *(model-representative-exclusive cohort value)*, สาขาวิชา
 
-### 3.9 Alumni-Agency Page (ต้นสังกัดศิษย์เก่า)
+### 3.9 Alumni-Agency Page (ข้อมูลการทำงานศิษย์เก่า)
 
 - Route: `/alumni-agency`
 - A **toggle** between two modes: **Thailand** and **Abroad**. Both modes share the same columns; **Abroad mode adds ประเทศ (country)**.
@@ -247,9 +247,9 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 
 - Route: `/management/alumni/[id]` — the route param accepts the alumni UUID **or** `studentId`.
 - **Entry:** reached by **clicking any row** in the all-alumni table and every alumni-related table (alumni-agency, awards, associations, graduate-committee, model-representatives, potentials). Clicks on a checkbox, edit/delete button, an orange value, or a link/image inside a row do not navigate.
-- **Layout** mirrors the alumni-portal profile page: ข้อมูลพื้นฐาน / ข้อมูลติดต่อ / ข้อมูลการทำงาน + related sections (รางวัล, สมาคม/ชมรม, กรรมการบัณฑิต, ศักยภาพ, ผู้แทนรุ่น, ต้นสังกัดศิษย์เก่า).
+- **Layout** mirrors the alumni-portal profile page: ข้อมูลพื้นฐาน / ข้อมูลติดต่อ / ข้อมูลการทำงาน + related sections (รางวัล, สมาคม/ชมรม, กรรมการบัณฑิต, ศักยภาพ, ผู้แทนรุ่น, ข้อมูลการทำงานศิษย์เก่า).
 - **Orange edit-history indicators:** core fields changed by an admin (`resourceType: alumni`) **or** by the alumni themselves (`resourceType: alumni_profile`) render orange; clicking opens the per-field edit-history modal (old → new, who, when, reason).
-- **Edit mode** (roles with write permission): edits core fields + the 5 related sections via `PUT /api/alumni/update-with-related/[id]` (requires เหตุผลในการแก้ไข; sets `adminEditedAt`). ต้นสังกัดศิษย์เก่า is view-only here (the route does not persist it).
+- **Edit mode** (roles with write permission): edits core fields + the 5 related sections via `PUT /api/alumni/update-with-related/[id]` (requires เหตุผลในการแก้ไข; sets `adminEditedAt`). ข้อมูลการทำงานศิษย์เก่า is view-only here (the route does not persist it).
 - **ประวัติการเปลี่ยนแปลง toggle:** switches the page to a merged change timeline — field-change history (alumni core `alumni`/`alumni_profile` + this alumni's related rows) ∪ activity-log events for the alumni; newest first (see §9.3 `/api/alumni/[id]/activity`).
 
 ---

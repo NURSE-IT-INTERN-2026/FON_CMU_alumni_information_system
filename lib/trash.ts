@@ -20,7 +20,7 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   "graduate-committee": { delegate: "graduateCommittee", label: "กรรมการบัณฑิต", nameFields: ["fullName"], resource: "graduate_committee" },
   "model-representatives": { delegate: "modelRepresentative", label: "ผู้แทนรุ่น", nameFields: ["name"], resource: "model_representative" },
   potentials: { delegate: "potential", label: "ศักยภาพ", nameFields: ["fullName"], resource: "potential" },
-  "alumni-agency": { delegate: "alumniAgency", label: "ต้นสังกัดศิษย์เก่า", nameFields: ["thaiName", "englishName", "country"], resource: "alumni_agency" },
+  "alumni-agency": { delegate: "alumniAgency", label: "ข้อมูลการทำงานศิษย์เก่า", nameFields: ["thaiName", "englishName", "country"], resource: "alumni_agency" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

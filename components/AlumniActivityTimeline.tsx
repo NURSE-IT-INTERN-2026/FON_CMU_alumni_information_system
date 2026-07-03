@@ -74,7 +74,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   graduate_committee: "กรรมการบัณฑิต",
   potential: "ศักยภาพ",
   model_representative: "ผู้แทนรุ่น",
-  alumni_agency: "ต้นสังกัดศิษย์เก่า",
+  alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
   news: "ข่าว",
   user: "ผู้ใช้",
   alumni_auth: "การเข้าสู่ระบบ",
