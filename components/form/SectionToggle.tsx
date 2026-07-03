@@ -14,14 +14,14 @@ export default function SectionToggle({
   children,
 }: SectionToggleProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 mb-4">
+    <div className="bg-purple-50 rounded-lg shadow-sm border border-purple-100 mb-4">
       <button
         onClick={onToggle}
         type="button"
         className="w-full flex items-center justify-between px-6 py-4 text-left"
       >
-        <span className="text-sm font-semibold text-gray-700">{title}</span>
-        <span className="text-gray-400 text-lg">
+        <span className="text-sm font-semibold text-[var(--primary-dark)]">{title}</span>
+        <span className="text-[var(--accent)] text-lg">
           {open ? "▲" : "▼"}
         </span>
       </button>
