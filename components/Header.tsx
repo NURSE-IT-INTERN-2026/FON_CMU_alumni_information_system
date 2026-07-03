@@ -4,9 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
-import { useRole } from "@/lib/role-context";
+import { useRole, roleLabel } from "@/lib/role-context";
 
-export default function Header() {
+interface HeaderProps {
+  user?: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export default function Header({ user }: HeaderProps = {}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -14,6 +21,7 @@ export default function Header() {
   const isSuperAdmin = role === "superadmin";
   const showLogout = pathname !== "/login";
   const showSettings = pathname.startsWith("/management/settings");
+  const displayName = user ? `${user.firstName} ${user.lastName}` : "";
 
   const items = showSettings
     ? SETTINGS_NAV_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
@@ -53,6 +61,14 @@ export default function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
+            {/* Name & role (desktop) */}
+            {showLogout && user && (
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-medium text-white/90">{displayName}</p>
+                <p className="text-xs text-white/60">{roleLabel(role)}</p>
+              </div>
+            )}
+
             {/* Settings button (desktop) */}
             {showLogout && (
             <button
