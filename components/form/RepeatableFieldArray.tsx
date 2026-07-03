@@ -4,7 +4,7 @@ import React from "react";
 import { useFieldArray, type UseFormRegister, type FieldErrors, type Control, type FieldValues, type FieldPath, type FieldArrayPath } from "react-hook-form";
 
 const INPUT_CLASS =
-  "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
+  "w-full border border-purple-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
 const ERROR_INPUT_CLASS =
   "w-full border border-red-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent";
 
@@ -67,7 +67,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
       {fields.map((field, idx) => (
         <div
           key={field.id}
-          className="flex flex-wrap items-end gap-3 mb-3 p-3 bg-gray-50 rounded-lg"
+          className="flex flex-wrap items-end gap-3 mb-3 p-3 bg-purple-50/60 rounded-lg"
         >
           {fieldDefs.map((f) => {
             const fieldPath = `${name}.${idx}.${f.key}`;
@@ -76,7 +76,7 @@ export default function RepeatableFieldArray<TFieldValues extends FieldValues>({
 
             return (
               <div key={f.key} className="flex-1 min-w-[140px]">
-                <label className="block text-xs font-medium text-gray-600 mb-1">
+                <label className="block text-xs font-medium text-[var(--primary-dark)] mb-1">
                   {f.label}{" "}
                   {f.required && <span className="text-red-500">*</span>}
                 </label>

@@ -214,11 +214,11 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border)] p-4">
+    <div className="rounded-lg border border-purple-100 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--muted)]">ประวัติการศึกษา</h3>
-          <p className="text-[11px] text-[var(--muted)]">
+          <h3 className="text-sm font-semibold text-[var(--primary-dark)]">ประวัติการศึกษา</h3>
+          <p className="text-[11px] text-purple-700/70">
             หลักสูตรหลักคือระดับปริญญาสูงสุด (ระบบเลือกโดยอัตโนมัติ เปลี่ยนเองไม่ได้)
           </p>
         </div>
@@ -230,9 +230,9 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       </div>
 
       {isLoading ? (
-        <p className="py-10 text-center text-sm text-[var(--muted)]">กำลังโหลด…</p>
+        <p className="py-10 text-center text-sm text-purple-700/70">กำลังโหลด…</p>
       ) : educations.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[var(--muted)]">ยังไม่มีข้อมูลการศึกษา</p>
+        <p className="py-10 text-center text-sm text-purple-700/70">ยังไม่มีข้อมูลการศึกษา</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {educations.map((edu) => {
@@ -360,7 +360,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-[var(--muted)]">{label}</dt>
+      <dt className="text-[11px] text-purple-700/70">{label}</dt>
       <dd className="break-words text-sm font-medium">{value}</dd>
     </div>
   );

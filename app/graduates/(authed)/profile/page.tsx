@@ -24,6 +24,7 @@ import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
+import { SectionHeading } from "@/components/SectionHeading";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 
@@ -414,7 +415,7 @@ export default function AlumniProfilePage() {
               </svg>
             </div>
             <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">พบข้อมูลของท่านในระบบแล้ว</h3>
-            <p className="mb-6 text-sm text-[var(--muted)]">
+            <p className="mb-6 text-sm text-purple-700">
               พบข้อมูลของท่านในระบบแล้ว กรุณาตรวจสอบและแก้ไขข้อมูลตามต้องการ
             </p>
             <button
@@ -437,7 +438,7 @@ export default function AlumniProfilePage() {
               </svg>
             </div>
             <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน</h3>
-            <p className="mb-6 text-sm text-[var(--muted)]">
+            <p className="mb-6 text-sm text-purple-700">
               ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน กรุณาตรวจสอบความถูกต้อง หากไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
             </p>
             <button
@@ -455,7 +456,7 @@ export default function AlumniProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">ข้อมูลส่วนตัว</h1>
-            <p className="text-sm text-[var(--muted)]">ดูและแก้ไขข้อมูลส่วนตัวของท่าน</p>
+            <p className="text-sm text-purple-700">ดูและแก้ไขข้อมูลส่วนตัวของท่าน</p>
           </div>
           {!editMode && (
             <button
@@ -484,22 +485,22 @@ export default function AlumniProfilePage() {
           {editMode ? (
             <form onSubmit={handleSubmit(handleSave)} className="space-y-5">
               {/* Read-only fields */}
-              <div className="rounded-lg bg-gray-50 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลที่ไม่สามารถแก้ไขได้</h3>
+              <div className="rounded-lg bg-purple-50 p-4">
+                <SectionHeading title="ข้อมูลที่ไม่สามารถแก้ไขได้" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--muted)]">รหัสนักศึกษา</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">รหัสนักศึกษา</label>
                     <p className="rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--foreground)]">{alumni.studentId}</p>
                   </div>
                   {alumni.citizenId && (
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--muted)]">เลขบัตรประชาชน</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">เลขบัตรประชาชน</label>
                       <p className="rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--foreground)]">{alumni.citizenId}</p>
                     </div>
                   )}
                   {alumni.birthDate && (
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[var(--muted)]">วันเกิด (พ.ศ.)</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">วันเกิด (พ.ศ.)</label>
                       <p className="rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--foreground)]">{alumni.birthDate}</p>
                     </div>
                   )}
@@ -597,8 +598,8 @@ export default function AlumniProfilePage() {
 
               {/* Expandable additional-data sections */}
               <div className="border-t border-[var(--border)] pt-4">
-                <h3 className="mb-1 text-sm font-semibold text-[var(--muted)]">ข้อมูลเพิ่มเติม</h3>
-                <p className="mb-3 text-xs text-[var(--muted)]">เปิดส่วนที่ต้องการเพื่อเพิ่มหรือแก้ไขข้อมูล หากไม่ต้องการสามารถปล่อยว่างได้</p>
+                <h3 className="mb-1 text-sm font-semibold text-[var(--primary-dark)]">ข้อมูลเพิ่มเติม</h3>
+                <p className="mb-3 text-xs text-purple-700/70">เปิดส่วนที่ต้องการเพื่อเพิ่มหรือแก้ไขข้อมูล หากไม่ต้องการสามารถปล่อยว่างได้</p>
               </div>
 
               <SectionToggle title="รางวัล" open={sections.awards} onToggle={() => toggleSection("awards")}>
@@ -679,7 +680,7 @@ export default function AlumniProfilePage() {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="rounded-lg border border-[var(--border)] px-6 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50"
+                  className="rounded-lg border border-[var(--border)] px-6 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-purple-50"
                 >
                   ยกเลิก
                 </button>
@@ -690,7 +691,7 @@ export default function AlumniProfilePage() {
             <div className="space-y-6">
               {/* ข้อมูลส่วนตัว */}
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลส่วนตัว</h3>
+                <SectionHeading title="ข้อมูลส่วนตัว" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InfoField label="คำนำหน้า" value={alumni.prefix} />
                   <InfoField label="ชื่อ" value={alumni.firstName} />
@@ -706,11 +707,11 @@ export default function AlumniProfilePage() {
                 onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.me() })}
               />
 
-              <div className="h-px bg-[var(--border)]" />
+              <div className="h-px bg-purple-100" />
 
               {/* Contact section */}
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">ข้อมูลติดต่อ</h3>
+                <SectionHeading title="ข้อมูลติดต่อ" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InfoField label="อีเมล (เข้าสู่ระบบ)" value={alumni.email} />
                   <InfoField label="อีเมลติดต่อ" value={alumni.contactEmail} />
@@ -722,7 +723,7 @@ export default function AlumniProfilePage() {
               {/* Additional data — each section renders only when it has entries */}
               {alumni.awards && alumni.awards.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="รางวัล">
                     {alumni.awards.map((a) => (
                       <RelatedItem
@@ -738,7 +739,7 @@ export default function AlumniProfilePage() {
 
               {alumni.associations && alumni.associations.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="สมาคม/ชมรม">
                     {alumni.associations.map((a) => (
                       <RelatedItem
@@ -753,7 +754,7 @@ export default function AlumniProfilePage() {
 
               {alumni.graduateCommittees && alumni.graduateCommittees.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="กรรมการบัณฑิต">
                     {alumni.graduateCommittees.map((c) => (
                       <RelatedItem
@@ -769,7 +770,7 @@ export default function AlumniProfilePage() {
 
               {alumni.potentials && alumni.potentials.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="ศักยภาพ">
                     {alumni.potentials.map((p) => (
                       <RelatedItem
@@ -784,7 +785,7 @@ export default function AlumniProfilePage() {
 
               {alumni.modelRepresentatives && alumni.modelRepresentatives.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="ผู้แทนรุ่น">
                     {alumni.modelRepresentatives.map((m) => (
                       <RelatedItem
@@ -799,7 +800,7 @@ export default function AlumniProfilePage() {
 
               {alumni.alumniAgency && alumni.alumniAgency.length > 0 && (
                 <>
-                  <div className="h-px bg-[var(--border)]" />
+                  <div className="h-px bg-purple-100" />
                   <RelatedSection title="ข้อมูลการทำงานศิษย์เก่า">
                     {alumni.alumniAgency.map((a) => (
                       <RelatedItem
@@ -851,7 +852,7 @@ export default function AlumniProfilePage() {
 function InfoField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-medium text-[var(--primary-dark)]">{label}</p>
       <p className="mt-0.5 text-sm text-[var(--foreground)]">{value || "—"}</p>
     </div>
   );
@@ -860,7 +861,7 @@ function InfoField({ label, value }: { label: string; value: string | null | und
 function RelatedSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">{title}</h3>
+      <SectionHeading title={title} />
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -876,10 +877,10 @@ function RelatedItem({
   detail?: string | null;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-gray-50 p-3">
+    <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
       <div className="text-sm font-medium text-[var(--foreground)]">{title}</div>
-      {meta && <div className="mt-0.5 text-xs text-[var(--muted)]">{meta}</div>}
-      {detail && <div className="mt-1 text-xs text-[var(--muted)]">{detail}</div>}
+      {meta && <div className="mt-0.5 text-xs text-purple-700/70">{meta}</div>}
+      {detail && <div className="mt-1 text-xs text-purple-700/70">{detail}</div>}
     </div>
   );
 }

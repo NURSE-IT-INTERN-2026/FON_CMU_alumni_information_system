@@ -30,7 +30,7 @@ npx tsx prisma/seed.ts    # Run database seed script
 - **React 19.2** with server and client components.
 - **Prisma 7** ORM with PostgreSQL. Schema at `prisma/schema.prisma`. Client generates to `app/generated/prisma/` (import from there, not `@prisma/client`).
 - **Prisma PostgreSQL adapter** (`@prisma/adapter-pg`) — the Prisma client is initialized with the `PrismaPg` adapter in `lib/prisma.ts`, using `DATABASE_URL` from `.env`.
-- **Tailwind CSS 4** with PostCSS plugin (`@tailwindcss/postcss`). CSS-first configuration in `app/globals.css` — no `tailwind.config.js`. Uses `@theme inline` block for custom theme colors (primary: `#1e3a5f` dark blue, accent: `#e8a838` gold).
+- **Tailwind CSS 4** with PostCSS plugin (`@tailwindcss/postcss`). CSS-first configuration in `app/globals.css` — no `tailwind.config.js`. Uses `@theme inline` block for custom theme colors (primary: `#5b21b6` purple, accent: `#e8a838` gold).
 - **Vitest 4** for testing. Config at `vitest.config.ts`. Tests in `tests/`.
 - **Path alias:** `@/*` maps to project root.
 
