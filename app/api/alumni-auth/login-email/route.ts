@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import {
@@ -7,12 +7,31 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@/lib/auth";
+import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError } from "@/lib/validations/helpers";
 import { alumniLoginSchema } from "@/lib/validations/auth";
 
 export async function POST(request: Request) {
   try {
+    const headerStore = await headers();
+    const ip =
+      headerStore.get("x-forwarded-for")?.split(",")[0].trim() ??
+      headerStore.get("x-real-ip") ??
+      "unknown";
+
+    const rateLimit = checkRateLimit(`alumni-login:${ip}`);
+    if (!rateLimit.allowed) {
+      const retryAfterSec = Math.ceil(rateLimit.retryAfterMs / 1000);
+      return NextResponse.json(
+        { error: "ลองเข้าสู่ระบบมากเกินไป กรุณารอสักครู่แล้วลองใหม่" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfterSec) },
+        }
+      );
+    }
+
     const body = await request.json();
     const validated = alumniLoginSchema.parse(body);
 
@@ -86,6 +105,9 @@ export async function POST(request: Request) {
         lastLoginAt: new Date(),
       },
     });
+
+    // Reset rate limit on success
+    resetRateLimit(`alumni-login:${ip}`);
 
     // Set session cookie
     const cookieStore = await cookies();
