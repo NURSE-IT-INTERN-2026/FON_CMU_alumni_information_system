@@ -592,7 +592,7 @@ export default function AdminAlumniProfilePage() {
               {alumni.alumniAgency && alumni.alumniAgency.length > 0 && (
                 <>
                   <div className="h-px bg-[var(--border)]" />
-                  <RelatedSection title="ต้นสังกัดศิษย์เก่า">
+                  <RelatedSection title="ข้อมูลการทำงานศิษย์เก่า">
                     {alumni.alumniAgency.map((a) => (
                       <RelatedItem key={a.id} title={a.country} meta={a.workplace || undefined} detail={[a.homeAddress, a.notes].filter(Boolean).join(" — ") || undefined} />
                     ))}

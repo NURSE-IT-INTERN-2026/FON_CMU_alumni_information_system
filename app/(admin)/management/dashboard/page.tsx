@@ -219,7 +219,7 @@ const CARDS: CardConfig[] = [
     getCount: (d) => d.modelRepresentatives.total,
   },
   {
-    label: "ต้นสังกัดศิษย์เก่า",
+    label: "ข้อมูลการทำงานศิษย์เก่า",
     href: "/management/alumni-agency",
     color: "#1565c0",
     icon: (

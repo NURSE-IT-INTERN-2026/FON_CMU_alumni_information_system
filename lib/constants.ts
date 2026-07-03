@@ -47,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/management/associations", label: "สมาคม/ชมรม" },
   { href: "/management/graduate-committee", label: "กรรมการบัณฑิต" },
   { href: "/management/model-representatives", label: "ผู้แทนรุ่น" },
-  { href: "/management/alumni-agency", label: "ต้นสังกัดศิษย์เก่า" },
+  { href: "/management/alumni-agency", label: "ข้อมูลการทำงานศิษย์เก่า" },
   { href: "/management/news", label: "ข่าวสาร" },
 ];
 

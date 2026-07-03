@@ -475,7 +475,7 @@ export default function NewAlumniPage() {
             </SectionToggle>
 
             <SectionToggle
-              title="ต้นสังกัดศิษย์เก่า"
+              title="ข้อมูลการทำงานศิษย์เก่า"
               open={sections.abroad}
               onToggle={() => toggleSection("abroad")}
             >

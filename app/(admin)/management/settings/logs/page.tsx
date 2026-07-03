@@ -68,8 +68,8 @@ const RESOURCE_LABELS: Record<string, string> = {
   graduate_committee: "กรรมการบัณฑิต",
   potential: "ศักยภาพ",
   model_representative: "ผู้แทนรุ่น",
-  alumni_agency: "ต้นสังกัดศิษย์เก่า",
-  abroad_alumni: "ต้นสังกัดศิษย์เก่า",  // legacy key for pre-rename log rows
+  alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
+  abroad_alumni: "ข้อมูลการทำงานศิษย์เก่า",  // legacy key for pre-rename log rows
   news: "ข่าวสาร",
   user: "ผู้ใช้งาน",
   alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",

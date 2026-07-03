@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       "ลำดับ": a.order,
     }));
 
-    return buildExcelResponse(rows, "ต้นสังกัดศิษย์เก่า", "alumni_agency_export");
+    return buildExcelResponse(rows, "ข้อมูลการทำงานศิษย์เก่า", "alumni_agency_export");
   } catch (error) {
     console.error("GET /api/alumni-agency/export error:", error);
     return NextResponse.json(
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       "ลำดับ": a.order,
     }));
 
-    return buildExcelResponse(rows, "ต้นสังกัดศิษย์เก่า", "alumni_agency_export");
+    return buildExcelResponse(rows, "ข้อมูลการทำงานศิษย์เก่า", "alumni_agency_export");
   } catch (error) {
     console.error("POST /api/alumni-agency/export error:", error);
     return NextResponse.json(

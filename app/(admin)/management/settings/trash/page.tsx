@@ -32,7 +32,7 @@ const ENTITY_OPTIONS: { value: string; label: string }[] = [
   { value: "associations", label: "สมาคม/ชมรม" },
   { value: "graduate-committee", label: "กรรมการบัณฑิต" },
   { value: "model-representatives", label: "ผู้แทนรุ่น" },
-  { value: "alumni-agency", label: "ต้นสังกัดศิษย์เก่า" },
+  { value: "alumni-agency", label: "ข้อมูลการทำงานศิษย์เก่า" },
 ];
 
 export default function TrashPage() {
