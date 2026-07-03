@@ -19,7 +19,7 @@ export default async function PublicLayout({
   return (
     <RoleProvider role={session.user.role}>
       <div className="flex min-h-screen flex-col">
-        <Header />
+        <Header user={{ firstName: session.user.firstName, lastName: session.user.lastName }} />
         <div className="flex flex-1">
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
