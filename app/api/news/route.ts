@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const search = searchParams.get("search") || "";
     const statusParam = searchParams.get("status") || "";
+    const pinnedOnly = searchParams.get("pinned") === "true";
 
     // No public/anonymous browsing (PRD §1/§3.12): news is readable only by
     // authenticated staff (any status) or alumni (PUBLISHED only). proxy.ts only
@@ -31,6 +32,15 @@ export async function GET(request: NextRequest) {
     }
 
     const where: Prisma.NewsWhereInput = {};
+
+    if (pinnedOnly) {
+      // The "ประชาสัมพันธ์สำคัญ" section fetch: only pinned articles.
+      where.pinnedAt = { not: null };
+    } else {
+      // Pinned articles render in a separate section above the grid — exclude
+      // them from the regular paginated list so nothing appears twice.
+      where.pinnedAt = null;
+    }
 
     if (adminSession) {
       // Staff: honor an explicit status filter, otherwise return all statuses.
@@ -52,7 +62,7 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.news.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: pinnedOnly ? { pinnedAt: "desc" } : { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

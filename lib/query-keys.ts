@@ -39,6 +39,9 @@ export const queryKeys = {
       search: string;
       statusFilter: string;
     }) => ["news", "list", o] as const,
+    // Pinned "ประชาสัมพันธ์สำคัญ" section — stable key (the server enforces
+    // PUBLISHED-only for alumni). Covered by `.all` invalidation.
+    pinned: () => ["news", "pinned"] as const,
   },
   logs: {
     all: ["logs"] as const,

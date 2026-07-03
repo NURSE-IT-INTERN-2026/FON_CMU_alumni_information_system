@@ -85,6 +85,10 @@ export async function PUT(
       if (validated.status === "PUBLISHED" && existing.status !== "PUBLISHED") {
         updateData.publishedAt = new Date();
       }
+      // Discontinuing clears the pin (pinned ⇒ not-discontinued).
+      if (validated.status === "DISCONTINUED") {
+        updateData.pinnedAt = null;
+      }
     }
 
     const news = await prisma.news.update({
@@ -134,7 +138,8 @@ export async function DELETE(
     }
 
     // PRD §3.12: news "delete" discontinues the article (sets status), it does not hard-delete.
-    await prisma.news.update({ where: { id }, data: { status: "DISCONTINUED" } });
+    // Discontinuing also clears the pin (pinned ⇒ not-discontinued); restoring is not auto-repinned.
+    await prisma.news.update({ where: { id }, data: { status: "DISCONTINUED", pinnedAt: null } });
 
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
