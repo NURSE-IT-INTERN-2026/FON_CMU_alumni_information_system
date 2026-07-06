@@ -96,6 +96,7 @@ app/
 │   └── management/               # All admin data pages
 │       ├── page.tsx
 │       ├── dashboard/            # Dashboard (charts, count cards, latest news)
+│       ├── alumni-activity/      # Alumni-portal engagement analytics (login activity + accounts) — read-only stats (no CRUD)
 │       ├── all-alumni/           # All-alumni table
 │       ├── new-alumni/           # Alumni creation (full-form with related records)
 │       ├── alumni/[id]/          # Admin alumni profile VIEW — orange edit-history, edit mode, data-logs toggle (param = UUID or studentId)
@@ -122,6 +123,7 @@ app/
 │   ├── alumni-auth/              # signup, login-email, forgot/reset-password, accept-tos, logout
 │   ├── alumni-profile/           # Logged-in alumni's own profile (GET/PUT) + /educations (GET/POST — alumni-self education records)
 │   ├── alumni-count/             # Dashboard aggregation
+│   ├── alumni-activity/          # Alumni-portal engagement stats (logins/accounts) — read-only, session-guarded, TTL-cached (no CRUD)
 │   ├── associations/ · awards/ · graduate-committee/ · model-representatives/ · potentials/  # CRUD + import/export/bulk-delete
 │   ├── news/                     # CRUD + bulk-delete (delete → DISCONTINUED) + [id]/pin (admin pin toggle → "ประชาสัมพันธ์สำคัญ" section)
 │   ├── auth/{login,cmu-login,logout,callback,cleanup}/   # callback = CMU OAuth callback (Microsoft Entra ID PKCE)
@@ -148,6 +150,7 @@ Each data entity follows a consistent route structure:
 - Every mutating route must call `checkWritePermission` (`@/lib/permissions`) and `logActivity` (`@/lib/activity-log`)
 - **Standard CRUD + import/export/bulk-delete entities:** alumni, alumni-agency, associations, awards, graduate-committee, model-representatives, potentials.
 - **Deviations from the standard pattern:**
+  - `alumni-activity` — read-only engagement analytics (login activity + accounts); no `/[id]`/import/export/bulk-delete. Session-guarded + 60s-TTL-cached (`withTtlCache("alumni-activity")`), same class as `dashboard`/`alumni-count`. Login counts read `ActivityLog` where `action='CREATE'` + `resource='alumni_auth'` + `details.action='login'` (see Known Pitfalls — no `LOGIN` action exists).
   - `news` — no `import`/`export`; DELETE → `status: DISCONTINUED` (NOT a soft delete, NOT trash-recoverable). **Pinned news ("ประชาสัมพันธ์สำคัญ"):** `GET /api/news` **excludes pinned by default** (`pinnedAt: null`) and `?pinned=true` returns only pinned (`pinnedAt desc`, used by the top-of-page section on both the admin + alumni news pages); `POST /api/news/[id]/pin` `{ pinned }` is the admin toggle. Discontinuing (single DELETE / bulk-delete / PUT status→DISCONTINUED) clears `pinnedAt` (pinned ⇒ not-discontinued).
   - `users` — no `import`/`export`/`bulk-delete`; write ops are superadmin-only (`checkSuperAdminPermission`).
   - `alumni-accounts` — admin alumni-account mgmt; no import/export/bulk-delete. The list filters `passwordHash != null` (any credential-bearing account: PENDING/ACTIVE/REJECTED) + a `?status=` filter, and returns `accountStatus` + `signupVerification`. Sub-routes: `/[id]/suspend` (toggle `suspendedAt` + kill sessions), and the **admin-approval** set `/[id]/approve` (PENDING|REJECTED → ACTIVE; creates the deferred Education + `syncPrimarySnapshot` + graduation logs + approval email), `/[id]/reject` (→ REJECTED + kill sessions + rejection email; re-approvable), `/[id]/reverify` (re-fetch CMU, rebuild `signupVerification`). All write sub-routes use `checkWritePermission` (admin + superadmin) + `logActivity` (`APPROVE`/`REJECT`/`SUSPEND`/`RESTORE`).
@@ -477,6 +480,11 @@ Template for a ledger entry:
 - **Symptom:** Tempting to delete `getIp` (`lib/activity-log.ts`) wholesale when removing activity-log IP capture.
 - **Root cause:** `getIp` lives in a *logging* file but is used by `cmu-alumni/route.ts` for `checkRateLimit(\`cmu-alumni:${ip}\`)` — independent of logging. The auth routes (`login`, `signup`, `forgot/reset-password`, `login-email`) instead extract the IP from headers directly for their own rate-limiting.
 - **Prevention:** The `ipAddress` DB column + the `logActivity` `ipAddress` param were removed (migration `20260625010517_drop_activity_log_ip_address`, 2026-06) — activity logs no longer capture IP. But `getIp` MUST stay (only `cmu-alumni` still imports it). When removing a positional `logActivity` arg, note `ipAddress` was param 6 (before `reason`/`tx`); a leftover arg silently binds to `reason` (both `string | null`) so tsc won't catch stragglers — grep-verify. Also, handlers that used `request` ONLY for `getIp(request)` (e.g. `accept-tos` POST, `users` GET, `alumni-profile` DELETE) lose their `request` param — drop it or prefix `_`.
+
+### Alumni logins are logged as `CREATE`/`alumni_auth`/`details.action=login` — count via that JSON predicate (use ActivityLog, NOT Session)
+- **Symptom:** Need to count alumni logins / "active this month" / per-month login trends for stats, but there is no `LOGIN` action and no per-login history field on `Alumni`.
+- **Root cause:** `POST /api/alumni-auth/login-email` records a login via `logActivity(ctx, "CREATE", "alumni_auth", alumni.id, { action: "login", method: "email" })` — the login marker lives ONLY inside the JSON `details` blob; the `action` column is the generic `"CREATE"`. `Alumni.lastLoginAt` is overwritten on every login (recent-only, no history); `Alumni.hasLoggedIn` is a single boolean. `Session` rows are pruned on expiry (`cleanupExpiredSessions`), so they cannot reconstruct history either.
+- **Prevention:** The reliable source is **`ActivityLog`** (append-only, indexed on `createdAt` + `alumniId`). Filter `actorType='ALUMNI'` AND `action='CREATE'` AND `resource='alumni_auth'` AND `details->>'action'='login'` (signup/forgot/reset/accept-tos also write `resource='alumni_auth'`, so the `details` check is mandatory). Per-month: `COUNT(*)` = logins, `COUNT(DISTINCT "alumniId")` = active alumni, bucketed by Thai month (`date_trunc('month', "createdAt" AT TIME ZONE 'Asia/Bangkok')` — DB stores UTC). The same predicate in Prisma is `{ details: { path: ["action"], equals: "login" } }`. Implemented by `GET /api/alumni-activity` + `/management/alumni-activity`. (Optional future cleanup: add a `LOGIN` value to the `LogAction` union so queries don't depend on a JSON-blob check — but that needs a backfill to re-tag history.)
 
 ### Uploaded/public images must be basePath-prefixed at render (`assetUrl`)
 - **Symptom:** News form image preview (and news cards + public/alumni detail pages) showed a broken image with a 404 on the GET, even though the file existed in `public/uploads/` and `POST /api/upload` returned 201.

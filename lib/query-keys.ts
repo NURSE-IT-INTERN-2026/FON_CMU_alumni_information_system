@@ -69,6 +69,12 @@ export const queryKeys = {
     chart: () => ["dashboard", "chart"] as const,
   },
 
+  // Alumni-portal engagement analytics (login activity / accounts).
+  alumniActivity: {
+    all: ["alumniActivity"] as const,
+    stats: () => ["alumniActivity", "stats"] as const,
+  },
+
   // CMU Registrar sync (การดึงข้อมูล page) — compare + materialize.
   cmuSync: {
     all: ["cmuSync"] as const,
