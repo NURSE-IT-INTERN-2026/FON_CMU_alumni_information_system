@@ -22,6 +22,8 @@ function AlumniSignupForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   const {
     register,
@@ -70,15 +72,33 @@ function AlumniSignupForm() {
         return;
       }
 
-      // Signup creates a PENDING account — an admin must approve before the
-      // alumni can log in. Show a confirmation instead of redirecting (no
-      // session is created).
+      // Signup creates an UNVERIFIED account — the applicant must confirm
+      // email ownership (click the verification link) before the account enters
+      // the admin-approval queue. Show a "check your email" panel with a resend
+      // option instead of redirecting (no session is created).
+      setSubmittedEmail(data.email.trim().toLowerCase());
       setSubmitted(true);
     } catch {
       setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    if (!submittedEmail || resendState === "sending") return;
+    setResendState("sending");
+    try {
+      await fetch(`${BASE_PATH}/api/alumni-auth/verify-email/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: submittedEmail }),
+      });
+    } catch {
+      // Swallow — the endpoint is enumeration-safe and returns the same message
+      // regardless; we just reflect a generic "sent" state to the user.
+    }
+    setResendState("sent");
   }
 
   return (
@@ -115,23 +135,37 @@ function AlumniSignupForm() {
         <div className="w-full max-w-md">
           {submitted ? (
             <div className="text-center">
-              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-sky-100">
+                <svg className="h-8 w-8 text-sky-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-[var(--foreground)]">ลงทะเบียนสำเร็จ</h2>
+              <h2 className="text-2xl font-bold text-[var(--foreground)]">กรุณายืนยันอีเมล</h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-                ระบบได้รับข้อมูลของท่านแล้ว บัญชีของท่านอยู่ระหว่างการตรวจสอบ
-                กรุณารอการอนุมัติจากผู้ดูแลระบบก่อนเข้าสู่ระบบ
-                ท่านจะได้รับอีเมลแจ้งเตือนเมื่อบัญชีพร้อมใช้งาน
+                ระบบได้ส่งลิงก์ยืนยันอีเมลไปยัง<strong className="text-[var(--foreground)]"> {submittedEmail} </strong>แล้ว
+                กรุณาตรวจสอบกล่องอีเมลของท่านและคลิกลิงก์เพื่อยืนยันตัวตน
+                หลังยืนยันแล้ว บัญชีของท่านจะเข้าสู่ขั้นตอนการตรวจสอบโดยผู้ดูแลระบบ
               </p>
-              <a
-                href={`${BASE_PATH}/login`}
-                className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
-              >
-                กลับสู่หน้าเข้าสู่ระบบ
-              </a>
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendState !== "idle"}
+                  className="text-sm font-medium text-[var(--primary)] hover:underline disabled:opacity-60 disabled:no-underline cursor-pointer"
+                >
+                  {resendState === "sending"
+                    ? "กำลังส่ง..."
+                    : resendState === "sent"
+                      ? "ส่งลิงก์ยืนยันอีกครั้งแล้ว กรุณาตรวจสอบอีเมล"
+                      : "ไม่ได้รับอีเมล? ส่งลิงก์ยืนยันอีกครั้ง"}
+                </button>
+                <a
+                  href={`${BASE_PATH}/login`}
+                  className="inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
+                >
+                  กลับสู่หน้าเข้าสู่ระบบ
+                </a>
+              </div>
             </div>
           ) : (
           <>

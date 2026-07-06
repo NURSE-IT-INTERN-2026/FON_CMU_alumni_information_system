@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-const STATUS_FILTERS = new Set(["pending", "active", "rejected"]);
+const STATUS_FILTERS = new Set(["unverified", "pending", "active", "rejected"]);
 
 export async function GET(request: NextRequest) {
   try {

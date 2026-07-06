@@ -154,6 +154,7 @@ async function getAlumniActivity() {
       total: totalAccounts,
       active: statusCounts.ACTIVE ?? 0,
       pending: statusCounts.PENDING ?? 0,
+      unverified: statusCounts.UNVERIFIED ?? 0,
       rejected: statusCounts.REJECTED ?? 0,
       suspended: suspendedCount,
       everLoggedIn,

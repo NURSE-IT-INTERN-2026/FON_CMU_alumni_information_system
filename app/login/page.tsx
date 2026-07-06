@@ -41,11 +41,12 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
   const resetSuccess = searchParams.get("reset") === "success";
+  const verifySuccess = searchParams.get("verify") === "success";
 
   // Auto-switch to alumni tab if the error/params are alumni-specific
   const isAlumniError = oauthError ? ALUMNI_ERROR_KEYS.has(oauthError) : false;
   const [mode, setMode] = useState<LoginMode>(
-    isAlumniError || resetSuccess ? "alumni" : "admin"
+    isAlumniError || resetSuccess || verifySuccess ? "alumni" : "admin"
   );
 
   const [error, setError] = useState(
@@ -54,11 +55,17 @@ function LoginForm() {
       : ""
   );
   const [success, setSuccess] = useState(
-    resetSuccess
-      ? "รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่"
-      : ""
+    verifySuccess
+      ? "ยืนยันอีเมลสำเร็จ บัญชีของท่านอยู่ระหว่างการตรวจสอบโดยผู้ดูแลระบบ"
+      : resetSuccess
+        ? "รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่"
+        : ""
   );
   const [loading, setLoading] = useState(false);
+  // Set when an alumni login is rejected with code "UNVERIFIED" — surfaces the
+  // "resend verification email" affordance below the error.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   // Admin form
   const adminForm = useForm<AdminLoginData>({
@@ -123,6 +130,9 @@ function LoginForm() {
 
       if (!res.ok) {
         setError(resData.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+        // An UNVERIFIED account needs email confirmation — offer to resend.
+        setUnverifiedEmail(resData.code === "UNVERIFIED" ? data.email.trim().toLowerCase() : null);
+        setResendState("idle");
         return;
       }
 
@@ -132,6 +142,21 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResendVerification() {
+    if (!unverifiedEmail || resendState !== "idle") return;
+    setResendState("sending");
+    try {
+      await fetch(`${BASE_PATH}/api/alumni-auth/verify-email/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+    } catch {
+      // Swallow — endpoint is enumeration-safe; reflect a generic sent state.
+    }
+    setResendState("sent");
   }
 
   return (
@@ -213,6 +238,26 @@ function LoginForm() {
           {success && (
             <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-[var(--success)]">
               {success}
+            </div>
+          )}
+
+          {unverifiedEmail && mode === "alumni" && (
+            <div className="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+              {resendState === "sent" ? (
+                <span>ส่งลิงก์ยืนยันไปยัง <strong>{unverifiedEmail}</strong> แล้ว กรุณาตรวจสอบอีเมล</span>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>ไม่ได้รับอีเมลยืนยัน?</span>
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendState === "sending"}
+                    className="rounded-md bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-60 cursor-pointer"
+                  >
+                    {resendState === "sending" ? "กำลังส่ง..." : "ส่งอีเมลยืนยันอีกครั้ง"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -48,6 +48,8 @@ const ACTION_LABELS: Record<string, string> = {
   SUSPEND: "ระงับบัญชี",
   RESTORE: "ยกเลิกการระงับ",
   HARD_DELETE: "ลบถาวร",
+  EMAIL_VERIFY: "ยืนยันอีเมล",
+  EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -61,6 +63,8 @@ const ACTION_COLORS: Record<string, string> = {
   SUSPEND: "bg-amber-100 text-amber-700",
   RESTORE: "bg-green-100 text-green-700",
   HARD_DELETE: "bg-red-100 text-red-700",
+  EMAIL_VERIFY: "bg-emerald-100 text-emerald-700",
+  EMAIL_VERIFY_REQUEST: "bg-sky-100 text-sky-700",
 };
 
 const RESOURCE_LABELS: Record<string, string> = {

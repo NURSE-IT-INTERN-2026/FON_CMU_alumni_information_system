@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
+import { sendEmailVerificationEmail } from "@/lib/email";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import {
   buildSignupVerification,
@@ -13,7 +15,6 @@ import {
 } from "@/lib/signup-verification";
 import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
 import { Prisma, type DegreeLevel } from "@/app/generated/prisma/client";
-import { bustCache } from "@/lib/cache";
 
 const alumniSignupApiSchema = z.object({
   studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
@@ -82,12 +83,14 @@ export async function POST(request: Request) {
     if (localAlumni?.passwordHash) {
       const status = localAlumni.accountStatus;
       const msg =
-        status === "PENDING"
-          ? "บัญชีของท่านอยู่ระหว่างตรวจสอบ กรุณารอการอนุมัติจากผู้ดูแลระบบ"
-          : status === "REJECTED"
-            ? "การลงทะเบียนของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ"
-            : "ท่านได้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ";
-      return NextResponse.json({ error: msg }, { status: 409 });
+        status === "UNVERIFIED"
+          ? "บัญชีของท่านรอยืนยันอีเมล กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตน"
+          : status === "PENDING"
+            ? "บัญชีของท่านอยู่ระหว่างตรวจสอบ กรุณารอการอนุมัติจากผู้ดูแลระบบ"
+            : status === "REJECTED"
+              ? "การลงทะเบียนของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ"
+              : "ท่านได้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ";
+      return NextResponse.json({ error: msg, code: status }, { status: 409 });
     }
 
     // 3. Best-effort CMU lookup to capture the per-field comparison snapshot for
@@ -121,16 +124,17 @@ export async function POST(request: Request) {
       localAlumni ? localAuthoritativeFromAlumni(localAlumni) : null,
     );
 
-    // 4. Upsert a PENDING account. No auto-login, no session/cookie, no
-    //    hasLoggedIn — the admin must approve first. Education/snapshot/grad-log
-    //    creation is deferred to approval so a rejected (e.g. fabricated) signup
-    //    never pollutes degree data.
+    // 4. Upsert an UNVERIFIED account. No auto-login, no session/cookie, no
+    //    hasLoggedIn — the applicant must confirm email ownership, then an admin
+    //    must approve. Education/snapshot/grad-log creation is deferred to
+    //    approval so a rejected (e.g. fabricated) signup never pollutes degree
+    //    data.
     const passwordHash = await hashPassword(validated.password);
     let alumniId: string;
 
     try {
       if (localAlumni) {
-        // Existing imported/CMU-only row: attach credentials + flip to PENDING.
+        // Existing imported/CMU-only row: attach credentials + flip to UNVERIFIED.
         // Leave its identity fields intact (they're already authoritative); the
         // submitted data lives in `signupVerification` for the admin to compare.
         await prisma.alumni.update({
@@ -138,7 +142,7 @@ export async function POST(request: Request) {
           data: {
             email,
             passwordHash,
-            accountStatus: "PENDING",
+            accountStatus: "UNVERIFIED",
             signupVerification: verification as unknown as Prisma.InputJsonValue,
           },
         });
@@ -155,7 +159,7 @@ export async function POST(request: Request) {
             degreeLevel: validated.degreeLevel as DegreeLevel,
             email,
             passwordHash,
-            accountStatus: "PENDING",
+            accountStatus: "UNVERIFIED",
             signupVerification: verification as unknown as Prisma.InputJsonValue,
           },
         });
@@ -175,9 +179,24 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    // A new PENDING signup changes the dashboard "pending approvals" count — bust
-    // so the card is fresh when an admin next loads it.
-    bustCache("dashboard");
+    // 5. Issue an email-verification token and send the confirmation email. Best
+    //    effort: a send failure is logged but does NOT fail the signup — the
+    //    account exists as UNVERIFIED and the applicant can resend from the
+    //    signup page or login screen.
+    const verifyToken = randomBytes(32).toString("hex");
+    const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await prisma.emailVerification.create({
+      data: { alumniId, token: verifyToken, expiresAt: verifyExpiresAt },
+    });
+    try {
+      await sendEmailVerificationEmail(email, `${firstName} ${lastName}`, verifyToken);
+    } catch (err) {
+      console.error("Failed to send email-verification email:", err);
+    }
+
+    // A new signup does NOT enter the admin pending queue until the email is
+    // verified (UNVERIFIED → PENDING), so the dashboard "pending approvals"
+    // count is unchanged here; no cache bust needed yet.
 
     await logActivity(
       {
@@ -199,9 +218,10 @@ export async function POST(request: Request) {
       },
     );
 
-    // No session is created — the applicant must wait for admin approval. The
-    // signup page shows a "pending review" success state.
-    return NextResponse.json({ success: true, pending: true });
+    // No session is created — the applicant must verify their email, then wait
+    // for admin approval. The signup page shows a "check your email" success
+    // state with a resend option.
+    return NextResponse.json({ success: true, unverified: true });
   } catch (error) {
     if (error instanceof z.ZodError) return handleZodError(error);
     return NextResponse.json(

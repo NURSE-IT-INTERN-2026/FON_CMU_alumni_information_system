@@ -10,6 +10,8 @@ export type LogAction =
   | "BULK_DELETE"
   | "SIGNUP"
   | "LOGIN"
+  | "EMAIL_VERIFY_REQUEST"
+  | "EMAIL_VERIFY"
   | "PASSWORD_RESET_REQUEST"
   | "PASSWORD_RESET_COMPLETE"
   | "APPROVE"
