@@ -9,14 +9,11 @@ import { Prisma } from "@/app/generated/prisma/client";
 //   • Alumni account/engagement fields (passwordHash/accountStatus/hasLoggedIn/
 //     lastLoginAt/suspendedAt) for the headline + recency counts.
 //   • ActivityLog for login HISTORY — every successful alumni login is logged
-//     by /api/alumni-auth/login-email as CREATE/alumni_auth with
-//     details.action = "login" (there is no LOGIN action). ActivityLog is
+//     by /api/alumni-auth/login-email with action = "LOGIN", resource =
+//     "alumni_auth". (Pre-2026-07 logins were CREATE + details.action="login";
+//     backfilled to LOGIN by scripts/backfill-login-action.ts.) ActivityLog is
 //     append-only + indexed on createdAt/alumniId, so it is the correct source
 //     for per-month history — NOT Session (sessions are pruned on expiry).
-//
-// The login predicate appears in TWO forms and they MUST stay in sync:
-//   • Prisma `where`  -> { details: { path: ["action"], equals: "login" } }
-//   • raw SQL `WHERE` -> details->>'action' = 'login'
 const CACHE_TTL_MS = 60_000;
 const ICT_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Bangkok = UTC+7
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -99,13 +96,12 @@ async function getAlumniActivity() {
       where: accountWhere,
     }),
 
-    // All-time alumni login events (login predicate — see file header).
+    // All-time alumni login events (action = LOGIN — see file header).
     prisma.activityLog.count({
       where: {
         actorType: "ALUMNI",
-        action: "CREATE",
+        action: "LOGIN",
         resource: "alumni_auth",
-        details: { path: ["action"], equals: "login" },
       },
     }),
 
@@ -123,9 +119,8 @@ async function getAlumniActivity() {
              COUNT(DISTINCT "alumniId")::int AS "activeAlumni"
       FROM activity_logs
       WHERE "actorType" = 'ALUMNI'
-        AND action = 'CREATE'
+        AND action = 'LOGIN'
         AND resource = 'alumni_auth'
-        AND details->>'action' = 'login'
         AND "createdAt" >= ${windowStart}
       GROUP BY 1
       ORDER BY 1

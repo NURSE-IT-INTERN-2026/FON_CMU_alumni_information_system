@@ -9,6 +9,7 @@ export type LogAction =
   | "EXPORT"
   | "BULK_DELETE"
   | "SIGNUP"
+  | "LOGIN"
   | "PASSWORD_RESET_REQUEST"
   | "PASSWORD_RESET_COMPLETE"
   | "APPROVE"
