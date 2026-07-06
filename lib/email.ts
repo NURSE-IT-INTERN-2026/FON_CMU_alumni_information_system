@@ -1,6 +1,25 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+// From address used for every alumni-facing email. RESEND_FROM is preferred
+// (Resend requires a verified sending domain — for local testing use
+// `onboarding@resend.dev`); fall back to the nodemailer SMTP_FROM, then a sane
+// default.
+const fromAddress =
+  process.env.RESEND_FROM ||
+  process.env.SMTP_FROM ||
+  '"FON CMU Alumni" <noreply@cmu.ac.th>';
+
+// Resend is the primary provider (RESEND_API_KEY configured). A nodemailer
+// transporter is kept as a fallback so local dev without a Resend key still
+// sends via SMTP.
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const fallbackTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
   secure: process.env.SMTP_SECURE === "true",
@@ -10,18 +29,35 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+type SendEmailInput = {
+  to: string;
+  subject: string;
+  html: string;
+};
+
+/**
+ * Shared email primitive. Sends via Resend when RESEND_API_KEY is configured,
+ * otherwise falls back to the nodemailer SMTP transporter. Throws on failure so
+ * callers can decide whether to swallow (best-effort notifications) or surface.
+ */
+async function sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {
+  if (resend) {
+    const { error } = await resend.emails.send({ from: fromAddress, to, subject, html });
+    if (error) {
+      throw new Error(`Resend send failed: ${error.message}`);
+    }
+    return;
+  }
+  await fallbackTransporter.sendMail({ from: fromAddress, to, subject, html });
+}
+
 export async function sendPasswordResetEmail(
   to: string,
   resetToken: string
 ): Promise<void> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const resetUrl = `${baseUrl}/alumni/reset-password?token=${resetToken}`;
+  const resetUrl = `${baseUrl}/alumni/graduates/reset-password?token=${resetToken}`;
 
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      '"FON CMU Alumni" <noreply@cmu.ac.th>',
+  await sendEmail({
     to,
     subject:
       "รีเซ็ตรหัสผ่าน - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
@@ -66,17 +102,69 @@ export async function sendPasswordResetEmail(
 }
 
 /**
+ * Email-ownership verification email sent at signup (and on resend). Clicking
+ * the link flips the account UNVERIFIED → PENDING (enters the admin queue).
+ * `name` is the applicant's first+last name for the greeting.
+ */
+export async function sendEmailVerificationEmail(
+  to: string,
+  name: string,
+  verifyToken: string,
+): Promise<void> {
+  const verifyUrl = `${baseUrl}/alumni/graduates/verify-email?token=${verifyToken}`;
+
+  await sendEmail({
+    to,
+    subject:
+      "ยืนยันอีเมล - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
+    html: `
+      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #5b21b6; margin: 0; font-size: 22px;">ยืนยันที่อยู่อีเมล</h2>
+          </div>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            เรียน ${name},
+          </p>
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            ขอบคุณที่ลงทะเบียนในระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+            กรุณาคลิกปุ่มด้านล่างเพื่อยืนยันที่อยู่อีเมลของท่าน
+            <span style="color: #e53e3e; font-weight: 600;">(ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง)</span>
+          </p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${verifyUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
+              ยืนยันอีเมล
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
+          </p>
+          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
+            ${verifyUrl}
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
+            หากท่านไม่ได้เป็นผู้ลงทะเบียน กรุณาเพิกเฉยต่ออีเมลนี้
+          </p>
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <p style="color: #9ca3af; font-size: 12px;">
+            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+/**
  * Sent when an admin approves a pending signup — the alumni can now log in.
  * `name` is the alumni's current display name (prefix + first + last).
  */
 export async function sendSignupApprovedEmail(to: string, name: string): Promise<void> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
   const loginUrl = `${baseUrl}/alumni/login`;
 
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      '"FON CMU Alumni" <noreply@cmu.ac.th>',
+  await sendEmail({
     to,
     subject:
       "บัญชีของท่านได้รับอนุมัติแล้ว - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
@@ -99,7 +187,7 @@ export async function sendSignupApprovedEmail(to: string, name: string): Promise
             </a>
           </div>
           <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดใปเบราว์เซอร์:
+            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
           </p>
           <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
             ${loginUrl}
@@ -124,10 +212,7 @@ export async function sendSignupRejectedEmail(
   name: string,
   reason?: string | null,
 ): Promise<void> {
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      '"FON CMU Alumni" <noreply@cmu.ac.th>',
+  await sendEmail({
     to,
     subject:
       "แจ้งผลการพิจารณาการลงทะเบียน - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",

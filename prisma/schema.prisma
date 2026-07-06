@@ -39,11 +39,13 @@ enum ActorType {
 }
 
 // Alumni account lifecycle for the admin-approval signup flow. New signups are
-// PENDING until an admin reviews them; ACTIVE accounts may log in; REJECTED
-// accounts are kept (re-approvable) but blocked from login. Default ACTIVE so
-// pre-existing rows and CMU-only/imported rows (no credentials) are unaffected
-// — login is additionally gated on `passwordHash`.
+// UNVERIFIED until the alumni confirms email ownership (clicks the verification
+// link), then PENDING until an admin reviews them; ACTIVE accounts may log in;
+// REJECTED accounts are kept (re-approvable) but blocked from login. Default
+// ACTIVE so pre-existing rows and CMU-only/imported rows (no credentials) are
+// unaffected — login is additionally gated on `passwordHash`.
 enum AccountStatus {
+  UNVERIFIED
   PENDING
   ACTIVE
   REJECTED
@@ -89,6 +91,10 @@ model Alumni {
   // field-by-field approve/review modal (null for accounts created otherwise).
   accountStatus         AccountStatus @default(ACTIVE)
   signupVerification    Json?
+  // Set when the alumni confirmed email ownership (clicked the verification
+  // link: UNVERIFIED → PENDING). Durable across later status changes; useful
+  // for audit and future email-change re-verification.
+  emailVerifiedAt       DateTime?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
@@ -99,6 +105,7 @@ model Alumni {
   modelRepresentatives ModelRepresentative[]
   alumniAgency         AlumniAgency[]
   passwordResets       PasswordReset[]
+  emailVerifications   EmailVerification[]
   sessions             Session[]
   activityLogs         ActivityLog[]
   educations           Education[]
@@ -375,6 +382,24 @@ model PasswordReset {
   @@index([alumniId])
   @@index([expiresAt])
   @@map("password_resets")
+}
+
+// Email-ownership verification tokens for the signup flow. A signup creates an
+// UNVERIFIED account + one of these; clicking the link (verify-email route)
+// flips the account to PENDING and marks the token used. Mirrors PasswordReset.
+model EmailVerification {
+  id        String   @id @default(uuid())
+  alumniId  String
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@index([alumniId])
+  @@index([expiresAt])
+  @@map("email_verifications")
 }
 
 // Per-field change history — powers the orange "updated value" indicators on

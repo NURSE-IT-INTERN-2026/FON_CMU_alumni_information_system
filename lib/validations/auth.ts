@@ -60,8 +60,20 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+// --- Email verification (signup email-ownership confirmation) ---
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, "โทเคนไม่ถูกต้อง"),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().min(1, "กรุณากรอกอีเมล").email("รูปแบบอีเมลไม่ถูกต้อง"),
+});
+
 export type AdminLoginData = z.infer<typeof adminLoginSchema>;
 export type AlumniLoginData = z.infer<typeof alumniLoginSchema>;
 export type AlumniSignupData = z.infer<typeof alumniSignupSchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
+export type VerifyEmailData = z.infer<typeof verifyEmailSchema>;
+export type ResendVerificationData = z.infer<typeof resendVerificationSchema>;

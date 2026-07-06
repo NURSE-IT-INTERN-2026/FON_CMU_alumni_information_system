@@ -59,10 +59,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Admin-approval signup flow: only ACTIVE accounts may log in. A PENDING
-    // account is awaiting review; a REJECTED account was declined. Surfaced
-    // before the password check so the applicant knows their status (consistent
-    // with the suspended/not-registered messages above).
+    // Admin-approval signup flow: only ACTIVE accounts may log in. An UNVERIFIED
+    // account still needs email confirmation; a PENDING account is awaiting
+    // review; a REJECTED account was declined. Surfaced before the password
+    // check so the applicant knows their status (consistent with the
+    // suspended/not-registered messages above). The UNVERIFIED branch returns a
+    // `code` so the login page can offer a "resend verification email" action.
+    if (alumni.accountStatus === "UNVERIFIED") {
+      return NextResponse.json(
+        {
+          error: "บัญชีของท่านรอยืนยันอีเมล กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ",
+          code: "UNVERIFIED",
+        },
+        { status: 403 }
+      );
+    }
     if (alumni.accountStatus === "PENDING") {
       return NextResponse.json(
         { error: "บัญชีของท่านอยู่ระหว่างตรวจสอบ กรุณารอการอนุมัติจากผู้ดูแลระบบ" },

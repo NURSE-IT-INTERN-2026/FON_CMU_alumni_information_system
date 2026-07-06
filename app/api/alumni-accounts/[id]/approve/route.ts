@@ -51,7 +51,15 @@ export async function POST(
     await prisma.$transaction(async (tx) => {
       await tx.alumni.update({
         where: { id },
-        data: { accountStatus: "ACTIVE" },
+        data: {
+          accountStatus: "ACTIVE",
+          // An admin may approve straight from UNVERIFIED (override, e.g. an
+          // applicant who verified in person) — record the email-verified time
+          // so the audit timestamp is correct.
+          ...(alumni.accountStatus === "UNVERIFIED"
+            ? { emailVerifiedAt: new Date() }
+            : {}),
+        },
       });
 
       // Ensure an Education row exists for this signup degree, then let the

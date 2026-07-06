@@ -121,6 +121,8 @@ export {
   alumniSignupSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 } from "./auth";
 export type {
   AdminLoginData,
@@ -128,6 +130,8 @@ export type {
   AlumniSignupData,
   ForgotPasswordData,
   ResetPasswordData,
+  VerifyEmailData,
+  ResendVerificationData,
 } from "./auth";
 
 // News
