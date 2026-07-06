@@ -39,6 +39,7 @@ interface ActivityLog {
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: "เพิ่มข้อมูล",
+  LOGIN: "เข้าสู่ระบบ",
   UPDATE: "แก้ไขข้อมูล",
   DELETE: "ลบข้อมูล",
   BULK_DELETE: "ลบหลายรายการ",
@@ -51,6 +52,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE: "bg-purple-100 text-purple-700",
+  LOGIN: "bg-emerald-100 text-emerald-700",
   UPDATE: "bg-yellow-100 text-yellow-700",
   DELETE: "bg-red-100 text-red-700",
   BULK_DELETE: "bg-red-100 text-red-700",

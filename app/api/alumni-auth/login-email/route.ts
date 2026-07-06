@@ -120,10 +120,10 @@ export async function POST(request: Request) {
         alumniId: alumni.id,
         alumniName: `${alumni.firstName} ${alumni.lastName}`,
       },
-      "CREATE",
+      "LOGIN",
       "alumni_auth",
       alumni.id,
-      { action: "login", method: "email" },
+      { method: "email" },
     );
 
     return NextResponse.json({
