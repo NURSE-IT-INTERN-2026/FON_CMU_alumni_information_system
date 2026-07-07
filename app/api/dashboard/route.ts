@@ -131,7 +131,13 @@ async function getDashboardData() {
     prisma.alumni.groupBy({
       by: ["accountStatus"],
       _count: true,
-      where: { passwordHash: { not: null }, deletedAt: null },
+      // Same "has an account" + exclude-UNVERIFIED definition as
+      // GET /api/alumni-accounts — UNVERIFIED isn't tracked by admins.
+      where: {
+        passwordHash: { not: null },
+        deletedAt: null,
+        accountStatus: { not: "UNVERIFIED" },
+      },
     }),
   ]);
 
@@ -166,7 +172,6 @@ async function getDashboardData() {
       degreeBreakdown,
     },
     alumniAccounts: {
-      unverified: accountStatusCounts.UNVERIFIED ?? 0,
       pending: accountStatusCounts.PENDING ?? 0,
       active: accountStatusCounts.ACTIVE ?? 0,
       rejected: accountStatusCounts.REJECTED ?? 0,

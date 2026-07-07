@@ -79,7 +79,6 @@ interface DashboardData {
   // Signup-account counts by status (credential-bearing, non-deleted) — drives
   // the "pending approvals" card.
   alumniAccounts: {
-    unverified: number;
     pending: number;
     active: number;
     rejected: number;
@@ -359,8 +358,7 @@ export default function DashboardPage() {
 
       {/* Pending alumni accounts — summary banner. Purple left border + purple
           circular arrow; whole card opens the approval queue. Pills are colored
-          by status: sky=unverified (awaiting email), yellow=pending, green=active,
-          red=rejected. */}
+          by status: yellow=pending, green=active, red=rejected. */}
       <Link
         href="/management/settings/users?status=pending"
         className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border-l-4 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
@@ -376,7 +374,6 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill count={data.alumniAccounts.unverified} label="รอยืนยันอีเมล" color="#0284c7" />
           <StatusPill count={data.alumniAccounts.pending} label="รออนุมัติ" color="#ca8a04" />
           <StatusPill count={data.alumniAccounts.active} label="ใช้งาน" color="#16a34a" />
           <StatusPill count={data.alumniAccounts.rejected} label="ปฏิเสธ" color="#dc2626" />
