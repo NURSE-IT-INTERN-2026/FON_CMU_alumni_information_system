@@ -59,6 +59,8 @@ interface AlumniAccount {
   accountStatus: AccountStatus;
   createdAt: string;
   signupVerification: SignupVerification | null;
+  rejectionReason: string | null;
+  rejectedAt: string | null;
 }
 
 const STATUS_LABELS: Record<AccountStatus, string> = {
@@ -328,6 +330,7 @@ function AlumniAccountsTab({
   const [emailSaving, setEmailSaving] = useState(false);
   const [reviewAccount, setReviewAccount] = useState<AlumniAccount | null>(null);
   const [reviewActioning, setReviewActioning] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const pageSize = 10;
 
@@ -352,6 +355,33 @@ function AlumniAccountsTab({
       apiFetch<{ total: number }>(`/api/alumni-accounts?status=pending&pageSize=1`),
   });
   const pendingCount = pendingData?.total ?? 0;
+
+  // Rejection history for the account in the review modal — the admin sees why
+  // they (or another admin) rejected before. Reuses the merged activity timeline
+  // (GET /api/alumni/[id]/activity), filtered to REJECT events.
+  const { data: rejectionHistory } = useQuery({
+    queryKey: ["alumniAccounts", "rejectionHistory", reviewAccount?.id],
+    queryFn: () =>
+      apiFetch<{
+        items: {
+          kind: string;
+          action: string;
+          reason: string | null;
+          createdAt: string;
+          actorName: string | null;
+          details?: { reason?: string } | null;
+        }[];
+      }>(`/api/alumni/${reviewAccount!.id}/activity`),
+    enabled: !!reviewAccount,
+    select: (res) =>
+      (res.items ?? [])
+        .filter((i) => i.kind === "activity" && i.action === "REJECT")
+        .map((i) => ({
+          reason: i.reason ?? (i.details?.reason as string | null) ?? null,
+          createdAt: i.createdAt,
+          actorName: i.actorName,
+        })),
+  });
 
   const totalPages = Math.ceil(total / pageSize);
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -385,6 +415,14 @@ function AlumniAccountsTab({
     qc.invalidateQueries({ queryKey: queryKeys.alumniAccounts.all });
   };
 
+  // Open the review modal for an account — reset the per-session reject reason
+  // + error so a stale value from a previous review never carries over.
+  const openReview = (a: AlumniAccount) => {
+    setReviewAccount(a);
+    setErrorMsg("");
+    setRejectReason("");
+  };
+
   const handleApprove = async () => {
     if (!reviewAccount) return;
     setReviewActioning(true); setErrorMsg("");
@@ -400,7 +438,7 @@ function AlumniAccountsTab({
     if (!reviewAccount) return;
     setReviewActioning(true); setErrorMsg("");
     try {
-      await apiFetch(`/api/alumni-accounts/${reviewAccount.id}/reject`, { method: "POST", json: {} });
+      await apiFetch(`/api/alumni-accounts/${reviewAccount.id}/reject`, { method: "POST", json: { reason: rejectReason.trim() } });
       setReviewAccount(null);
       refreshAfterReview();
     } catch (e) { setErrorMsg(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการปฏิเสธ"); }
@@ -492,7 +530,7 @@ function AlumniAccountsTab({
                     onClick={() =>
                       a.accountStatus === "ACTIVE"
                         ? router.push(`/management/alumni/${a.id}`)
-                        : setReviewAccount(a)
+                        : openReview(a)
                     }
                     className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-gray-50"
                   >
@@ -512,7 +550,7 @@ function AlumniAccountsTab({
                     {canWrite && (
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => setReviewAccount(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" title="ตรวจสอบการลงทะเบียน">
+                          <button onClick={() => openReview(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" title="ตรวจสอบการลงทะเบียน">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                           </button>
                           <button onClick={() => openEmailEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="เปลี่ยนอีเมล">
@@ -593,12 +631,59 @@ function AlumniAccountsTab({
               </div>
             )}
 
+            {/* Prior rejection(s) — shown when this is a re-application, so the
+                admin sees why it was rejected before. Latest from the row +
+                the full history from the activity timeline. */}
+            {reviewAccount.rejectionReason && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                <p className="font-semibold text-amber-800">เหตุผลที่ถูกปฏิเสธครั้งล่าสุด</p>
+                <p className="mt-1 whitespace-pre-wrap text-amber-900">{reviewAccount.rejectionReason}</p>
+                {reviewAccount.rejectedAt && (
+                  <p className="mt-1 text-xs text-amber-700">{formatDate(reviewAccount.rejectedAt)}</p>
+                )}
+              </div>
+            )}
+            {(rejectionHistory?.length ?? 0) > 1 && (
+              <details className="mt-2 text-sm text-gray-600">
+                <summary className="cursor-pointer font-medium text-gray-700">
+                  ประวัติการปฏิเสธทั้งหมด ({rejectionHistory!.length} ครั้ง)
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {rejectionHistory!.map((r, i) => (
+                    <li key={i} className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                      <span className="whitespace-pre-wrap text-gray-900">{r.reason ?? "—"}</span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {formatDate(r.createdAt)}{r.actorName ? ` · ${r.actorName}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {/* Required reject reason — only for rejectable accounts. The API
+                rejects (400) a blank reason; disabling here gives instant feedback. */}
+            {reviewAccount.accountStatus !== "REJECTED" && (
+              <div className="mt-4">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  เหตุผลที่ปฏิเสธ <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="ระบุเหตุผลที่ปฏิเสธ (จะถูกส่งไปยังอีเมลของผู้สมัคร)"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                />
+              </div>
+            )}
+
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button onClick={handleReverify} disabled={reviewActioning} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
                 ตรวจสอบใหม่
               </button>
               {reviewAccount.accountStatus !== "REJECTED" && (
-                <button onClick={handleReject} disabled={reviewActioning} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer">
+                <button onClick={handleReject} disabled={reviewActioning || !rejectReason.trim()} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer">
                   ปฏิเสธ
                 </button>
               )}

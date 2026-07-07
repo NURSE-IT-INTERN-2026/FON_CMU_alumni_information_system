@@ -16,6 +16,7 @@ export type LogAction =
   | "PASSWORD_RESET_COMPLETE"
   | "APPROVE"
   | "REJECT"
+  | "REAPPLY"
   | "VERIFY_IDENTITY"
   | "RESTORE"
   | "SUSPEND"

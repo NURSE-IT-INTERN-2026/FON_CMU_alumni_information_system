@@ -66,6 +66,9 @@ function LoginForm() {
   // "resend verification email" affordance below the error.
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+  // Set when an alumni login is rejected with code "REJECTED" — surfaces the
+  // "re-apply" affordance below the error.
+  const [rejectedEmail, setRejectedEmail] = useState<string | null>(null);
 
   // Admin form
   const adminForm = useForm<AdminLoginData>({
@@ -132,6 +135,8 @@ function LoginForm() {
         setError(resData.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
         // An UNVERIFIED account needs email confirmation — offer to resend.
         setUnverifiedEmail(resData.code === "UNVERIFIED" ? data.email.trim().toLowerCase() : null);
+        // A REJECTED account can re-apply — offer the re-apply link.
+        setRejectedEmail(resData.code === "REJECTED" ? data.email.trim().toLowerCase() : null);
         setResendState("idle");
         return;
       }
@@ -258,6 +263,20 @@ function LoginForm() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {rejectedEmail && mode === "alumni" && (
+            <div className="mb-5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>บัญชีของท่านถูกปฏิเสธ สามารถยื่นคำขอใหม่ได้</span>
+                <a
+                  href={`${BASE_PATH}/graduates/reapply?email=${encodeURIComponent(rejectedEmail)}`}
+                  className="rounded-md bg-[var(--primary)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--primary-light)] cursor-pointer"
+                >
+                  ยื่นคำขอใหม่
+                </a>
+              </div>
             </div>
           )}
 

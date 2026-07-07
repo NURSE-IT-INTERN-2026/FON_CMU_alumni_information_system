@@ -82,7 +82,10 @@ export async function POST(request: Request) {
     }
     if (alumni.accountStatus === "REJECTED") {
       return NextResponse.json(
-        { error: "บัญชีของท่านถูกปฏิเสธ กรุณาติดต่อผู้ดูแลระบบ" },
+        {
+          error: "บัญชีของท่านถูกปฏิเสธ ท่านสามารถยื่นคำขอใหม่ได้",
+          code: "REJECTED",
+        },
         { status: 403 }
       );
     }

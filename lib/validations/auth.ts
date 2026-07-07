@@ -41,6 +41,23 @@ export const alumniSignupSchema = z
     path: ["confirmPassword"],
   });
 
+// --- Alumni re-apply (rejected → resubmit to the admin queue) ---
+// Covers the editable identity fields shown pre-filled in step 2. Email +
+// password (identity proof) are collected in step 1 and validated server-side
+// by /api/alumni-auth/reapply(+/prepare); they aren't part of this form schema.
+
+export const alumniReapplySchema = z.object({
+  studentId: z.string().min(1, "กรุณากรอกรหัสนักศึกษา"),
+  degreeLevel: z.string().min(1, "กรุณาเลือกระดับการศึกษา"),
+  cohort: z.string().min(1, "กรุณากรอกปีที่จบ"),
+  firstName: z.string().min(1, "กรุณากรอกชื่อ"),
+  lastName: z.string().min(1, "กรุณากรอกนามสกุลเดิม"),
+  birthDate: z
+    .string()
+    .min(1, "กรุณากรอกวันเกิด")
+    .regex(/^\d{8}$/, "รูปแบบวันเกิดไม่ถูกต้อง ต้องเป็น DDMMYYYY"),
+});
+
 // --- Forgot password ---
 
 export const forgotPasswordSchema = z.object({
@@ -73,6 +90,7 @@ export const resendVerificationSchema = z.object({
 export type AdminLoginData = z.infer<typeof adminLoginSchema>;
 export type AlumniLoginData = z.infer<typeof alumniLoginSchema>;
 export type AlumniSignupData = z.infer<typeof alumniSignupSchema>;
+export type AlumniReapplyData = z.infer<typeof alumniReapplySchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
 export type VerifyEmailData = z.infer<typeof verifyEmailSchema>;

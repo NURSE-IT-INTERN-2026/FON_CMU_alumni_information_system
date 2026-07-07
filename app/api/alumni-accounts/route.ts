@@ -66,6 +66,8 @@ export async function GET(request: NextRequest) {
           accountStatus: true,
           createdAt: true,
           signupVerification: true,
+          rejectionReason: true,
+          rejectedAt: true,
         },
       }),
       prisma.alumni.count({ where }),

@@ -2,6 +2,15 @@ import nodemailer from "nodemailer";
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
+// Escape user-provided text interpolated into email HTML (reason, name) so an
+// admin/alumni can't inject markup into the message body.
+const escapeHtml = (s: string): string =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 // From address used for every alumni-facing email. SMTP_FROM is preferred,
 // falling back to a sensible default. Configure a real sending address in .env.
 const fromAddress =
@@ -189,14 +198,17 @@ export async function sendSignupApprovedEmail(to: string, name: string): Promise
 }
 
 /**
- * Sent when an admin rejects a pending signup. Deliberately vague — no field
- * details, just "contact the admin" — so the alumni knows to follow up.
+ * Sent when an admin rejects a pending signup. Now carries the admin's reason
+ * (required at the reject endpoint) and a "ยื่นคำขอใหม่" button so the alumni
+ * can re-apply directly from the email. `to` is the recipient, so including it
+ * in the reapply link's ?email= is safe (no leak beyond the inbox owner).
  */
 export async function sendSignupRejectedEmail(
   to: string,
   name: string,
   reason?: string | null,
 ): Promise<void> {
+  const reapplyUrl = `${baseUrl}/alumni/graduates/reapply?email=${encodeURIComponent(to)}`;
   await sendEmail({
     to,
     subject:
@@ -208,17 +220,30 @@ export async function sendSignupRejectedEmail(
             <h2 style="color: #c62828; margin: 0; font-size: 22px;">แจ้งผลการพิจารณาการลงทะเบียน</h2>
           </div>
           <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            เรียน ${name},
+            เรียน ${escapeHtml(name)},
           </p>
           <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
             การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-            ยังไม่ได้รับการอนุมัติ หากท่านมีข้อสงสัยหรือต้องการสอบถามรายละเอียดเพิ่มเติม
-            กรุณาติดต่อผู้ดูแลระบบ
+            ยังไม่ได้รับการอนุมัติ
           </p>
           ${reason ? `
           <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            <strong>หมายเหตุ:</strong> ${reason}
+            <strong>เหตุผลที่ปฏิเสธ:</strong> ${escapeHtml(reason)}
           </p>` : ""}
+          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
+            ท่านสามารถแก้ไขข้อมูลและยื่นคำขอใหม่ได้โดยคลิกปุ่มด้านล่าง
+          </p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${reapplyUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
+              ยื่นคำขอใหม่
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
+          </p>
+          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
+            ${reapplyUrl}
+          </p>
         </div>
         <div style="text-align: center; margin-top: 16px;">
           <p style="color: #9ca3af; font-size: 12px;">
