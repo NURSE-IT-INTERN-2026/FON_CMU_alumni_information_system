@@ -95,6 +95,11 @@ model Alumni {
   // link: UNVERIFIED → PENDING). Durable across later status changes; useful
   // for audit and future email-change re-verification.
   emailVerifiedAt       DateTime?
+  // Latest admin rejection (reason + when). Set on reject, kept across a
+  // re-application (REJECTED → reapply → PENDING) so the admin sees why they
+  // rejected before, and cleared on approval. Full history lives in ActivityLog.
+  rejectionReason       String?
+  rejectedAt            DateTime?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 

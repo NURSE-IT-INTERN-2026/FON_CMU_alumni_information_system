@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { sendSignupRejectedEmail } from "@/lib/email";
 import { bustCache } from "@/lib/cache";
+import { handleZodError } from "@/lib/validations/helpers";
+
+// A rejection reason is mandatory — the alumni must be told why. Non-empty
+// after trim; the parsed (trimmed) value is what's stored + emailed.
+const rejectSchema = z.object({
+  reason: z.string().trim().min(1, "กรุณาระบุเหตุผลในการปฏิเสธ"),
+});
 
 // Reject a pending signup → accountStatus REJECTED. The account is kept (visible
 // behind the status filter, re-approvable) but blocked from login, and any
@@ -23,10 +31,7 @@ export async function POST(
     const { id } = await params;
 
     const body = await request.json().catch(() => ({}));
-    const reason =
-      typeof body?.reason === "string" && body.reason.trim()
-        ? body.reason.trim()
-        : null;
+    const { reason } = rejectSchema.parse(body);
 
     const alumni = await prisma.alumni.findUnique({ where: { id } });
     if (!alumni) {
@@ -37,7 +42,11 @@ export async function POST(
 
     await prisma.alumni.update({
       where: { id },
-      data: { accountStatus: "REJECTED" },
+      data: {
+        accountStatus: "REJECTED",
+        rejectionReason: reason,
+        rejectedAt: new Date(),
+      },
     });
 
     // End any active sessions so the block takes effect at once (PENDING
@@ -64,6 +73,7 @@ export async function POST(
         studentId: alumni.studentId,
         reason,
       },
+      reason,
     );
 
     if (!wasRejected && alumni.email) {
@@ -80,6 +90,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, accountStatus: "REJECTED" });
   } catch (error) {
+    if (error instanceof z.ZodError) return handleZodError(error);
     console.error("POST /api/alumni-accounts/[id]/reject error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการดำเนินการ" },

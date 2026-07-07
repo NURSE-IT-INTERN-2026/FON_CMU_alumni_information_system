@@ -53,6 +53,10 @@ export async function POST(
         where: { id },
         data: {
           accountStatus: "ACTIVE",
+          // Clean slate on approval — the prior rejection is moot now (its full
+          // history remains in ActivityLog). Lets a later rejection start fresh.
+          rejectionReason: null,
+          rejectedAt: null,
           // An admin may approve straight from UNVERIFIED (override, e.g. an
           // applicant who verified in person) — record the email-verified time
           // so the audit timestamp is correct.
