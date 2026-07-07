@@ -37,7 +37,10 @@ const EMPTY_FORM: UserCreateInput = {
 };
 
 /* ───── Alumni Account types ───── */
-type AccountStatus = "UNVERIFIED" | "PENDING" | "ACTIVE" | "REJECTED";
+// UNVERIFIED is a transient pre-email-verification state admins don't track,
+// so it's excluded from this view (the list API filters it out). Only the three
+// admin-actionable statuses appear here.
+type AccountStatus = "PENDING" | "ACTIVE" | "REJECTED";
 
 interface AlumniAccount {
   id: string;
@@ -59,13 +62,11 @@ interface AlumniAccount {
 }
 
 const STATUS_LABELS: Record<AccountStatus, string> = {
-  UNVERIFIED: "รอยืนยันอีเมล",
   PENDING: "รออนุมัติ",
   ACTIVE: "ใช้งาน",
   REJECTED: "ปฏิเสธ",
 };
 const STATUS_BADGE_CLASSES: Record<AccountStatus, string> = {
-  UNVERIFIED: "bg-sky-100 text-sky-700",
   PENDING: "bg-amber-100 text-amber-700",
   ACTIVE: "bg-green-100 text-green-700",
   REJECTED: "bg-red-100 text-red-700",
@@ -88,7 +89,7 @@ export default function UsersPage() {
   const searchParams = useSearchParams();
   const statusParam = (searchParams.get("status") ?? "").toUpperCase();
   const initialStatus: AccountStatus | null =
-    statusParam === "UNVERIFIED" || statusParam === "PENDING" || statusParam === "ACTIVE" || statusParam === "REJECTED"
+    statusParam === "PENDING" || statusParam === "ACTIVE" || statusParam === "REJECTED"
       ? statusParam
       : null;
 
@@ -454,7 +455,6 @@ function AlumniAccountsTab({
           className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
         >
           <option value="all">ทุกสถานะ</option>
-          <option value="UNVERIFIED">รอยืนยันอีเมล</option>
           <option value="PENDING">รออนุมัติ</option>
           <option value="ACTIVE">ใช้งาน</option>
           <option value="REJECTED">ปฏิเสธ</option>

@@ -38,7 +38,6 @@ interface AlumniActivityData {
     total: number;
     active: number;
     pending: number;
-    unverified: number;
     rejected: number;
     suspended: number;
     everLoggedIn: number;
@@ -59,7 +58,6 @@ const COLOR = {
   teal: "#0d9488", // logins / month line
   emerald: "#059669", // this-month active
   amber: "#ca8a04", // pending
-  sky: "#0284c7", // unverified (awaiting email)
   green: "#16a34a", // active status
   red: "#dc2626", // rejected / suspended
   slate: "#475569", // recency neutrals
@@ -286,7 +284,6 @@ export default function AlumniActivityPage() {
           footer={
             <div className="mt-3 flex flex-wrap gap-1.5">
               <StatusPill count={data.accounts.active} label="ใช้งาน" color={COLOR.green} />
-              <StatusPill count={data.accounts.unverified} label="รอยืนยันอีเมล" color={COLOR.sky} />
               <StatusPill count={data.accounts.pending} label="รออนุมัติ" color={COLOR.amber} />
               <StatusPill count={data.accounts.rejected} label="ปฏิเสธ" color={COLOR.red} />
             </div>

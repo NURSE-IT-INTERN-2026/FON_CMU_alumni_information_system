@@ -71,11 +71,13 @@ async function getAlumniActivity() {
   const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
 
-  // "Has an account" = credential-bearing + not soft-deleted — same definition
-  // as GET /api/alumni-accounts (passwordHash != null, deletedAt null).
+  // "Has an account" = credential-bearing + not soft-deleted, excluding
+  // UNVERIFIED (admins don't track that transient pre-email-verification state) —
+  // same definition as GET /api/alumni-accounts.
   const accountWhere: Prisma.AlumniWhereInput = {
     passwordHash: { not: null },
     deletedAt: null,
+    accountStatus: { not: "UNVERIFIED" },
   };
 
   const [
@@ -154,7 +156,6 @@ async function getAlumniActivity() {
       total: totalAccounts,
       active: statusCounts.ACTIVE ?? 0,
       pending: statusCounts.PENDING ?? 0,
-      unverified: statusCounts.UNVERIFIED ?? 0,
       rejected: statusCounts.REJECTED ?? 0,
       suspended: suspendedCount,
       everLoggedIn,

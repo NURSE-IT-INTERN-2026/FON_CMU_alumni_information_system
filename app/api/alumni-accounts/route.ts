@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-const STATUS_FILTERS = new Set(["unverified", "pending", "active", "rejected"]);
+// "unverified" is intentionally NOT a filter — UNVERIFIED accounts are a
+// transient pre-email-verification state that admins don't track, so they're
+// excluded from this list entirely (see the base `where` below).
+const STATUS_FILTERS = new Set(["pending", "active", "rejected"]);
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,11 +20,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = (searchParams.get("status") || "").toLowerCase();
 
-    // Any alumni with credentials is an account (PENDING / ACTIVE / REJECTED).
+    // Any alumni with credentials is an account — but UNVERIFIED (signed up,
+    // not yet email-confirmed) is a transient state admins don't track, so it's
+    // excluded from this list (PENDING / ACTIVE / REJECTED only).
     // (Previously gated on `hasLoggedIn`, which skipped not-yet-approved signups.)
     const where: Record<string, unknown> = {
       passwordHash: { not: null },
       deletedAt: null,
+      accountStatus: { not: "UNVERIFIED" },
     };
 
     if (STATUS_FILTERS.has(status)) {
