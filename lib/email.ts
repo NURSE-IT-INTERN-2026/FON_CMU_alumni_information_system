@@ -1,25 +1,17 @@
 import nodemailer from "nodemailer";
-import { Resend } from "resend";
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-// From address used for every alumni-facing email. RESEND_FROM is preferred
-// (Resend requires a verified sending domain — for local testing use
-// `onboarding@resend.dev`); fall back to the nodemailer SMTP_FROM, then a sane
-// default.
+// From address used for every alumni-facing email. SMTP_FROM is preferred,
+// falling back to a sensible default. Configure a real sending address in .env.
 const fromAddress =
-  process.env.RESEND_FROM ||
   process.env.SMTP_FROM ||
   '"FON CMU Alumni" <noreply@cmu.ac.th>';
 
-// Resend is the primary provider (RESEND_API_KEY configured). A nodemailer
-// transporter is kept as a fallback so local dev without a Resend key still
-// sends via SMTP.
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-const fallbackTransporter = nodemailer.createTransport({
+// nodemailer SMTP transporter — the sole email provider for alumni mail
+// (verification, password reset, signup approved/rejected). Configure via the
+// SMTP_* env vars (see .env.example).
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
   secure: process.env.SMTP_SECURE === "true",
@@ -36,19 +28,12 @@ type SendEmailInput = {
 };
 
 /**
- * Shared email primitive. Sends via Resend when RESEND_API_KEY is configured,
- * otherwise falls back to the nodemailer SMTP transporter. Throws on failure so
- * callers can decide whether to swallow (best-effort notifications) or surface.
+ * Shared email primitive. Sends alumni mail via the nodemailer SMTP
+ * transporter. Throws on failure so callers can decide whether to swallow
+ * (best-effort notifications) or surface the error.
  */
 async function sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {
-  if (resend) {
-    const { error } = await resend.emails.send({ from: fromAddress, to, subject, html });
-    if (error) {
-      throw new Error(`Resend send failed: ${error.message}`);
-    }
-    return;
-  }
-  await fallbackTransporter.sendMail({ from: fromAddress, to, subject, html });
+  await transporter.sendMail({ from: fromAddress, to, subject, html });
 }
 
 export async function sendPasswordResetEmail(
