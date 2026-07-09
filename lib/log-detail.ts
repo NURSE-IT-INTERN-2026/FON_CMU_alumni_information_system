@@ -287,11 +287,11 @@ const LOG_RESOURCE_LABELS: Record<string, string> = {
 };
 
 const SECTION_LABELS: Record<string, string> = {
-  awards: "รางวัล",
-  associations: "สมาคม/ชมรม",
-  graduateCommittees: "กรรมการบัณฑิต",
-  potentials: "ศักยภาพ",
-  modelRepresentatives: "ผู้แทนรุ่น",
+  awards: "ข้อมูลรางวัล",
+  associations: "ข้อมูลสมาคม/ชมรม",
+  graduateCommittees: "ข้อมูลกรรมการบัณฑิต",
+  potentials: "ข้อมูลศักยภาพ",
+  modelRepresentatives: "ข้อมูลผู้แทนรุ่น",
   alumniAgency: "ข้อมูลการทำงานศิษย์เก่า",
 };
 
@@ -377,16 +377,48 @@ export function readSectionChanges(details: unknown): SectionChangeView[] {
 }
 
 /** Legacy fallback: read the old `sections` counts (pre-sectionChanges logs) →
- *  "รางวัล 1, สมาคม/ชมรม 2". Null when there are no non-zero counts. */
+ *  "ข้อมูลรางวัล 1, ข้อมูลสมาคม/ชมรม 2". Null when there are no non-zero counts. */
 export function sectionCountSummary(details: unknown): string | null {
-  if (typeof details !== "object" || details === null) return null;
+  const entries = sectionCountEntries(details);
+  if (entries.length === 0) return null;
+  return entries.map((e) => `${e.label} ${e.count}`).join(", ");
+}
+
+/** Structured read of the legacy `sections` counts (non-zero only). */
+export function sectionCountEntries(details: unknown): { label: string; count: number }[] {
+  if (typeof details !== "object" || details === null) return [];
   const sections = (details as { sections?: Record<string, number> }).sections;
-  if (!sections || typeof sections !== "object") return null;
-  const parts: string[] = [];
+  if (!sections || typeof sections !== "object") return [];
+  const out: { label: string; count: number }[] = [];
   for (const [key, n] of Object.entries(sections)) {
-    if (typeof n === "number" && n > 0) parts.push(`${SECTION_LABELS[key] ?? key} ${n}`);
+    if (typeof n === "number" && n > 0) out.push({ label: SECTION_LABELS[key] ?? key, count: n });
   }
-  return parts.length ? parts.join(", ") : null;
+  return out;
+}
+
+/**
+ * Surface label for an alumni self-edit (`alumni_profile` UPDATE) — names the
+ * section(s) touched: "เพิ่มข้อมูลรางวัล" / "แก้ไขข้อมูลรางวัล" / "ลบข้อมูลรางวัล".
+ * Uses `sectionChanges` (precise verb) when present, else falls back to the
+ * legacy `sections` counts ("แก้ไข…", verb unknown). Core-field changes are
+ * appended. Empty → "แก้ไขข้อมูลส่วนตัว".
+ */
+function selfEditSurfaceLabel(details: Record<string, unknown> | null): string {
+  const parts: string[] = [];
+  const sectionRows = readSectionChanges(details);
+  if (sectionRows.length > 0) {
+    for (const s of sectionRows) {
+      const verb = s.added.length > 0 && s.removed.length > 0 ? "แก้ไข" : s.added.length > 0 ? "เพิ่ม" : "ลบ";
+      parts.push(verb + s.label);
+    }
+  } else {
+    for (const e of sectionCountEntries(details)) parts.push("แก้ไข" + e.label);
+  }
+  const core = extractChanges(details);
+  if (core && core.length > 0) {
+    parts.push("แก้ไข" + core.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", "));
+  }
+  return parts.length > 0 ? parts.join(", ") : "แก้ไขข้อมูลส่วนตัว";
 }
 
 /**
@@ -414,6 +446,10 @@ export function describeActivityLog(args: {
       if (changes && changes.length > 0) {
         return "แก้ไข" + changes.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ");
       }
+    }
+    // Self-edit names the section(s) touched (เพิ่ม/แก้ไข/ลบข้อมูลรางวัล, …).
+    if (resource === "alumni_profile") {
+      return selfEditSurfaceLabel(details);
     }
     return "แก้ไข" + resourceLabel;
   }
