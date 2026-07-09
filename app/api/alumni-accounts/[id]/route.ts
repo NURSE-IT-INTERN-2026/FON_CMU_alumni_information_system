@@ -82,8 +82,7 @@ export async function PUT(
 
     // Log admin edit of alumni profile + field-change history
     const changes = computeFieldChanges(old, alumni, TRACKED_FIELDS.alumni_profile);
-    await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason });
-    await logActivity(
+    const logId = await logActivity(
       {
         actorType: "ADMIN",
         userId: session.user.id,
@@ -96,6 +95,7 @@ export async function PUT(
       { changes, source: "admin_edit" },
       reason
     );
+    await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason, activityLogId: logId });
 
     return NextResponse.json(alumni);
   } catch (error) {

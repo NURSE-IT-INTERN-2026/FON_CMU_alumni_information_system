@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { detailRows } from "@/lib/log-detail";
 
 /**
  * Merged change timeline for one alumni — the "data logs" tab on the admin
  * alumni profile page (PRD §3.18). Fed by GET /api/alumni/[id]/activity, which
- * unions per-field change history (alumni core + related rows + education) with
- * activity-log events (incl. SYSTEM graduation logs). Newest first. Clicking a
- * row opens a changes modal (field-level old→new).
+ * unions per-field change history (alumni core + related rows; orphans only)
+ * with activity-log events. Newest first. Clicking a row opens a detail modal
+ * (field-level old→new for edits, or the created record's fields for creates).
  */
 
 type ActorType = "ADMIN" | "ALUMNI" | "SYSTEM";
@@ -28,6 +29,8 @@ const FIELD_LABELS: Record<string, string> = {
   major: "สาขาวิชา",
   graduationYear: "ปีที่จบ",
   email: "อีเมล",
+  contactEmail: "อีเมลติดต่อ",
+  phones: "เบอร์โทรศัพท์",
   phone: "เบอร์โทรศัพท์",
   workplace: "สถานที่ทำงาน",
   country: "ประเทศ",
@@ -55,7 +58,7 @@ const ACTION_LABELS: Record<string, string> = {
   EXPORT: "ส่งออก",
   BULK_DELETE: "ลบหลายรายการ",
   SIGNUP: "สมัครสมาชิก",
-  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรหัสผ่าน",
+  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรัหัสผ่าน",
   PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
   APPROVE: "อนุมัติ",
   REJECT: "ปฏิเสธ",
@@ -77,9 +80,46 @@ const RESOURCE_LABELS: Record<string, string> = {
   alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
   news: "ข่าว",
   user: "ผู้ใช้",
-  alumni_auth: "การเข้าสู่ระบบ",
+  alumni_auth: "บัญชีศิษย์เก่า",
   cmu_alumni: "ทะเบียน มช.",
 };
+
+/** Thai title for an `alumni_auth` lifecycle event (account/login), or null. */
+function authEventTitle(action: string, details: unknown): string | null {
+  const actionDetail =
+    typeof details === "object" && details !== null
+      ? (details as { action?: string }).action
+      : undefined;
+  switch (action) {
+    case "LOGIN":
+      return "เข้าสู่ระบบ";
+    case "SIGNUP":
+      return "สมัครสมาชิก";
+    case "APPROVE":
+      return "อนุมัติบัญชี";
+    case "REJECT":
+      return "ปฏิเสธบัญชี";
+    case "REAPPLY":
+      return "ยื่นคำขอใหม่";
+    case "SUSPEND":
+      return "จัดการการระงับบัญชี";
+    case "PASSWORD_RESET_REQUEST":
+      return "ขอรีเซ็ตรหัสผ่าน";
+    case "PASSWORD_RESET_COMPLETE":
+      return "รีเซ็ตรหัสผ่าน";
+    case "EMAIL_VERIFY":
+      return "ยืนยันอีเมล";
+    case "EMAIL_VERIFY_REQUEST":
+      return "ส่งอีเมลยืนยันตัวตน";
+    case "VERIFY_IDENTITY":
+      return "ยืนยันตัวตน";
+    case "UPDATE":
+      if (actionDetail === "accept_tos") return "ยอมรับเงื่อนไขการใช้งาน";
+      return null;
+    default:
+      return null;
+  }
+}
 
 interface FieldChange {
   field: string;
@@ -135,9 +175,63 @@ function ActorBadge({ actorType }: { actorType: ActorType }) {
   );
 }
 
-// A SYSTEM education log is a graduation event (reason = "สำเร็จการศึกษา …").
-function isGraduation(item: TimelineItem): boolean {
-  return item.kind === "activity" && item.actorType === "SYSTEM" && item.resource === "education";
+/** Field changes for an activity item: linked rows, else the `details.changes`
+ *  snapshot some routes embed (which uses `{field, from, to}` — normalized here
+ *  to the linked `{field, oldValue, newValue}` shape). Empty for creates / auth. */
+function effectiveChanges(item: ActivityItem): FieldChange[] {
+  if (item.changes.length > 0) return item.changes;
+  const details = item.details as Record<string, unknown> | null;
+  const raw = details?.changes;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+    .map((c) => ({
+      field: String(c.field ?? ""),
+      oldValue: c.from == null ? null : String(c.from),
+      newValue: c.to == null ? null : String(c.to),
+    }));
+}
+
+const SECTION_LABELS: Record<string, string> = {
+  awards: "รางวัล",
+  associations: "สมาคม/ชมรม",
+  graduateCommittees: "กรรมการบัณฑิต",
+  potentials: "ศักยภาพ",
+  modelRepresentatives: "ผู้แทนรุ่น",
+  alumniAgency: "ข้อมูลการทำงานศิษย์เก่า",
+};
+
+/** For alumni self-edits that only touched related sections (no core field
+ *  change), summarize which sections were updated — avoids an empty modal. */
+function sectionsSummary(details: unknown): string[] {
+  if (typeof details !== "object" || details === null) return [];
+  const sections = (details as { sections?: Record<string, number> }).sections;
+  if (!sections || typeof sections !== "object") return [];
+  return Object.entries(sections)
+    .filter(([, n]) => typeof n === "number" && n > 0)
+    .map(([k, n]) => `${SECTION_LABELS[k] ?? k} ${n} รายการ`);
+}
+
+/** One-line Thai title for a timeline row (used in the list + modal header). */
+function itemTitle(item: TimelineItem): string {
+  if (item.kind === "field") {
+    return `แก้ไข${FIELD_LABELS[item.field] ?? item.field}`;
+  }
+  const auth =
+    item.resource === "alumni_auth"
+      ? authEventTitle(item.action, item.details)
+      : null;
+  if (auth) return auth;
+  if (item.action === "UPDATE") {
+    const changed = effectiveChanges(item);
+    if (changed.length > 0) {
+      return `แก้ไข${changed.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ")}`;
+    }
+  }
+  // CREATE → "เพิ่มการศึกษา" / "เพิ่มข้อมูลศิษย์เก่า"; other actions keep a space.
+  const action = ACTION_LABELS[item.action] ?? item.action;
+  const resource = RESOURCE_LABELS[item.resource] ?? item.resource;
+  return `${action}${resource}`;
 }
 
 export default function AlumniActivityTimeline({ alumniId }: { alumniId: string }) {
@@ -177,54 +271,42 @@ export default function AlumniActivityTimeline({ alumniId }: { alumniId: string 
   return (
     <>
       <div className="space-y-3">
-        {items.map((item) => {
-          const grad = isGraduation(item);
-          return (
-            <button
-              type="button"
-              key={`${item.kind}-${item.id}`}
-              onClick={() => setSelected(item)}
-              className="block w-full rounded-lg border border-[var(--border)] bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50"
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
-                <ActorBadge actorType={item.actorType} />
-                <span>{fmt(item.createdAt)}</span>
-                {item.actorName && <span>• {item.actorName}</span>}
+        {items.map((item) => (
+          <button
+            type="button"
+            key={`${item.kind}-${item.id}`}
+            onClick={() => setSelected(item)}
+            className="block w-full rounded-lg border border-[var(--border)] bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50"
+          >
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+              <ActorBadge actorType={item.actorType} />
+              <span>{fmt(item.createdAt)}</span>
+              {item.actorName && <span>• {item.actorName}</span>}
+            </div>
+
+            <div className="text-sm font-medium text-[var(--foreground)]">
+              {itemTitle(item)}
+              {item.kind === "field" &&
+                item.resourceType !== "alumni" &&
+                item.resourceType !== "alumni_profile" && (
+                  <span className="ml-1 text-[var(--muted)]">
+                    ({RESOURCE_LABELS[item.resourceType] ?? item.resourceType})
+                  </span>
+                )}
+            </div>
+
+            {/* Inline old→new for a single field-change row. */}
+            {item.kind === "field" && (
+              <div className="mt-1 text-sm">
+                <span className="text-gray-400 line-through">{item.oldValue || "—"}</span>
+                <span className="mx-1.5 font-semibold text-orange-500">→</span>
+                <span className="text-gray-800">{item.newValue || "—"}</span>
               </div>
+            )}
 
-              {item.kind === "field" ? (
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-[var(--foreground)]">
-                    แก้ไข{FIELD_LABELS[item.field] ?? item.field}
-                    {item.resourceType !== "alumni" && item.resourceType !== "alumni_profile" && (
-                      <span className="ml-1 text-[var(--muted)]">
-                        ({RESOURCE_LABELS[item.resourceType] ?? item.resourceType})
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-gray-400 line-through">{item.oldValue || "—"}</span>
-                    <span className="mx-1.5 font-semibold text-orange-500">→</span>
-                    <span className="text-gray-800">{item.newValue || "—"}</span>
-                  </div>
-                </div>
-              ) : grad ? (
-                <div className="text-sm font-medium text-[var(--foreground)]">
-                  {item.reason ?? `${ACTION_LABELS[item.action] ?? item.action} ${RESOURCE_LABELS[item.resource] ?? item.resource}`}
-                </div>
-              ) : (
-                <div className="text-sm font-medium text-[var(--foreground)]">
-                  {ACTION_LABELS[item.action] ?? item.action}{" "}
-                  {RESOURCE_LABELS[item.resource] ?? item.resource}
-                </div>
-              )}
-
-              {item.reason && !grad && (
-                <div className="mt-1 text-xs text-[var(--muted)]">เหตุผล: {item.reason}</div>
-              )}
-            </button>
-          );
-        })}
+            {item.reason && <div className="mt-1 text-xs text-[var(--muted)]">เหตุผล: {item.reason}</div>}
+          </button>
+        ))}
       </div>
 
       {selected && <ActivityDetailModal item={selected} onClose={() => setSelected(null)} />}
@@ -235,9 +317,14 @@ export default function AlumniActivityTimeline({ alumniId }: { alumniId: string 
 function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: () => void }) {
   const changes: FieldChange[] =
     item.kind === "activity"
-      ? item.changes
+      ? effectiveChanges(item)
       : [{ field: item.field, oldValue: item.oldValue, newValue: item.newValue }];
-  const grad = isGraduation(item);
+  const details =
+    item.kind === "activity" ? (item.details as Record<string, unknown> | null) : null;
+  // For creates / auth events there are no old→new pairs — show the carried
+  // record fields as flat labeled rows instead.
+  const rows = changes.length === 0 ? detailRows(details) : [];
+  const sections = changes.length === 0 && rows.length === 0 ? sectionsSummary(details) : [];
 
   return (
     <div
@@ -250,7 +337,7 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
       >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-[var(--foreground)]">
-            {grad ? "รายละเอียดการสำเร็จการศึกษา" : "รายละเอียดการเปลี่ยนแปลง"}
+            {itemTitle(item)}
           </h3>
           <button
             type="button"
@@ -267,10 +354,6 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
           {item.actorName && <span>• {item.actorName}</span>}
         </div>
 
-        {grad && item.reason && (
-          <p className="mb-3 text-sm font-medium text-[var(--foreground)]">{item.reason}</p>
-        )}
-
         {changes.length > 0 ? (
           <div className="max-h-80 space-y-2 overflow-y-auto">
             {changes.map((c, i) => (
@@ -286,11 +369,24 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
               </div>
             ))}
           </div>
+        ) : rows.length > 0 ? (
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {rows.map((r, i) => (
+              <div key={i} className="rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm">
+                <div className="text-xs font-medium text-[var(--muted)]">{r.label}</div>
+                <div className="mt-1 text-gray-800">{r.value}</div>
+              </div>
+            ))}
+          </div>
+        ) : sections.length > 0 ? (
+          <div className="rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm text-gray-800">
+            รายการที่อัปเดต: {sections.join(", ")}
+          </div>
         ) : (
-          <p className="text-sm text-[var(--muted)]">ไม่มีรายละเอียดระดับฟิลด์</p>
+          <p className="text-sm text-[var(--muted)]">ไม่มีรายละเอียดเพิ่มเติม</p>
         )}
 
-        {item.reason && !grad && (
+        {item.reason && (
           <div className="mt-3 text-xs text-[var(--muted)]">เหตุผล: {item.reason}</div>
         )}
       </div>

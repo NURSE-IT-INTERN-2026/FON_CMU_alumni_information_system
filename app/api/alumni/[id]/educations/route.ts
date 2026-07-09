@@ -5,10 +5,10 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
-import { generateGraduationLogs } from "@/lib/graduation-log";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
 import { assertEducationSamePerson } from "@/lib/education-identity";
+import { educationRecordDetails } from "@/lib/log-payload";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 // Resolve an alumni by UUID or studentId (mirrors GET /api/alumni/[id]).
@@ -98,10 +98,10 @@ export async function POST(
         "CREATE",
         "education",
         created.id,
-        { alumniId: alumni.id, studentId: created.studentId, degreeLevel: created.degreeLevel },
+        { source: "admin_add", alumniId: alumni.id, ...educationRecordDetails(created) },
       );
-      // SYSTEM graduation log + re-sync the current name from the highest degree.
-      await generateGraduationLogs(alumni.id);
+      // Re-sync the current name from the highest degree (a separate concern
+      // from logging — the auto graduation-log feature was removed).
       await syncNameFromHighestDegree(alumni.id);
       // Primary = highest degree; if this new degree outranks the current one,
       // it becomes the primary (and the snapshot re-syncs).

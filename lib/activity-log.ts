@@ -50,15 +50,7 @@ interface AlumniLogContext {
   alumniName: string;
 }
 
-// System-generated events (e.g. graduation logs). alumniId/alumniName optional
-// — set when the event is about a specific alumni.
-interface SystemLogContext {
-  actorType: "SYSTEM";
-  alumniId?: string;
-  alumniName?: string;
-}
-
-export type LogContext = AdminLogContext | AlumniLogContext | SystemLogContext;
+export type LogContext = AdminLogContext | AlumniLogContext;
 
 export async function logActivity(
   ctx: LogContext,
@@ -86,19 +78,12 @@ export async function logActivity(
         userEmail: ctx.userEmail,
         userRole: ctx.userRole,
       };
-    } else if (ctx.actorType === "ALUMNI") {
+    } else {
       data = {
         ...common,
         actorType: "ALUMNI",
         alumniId: ctx.alumniId,
         alumniName: ctx.alumniName,
-      };
-    } else {
-      data = {
-        ...common,
-        actorType: "SYSTEM",
-        ...(ctx.alumniId ? { alumniId: ctx.alumniId } : {}),
-        ...(ctx.alumniName ? { alumniName: ctx.alumniName } : {}),
       };
     }
     const log = await tx.activityLog.create({ data });

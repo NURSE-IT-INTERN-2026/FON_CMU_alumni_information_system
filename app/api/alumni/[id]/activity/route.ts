@@ -9,7 +9,9 @@ import { getSession } from "@/lib/auth";
 // as GET /api/alumni/[id]). Returns a single `createdAt`-desc list combining:
 //   - FieldChangeHistory for the alumni core record (`alumni` + `alumni_profile`)
 //     and every related entity row (award/association/graduate_committee/
-//     potential/model_representative/alumni_agency) this alumni owns.
+//     potential/model_representative/alumni_agency) this alumni owns — but ONLY
+//     orphaned rows (those not linked to an activity log); linked changes are
+//     shown inside their activity log's modal, so they aren't duplicated.
 //   - ActivityLog events tied to this alumni: alumni-self actions
 //     (`alumniId`), admin direct-alumni edits (`resource="alumni"`) and any
 //     event logged against one of this alumni's related rows (`resourceId`).
@@ -78,10 +80,11 @@ export async function GET(
     ];
 
     // Field-change clauses — only include a resource type if it has rows.
+    // (The auto SYSTEM "education" graduation-log rows were removed; education
+    // field changes are no longer written.)
     const fieldClauses = [
       { resourceType: "alumni", resourceId: alumni.id },
       { resourceType: "alumni_profile", resourceId: alumni.id },
-      { resourceType: "education", resourceId: alumni.id },
       ...(awardIds.length ? [{ resourceType: "award", resourceId: { in: awardIds } }] : []),
       ...(assocIds.length ? [{ resourceType: "association", resourceId: { in: assocIds } }] : []),
       ...(committeeIds.length ? [{ resourceType: "graduate_committee", resourceId: { in: committeeIds } }] : []),
@@ -91,9 +94,12 @@ export async function GET(
     ];
 
     const [fieldChanges, activityLogs] = await Promise.all([
+      // Standalone field-change items: ONLY orphans (not linked to an activity
+      // log). Linked changes surface inside their activity log's modal below —
+      // showing both would duplicate one edit as two timeline entries.
       fieldClauses.length
         ? prisma.fieldChangeHistory.findMany({
-            where: { OR: fieldClauses },
+            where: { OR: fieldClauses, activityLogId: null },
             orderBy: { createdAt: "desc" },
             take: MAX_ITEMS,
           })
@@ -113,7 +119,8 @@ export async function GET(
     ]);
 
     // Field changes linked to each activity log (via activityLogId) — drives the
-    // click-to-open changes modal. SYSTEM graduation logs link education fields.
+    // click-to-open changes modal. Edit routes link their field-change rows to
+    // the activity log they belong to, so one edit = one timeline entry.
     const activityIds = activityLogs.map((l) => l.id);
     const linkedChanges = activityIds.length
       ? await prisma.fieldChangeHistory.findMany({
