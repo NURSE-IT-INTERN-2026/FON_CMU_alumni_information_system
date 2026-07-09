@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
+import { DEGREE_COLORS } from "@/lib/constants";
 import {
   LineChart,
   Line,
@@ -25,11 +26,17 @@ import {
 // Types — matches the GET /api/alumni-activity response shape.
 // ---------------------------------------------------------------------------
 
+interface DegreePoint {
+  logins: number;
+  activeAlumni: number;
+}
+
 interface MonthlyPoint {
   month: string; // "YYYY-MM"
   label: string; // "ส.ค. 68"
-  logins: number;
-  activeAlumni: number;
+  logins: number; // derived: sum over degrees
+  activeAlumni: number; // derived: sum over degrees
+  byDegree: Record<string, DegreePoint>;
 }
 
 interface AlumniActivityData {
@@ -45,6 +52,10 @@ interface AlumniActivityData {
   thisMonth: { activeAlumni: number; logins: number; label: string };
   recency: { days7: number; days30: number };
   monthly: MonthlyPoint[];
+  degreeTotals: Record<
+    string,
+    { active12mo: number; logins12mo: number }
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +71,31 @@ const COLOR = {
   red: "#dc2626", // rejected / suspended
   slate: "#475569", // recency neutrals
 };
+
+// Degree-level series — mirrors the dashboard's all-alumni graph (same colors,
+// same lowest→highest order, same short labels). DEGREE_COLORS is the single
+// source of truth in lib/constants.ts.
+const DEGREE_ORDER = [
+  "NURSING_ASSISTANT",
+  "ASSOCIATE",
+  "BACHELOR",
+  "MASTER",
+  "DOCTORAL",
+] as const;
+
+const DEGREE_SHORT_LABELS: Record<string, string> = {
+  NURSING_ASSISTANT: "ผู้ช่วยพยาบาล",
+  ASSOCIATE: "อนุปริญญา",
+  BACHELOR: "ปริญญาตรี",
+  MASTER: "ปริญญาโท",
+  DOCTORAL: "ปริญญาเอก",
+};
+
+const DEGREE_MINI_CARDS = DEGREE_ORDER.map((key) => ({
+  key,
+  label: DEGREE_SHORT_LABELS[key],
+  color: DEGREE_COLORS[key],
+}));
 
 // ---------------------------------------------------------------------------
 // Small building blocks (mirror the dashboard's card / pill styling)
@@ -134,18 +170,47 @@ function KpiCard({
   );
 }
 
-function LineChartCard({
+function DegreeMiniCards({
+  totals,
+  unit,
+}: {
+  totals: Record<string, number>;
+  unit: string;
+}) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+      {DEGREE_MINI_CARDS.map((deg) => (
+        <div
+          key={deg.key}
+          className="rounded-lg p-3"
+          style={{
+            backgroundColor: `${deg.color}08`,
+            borderTop: `3px solid ${deg.color}`,
+          }}
+        >
+          <p className="text-xs text-[var(--muted)]">{deg.label}</p>
+          <p className="mt-0.5 text-lg font-bold" style={{ color: deg.color }}>
+            {(totals[deg.key] ?? 0).toLocaleString()}{" "}
+            <span className="text-xs font-normal text-[var(--muted)]">
+              {unit}
+            </span>
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DegreeLineChart({
   title,
-  data,
-  dataKey,
-  color,
+  points,
+  totals,
   unit,
   ready,
 }: {
   title: string;
-  data: MonthlyPoint[];
-  dataKey: "activeAlumni" | "logins";
-  color: string;
+  points: Record<string, string | number>[];
+  totals: Record<string, number>;
   unit: string;
   ready: boolean;
 }) {
@@ -153,31 +218,56 @@ function LineChartCard({
     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
       <p className="text-xs text-[var(--muted)]">12 เดือนที่ผ่านมา</p>
+      <DegreeMiniCards totals={totals} unit={unit} />
       {ready ? (
         <div className="mt-4 h-[280px] sm:h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={data}
+              data={points}
               margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip
-                formatter={(value) => `${Number(value).toLocaleString()} ${unit}`}
+                formatter={(value, name) => {
+                  const deg = DEGREE_MINI_CARDS.find((d) => d.key === name);
+                  return [
+                    `${Number(value).toLocaleString()} ${unit}`,
+                    deg?.label ?? String(name),
+                  ];
+                }}
               />
-              <Line
-                type="monotone"
-                dataKey={dataKey}
-                stroke={color}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 5 }}
-              />
+              {DEGREE_MINI_CARDS.map((deg) => (
+                <Line
+                  key={deg.key}
+                  type="monotone"
+                  dataKey={deg.key}
+                  stroke={deg.color}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </div>
       ) : null}
+      {/* Legend */}
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        {DEGREE_MINI_CARDS.map((deg) => (
+          <span
+            key={deg.key}
+            className="flex items-center gap-1.5 text-xs text-gray-600"
+          >
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: deg.color }}
+            />
+            {deg.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -204,6 +294,48 @@ export default function AlumniActivityPage() {
   useEffect(() => {
     const id = requestAnimationFrame(() => setChartReady(!!data));
     return () => cancelAnimationFrame(id);
+  }, [data]);
+
+  // Reshape monthly data into one recharts point per month, keyed by degree —
+  // two datasets (distinct active alumni, login events) share the same shape.
+  const activePoints = useMemo(
+    () =>
+      (data?.monthly ?? []).map((mp) => {
+        const point: Record<string, string | number> = { label: mp.label };
+        for (const deg of DEGREE_MINI_CARDS) {
+          point[deg.key] = mp.byDegree[deg.key]?.activeAlumni ?? 0;
+        }
+        return point;
+      }),
+    [data],
+  );
+
+  const loginPoints = useMemo(
+    () =>
+      (data?.monthly ?? []).map((mp) => {
+        const point: Record<string, string | number> = { label: mp.label };
+        for (const deg of DEGREE_MINI_CARDS) {
+          point[deg.key] = mp.byDegree[deg.key]?.logins ?? 0;
+        }
+        return point;
+      }),
+    [data],
+  );
+
+  const activeTotals = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const deg of DEGREE_MINI_CARDS) {
+      out[deg.key] = data?.degreeTotals[deg.key]?.active12mo ?? 0;
+    }
+    return out;
+  }, [data]);
+
+  const loginTotals = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const deg of DEGREE_MINI_CARDS) {
+      out[deg.key] = data?.degreeTotals[deg.key]?.logins12mo ?? 0;
+    }
+    return out;
   }, [data]);
 
   // ---- Loading state ----
@@ -306,21 +438,20 @@ export default function AlumniActivityPage() {
         />
       </div>
 
-      {/* Line graphs */}
+      {/* Line graphs — one line per degree level (mirrors the dashboard's
+          all-alumni graph) */}
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <LineChartCard
+        <DegreeLineChart
           title="จำนวนศิษย์เก่าที่ใช้งานต่อเดือน"
-          data={data.monthly}
-          dataKey="activeAlumni"
-          color={COLOR.emerald}
+          points={activePoints}
+          totals={activeTotals}
           unit="คน"
           ready={chartReady}
         />
-        <LineChartCard
+        <DegreeLineChart
           title="จำนวนการเข้าสู่ระบบต่อเดือน"
-          data={data.monthly}
-          dataKey="logins"
-          color={COLOR.teal}
+          points={loginPoints}
+          totals={loginTotals}
           unit="ครั้ง"
           ready={chartReady}
         />
