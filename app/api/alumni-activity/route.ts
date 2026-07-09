@@ -23,11 +23,26 @@ const THAI_MONTH_ABBR = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ];
 
-interface MonthRow {
+interface DegreeMonthRow {
   month: string; // "YYYY-MM" (ICT)
+  degreeLevel: string;
   logins: number;
   activeAlumni: number;
 }
+
+interface DegreeTotalRow {
+  degreeLevel: string;
+  active12mo: number;
+  logins12mo: number;
+}
+
+const DEGREES = [
+  "NURSING_ASSISTANT",
+  "ASSOCIATE",
+  "BACHELOR",
+  "MASTER",
+  "DOCTORAL",
+] as const;
 
 /** ICT wall-clock CE year + 0-based month for a UTC instant. */
 function ictYearMonth(d: Date): { y: number; m: number } {
@@ -88,7 +103,8 @@ async function getAlumniActivity() {
     suspendedCount,
     recent7,
     recent30,
-    monthRows,
+    degreeMonthRows,
+    degreeTotalRows,
   ] = await Promise.all([
     prisma.alumni.count({ where: accountWhere }),
 
@@ -112,35 +128,91 @@ async function getAlumniActivity() {
     prisma.alumni.count({ where: { ...accountWhere, lastLoginAt: { gte: sevenDaysAgo } } }),
     prisma.alumni.count({ where: { ...accountWhere, lastLoginAt: { gte: thirtyDaysAgo } } }),
 
-    // Per-month login totals + DISTINCT active alumni, bucketed by Thai
-    // calendar month (AT TIME ZONE 'Asia/Bangkok') so "current month" matches
-    // a Thai user's expectation despite createdAt being stored as UTC.
-    prisma.$queryRaw<MonthRow[]>`
-      SELECT to_char(date_trunc('month', "createdAt" AT TIME ZONE 'Asia/Bangkok'), 'YYYY-MM') AS month,
+    // Per-month + per-degree login totals and DISTINCT active alumni, bucketed
+    // by Thai calendar month. INNER JOIN alumni so each login is attributed to
+    // its (primary, denormalized) degreeLevel — alumni are soft-deleted so the
+    // join always resolves. Within a month the per-degree distinct counts sum
+    // exactly to the all-degree total (one degree per alumni), so monthly
+    // logins/activeAlumni are derived from this in the reshape below.
+    prisma.$queryRaw<DegreeMonthRow[]>`
+      SELECT to_char(date_trunc('month', al."createdAt" AT TIME ZONE 'Asia/Bangkok'), 'YYYY-MM') AS month,
+             a."degreeLevel"::text AS "degreeLevel",
              COUNT(*)::int AS logins,
-             COUNT(DISTINCT "alumniId")::int AS "activeAlumni"
-      FROM activity_logs
-      WHERE "actorType" = 'ALUMNI'
-        AND action = 'LOGIN'
-        AND resource = 'alumni_auth'
-        AND "createdAt" >= ${windowStart}
-      GROUP BY 1
+             COUNT(DISTINCT al."alumniId")::int AS "activeAlumni"
+      FROM activity_logs al
+      JOIN alumni a ON a.id = al."alumniId"
+      WHERE al."actorType" = 'ALUMNI'
+        AND al.action = 'LOGIN'
+        AND al.resource = 'alumni_auth'
+        AND al."createdAt" >= ${windowStart}
+      GROUP BY 1, a."degreeLevel"
       ORDER BY 1
+    `,
+
+    // Per-degree window totals for the mini cards: distinct alumni active in
+    // the 12-month window + total login events, per degree.
+    prisma.$queryRaw<DegreeTotalRow[]>`
+      SELECT a."degreeLevel"::text AS "degreeLevel",
+             COUNT(DISTINCT al."alumniId")::int AS "active12mo",
+             COUNT(*)::int AS "logins12mo"
+      FROM activity_logs al
+      JOIN alumni a ON a.id = al."alumniId"
+      WHERE al."actorType" = 'ALUMNI'
+        AND al.action = 'LOGIN'
+        AND al.resource = 'alumni_auth'
+        AND al."createdAt" >= ${windowStart}
+      GROUP BY a."degreeLevel"
     `,
   ]);
 
-  // Zero-fill the 12 months (months with no logins are absent from GROUP BY).
-  const byKey = new Map(monthRows.map((r) => [r.month, r]));
+  // Index per-month-per-degree rows: month -> degree -> {logins, activeAlumni}.
+  const byMonthDegree = new Map<
+    string,
+    Map<string, { logins: number; activeAlumni: number }>
+  >();
+  for (const r of degreeMonthRows) {
+    let dm = byMonthDegree.get(r.month);
+    if (!dm) {
+      dm = new Map();
+      byMonthDegree.set(r.month, dm);
+    }
+    dm.set(r.degreeLevel, { logins: r.logins, activeAlumni: r.activeAlumni });
+  }
+
+  // Zero-fill the 12 months (months/degrees with no logins are absent from
+  // GROUP BY). logins/activeAlumni are DERIVED as the sum over degrees.
   const monthly = months.map(({ y, m }) => {
     const key = monthKey(y, m);
-    const row = byKey.get(key);
+    const dm = byMonthDegree.get(key);
+    const byDegree: Record<string, { logins: number; activeAlumni: number }> = {};
+    let logins = 0;
+    let activeAlumni = 0;
+    for (const d of DEGREES) {
+      const v = dm?.get(d) ?? { logins: 0, activeAlumni: 0 };
+      byDegree[d] = v;
+      logins += v.logins;
+      activeAlumni += v.activeAlumni;
+    }
     return {
       month: key,
       label: monthLabel(y, m),
-      logins: row?.logins ?? 0,
-      activeAlumni: row?.activeAlumni ?? 0,
+      logins,
+      activeAlumni,
+      byDegree,
     };
   });
+
+  const degreeTotals: Record<
+    string,
+    { active12mo: number; logins12mo: number }
+  > = {};
+  for (const d of DEGREES) degreeTotals[d] = { active12mo: 0, logins12mo: 0 };
+  for (const r of degreeTotalRows) {
+    degreeTotals[r.degreeLevel] = {
+      active12mo: r.active12mo,
+      logins12mo: r.logins12mo,
+    };
+  }
 
   const statusCounts = Object.fromEntries(
     (accountStatusGroups as { accountStatus: string; _count: number }[]).map(
@@ -168,6 +240,7 @@ async function getAlumniActivity() {
     },
     recency: { days7: recent7, days30: recent30 },
     monthly,
+    degreeTotals,
   };
 }
 
