@@ -274,7 +274,7 @@ const LOG_RESOURCE_LABELS: Record<string, string> = {
   alumni: "ข้อมูลศิษย์เก่า",
   alumni_profile: "ข้อมูลส่วนตัว",
   education: "ประวัติการศึกษา",
-  award: "รางวัล",
+  award: "ข้อมูลรางวัล",
   association: "สมาคม/ชมรม",
   graduate_committee: "กรรมการบัณฑิต",
   potential: "ศักยภาพ",
@@ -299,26 +299,24 @@ function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v : null;
 }
 
-/** Build a display name for an alumni core record from `details`. */
-function alumniNameFromDetails(d: Record<string, unknown>): string | null {
-  const name = str(d.name);
-  if (name) return name;
-  const first = [str(d.prefix), str(d.firstName)].filter(Boolean).join("");
-  const last = str(d.lastName);
-  return [first, last].filter(Boolean).join(" ") || null;
-}
-
-/** A clear Thai sentence for an `alumni_auth` (account/login) event. */
+/**
+ * A clear Thai sentence for an `alumni_auth` (account/login) event.
+ * `brief = true` (default for the surface line) → action label only, no
+ * specifics. `brief = false` (modal) → full sentence with method/email/
+ * CMU outcome/reject reason.
+ */
 export function describeAuthEvent(
   action: string,
   details: Record<string, unknown> | null,
+  brief = false,
 ): string {
   const d = details ?? {};
   const actionDetail = str(d.action);
   switch (action) {
     case "LOGIN":
-      return `เข้าสู่ระบบ${str(d.method) === "email" ? "ด้วยอีเมล" : ""}`.trim();
+      return brief ? "เข้าสู่ระบบ" : `เข้าสู่ระบบ${str(d.method) === "email" ? "ด้วยอีเมล" : ""}`.trim();
     case "SIGNUP": {
+      if (brief) return "สมัครสมาชิก";
       const parts = ["สมัครสมาชิก"];
       const email = str(d.email);
       if (email) parts.push(`(อีเมล ${email})`);
@@ -334,7 +332,9 @@ export function describeAuthEvent(
     case "APPROVE":
       return "อนุมัติบัญชีศิษย์เก่า";
     case "REJECT":
-      return str(d.reason) ? `ปฏิเสธบัญชี: ${str(d.reason)}` : "ปฏิเสธบัญชีศิษย์เก่า";
+      return brief || !str(d.reason)
+        ? "ปฏิเสธบัญชีศิษย์เก่า"
+        : `ปฏิเสธบัญชี: ${str(d.reason)}`;
     case "REAPPLY":
       return "ยื่นคำขอสมัครสมาชิกใหม่";
     case "SUSPEND":
@@ -352,21 +352,6 @@ export function describeAuthEvent(
     default:
       return "บัญชีศิษย์เก่า";
   }
-}
-
-/** Short summary of `details.sectionChanges` — "รางวัล (เพิ่ม 1), สมาคม (ลบ 1)".
- *  Returns null when there are no section changes. */
-export function sectionChangeSummary(details: unknown): string | null {
-  const rows = readSectionChanges(details);
-  if (rows.length === 0) return null;
-  return rows
-    .map((r) => {
-      const bits: string[] = [];
-      if (r.added.length) bits.push(`เพิ่ม ${r.added.length}`);
-      if (r.removed.length) bits.push(`ลบ ${r.removed.length}`);
-      return `${r.label} (${bits.join(", ")})`;
-    })
-    .join(", ");
 }
 
 export interface SectionChangeView {
@@ -404,39 +389,12 @@ export function sectionCountSummary(details: unknown): string | null {
   return parts.length ? parts.join(", ") : null;
 }
 
-/** Build "เพิ่ม/ลบ <resource>: <identifier>" for a CREATE/DELETE log. */
-function describeCreateOrDelete(
-  verb: string,
-  resource: string,
-  d: Record<string, unknown>,
-): string {
-  const resourceLabel = LOG_RESOURCE_LABELS[resource] ?? resource;
-  if (resource === "alumni") {
-    const name = alumniNameFromDetails(d);
-    const sid = str(d.studentId);
-    if (name && sid) return `${verb}${resourceLabel}: ${name} (รหัส ${sid})`;
-    if (name) return `${verb}${resourceLabel}: ${name}`;
-    return `${verb}${resourceLabel}`;
-  }
-  if (resource === "education") {
-    const deg = formatValue("degreeLevel", d.degreeLevel);
-    const major = str(d.major);
-    const sid = str(d.studentId);
-    const bits = [
-      resourceLabel,
-      deg && deg !== "—" ? deg : null,
-      major,
-      sid ? `รหัส ${sid}` : null,
-    ].filter(Boolean);
-    return `${verb}${bits.join(" ")}`;
-  }
-  const name = str(d.name ?? d.title);
-  return name ? `${verb}${resourceLabel}: ${name}` : `${verb}${resourceLabel}`;
-}
-
 /**
- * One Thai sentence describing an activity log entry. Used as the row summary
- * on both the profile timeline and the System Logs page.
+ * One TERSE Thai sentence for an activity log entry — the surface/list line on
+ * both the profile timeline and the System Logs page. Shows the ACTION only
+ * (action + field-name(s) for alumni core edits, action + resource otherwise,
+ * + degree tag for education creates, action label only for auth). All data
+ * values (old→new, names, ids, emails, section counts) live in the modal.
  */
 export function describeActivityLog(args: {
   action: string;
@@ -445,33 +403,32 @@ export function describeActivityLog(args: {
 }): string {
   const { action, resource } = args;
   const details: Record<string, unknown> | null = args.details ?? null;
-  const d = details ?? {};
   const resourceLabel = LOG_RESOURCE_LABELS[resource] ?? resource;
 
-  if (resource === "alumni_auth") return describeAuthEvent(action, details);
+  if (resource === "alumni_auth") return describeAuthEvent(action, details, true);
 
   if (action === "UPDATE") {
-    const changes = extractChanges(details);
-    if (changes && changes.length > 0) {
-      const labels = changes.map((c) => FIELD_LABELS[c.field] ?? c.field);
-      if (changes.length === 1) {
-        const c = changes[0];
-        return `แก้ไข${labels[0]} ${c.from ?? "—"} → ${c.to ?? "—"}`;
+    // Alumni core edits name the field(s); everything else is action + resource.
+    if (resource === "alumni") {
+      const changes = extractChanges(details);
+      if (changes && changes.length > 0) {
+        return "แก้ไข" + changes.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ");
       }
-      return `แก้ไข${labels.join(", ")}`;
     }
-    const sc = sectionChangeSummary(details) ?? sectionCountSummary(details);
-    return sc ? `แก้ไข${resourceLabel} (${sc})` : `แก้ไข${resourceLabel}`;
+    return "แก้ไข" + resourceLabel;
   }
 
-  if (action === "CREATE") return describeCreateOrDelete("เพิ่ม", resource, d);
-  if (action === "DELETE" || action === "HARD_DELETE") return describeCreateOrDelete("ลบ", resource, d);
-
-  if (action === "IMPORT") {
-    const n = typeof d.created === "number" ? d.created : null;
-    return `นำเข้า${resourceLabel}${n != null ? ` ${n} รายการ` : ""}`;
+  if (action === "CREATE") {
+    if (resource === "education") {
+      const deg = formatValue("degreeLevel", details?.degreeLevel);
+      return "เพิ่ม" + resourceLabel + (deg && deg !== "—" ? ` ${deg}` : "");
+    }
+    return "เพิ่ม" + resourceLabel;
   }
+  if (action === "DELETE" || action === "HARD_DELETE") return "ลบ" + resourceLabel;
+
+  if (action === "IMPORT") return "นำเข้า" + resourceLabel;
 
   const actionLabel = LOG_ACTION_LABELS[action] ?? action;
-  return `${actionLabel}${resourceLabel}`;
+  return actionLabel + resourceLabel;
 }

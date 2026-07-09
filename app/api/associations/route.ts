@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
+import { TRACKED_FIELDS } from "@/lib/field-changes";
+import { recordDetailsFromFields } from "@/lib/log-payload";
 import { handleZodError, associationCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 
@@ -105,6 +108,17 @@ export async function POST(request: NextRequest) {
         major: validated.major?.trim() || null,
       },
     });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "CREATE",
+        "association",
+        item.id,
+        { source: "admin_create", ...recordDetailsFromFields(item as unknown as Record<string, unknown>, TRACKED_FIELDS.association) },
+      );
+    }
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

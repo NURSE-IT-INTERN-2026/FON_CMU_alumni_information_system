@@ -3,6 +3,9 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
+import { TRACKED_FIELDS } from "@/lib/field-changes";
+import { recordDetailsFromFields } from "@/lib/log-payload";
 import { handleZodError, alumniAgencyCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
@@ -30,6 +33,17 @@ export async function POST(request: NextRequest) {
         order: validated.order,
       },
     });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "CREATE",
+        "alumni_agency",
+        item.id,
+        { source: "admin_create", ...recordDetailsFromFields(item as unknown as Record<string, unknown>, TRACKED_FIELDS.alumni_agency) },
+      );
+    }
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

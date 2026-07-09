@@ -7,6 +7,8 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, awardCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
+import { TRACKED_FIELDS } from "@/lib/field-changes";
+import { recordDetailsFromFields } from "@/lib/log-payload";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
         "CREATE",
         "award",
         award.id,
-        { awardName: award.awardName, awardType: award.awardType, year: award.year },
+        { source: "admin_create", ...recordDetailsFromFields(award as unknown as Record<string, unknown>, TRACKED_FIELDS.award) },
       );
     }
 
