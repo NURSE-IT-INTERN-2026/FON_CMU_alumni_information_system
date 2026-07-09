@@ -5,10 +5,10 @@ import { getAlumniSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
-import { generateGraduationLogs } from "@/lib/graduation-log";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
 import { assertEducationSamePerson } from "@/lib/education-identity";
+import { educationRecordDetails } from "@/lib/log-payload";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 // GET /api/alumni-profile/educations — the logged-in alumni's education records.
@@ -77,10 +77,10 @@ export async function POST(request: NextRequest) {
         "CREATE",
         "education",
         created.id,
-        { source: "alumni_self_add", studentId: created.studentId, degreeLevel: created.degreeLevel },
+        { source: "alumni_self_add", ...educationRecordDetails(created) },
       );
-      // SYSTEM graduation log + re-sync the current name from the highest degree.
-      await generateGraduationLogs(alumni.id);
+      // Re-sync the current name from the highest degree (a separate concern
+      // from logging — the auto graduation-log feature was removed).
       await syncNameFromHighestDegree(alumni.id);
       // Primary = highest degree; a newly-added higher degree becomes primary.
       await recomputePrimaryEducation(alumni.id);

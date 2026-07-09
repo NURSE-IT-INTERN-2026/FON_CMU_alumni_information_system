@@ -60,15 +60,6 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
     "homeAddress",
     "remarks",
   ],
-  education: [
-    "studentId",
-    "degreeLevel",
-    "graduationYear",
-    "major",
-    "cohort",
-    "firstName",
-    "lastName",
-  ],
 };
 
 function coerce(v: unknown): string | null {
@@ -101,6 +92,12 @@ export type ChangeActor =
 /**
  * Persist per-field change rows. Fire-and-forget (like logActivity) — must
  * never throw and break the main request.
+ *
+ * Pass the owning `activityLogId` so the change rows are LINKED to their
+ * activity log — the merged profile timeline then shows one entry per edit
+ * (the activity log) with these changes attached in its modal, instead of a
+ * duplicate standalone field-change item. Callers should `logActivity` first,
+ * capture the returned id, and pass it here.
  */
 export async function recordFieldChanges(args: {
   resourceType: string;
@@ -108,6 +105,7 @@ export async function recordFieldChanges(args: {
   changes: FieldChange[];
   actor: ChangeActor;
   reason?: string | null;
+  activityLogId?: string | null;
 }): Promise<void> {
   if (args.changes.length === 0) return;
   try {
@@ -123,6 +121,7 @@ export async function recordFieldChanges(args: {
         alumniId: args.actor.actorType === "ALUMNI" ? args.actor.alumniId : null,
         actorName: args.actor.actorName ?? null,
         reason: args.reason ?? null,
+        activityLogId: args.activityLogId ?? null,
       })),
     });
   } catch (err) {

@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
+import { alumniRecordDetails } from "@/lib/log-payload";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
         "CREATE",
         "alumni",
         alumni.id,
-        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
+        { source: "admin_create", ...alumniRecordDetails(alumni) },
       );
     }
 

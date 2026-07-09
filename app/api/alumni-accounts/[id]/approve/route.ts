@@ -5,7 +5,6 @@ import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
-import { generateGraduationLogs } from "@/lib/graduation-log";
 import { sendSignupApprovedEmail } from "@/lib/email";
 import { cmuLevelToDegree } from "@/lib/alumni-verify";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
@@ -94,9 +93,6 @@ export async function POST(
     // The dashboard "pending approvals" card counts accountStatus — bust so it's
     // fresh right after an approval.
     bustCache("dashboard");
-
-    // Graduation logs do their own CMU fetches — run outside the txn (idempotent).
-    await generateGraduationLogs(id);
 
     await logActivity(
       {

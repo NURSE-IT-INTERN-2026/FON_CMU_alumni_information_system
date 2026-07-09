@@ -203,8 +203,7 @@ export async function PUT(request: NextRequest) {
 
       // Log alumni profile edit + field-change history
       const changes = computeFieldChanges(oldCore, alumni, TRACKED_FIELDS.alumni_profile);
-      await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` }, reason: validated.reason });
-      await logActivity(
+      const logId = await logActivity(
         {
           actorType: "ALUMNI",
           alumniId: alumni.id,
@@ -215,6 +214,7 @@ export async function PUT(request: NextRequest) {
         alumni.id,
         {
           source: "alumni_self_edit",
+          changes,
           sections: {
             awards: validated.awards?.length ?? 0,
             associations: validated.associations?.length ?? 0,
@@ -226,6 +226,7 @@ export async function PUT(request: NextRequest) {
         },
         validated.reason
       );
+      await recordFieldChanges({ resourceType: "alumni_profile", resourceId: alumni.id, changes, actor: { actorType: "ALUMNI", alumniId: alumni.id, actorName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` }, reason: validated.reason, activityLogId: logId });
 
       return NextResponse.json(alumni);
     } catch (error) {

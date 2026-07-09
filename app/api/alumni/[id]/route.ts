@@ -142,8 +142,7 @@ export async function PUT(
     const changes = computeFieldChanges(existing, alumni, TRACKED_FIELDS.alumni);
     const session = await getSession();
     if (session) {
-      await recordFieldChanges({ resourceType: "alumni", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason });
-      await logActivity(
+      const logId = await logActivity(
         { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
         "UPDATE",
         "alumni",
@@ -151,6 +150,7 @@ export async function PUT(
         { changes },
         validated.reason
       );
+      await recordFieldChanges({ resourceType: "alumni", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason, activityLogId: logId });
     }
 
     return NextResponse.json(alumni);

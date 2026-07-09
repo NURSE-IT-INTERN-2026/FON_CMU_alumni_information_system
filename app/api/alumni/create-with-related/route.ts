@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedCreateSchema } from "@/lib/validations";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
+import { alumniRecordDetails } from "@/lib/log-payload";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
         "CREATE",
         "alumni",
         alumni.id,
-        { studentId: alumni.studentId, name: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}` },
+        { source: "admin_create", ...alumniRecordDetails(alumni) },
       );
     }
 
