@@ -15,7 +15,6 @@ import {
 } from "recharts";
 import {
   Users,
-  LogIn,
   UserCheck,
   TrendingUp,
   Clock,
@@ -54,7 +53,6 @@ interface AlumniActivityData {
 
 const COLOR = {
   primary: "#5b21b6", // accounts
-  indigo: "#4f46e5", // all-time logins
   teal: "#0d9488", // logins / month line
   emerald: "#059669", // this-month active
   amber: "#ca8a04", // pending
@@ -274,7 +272,7 @@ export default function AlumniActivityPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           label="บัญชีศิษย์เก่าทั้งหมด"
           value={data.accounts.total}
@@ -288,14 +286,6 @@ export default function AlumniActivityPage() {
               <StatusPill count={data.accounts.rejected} label="ปฏิเสธ" color={COLOR.red} />
             </div>
           }
-        />
-
-        <KpiCard
-          label="การเข้าสู่ระบบสะสม"
-          value={data.logins.total}
-          unit="ครั้ง"
-          color={COLOR.indigo}
-          icon={<LogIn className="h-5 w-5" />}
         />
 
         <KpiCard
