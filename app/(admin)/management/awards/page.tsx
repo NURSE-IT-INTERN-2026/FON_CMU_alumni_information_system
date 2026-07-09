@@ -20,6 +20,7 @@ import { facetQueryParams } from "@/lib/filter-facets";
 import FacetFilter from "@/components/ui/facet-filter";
 import SearchInput from "@/components/ui/search-input";
 import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
+import { assetUrl } from "@/lib/asset-url";
 
 interface Award {
   id: string;
@@ -103,11 +104,19 @@ export default function AwardsPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue } = useForm<FormValues>({
+  const { register, handleSubmit, formState: { errors }, reset: formReset, control, getValues, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(awardPageFormSchema) as unknown as Resolver<FormValues>,
     defaultValues: DEFAULT_FORM_VALUES,
   });
+  // react-hook-form's `watch()` opts this component out of the React Compiler
+  // (benign — the component still works, it just isn't compiler-optimized).
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const awardImage = watch("imageUrl");
   const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoDragOver, setPhotoDragOver] = useState(false);
+  const photoFileRef = useRef<HTMLInputElement>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const {
     selectedCount,
@@ -215,6 +224,41 @@ export default function AwardsPage() {
     setNameSearch("");
     setFormSearchField(null);
     clearResults();
+  };
+
+  // Upload a photo to /api/upload (PNG/JPG ≤5MB) and store its basePath-relative
+  // path in the form's `imageUrl` field. Uses raw fetch (not apiFetch) because
+  // the upload is multipart FormData, not JSON.
+  const uploadImage = async (file: File): Promise<string | null> => {
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      setErrorMsg("อนุญาตเฉพาะไฟล์ JPG และ PNG เท่านั้น");
+      return null;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("ขนาดไฟล์ต้องไม่เกิน 5MB");
+      return null;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${BASE_PATH}/api/upload`, { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+      const { url } = await res.json();
+      return url;
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการอัปโหลด");
+      return null;
+    }
+  };
+
+  const uploadPhoto = async (file: File) => {
+    setPhotoUploading(true);
+    const url = await uploadImage(file);
+    if (url) setValue("imageUrl", url);
+    setPhotoUploading(false);
   };
 
   const onSave = async (data: AwardPageFormData) => {
@@ -451,8 +495,49 @@ export default function AwardsPage() {
             <FormField label="ลิงค์">
               <FormInput registration={register("link")} type="text" placeholder="https://..." />
             </FormField>
-            <FormField label="รูปภาพ">
-              <FormInput registration={register("imageUrl")} type="text" placeholder="https://..." />
+            <FormField label="รูปภาพ" className="sm:col-span-2">
+              {awardImage ? (
+                <div className="relative inline-block">
+                  <img src={assetUrl(awardImage)} alt="preview" className="max-h-40 rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={() => setValue("imageUrl", "")}
+                    title="ลบรูปภาพ"
+                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setPhotoDragOver(true); }}
+                  onDragLeave={() => setPhotoDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setPhotoDragOver(false); const f = e.dataTransfer.files[0]; if (f) uploadPhoto(f); }}
+                  onClick={() => photoFileRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+                    photoDragOver ? "border-[var(--primary)] bg-[var(--primary)]/5" : "border-gray-300 bg-gray-50 hover:border-gray-400"
+                  }`}
+                >
+                  {photoUploading ? (
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+                  ) : (
+                    <>
+                      <svg className="mb-2 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                      </svg>
+                      <p className="text-sm text-gray-600">คลิกหรือลากไฟล์มาวาง</p>
+                      <p className="mt-1 text-xs text-gray-400">อนุญาตเฉพาะ JPG, PNG (ไม่เกิน 5MB)</p>
+                    </>
+                  )}
+                  <input
+                    ref={photoFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = ""; }}
+                  />
+                </div>
+              )}
             </FormField>
             <FormField label="รายละเอียด" className="sm:col-span-2">
               <FormInput registration={register("description")} type="text" />
@@ -664,11 +749,19 @@ export default function AwardsPage() {
                         </a>
                       ) : "-"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center">
                       {award.imageUrl ? (
-                        <a href={award.imageUrl} target="_blank" rel="noopener noreferrer">
-                          <img src={award.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
-                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setPhotoPreviewUrl(award.imageUrl)}
+                          title="ดูรูปภาพ"
+                          className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
                       ) : "-"}
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="award" recordId={award.id} field="description" value={award.description || "-"} hotFields={hot[award.id]} /></td>
@@ -715,6 +808,22 @@ export default function AwardsPage() {
               <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
               <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {photoPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhotoPreviewUrl(null)}>
+          <div className="relative max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setPhotoPreviewUrl(null)}
+              title="ปิด"
+              className="absolute -right-3 -top-3 z-10 rounded-full bg-white p-1.5 text-gray-700 shadow-lg hover:bg-gray-100"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <img src={assetUrl(photoPreviewUrl)} alt="รูปภาพรางวัล" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
           </div>
         </div>
       )}
