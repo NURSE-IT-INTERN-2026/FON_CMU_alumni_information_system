@@ -6,6 +6,7 @@ import { getAlumniSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniProfileUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
+import { buildSectionChanges } from "@/lib/log-payload";
 
 const RELATED_INCLUDE = {
   awards: true,
@@ -68,7 +69,10 @@ export async function PUT(request: NextRequest) {
     const hasAbroad = (validated.alumniAgency?.length ?? 0) > 0;
 
     try {
-      const oldCore = await prisma.alumni.findUnique({ where: { id: alumniId } });
+      const oldCore = await prisma.alumni.findUnique({
+        where: { id: alumniId },
+        include: RELATED_INCLUDE,
+      });
       const alumni = await prisma.$transaction(async (tx) => {
         // --- Core fields ---
         const updated = await tx.alumni.update({
@@ -203,6 +207,26 @@ export async function PUT(request: NextRequest) {
 
       // Log alumni profile edit + field-change history
       const changes = computeFieldChanges(oldCore, alumni, TRACKED_FIELDS.alumni_profile);
+      // What the alumni added/removed in each related section (old DB rows vs
+      // the submitted payload) — richer than the bare section counts.
+      const sectionChanges = buildSectionChanges(
+        {
+          awards: (oldCore?.awards ?? []) as unknown as Record<string, unknown>[],
+          associations: (oldCore?.associations ?? []) as unknown as Record<string, unknown>[],
+          graduateCommittees: (oldCore?.graduateCommittees ?? []) as unknown as Record<string, unknown>[],
+          potentials: (oldCore?.potentials ?? []) as unknown as Record<string, unknown>[],
+          modelRepresentatives: (oldCore?.modelRepresentatives ?? []) as unknown as Record<string, unknown>[],
+          alumniAgency: (oldCore?.alumniAgency ?? []) as unknown as Record<string, unknown>[],
+        },
+        {
+          awards: (validated.awards ?? []) as unknown as Record<string, unknown>[],
+          associations: (validated.associations ?? []) as unknown as Record<string, unknown>[],
+          graduateCommittees: (validated.graduateCommittees ?? []) as unknown as Record<string, unknown>[],
+          potentials: (validated.potentials ?? []) as unknown as Record<string, unknown>[],
+          modelRepresentatives: (validated.modelRepresentatives ?? []) as unknown as Record<string, unknown>[],
+          alumniAgency: (validated.alumniAgency ?? []) as unknown as Record<string, unknown>[],
+        },
+      );
       const logId = await logActivity(
         {
           actorType: "ALUMNI",
@@ -223,6 +247,7 @@ export async function PUT(request: NextRequest) {
             modelRepresentatives: validated.modelRepresentatives?.length ?? 0,
             alumniAgency: validated.alumniAgency?.length ?? 0,
           },
+          ...(sectionChanges ? { sectionChanges } : {}),
         },
         validated.reason
       );

@@ -4,19 +4,26 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
-import { detailRows } from "@/lib/log-detail";
+import {
+  describeActivityLog,
+  describeAuthEvent,
+  detailRows,
+  readSectionChanges,
+  sectionCountSummary,
+} from "@/lib/log-detail";
 
 /**
  * Merged change timeline for one alumni — the "data logs" tab on the admin
  * alumni profile page (PRD §3.18). Fed by GET /api/alumni/[id]/activity, which
  * unions per-field change history (alumni core + related rows; orphans only)
- * with activity-log events. Newest first. Clicking a row opens a detail modal
- * (field-level old→new for edits, or the created record's fields for creates).
+ * with activity-log events. Newest first. Clicking a row opens a detail modal.
+ * Row titles + modal text come from the shared `lib/log-detail.ts` description
+ * layer so this matches the System Logs page word-for-word.
  */
 
 type ActorType = "ADMIN" | "ALUMNI" | "SYSTEM";
 
-// Thai labels for the tracked fields. Falls back to the raw field name.
+// Thai labels for tracked fields (change rows + field-item titles).
 const FIELD_LABELS: Record<string, string> = {
   prefix: "คำนำหน้า",
   firstName: "ชื่อ",
@@ -50,24 +57,6 @@ const FIELD_LABELS: Record<string, string> = {
   imageUrl: "รูปภาพ",
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  CREATE: "เพิ่ม",
-  UPDATE: "แก้ไข",
-  DELETE: "ลบ",
-  IMPORT: "นำเข้า",
-  EXPORT: "ส่งออก",
-  BULK_DELETE: "ลบหลายรายการ",
-  SIGNUP: "สมัครสมาชิก",
-  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรัหัสผ่าน",
-  PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
-  APPROVE: "อนุมัติ",
-  REJECT: "ปฏิเสธ",
-  VERIFY_IDENTITY: "ยืนยันตัวตน",
-  RESTORE: "กู้คืน",
-  SUSPEND: "ระงับ",
-  HARD_DELETE: "ลบถาวร",
-};
-
 const RESOURCE_LABELS: Record<string, string> = {
   alumni: "ข้อมูลศิษย์เก่า",
   alumni_profile: "ข้อมูลส่วนตัว",
@@ -78,48 +67,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   potential: "ศักยภาพ",
   model_representative: "ผู้แทนรุ่น",
   alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
-  news: "ข่าว",
-  user: "ผู้ใช้",
-  alumni_auth: "บัญชีศิษย์เก่า",
-  cmu_alumni: "ทะเบียน มช.",
 };
-
-/** Thai title for an `alumni_auth` lifecycle event (account/login), or null. */
-function authEventTitle(action: string, details: unknown): string | null {
-  const actionDetail =
-    typeof details === "object" && details !== null
-      ? (details as { action?: string }).action
-      : undefined;
-  switch (action) {
-    case "LOGIN":
-      return "เข้าสู่ระบบ";
-    case "SIGNUP":
-      return "สมัครสมาชิก";
-    case "APPROVE":
-      return "อนุมัติบัญชี";
-    case "REJECT":
-      return "ปฏิเสธบัญชี";
-    case "REAPPLY":
-      return "ยื่นคำขอใหม่";
-    case "SUSPEND":
-      return "จัดการการระงับบัญชี";
-    case "PASSWORD_RESET_REQUEST":
-      return "ขอรีเซ็ตรหัสผ่าน";
-    case "PASSWORD_RESET_COMPLETE":
-      return "รีเซ็ตรหัสผ่าน";
-    case "EMAIL_VERIFY":
-      return "ยืนยันอีเมล";
-    case "EMAIL_VERIFY_REQUEST":
-      return "ส่งอีเมลยืนยันตัวตน";
-    case "VERIFY_IDENTITY":
-      return "ยืนยันตัวตน";
-    case "UPDATE":
-      if (actionDetail === "accept_tos") return "ยอมรับเงื่อนไขการใช้งาน";
-      return null;
-    default:
-      return null;
-  }
-}
 
 interface FieldChange {
   field: string;
@@ -176,8 +124,7 @@ function ActorBadge({ actorType }: { actorType: ActorType }) {
 }
 
 /** Field changes for an activity item: linked rows, else the `details.changes`
- *  snapshot some routes embed (which uses `{field, from, to}` — normalized here
- *  to the linked `{field, oldValue, newValue}` shape). Empty for creates / auth. */
+ *  snapshot some routes embed (`{field, from, to}` → normalized). */
 function effectiveChanges(item: ActivityItem): FieldChange[] {
   if (item.changes.length > 0) return item.changes;
   const details = item.details as Record<string, unknown> | null;
@@ -192,46 +139,16 @@ function effectiveChanges(item: ActivityItem): FieldChange[] {
     }));
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  awards: "รางวัล",
-  associations: "สมาคม/ชมรม",
-  graduateCommittees: "กรรมการบัณฑิต",
-  potentials: "ศักยภาพ",
-  modelRepresentatives: "ผู้แทนรุ่น",
-  alumniAgency: "ข้อมูลการทำงานศิษย์เก่า",
-};
-
-/** For alumni self-edits that only touched related sections (no core field
- *  change), summarize which sections were updated — avoids an empty modal. */
-function sectionsSummary(details: unknown): string[] {
-  if (typeof details !== "object" || details === null) return [];
-  const sections = (details as { sections?: Record<string, number> }).sections;
-  if (!sections || typeof sections !== "object") return [];
-  return Object.entries(sections)
-    .filter(([, n]) => typeof n === "number" && n > 0)
-    .map(([k, n]) => `${SECTION_LABELS[k] ?? k} ${n} รายการ`);
-}
-
-/** One-line Thai title for a timeline row (used in the list + modal header). */
+/** One-line Thai title for a timeline row (list + modal header). */
 function itemTitle(item: TimelineItem): string {
   if (item.kind === "field") {
     return `แก้ไข${FIELD_LABELS[item.field] ?? item.field}`;
   }
-  const auth =
-    item.resource === "alumni_auth"
-      ? authEventTitle(item.action, item.details)
-      : null;
-  if (auth) return auth;
-  if (item.action === "UPDATE") {
-    const changed = effectiveChanges(item);
-    if (changed.length > 0) {
-      return `แก้ไข${changed.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ")}`;
-    }
-  }
-  // CREATE → "เพิ่มการศึกษา" / "เพิ่มข้อมูลศิษย์เก่า"; other actions keep a space.
-  const action = ACTION_LABELS[item.action] ?? item.action;
-  const resource = RESOURCE_LABELS[item.resource] ?? item.resource;
-  return `${action}${resource}`;
+  return describeActivityLog({
+    action: item.action,
+    resource: item.resource,
+    details: item.details as Record<string, unknown> | null,
+  });
 }
 
 export default function AlumniActivityTimeline({ alumniId }: { alumniId: string }) {
@@ -315,16 +232,21 @@ export default function AlumniActivityTimeline({ alumniId }: { alumniId: string 
 }
 
 function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: () => void }) {
-  const changes: FieldChange[] =
-    item.kind === "activity"
-      ? effectiveChanges(item)
-      : [{ field: item.field, oldValue: item.oldValue, newValue: item.newValue }];
-  const details =
-    item.kind === "activity" ? (item.details as Record<string, unknown> | null) : null;
-  // For creates / auth events there are no old→new pairs — show the carried
-  // record fields as flat labeled rows instead.
+  const isActivity = item.kind === "activity";
+  const details = isActivity ? (item.details as Record<string, unknown> | null) : null;
+  const changes: FieldChange[] = isActivity
+    ? effectiveChanges(item)
+    : [{ field: item.field, oldValue: item.oldValue, newValue: item.newValue }];
+  const authLead =
+    isActivity && item.resource === "alumni_auth"
+      ? describeAuthEvent(item.action, details)
+      : null;
   const rows = changes.length === 0 ? detailRows(details) : [];
-  const sections = changes.length === 0 && rows.length === 0 ? sectionsSummary(details) : [];
+  const sectionRows = changes.length === 0 && rows.length === 0 ? readSectionChanges(details) : [];
+  const countSummary =
+    isActivity && changes.length === 0 && rows.length === 0 && sectionRows.length === 0
+      ? sectionCountSummary(details)
+      : null;
 
   return (
     <div
@@ -354,6 +276,12 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
           {item.actorName && <span>• {item.actorName}</span>}
         </div>
 
+        {authLead && (
+          <p className="mb-3 rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm font-medium text-[var(--foreground)]">
+            {authLead}
+          </p>
+        )}
+
         {changes.length > 0 ? (
           <div className="max-h-80 space-y-2 overflow-y-auto">
             {changes.map((c, i) => (
@@ -378,9 +306,29 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
               </div>
             ))}
           </div>
-        ) : sections.length > 0 ? (
+        ) : sectionRows.length > 0 ? (
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {sectionRows.map((s, i) => (
+              <div key={i} className="rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm">
+                <div className="text-xs font-semibold text-[var(--muted)]">{s.label}</div>
+                {s.added.length > 0 && (
+                  <div className="mt-1 text-green-700">
+                    <span className="text-xs text-[var(--muted)]">เพิ่ม: </span>
+                    {s.added.join(", ")}
+                  </div>
+                )}
+                {s.removed.length > 0 && (
+                  <div className="mt-1 text-red-600">
+                    <span className="text-xs text-[var(--muted)]">ลบ: </span>
+                    {s.removed.join(", ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : countSummary ? (
           <div className="rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm text-gray-800">
-            รายการที่อัปเดต: {sections.join(", ")}
+            รายการที่บันทึก: {countSummary}
           </div>
         ) : (
           <p className="text-sm text-[var(--muted)]">ไม่มีรายละเอียดเพิ่มเติม</p>
