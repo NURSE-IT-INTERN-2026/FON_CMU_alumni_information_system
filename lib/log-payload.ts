@@ -61,6 +61,24 @@ export function educationRecordDetails(edu: {
   };
 }
 
+/**
+ * Build a `details` object for a CREATE log by picking the given fields off a
+ * created record (keys match `FIELD_LABELS` so `detailRows` renders them).
+ * Array values (e.g. phones) are joined into a string. Used by the 6
+ * related-entity CREATE routes via `TRACKED_FIELDS[<entity>]`.
+ */
+export function recordDetailsFromFields(
+  record: Record<string, unknown>,
+  fields: string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of fields) {
+    const v = record[f];
+    out[f] = Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined && x !== "").join(", ") : (v ?? null);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Self-edit section diff — what an alumni added/removed in each related
 // section (awards / associations / …). Stored as `details.sectionChanges` and

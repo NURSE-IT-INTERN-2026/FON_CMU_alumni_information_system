@@ -212,15 +212,6 @@ export default function AlumniActivityTimeline({ alumniId }: { alumniId: string 
                 )}
             </div>
 
-            {/* Inline old→new for a single field-change row. */}
-            {item.kind === "field" && (
-              <div className="mt-1 text-sm">
-                <span className="text-gray-400 line-through">{item.oldValue || "—"}</span>
-                <span className="mx-1.5 font-semibold text-orange-500">→</span>
-                <span className="text-gray-800">{item.newValue || "—"}</span>
-              </div>
-            )}
-
             {item.reason && <div className="mt-1 text-xs text-[var(--muted)]">เหตุผล: {item.reason}</div>}
           </button>
         ))}
