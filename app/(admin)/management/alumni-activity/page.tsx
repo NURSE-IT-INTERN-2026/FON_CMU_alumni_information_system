@@ -253,11 +253,6 @@ export default function AlumniActivityPage() {
     );
   }
 
-  const activationRate =
-    data.accounts.total > 0
-      ? Math.round((data.accounts.everLoggedIn / data.accounts.total) * 100)
-      : 0;
-
   // ---- Main content ----
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -336,7 +331,7 @@ export default function AlumniActivityPage() {
         <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
           การมีส่วนร่วมล่าสุด
         </h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <KpiCard
             label="เข้าระบบใน 7 วันที่แล้ว"
             value={data.recency.days7}
@@ -350,18 +345,6 @@ export default function AlumniActivityPage() {
             unit="คน"
             color={COLOR.slate}
             icon={<Clock className="h-5 w-5" />}
-          />
-          <KpiCard
-            label="เคยเข้าระบบ"
-            value={data.accounts.everLoggedIn}
-            unit="คน"
-            color={COLOR.green}
-            icon={<UserCheck className="h-5 w-5" />}
-            footer={
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                {activationRate}% ของบัญชีทั้งหมด
-              </p>
-            }
           />
           <KpiCard
             label="ระงับการใช้งาน"
