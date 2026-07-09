@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { withTtlCache } from "@/lib/cache";
 import { Prisma } from "@/app/generated/prisma/client";
+import { THAI_MONTH_ABBR } from "@/lib/thai-month";
 
 // Alumni-portal engagement analytics. Read-only + 60s-TTL-cached like the
 // dashboard route. Two data sources:
@@ -17,11 +18,6 @@ import { Prisma } from "@/app/generated/prisma/client";
 const CACHE_TTL_MS = 60_000;
 const ICT_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Bangkok = UTC+7
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const THAI_MONTH_ABBR = [
-  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
-];
 
 interface DegreeMonthRow {
   month: string; // "YYYY-MM" (ICT)

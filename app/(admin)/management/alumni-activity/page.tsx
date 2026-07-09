@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { DEGREE_COLORS } from "@/lib/constants";
+import { THAI_MONTH_ABBR } from "@/lib/thai-month";
 import {
   LineChart,
   Line,
@@ -96,6 +97,48 @@ const DEGREE_MINI_CARDS = DEGREE_ORDER.map((key) => ({
   label: DEGREE_SHORT_LABELS[key],
   color: DEGREE_COLORS[key],
 }));
+
+/** Build a two-line X-axis label "ก.พ.\n2569" from a "YYYY-MM" month key
+ *  (month abbreviation over full Buddhist-era year). */
+function monthAxisLabel(month: string): string {
+  const [yStr, mStr] = month.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr) - 1;
+  return `${THAI_MONTH_ABBR[m] ?? ""}\n${String(y + 543)}`;
+}
+
+interface MonthTickProps {
+  x?: number | string;
+  y?: number | string;
+  payload?: { value?: string | number };
+  fill?: string;
+}
+
+// Custom recharts XAxis tick: splits the dataKey value on "\n" and renders it
+// as two stacked <tspan> lines (month abbreviation over Buddhist year) so all
+// 12 months fit without recharts skipping them. Function-form ticks are
+// rendered as a raw <text> (not wrapped in recharts <Text>).
+function MonthTick({ x, y, payload, fill }: MonthTickProps) {
+  const [m, yr] = String(payload?.value ?? "").split("\n");
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      dominantBaseline="hanging"
+      fontSize={12}
+      fill={fill ?? "#6b7280"}
+      className="recharts-cartesian-axis-tick-value"
+    >
+      <tspan x={x} dy={2}>
+        {m}
+      </tspan>
+      <tspan x={x} dy={14}>
+        {yr}
+      </tspan>
+    </text>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Small building blocks (mirror the dashboard's card / pill styling)
@@ -224,12 +267,13 @@ function DegreeLineChart({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={points}
-              margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+              margin={{ top: 10, right: 10, left: 10, bottom: 32 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="label" interval={0} tick={MonthTick} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip
+                labelFormatter={(l) => String(l).replace("\n", " ")}
                 formatter={(value, name) => {
                   const deg = DEGREE_MINI_CARDS.find((d) => d.key === name);
                   return [
@@ -301,7 +345,9 @@ export default function AlumniActivityPage() {
   const activePoints = useMemo(
     () =>
       (data?.monthly ?? []).map((mp) => {
-        const point: Record<string, string | number> = { label: mp.label };
+        const point: Record<string, string | number> = {
+        label: monthAxisLabel(mp.month),
+      };
         for (const deg of DEGREE_MINI_CARDS) {
           point[deg.key] = mp.byDegree[deg.key]?.activeAlumni ?? 0;
         }
@@ -313,7 +359,9 @@ export default function AlumniActivityPage() {
   const loginPoints = useMemo(
     () =>
       (data?.monthly ?? []).map((mp) => {
-        const point: Record<string, string | number> = { label: mp.label };
+        const point: Record<string, string | number> = {
+        label: monthAxisLabel(mp.month),
+      };
         for (const deg of DEGREE_MINI_CARDS) {
           point[deg.key] = mp.byDegree[deg.key]?.logins ?? 0;
         }
