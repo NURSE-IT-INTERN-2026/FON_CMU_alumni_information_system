@@ -78,7 +78,10 @@ const ROLE_LABELS: Record<string, string> = {
 const META_KEYS = new Set([
   "source",
   "sections",
+  "sectionChanges",
   "changes",
+  "action",
+  "method",
   // IMPORT details: the record/error arrays + their cap flags are rendered by
   // the dedicated ImportDetail component (via `extractImportDetails`), not as
   // generic rows. (The scalar counts created/updated/failed/attempted/fileName
@@ -238,4 +241,237 @@ export function extractImportDetails(details: Record<string, unknown> | null): I
     errorsTruncated: details.errorsTruncated === true,
     totalErrors: totalErrors || errors.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Description layer — one self-explanatory Thai sentence per activity log.
+// Shared by the profile data-logs timeline and the System Logs page so every
+// entry reads the same way on both surfaces.
+// ---------------------------------------------------------------------------
+
+const LOG_ACTION_LABELS: Record<string, string> = {
+  CREATE: "เพิ่ม",
+  UPDATE: "แก้ไข",
+  DELETE: "ลบ",
+  IMPORT: "นำเข้า",
+  EXPORT: "ส่งออก",
+  BULK_DELETE: "ลบหลายรายการ",
+  SIGNUP: "สมัครสมาชิก",
+  APPROVE: "อนุมัติ",
+  REJECT: "ปฏิเสธ",
+  RESTORE: "กู้คืน",
+  SUSPEND: "ระงับ",
+  HARD_DELETE: "ลบถาวร",
+  REAPPLY: "ยื่นคำขอใหม่",
+  VERIFY_IDENTITY: "ยืนยันตัวตน",
+  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรหัสผ่าน",
+  PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
+  EMAIL_VERIFY: "ยืนยันอีเมล",
+  EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
+};
+
+const LOG_RESOURCE_LABELS: Record<string, string> = {
+  alumni: "ข้อมูลศิษย์เก่า",
+  alumni_profile: "ข้อมูลส่วนตัว",
+  education: "ประวัติการศึกษา",
+  award: "รางวัล",
+  association: "สมาคม/ชมรม",
+  graduate_committee: "กรรมการบัณฑิต",
+  potential: "ศักยภาพ",
+  model_representative: "ผู้แทนรุ่น",
+  alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
+  news: "ข่าว",
+  user: "ผู้ใช้",
+  alumni_auth: "บัญชีศิษย์เก่า",
+  cmu_alumni: "ทะเบียน มช.",
+};
+
+const SECTION_LABELS: Record<string, string> = {
+  awards: "รางวัล",
+  associations: "สมาคม/ชมรม",
+  graduateCommittees: "กรรมการบัณฑิต",
+  potentials: "ศักยภาพ",
+  modelRepresentatives: "ผู้แทนรุ่น",
+  alumniAgency: "ข้อมูลการทำงานศิษย์เก่า",
+};
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v : null;
+}
+
+/** Build a display name for an alumni core record from `details`. */
+function alumniNameFromDetails(d: Record<string, unknown>): string | null {
+  const name = str(d.name);
+  if (name) return name;
+  const first = [str(d.prefix), str(d.firstName)].filter(Boolean).join("");
+  const last = str(d.lastName);
+  return [first, last].filter(Boolean).join(" ") || null;
+}
+
+/** A clear Thai sentence for an `alumni_auth` (account/login) event. */
+export function describeAuthEvent(
+  action: string,
+  details: Record<string, unknown> | null,
+): string {
+  const d = details ?? {};
+  const actionDetail = str(d.action);
+  switch (action) {
+    case "LOGIN":
+      return `เข้าสู่ระบบ${str(d.method) === "email" ? "ด้วยอีเมล" : ""}`.trim();
+    case "SIGNUP": {
+      const parts = ["สมัครสมาชิก"];
+      const email = str(d.email);
+      if (email) parts.push(`(อีเมล ${email})`);
+      const source = str(d.source);
+      if (source === "cmu-not-found") parts.push("— ยังไม่พบในทะเบียน มช.");
+      else if (source === "cmu") parts.push("— ตรงกับทะเบียน มช.");
+      else if (source === "cmu-unavailable") parts.push("— ไม่สามารถติดต่อทะเบียน มช.");
+      return parts.join(" ");
+    }
+    case "UPDATE":
+      if (actionDetail === "accept_tos") return "ยอมรับเงื่อนไขการใช้งาน";
+      return "อัปเดตบัญชีศิษย์เก่า";
+    case "APPROVE":
+      return "อนุมัติบัญชีศิษย์เก่า";
+    case "REJECT":
+      return str(d.reason) ? `ปฏิเสธบัญชี: ${str(d.reason)}` : "ปฏิเสธบัญชีศิษย์เก่า";
+    case "REAPPLY":
+      return "ยื่นคำขอสมัครสมาชิกใหม่";
+    case "SUSPEND":
+      return "จัดการการระงับบัญชี";
+    case "PASSWORD_RESET_REQUEST":
+      return "ขอรีเซ็ตรหัสผ่าน";
+    case "PASSWORD_RESET_COMPLETE":
+      return "รีเซ็ตรหัสผ่าน";
+    case "EMAIL_VERIFY":
+      return "ยืนยันอีเมล";
+    case "EMAIL_VERIFY_REQUEST":
+      return "ส่งอีเมลยืนยันตัวตน";
+    case "VERIFY_IDENTITY":
+      return "ยืนยันตัวตน";
+    default:
+      return "บัญชีศิษย์เก่า";
+  }
+}
+
+/** Short summary of `details.sectionChanges` — "รางวัล (เพิ่ม 1), สมาคม (ลบ 1)".
+ *  Returns null when there are no section changes. */
+export function sectionChangeSummary(details: unknown): string | null {
+  const rows = readSectionChanges(details);
+  if (rows.length === 0) return null;
+  return rows
+    .map((r) => {
+      const bits: string[] = [];
+      if (r.added.length) bits.push(`เพิ่ม ${r.added.length}`);
+      if (r.removed.length) bits.push(`ลบ ${r.removed.length}`);
+      return `${r.label} (${bits.join(", ")})`;
+    })
+    .join(", ");
+}
+
+export interface SectionChangeView {
+  label: string;
+  added: string[];
+  removed: string[];
+}
+
+/** Structured read of `details.sectionChanges` for full (added/removed) render. */
+export function readSectionChanges(details: unknown): SectionChangeView[] {
+  if (typeof details !== "object" || details === null) return [];
+  const sc = (details as { sectionChanges?: Record<string, { added?: unknown[]; removed?: unknown[] }> }).sectionChanges;
+  if (!sc || typeof sc !== "object") return [];
+  const out: SectionChangeView[] = [];
+  for (const [key, val] of Object.entries(sc)) {
+    if (!val || typeof val !== "object") continue;
+    const added = Array.isArray(val.added) ? val.added.filter((x): x is string => typeof x === "string") : [];
+    const removed = Array.isArray(val.removed) ? val.removed.filter((x): x is string => typeof x === "string") : [];
+    if (added.length === 0 && removed.length === 0) continue;
+    out.push({ label: SECTION_LABELS[key] ?? key, added, removed });
+  }
+  return out;
+}
+
+/** Legacy fallback: read the old `sections` counts (pre-sectionChanges logs) →
+ *  "รางวัล 1, สมาคม/ชมรม 2". Null when there are no non-zero counts. */
+export function sectionCountSummary(details: unknown): string | null {
+  if (typeof details !== "object" || details === null) return null;
+  const sections = (details as { sections?: Record<string, number> }).sections;
+  if (!sections || typeof sections !== "object") return null;
+  const parts: string[] = [];
+  for (const [key, n] of Object.entries(sections)) {
+    if (typeof n === "number" && n > 0) parts.push(`${SECTION_LABELS[key] ?? key} ${n}`);
+  }
+  return parts.length ? parts.join(", ") : null;
+}
+
+/** Build "เพิ่ม/ลบ <resource>: <identifier>" for a CREATE/DELETE log. */
+function describeCreateOrDelete(
+  verb: string,
+  resource: string,
+  d: Record<string, unknown>,
+): string {
+  const resourceLabel = LOG_RESOURCE_LABELS[resource] ?? resource;
+  if (resource === "alumni") {
+    const name = alumniNameFromDetails(d);
+    const sid = str(d.studentId);
+    if (name && sid) return `${verb}${resourceLabel}: ${name} (รหัส ${sid})`;
+    if (name) return `${verb}${resourceLabel}: ${name}`;
+    return `${verb}${resourceLabel}`;
+  }
+  if (resource === "education") {
+    const deg = formatValue("degreeLevel", d.degreeLevel);
+    const major = str(d.major);
+    const sid = str(d.studentId);
+    const bits = [
+      resourceLabel,
+      deg && deg !== "—" ? deg : null,
+      major,
+      sid ? `รหัส ${sid}` : null,
+    ].filter(Boolean);
+    return `${verb}${bits.join(" ")}`;
+  }
+  const name = str(d.name ?? d.title);
+  return name ? `${verb}${resourceLabel}: ${name}` : `${verb}${resourceLabel}`;
+}
+
+/**
+ * One Thai sentence describing an activity log entry. Used as the row summary
+ * on both the profile timeline and the System Logs page.
+ */
+export function describeActivityLog(args: {
+  action: string;
+  resource: string;
+  details?: Record<string, unknown> | null;
+}): string {
+  const { action, resource } = args;
+  const details: Record<string, unknown> | null = args.details ?? null;
+  const d = details ?? {};
+  const resourceLabel = LOG_RESOURCE_LABELS[resource] ?? resource;
+
+  if (resource === "alumni_auth") return describeAuthEvent(action, details);
+
+  if (action === "UPDATE") {
+    const changes = extractChanges(details);
+    if (changes && changes.length > 0) {
+      const labels = changes.map((c) => FIELD_LABELS[c.field] ?? c.field);
+      if (changes.length === 1) {
+        const c = changes[0];
+        return `แก้ไข${labels[0]} ${c.from ?? "—"} → ${c.to ?? "—"}`;
+      }
+      return `แก้ไข${labels.join(", ")}`;
+    }
+    const sc = sectionChangeSummary(details) ?? sectionCountSummary(details);
+    return sc ? `แก้ไข${resourceLabel} (${sc})` : `แก้ไข${resourceLabel}`;
+  }
+
+  if (action === "CREATE") return describeCreateOrDelete("เพิ่ม", resource, d);
+  if (action === "DELETE" || action === "HARD_DELETE") return describeCreateOrDelete("ลบ", resource, d);
+
+  if (action === "IMPORT") {
+    const n = typeof d.created === "number" ? d.created : null;
+    return `นำเข้า${resourceLabel}${n != null ? ` ${n} รายการ` : ""}`;
+  }
+
+  const actionLabel = LOG_ACTION_LABELS[action] ?? action;
+  return `${actionLabel}${resourceLabel}`;
 }

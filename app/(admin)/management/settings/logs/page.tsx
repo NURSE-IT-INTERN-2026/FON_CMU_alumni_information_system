@@ -13,6 +13,10 @@ import {
   detailRows,
   extractChanges,
   extractImportDetails,
+  describeActivityLog,
+  describeAuthEvent,
+  readSectionChanges,
+  sectionCountSummary,
   type ImportDetailView,
   type ImportRecordView,
 } from "@/lib/log-detail";
@@ -320,6 +324,11 @@ export default function LogsPage() {
                   : isAlumniActor
                     ? ""
                     : (log.userEmail || "");
+                const summary = describeActivityLog({
+                  action: log.action,
+                  resource: log.resource,
+                  details: log.details,
+                });
                 const selected = isSelected(log.id);
 
                 return (
@@ -366,10 +375,16 @@ export default function LogsPage() {
                           onOpen={() => setDetailLog(log)}
                         />
                       ) : (
-                        <div className="flex justify-center">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="line-clamp-2 max-w-[20rem] text-sm text-gray-600"
+                            title={summary}
+                          >
+                            {summary}
+                          </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); setDetailLog(log); }}
-                            className="cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
+                            className="shrink-0 cursor-pointer rounded p-1 text-purple-600 hover:bg-purple-100"
                             title="ดูรายละเอียด"
                             aria-label="ดูรายละเอียด"
                           >
@@ -450,6 +465,10 @@ function DetailModal({
   const changes = extractChanges(log.details);
   const rows = detailRows(log.details);
   const importDetails = extractImportDetails(log.details);
+  const sectionRows = readSectionChanges(log.details);
+  const countSummary = sectionCountSummary(log.details);
+  const authLead =
+    log.resource === "alumni_auth" ? describeAuthEvent(log.action, log.details) : null;
   const resourceLabel = RESOURCE_LABELS[log.resource] ?? log.resource;
 
   return (
@@ -479,8 +498,21 @@ function DetailModal({
         <div className="mb-3">
           {log.action === "IMPORT" && importDetails ? (
             <ImportDetail details={importDetails} />
+          ) : authLead ? (
+            <div>
+              <p className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-800">
+                {authLead}
+              </p>
+              {rows.length > 0 && (
+                <DataCard title="รายละเอียดเพิ่มเติม" rows={rows} emptyText="ไม่มีรายละเอียด" />
+              )}
+            </div>
           ) : log.action === "UPDATE" && changes && changes.length > 0 ? (
             <EditDiff changes={changes} />
+          ) : log.action === "UPDATE" && sectionRows.length > 0 ? (
+            <SectionChanges rows={sectionRows} />
+          ) : log.action === "UPDATE" && countSummary ? (
+            <DataCard title="รายการที่บันทึก" rows={[{ label: "ส่วนที่แก้ไข", value: countSummary }]} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
           ) : log.action === "UPDATE" ? (
             <DataCard title="ข้อมูลหลังแก้ไข" rows={rows} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
           ) : log.action === "CREATE" ? (
@@ -529,6 +561,29 @@ function DataCard({ title, rows, emptyText }: { title: string; rows: { label: st
           ))}
         </dl>
       )}
+    </div>
+  );
+}
+
+/** Added/removed rows per related section (alumni self-edit of awards/…). */
+function SectionChanges({ rows }: { rows: { label: string; added: string[]; removed: string[] }[] }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+      {rows.map((s, i) => (
+        <div key={i}>
+          <p className="mb-1 text-sm font-semibold text-gray-700">{s.label}</p>
+          {s.added.length > 0 && (
+            <p className="text-sm text-green-700">
+              <span className="text-gray-500">เพิ่ม: </span>{s.added.join(", ")}
+            </p>
+          )}
+          {s.removed.length > 0 && (
+            <p className="text-sm text-red-600">
+              <span className="text-gray-500">ลบ: </span>{s.removed.join(", ")}
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

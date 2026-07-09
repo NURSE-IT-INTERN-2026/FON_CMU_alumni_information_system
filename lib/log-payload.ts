@@ -60,3 +60,121 @@ export function educationRecordDetails(edu: {
     lastName: edu.lastName ?? null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Self-edit section diff — what an alumni added/removed in each related
+// section (awards / associations / …). Stored as `details.sectionChanges` and
+// rendered on both the profile timeline and the System Logs page.
+// ---------------------------------------------------------------------------
+
+type Row = Record<string, unknown>;
+
+function str(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
+
+export interface SectionDiff {
+  added: string[];
+  removed: string[];
+}
+
+/** Diff two row sets by a natural key → human labels for added/removed rows. */
+export function diffSection(
+  oldRows: Row[],
+  newRows: Row[],
+  keyOf: (r: Row) => string,
+  labelOf: (r: Row) => string,
+): SectionDiff {
+  const oldMap = new Map<string, string>();
+  for (const o of oldRows) {
+    const k = keyOf(o);
+    if (k && !oldMap.has(k)) oldMap.set(k, labelOf(o));
+  }
+  const newMap = new Map<string, string>();
+  for (const n of newRows) {
+    const k = keyOf(n);
+    if (k && !newMap.has(k)) newMap.set(k, labelOf(n));
+  }
+  const added: string[] = [];
+  const removed: string[] = [];
+  for (const [k, label] of newMap) if (!oldMap.has(k)) added.push(label);
+  for (const [k, label] of oldMap) if (!newMap.has(k)) removed.push(label);
+  return { added, removed };
+}
+
+/** Natural-key + Thai label per related section (mirrors the alumni full-form
+ *  + self-edit field sets). Keys must match across old (DB) and new (payload). */
+export const SECTION_DIFF_CONFIG: Record<
+  string,
+  { keyOf: (r: Row) => string; labelOf: (r: Row) => string }
+> = {
+  awards: {
+    keyOf: (r) => [str(r.awardName), String(r.year ?? "")].join("|"),
+    labelOf: (r) => {
+      const name = str(r.awardName) ?? "รางวัล";
+      const yr = str(String(r.year ?? ""));
+      return yr ? `${name} (${yr})` : name;
+    },
+  },
+  associations: {
+    keyOf: (r) => [str(r.associationName), str(r.position), String(r.recordedYear ?? "")].join("|"),
+    labelOf: (r) => {
+      const name = str(r.associationName) ?? "สมาคม/ชมรม";
+      const pos = str(r.position);
+      const yr = str(String(r.recordedYear ?? ""));
+      return [name, pos, yr ? `(${yr})` : null].filter(Boolean).join(" — ");
+    },
+  },
+  graduateCommittees: {
+    keyOf: (r) => [String(r.termYear ?? ""), str(r.position)].join("|"),
+    labelOf: (r) => {
+      const pos = str(r.position);
+      const term = str(String(r.termYear ?? ""));
+      return [pos, term ? `ปี ${term}` : null].filter(Boolean).join(" ") || "กรรมการบัณฑิต";
+    },
+  },
+  potentials: {
+    keyOf: (r) => [str(r.career), str(r.position), String(r.recordedYear ?? "")].join("|"),
+    labelOf: (r) => {
+      const parts = [str(r.career), str(r.position)].filter(Boolean);
+      const yr = str(String(r.recordedYear ?? ""));
+      const label = parts.join(" — ") || "ศักยภาพ";
+      return yr ? `${label} (${yr})` : label;
+    },
+  },
+  modelRepresentatives: {
+    keyOf: (r) => [str(r.cohort), String(r.generation ?? "")].join("|"),
+    labelOf: (r) => {
+      const gen = str(String(r.generation ?? ""));
+      const cohort = str(r.cohort);
+      return gen ? `ผู้แทนรุ่น ${gen}` : cohort ? `ผู้แทนรุ่น ${cohort}` : "ผู้แทนรุ่น";
+    },
+  },
+  alumniAgency: {
+    keyOf: (r) => [str(r.workplace), str(r.country)].join("|"),
+    labelOf: (r) => {
+      const parts = [str(r.workplace), str(r.country)].filter(Boolean);
+      return parts.join(" — ") || "ข้อมูลการทำงานศิษย์เก่า";
+    },
+  },
+};
+
+/**
+ * Build `details.sectionChanges` from old (pre-edit) and new (submitted)
+ * related rows. Only sections that actually changed are included.
+ */
+export function buildSectionChanges(
+  oldBySection: Record<string, Row[]>,
+  newBySection: Record<string, Row[]>,
+): Record<string, SectionDiff> | null {
+  const out: Record<string, SectionDiff> = {};
+  for (const [section, cfg] of Object.entries(SECTION_DIFF_CONFIG)) {
+    const oldRows = oldBySection[section] ?? [];
+    const newRows = newBySection[section] ?? [];
+    const diff = diffSection(oldRows, newRows, cfg.keyOf, cfg.labelOf);
+    if (diff.added.length > 0 || diff.removed.length > 0) out[section] = diff;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
