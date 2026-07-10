@@ -122,6 +122,16 @@ describe("parseOriginalFormat", () => {
     const result = parseOriginalFormat(rows);
     expect(result[0].data.country).toBe("แคนาดา");
   });
+
+  it("leaves province/position null (legacy positional format has no such columns)", () => {
+    const rows = [
+      ["รุ่น", "คำนำหน้า", "ชื่อไทย", "ชื่ออังกฤษ", "ที่ทำงาน", "หมายเหตุ"],
+      ["1", "นางสาว", "สมหญิง ดี", "Somying", "USA Hospital", ""],
+    ];
+    const result = parseOriginalFormat(rows);
+    expect(result[0].data.province).toBeNull();
+    expect(result[0].data.position).toBeNull();
+  });
 });
 
 describe("parseExportFormat", () => {
@@ -221,6 +231,28 @@ describe("parseExportFormat", () => {
     expect(result[0].data.studentId).toBeNull();
     expect(result[0].data.major).toBeNull();
     expect(result[0].data.pendingStudentId).toBeNull();
+  });
+
+  it("reads จังหวัด + ตำแหน่ง columns", () => {
+    const rows = [
+      {
+        ประเทศ: "ประเทศไทย",
+        ชื่อ: "สมหญิง",
+        นามสกุล: "ดี",
+        จังหวัด: "เชียงใหม่",
+        ตำแหน่ง: "หัวหน้าหอผู้ป่วย",
+      },
+    ];
+    const result = parseExportFormat(rows);
+    expect(result[0].data.province).toBe("เชียงใหม่");
+    expect(result[0].data.position).toBe("หัวหน้าหอผู้ป่วย");
+  });
+
+  it("defaults province/position to null when absent", () => {
+    const rows = [{ ประเทศ: "สหรัฐอเมริกา", ชื่อ: "สมหญิง" }];
+    const result = parseExportFormat(rows);
+    expect(result[0].data.province).toBeNull();
+    expect(result[0].data.position).toBeNull();
   });
 });
 

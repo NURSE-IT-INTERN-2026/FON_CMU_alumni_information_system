@@ -25,6 +25,8 @@ export async function PUT(
     if (validated.lastName !== undefined) updateData.lastName = validated.lastName?.trim() || null;
     if (validated.englishName !== undefined) updateData.englishName = validated.englishName?.trim() || null;
     if (validated.workplace !== undefined) updateData.workplace = validated.workplace?.trim() || null;
+    if (validated.province !== undefined) updateData.province = validated.province?.trim() || null;
+    if (validated.position !== undefined) updateData.position = validated.position?.trim() || null;
     if (validated.homeAddress !== undefined) updateData.homeAddress = validated.homeAddress?.trim() || null;
     if (validated.country !== undefined) updateData.country = validated.country;
     if (validated.notes !== undefined) updateData.notes = validated.notes?.trim() || null;

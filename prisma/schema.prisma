@@ -312,6 +312,8 @@ model AlumniAgency {
   lastName    String?
   englishName String?
   workplace   String?
+  province    String? // In-country (Thailand) rows only — required at the validation layer when country is Thailand
+  position    String? // ตำแหน่ง — optional for both in-country and abroad rows
   homeAddress String?
   country     String
   major       String?

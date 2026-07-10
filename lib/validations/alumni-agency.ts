@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { editReasonField } from "./helpers";
+import { isThailandCountry } from "@/lib/alumni-agency-region";
 
 const MSG = {
   countryRequired: "กรุณากรอกประเทศ",
+  provinceRequired: "กรุณากรอกจังหวัด",
   nameRequired: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ",
   addressRequired: "กรุณากรอกที่อยู่",
   universityRequired: "กรุณากรอกมหาวิทยาลัย",
@@ -27,6 +29,8 @@ export const alumniAgencyCreateSchema = z
     lastName: z.string().optional().nullable(),
     englishName: z.string().optional().nullable(),
     workplace: z.string().optional().nullable(),
+    province: z.string().optional().nullable(),
+    position: z.string().optional().nullable(),
     homeAddress: z.string().optional().nullable(),
     country: z.string().min(1, MSG.countryRequired).trim(),
     notes: z.string().optional().nullable(),
@@ -37,6 +41,11 @@ export const alumniAgencyCreateSchema = z
   .refine((data) => data.firstName || data.lastName || data.englishName, {
     message: MSG.nameRequired,
     path: ["firstName"],
+  })
+  // Province (จังหวัด) is required for in-country (Thailand) rows only.
+  .refine((data) => !isThailandCountry(data.country) || !!data.province?.trim(), {
+    message: MSG.provinceRequired,
+    path: ["province"],
   });
 
 export const alumniAgencyUpdateSchema = z.object({
@@ -46,6 +55,8 @@ export const alumniAgencyUpdateSchema = z.object({
   lastName: z.string().optional().nullable(),
   englishName: z.string().optional().nullable(),
   workplace: z.string().optional().nullable(),
+  province: z.string().optional().nullable(),
+  position: z.string().optional().nullable(),
   homeAddress: z.string().optional().nullable(),
   country: z.string().min(1, MSG.countryRequired).trim().optional(),
   notes: z.string().optional().nullable(),
@@ -53,6 +64,13 @@ export const alumniAgencyUpdateSchema = z.object({
   studentId: z.string().optional().nullable(),
   order: z.coerce.number().int().optional(),
   reason: editReasonField(),
+})
+// Province (จังหวัด) is required for in-country (Thailand) rows. On update the
+// payload may omit `country` (partial update) — only enforce when country is
+// present and is a Thailand value.
+.refine((data) => data.country === undefined || !isThailandCountry(data.country) || !!data.province?.trim(), {
+  message: MSG.provinceRequired,
+  path: ["province"],
 });
 
 export type AlumniAgencyFormData = z.infer<typeof alumniAgencyFormSchema>;

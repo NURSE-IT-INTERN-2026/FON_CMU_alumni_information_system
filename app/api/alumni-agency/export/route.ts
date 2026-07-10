@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       country: { in: [...THAILAND_COUNTRY_VALUES], mode: "insensitive" as const },
     };
 
-    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "cohort"];
+    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "cohort", "province", "position"];
     const where: Record<string, unknown> = {};
 
     if (region === "thailand") {
@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
           { country: { contains: search, mode: "insensitive" } },
           { workplace: { contains: search, mode: "insensitive" } },
           { cohort: { contains: search, mode: "insensitive" } },
+          { province: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
         ];
       }
     }
@@ -75,8 +77,10 @@ export async function GET(request: NextRequest) {
       "ชื่ออังกฤษ": a.englishName || "",
       "สาขาวิชา": a.major || "",
       "สถานที่ทำงาน": a.workplace || "",
+      "ตำแหน่ง": a.position || "",
       "ที่อยู่บ้าน": a.homeAddress || "",
       "ประเทศ": a.country,
+      "จังหวัด": a.province || "",
       "หมายเหตุ": a.notes || "",
       "ลำดับ": a.order,
     }));
@@ -132,8 +136,10 @@ export async function POST(request: NextRequest) {
       "ชื่ออังกฤษ": a.englishName || "",
       "สาขาวิชา": a.major || "",
       "สถานที่ทำงาน": a.workplace || "",
+      "ตำแหน่ง": a.position || "",
       "ที่อยู่บ้าน": a.homeAddress || "",
       "ประเทศ": a.country,
+      "จังหวัด": a.province || "",
       "หมายเหตุ": a.notes || "",
       "ลำดับ": a.order,
     }));

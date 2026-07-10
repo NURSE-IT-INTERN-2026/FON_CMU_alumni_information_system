@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
         lastName: validated.lastName?.trim() || null,
         englishName: validated.englishName?.trim() || null,
         workplace: validated.workplace?.trim() || null,
+        province: validated.province?.trim() || null,
+        position: validated.position?.trim() || null,
         homeAddress: validated.homeAddress?.trim() || null,
         country: validated.country,
         notes: validated.notes?.trim() || null,
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
 
-    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort"];
+    const validSearchFields = ["studentId", "major", "firstName", "lastName", "englishName", "country", "workplace", "homeAddress", "cohort", "province", "position"];
 
     // PRD §3.9 — the in-country (Thailand) and abroad tabs share this model;
     // `country` is the discriminator. `region=thailand` keeps only Thailand
@@ -121,6 +123,8 @@ export async function GET(request: NextRequest) {
           { country: { contains: search, mode: "insensitive" } },
           { homeAddress: { contains: search, mode: "insensitive" } },
           { cohort: { contains: search, mode: "insensitive" } },
+          { province: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
         ];
       }
     }
