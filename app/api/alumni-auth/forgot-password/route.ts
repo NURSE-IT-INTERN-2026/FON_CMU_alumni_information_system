@@ -36,11 +36,15 @@ export async function POST(request: Request) {
     const successMessage =
       "หากอีเมลนี้ลงทะเบียนในระบบ ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลดังกล่าว";
 
-    // Look up alumni by email who has a password (signed up)
+    // Look up an ACTIVE, non-suspended alumni by email who has a password.
+    // Only ACTIVE accounts can log in, so a reset link for any other status is
+    // a dead end — restrict here. Still enumeration-safe (same message below).
     const alumni = await prisma.alumni.findFirst({
       where: {
         email: validated.email.trim().toLowerCase(),
         passwordHash: { not: null },
+        accountStatus: "ACTIVE",
+        suspendedAt: null,
       },
     });
 
@@ -53,6 +57,13 @@ export async function POST(request: Request) {
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    // Invalidate any prior unused reset tokens so only the latest link is valid
+    // (mirrors the verify-email/resend route).
+    await prisma.passwordReset.updateMany({
+      where: { alumniId: alumni.id, used: false },
+      data: { used: true },
+    });
+
     await prisma.passwordReset.create({
       data: {
         alumniId: alumni.id,
@@ -61,8 +72,13 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send reset email
-    await sendPasswordResetEmail(alumni.email, token);
+    // Best-effort send: a failure is logged but does NOT fail the request
+    // (mirrors the verify-email/resend route).
+    try {
+      await sendPasswordResetEmail(alumni.email, token);
+    } catch (err) {
+      console.error("Failed to send password-reset email:", err);
+    }
 
     // Log activity
     await logActivity(

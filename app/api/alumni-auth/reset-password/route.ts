@@ -7,10 +7,16 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
 
-const resetPasswordApiSchema = z.object({
-  token: z.string().min(1, "โทเคนไม่ถูกต้อง"),
-  password: passwordField(),
-});
+const resetPasswordApiSchema = z
+  .object({
+    token: z.string().min(1, "โทเคนไม่ถูกต้อง"),
+    password: passwordField(),
+    confirmPassword: z.string().min(1, "กรุณายืนยันรหัสผ่าน"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "รหัสผ่านไม่ตรงกัน",
+    path: ["confirmPassword"],
+  });
 
 export async function POST(request: Request) {
   try {
@@ -48,6 +54,20 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         { error: "ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือหมดอายุแล้ว" },
+        { status: 400 }
+      );
+    }
+
+    // Defense in depth: only ACTIVE, non-suspended accounts may reset. The
+    // forgot step already gates on this, but the account's status may have
+    // changed between link issue and click. The token holder is the account
+    // owner, so a specific message is safe here.
+    if (
+      resetRecord.alumni.accountStatus !== "ACTIVE" ||
+      resetRecord.alumni.suspendedAt
+    ) {
+      return NextResponse.json(
+        { error: "บัญชีนี้ไม่สามารถรีเซ็ตรหัสผ่านได้ กรุณาติดต่อผู้ดูแลระบบ" },
         { status: 400 }
       );
     }

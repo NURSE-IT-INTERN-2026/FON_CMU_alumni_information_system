@@ -71,7 +71,11 @@ function ResetPasswordForm() {
       const res = await fetch(`${BASE_PATH}/api/alumni-auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: data.token, password: data.password }),
+        body: JSON.stringify({
+          token: data.token,
+          password: data.password,
+          confirmPassword: data.confirmPassword,
+        }),
       });
 
       const resData = await res.json();
