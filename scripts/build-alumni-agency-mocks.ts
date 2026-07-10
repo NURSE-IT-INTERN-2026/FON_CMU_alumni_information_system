@@ -29,7 +29,7 @@ const REAL_ALUMNI_XLSX = `${OUT_DIR}/alumni.xlsx`;
 
 const HEADERS = [
   "ลำดับ", "รุ่น", "คำนำหน้า", "ชื่อ", "นามสกุล", "ชื่ออังกฤษ",
-  "สถานที่ทำงาน", "ที่อยู่บ้าน", "ประเทศ", "หมายเหตุ",
+  "สถานที่ทำงาน", "ตำแหน่ง", "ที่อยู่บ้าน", "ประเทศ", "จังหวัด", "หมายเหตุ",
   "รหัสนักศึกษา", "สาขาวิชา",
 ] as const;
 
@@ -47,6 +47,19 @@ const MAJORS = [
   "พยาบาลศาสตร์มหาบัณฑิต",
   "สาธารณสุขศาสตร์",
 ];
+
+// ตำแหน่ง (optional) — cycle a few realistic nursing positions across rows.
+const POSITIONS = [
+  "พยาบาลวิชาชีพ",
+  "หัวหน้าหอผู้ป่วย",
+  "ผู้ช่วยผู้อำนวยการฝ่ายการพยาบาล",
+  "อาจารย์",
+  "พยาบาลผู้ให้การปรึกษา",
+  "",
+];
+
+// จังหวัด for the in-country (Thailand) fixture — cycle a spread of provinces.
+const MOCK_PROVINCES = ["เชียงใหม่", "กรุงเทพมหานคร", "ขอนแก่น", "สงขลา", "นครราชสีมา", "อุบลราชธานี"];
 
 // ---------------------------------------------------------------------------
 // Readers / writers (mirror scripts/build-import-excels.ts helpers — duplicated
@@ -165,7 +178,7 @@ async function main(): Promise<void> {
     const major = MAJORS[(rowIndex - 1) % MAJORS.length];
     majorTally.set(major, (majorTally.get(major) ?? 0) + 1);
 
-    const cells = (country: string): (string | number)[] => [
+    const cells = (country: string, province: string): (string | number)[] => [
       r["ลำดับ"] || rowIndex,
       r["รุ่น"] || "",
       r["คำนำหน้า"] || "",
@@ -173,14 +186,17 @@ async function main(): Promise<void> {
       r["นามสกุล"] || "",
       r["ชื่ออังกฤษ"] || "",
       r["สถานที่ทำงาน"] || "",
+      POSITIONS[(rowIndex - 1) % POSITIONS.length],
       r["ที่อยู่บ้าน"] || "",
       country,
+      province,
       r["หมายเหตุ"] || "",
       studentId,
       major,
     ];
-    abroad.push(cells(r["ประเทศ"] || "สหรัฐอเมริกา"));
-    thailand.push(cells("ประเทศไทย"));
+    // Abroad rows carry no province; in-country rows cycle a realistic province.
+    abroad.push(cells(r["ประเทศ"] || "สหรัฐอเมริกา", ""));
+    thailand.push(cells("ประเทศไทย", MOCK_PROVINCES[(rowIndex - 1) % MOCK_PROVINCES.length]));
   });
 
   fs.mkdirSync(OUT_DIR, { recursive: true });

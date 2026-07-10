@@ -48,6 +48,7 @@ export const FIELD_LABELS: Record<string, string> = {
   termYear: "ปี/วาระ",
   workplace: "สถานที่ทำงาน",
   country: "ประเทศ",
+  province: "จังหวัด",
   // misc
   title: "ชื่อเรื่อง",
   status: "สถานะ",

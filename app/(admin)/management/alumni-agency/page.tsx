@@ -17,6 +17,8 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
 import SearchInput from "@/components/ui/search-input";
+import { isThailandCountry } from "@/lib/alumni-agency-region";
+import { THAI_PROVINCES } from "@/lib/thai-provinces";
 
 interface AlumniAgency {
   id: string;
@@ -30,6 +32,8 @@ interface AlumniAgency {
   lastName: string | null;
   englishName: string | null;
   workplace: string | null;
+  province: string | null;
+  position: string | null;
   homeAddress: string | null;
   country: string;
   major: string | null;
@@ -62,6 +66,8 @@ const abroadFormSchema = z.object({
   lastName: z.string(),
   englishName: z.string(),
   workplace: z.string(),
+  position: z.string(),
+  province: z.string(),
   homeAddress: z.string(),
   country: z.string().min(1, "กรุณากรอกประเทศ"),
   major: z.string(),
@@ -70,14 +76,23 @@ const abroadFormSchema = z.object({
 }).refine((data) => data.firstName.trim() || data.lastName.trim() || data.englishName.trim(), {
   message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ",
   path: ["firstName"],
+})
+// จังหวัด is required for in-country (Thailand) rows only. In thailand mode
+// the form always writes THAILAND_DEFAULT_COUNTRY to `country`, so this refine
+// keys off the country value (mode-aware via the data itself, not a closure).
+.refine((data) => !isThailandCountry(data.country) || data.province.trim(), {
+  message: "กรุณากรอกจังหวัด",
+  path: ["province"],
 });
 type AbroadFormValues = z.infer<typeof abroadFormSchema>;
 
-type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "workplace" | "homeAddress" | "notes" | "order";
+type SortField = "studentId" | "cohort" | "major" | "prefix" | "firstName" | "lastName" | "englishName" | "country" | "province" | "workplace" | "position" | "homeAddress" | "notes" | "order";
 type SortDir = "asc" | "desc";
 
-// Abroad sort columns (includes country).
-const ABROAD_SORT_FIELDS: { field: SortField; label: string }[] = [
+// Columns shared by both tabs (PRD §3.9): รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า,
+// ชื่อ-นามสกุล, ชื่ออังกฤษ. Both tabs then add a location field in the same slot
+// (abroad = ประเทศ, in-country = จังหวัด) so header and body `<td>`s stay aligned.
+const SHARED_COLUMNS: { field: SortField; label: string }[] = [
   { field: "studentId", label: "รหัสนักศึกษา" },
   { field: "cohort", label: "รุ่น" },
   { field: "major", label: "สาขาวิชา" },
@@ -85,18 +100,28 @@ const ABROAD_SORT_FIELDS: { field: SortField; label: string }[] = [
   { field: "firstName", label: "ชื่อ" },
   { field: "lastName", label: "นามสกุล" },
   { field: "englishName", label: "ชื่ออังกฤษ" },
+];
+
+// Abroad tab: ประเทศ in the location slot; ตำแหน่ง after workplace.
+const ABROAD_SORT_FIELDS: { field: SortField; label: string }[] = [
+  ...SHARED_COLUMNS,
   { field: "country", label: "ประเทศ" },
   { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "position", label: "ตำแหน่ง" },
   { field: "homeAddress", label: "ที่อยู่บ้าน" },
   { field: "notes", label: "หมายเหตุ" },
 ];
 
-// In-country tab: abroad columns MINUS country (PRD §3.9 line 167:
-// รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, สถานที่ทำงาน,
-// ที่อยู่บ้าน, หมายเหตุ). workplace is included here — it was the missing column.
-const THAILAND_SORT_FIELDS: { field: SortField; label: string }[] = ABROAD_SORT_FIELDS.filter(
-  (f) => f.field !== "country"
-);
+// In-country tab: จังหวัด in the location slot (no ประเทศ — always Thailand);
+// ตำแหน่ง after workplace. workplace is included (PRD §3.9).
+const THAILAND_SORT_FIELDS: { field: SortField; label: string }[] = [
+  ...SHARED_COLUMNS,
+  { field: "province", label: "จังหวัด" },
+  { field: "workplace", label: "สถานที่ทำงาน" },
+  { field: "position", label: "ตำแหน่ง" },
+  { field: "homeAddress", label: "ที่อยู่บ้าน" },
+  { field: "notes", label: "หมายเหตุ" },
+];
 
 function getFieldValue(a: AlumniAgency, field: SortField): string {
   switch (field) {
@@ -108,7 +133,9 @@ function getFieldValue(a: AlumniAgency, field: SortField): string {
     case "lastName": return a.lastName || "";
     case "englishName": return a.englishName || "";
     case "country": return a.country;
+    case "province": return a.province || "";
     case "workplace": return a.workplace || "";
+    case "position": return a.position || "";
     case "homeAddress": return a.homeAddress || "";
     case "notes": return a.notes || "";
     case "order": return String(a.order);
@@ -170,7 +197,7 @@ export default function AlumniAgencyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as unknown as Resolver<AbroadFormValues>,
-    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
+    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
@@ -266,13 +293,13 @@ export default function AlumniAgencyPage() {
   const defaultCountry = () => (isThailand ? THAILAND_DEFAULT_COUNTRY : "");
 
   const openCreate = () => {
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: defaultCountry(), major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: defaultCountry(), major: "", notes: "", order: "0" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (a: AlumniAgency) => {
-    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
+    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", position: a.position || "", province: a.province || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -280,7 +307,7 @@ export default function AlumniAgencyPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
@@ -295,6 +322,8 @@ export default function AlumniAgencyPage() {
         lastName: data.lastName.trim() || null,
         englishName: data.englishName.trim() || null,
         workplace: data.workplace.trim() || null,
+        position: data.position.trim() || null,
+        province: data.province.trim() || null,
         homeAddress: data.homeAddress.trim() || null,
         country: data.country.trim(),
         major: data.major.trim() || null,
@@ -538,6 +567,9 @@ export default function AlumniAgencyPage() {
             <FormField label="สถานที่ทำงาน" className="sm:col-span-2">
               <FormTextarea registration={register("workplace")} rows={3} />
             </FormField>
+            <FormField label="ตำแหน่ง">
+              <FormInput registration={register("position")} type="text" />
+            </FormField>
             <FormField label="ที่อยู่บ้าน" className="sm:col-span-2">
               <FormTextarea registration={register("homeAddress")} rows={2} />
             </FormField>
@@ -552,6 +584,21 @@ export default function AlumniAgencyPage() {
                   {countries.map((c) => <option key={c} value={c} />)}
                 </datalist>
               </FormField>
+            )}
+            {isThailand ? (
+              // จังหวัด is required for in-country rows (enforced by the schema
+              // refine). Backed by a datalist of the 77 official Thai provinces.
+              <FormField label="จังหวัด" required error={errors.province?.message}>
+                <FormInput registration={register("province")} error={errors.province?.message} type="text" list="province-list" />
+                <datalist id="province-list">
+                  {THAI_PROVINCES.map((p) => <option key={p} value={p} />)}
+                </datalist>
+              </FormField>
+            ) : (
+              // Abroad records have no province — keep the field registered so
+              // the payload shape is stable, but hidden (abroad never trips the
+              // refine since its country is never a Thailand value).
+              <input type="hidden" {...register("province")} />
             )}
             <FormField label="หมายเหตุ">
               <FormInput registration={register("notes")} type="text" />
@@ -671,10 +718,13 @@ export default function AlumniAgencyPage() {
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="firstName" value={a.firstName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="lastName" value={a.lastName || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="englishName" value={a.englishName || "-"} hotFields={hot[a.id]} /></td>
-                    {!isThailand && (
+                    {isThailand ? (
+                      <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="province" value={a.province || "-"} hotFields={hot[a.id]} /></td>
+                    ) : (
                       <td className="px-4 py-3"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="country" value={a.country} hotFields={hot[a.id]} /></td>
                     )}
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="position" value={a.position || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="notes" value={a.notes || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-center">

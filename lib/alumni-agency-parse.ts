@@ -5,6 +5,8 @@ export interface ParsedAlumniAgencyRow {
   lastName: string | null;
   englishName: string | null;
   workplace: string | null;
+  province: string | null;
+  position: string | null;
   homeAddress: string | null;
   country: string;
   notes: string | null;
@@ -81,7 +83,7 @@ export function parseOriginalFormat(
     const notes = String(r[6] || "").trim() || null;
     const country = inferCountry(workplace || "");
     result.push({
-      data: { cohort, prefix, firstName, lastName, englishName, workplace, homeAddress, country, notes, order: i, studentId: null, major: null, pendingStudentId: null },
+      data: { cohort, prefix, firstName, lastName, englishName, workplace, province: null, position: null, homeAddress, country, notes, order: i, studentId: null, major: null, pendingStudentId: null },
       rowNumber: i + 1,
     });
   }
@@ -122,6 +124,8 @@ export function parseExportFormat(
         lastName,
         englishName,
         workplace: row["สถานที่ทำงาน"]?.toString().trim() || null,
+        position: row["ตำแหน่ง"]?.toString().trim() || null,
+        province: row["จังหวัด"]?.toString().trim() || null,
         homeAddress: row["ที่อยู่บ้าน"]?.toString().trim() || null,
         country,
         notes: row["หมายเหตุ"]?.toString().trim() || null,

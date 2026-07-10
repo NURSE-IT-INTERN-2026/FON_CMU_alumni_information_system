@@ -29,6 +29,8 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
     "lastName",
     "englishName",
     "workplace",
+    "province",
+    "position",
     "homeAddress",
     "country",
     "notes",
