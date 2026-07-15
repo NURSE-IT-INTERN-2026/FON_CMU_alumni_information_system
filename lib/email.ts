@@ -74,12 +74,6 @@ export async function sendPasswordResetEmail(
               รีเซ็ตรหัสผ่าน
             </a>
           </div>
-          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
-          </p>
-          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
-            ${resetUrl}
-          </p>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
           <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
             หากท่านไม่ได้เป็นผู้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยต่ออีเมลนี้ รหัสผ่านของท่านจะยังคงเดิม
@@ -130,12 +124,6 @@ export async function sendEmailVerificationEmail(
               ยืนยันอีเมล
             </a>
           </div>
-          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
-          </p>
-          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
-            ${verifyUrl}
-          </p>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
           <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
             หากท่านไม่ได้เป็นผู้ลงทะเบียน กรุณาเพิกเฉยต่ออีเมลนี้
@@ -180,12 +168,6 @@ export async function sendSignupApprovedEmail(to: string, name: string): Promise
               เข้าสู่ระบบ
             </a>
           </div>
-          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
-          </p>
-          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
-            ${loginUrl}
-          </p>
         </div>
         <div style="text-align: center; margin-top: 16px;">
           <p style="color: #9ca3af; font-size: 12px;">
@@ -238,12 +220,6 @@ export async function sendSignupRejectedEmail(
               ยื่นคำขอใหม่
             </a>
           </div>
-          <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-            หากปุ่มด้านบนไม่ทำงาน กรุณาคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:
-          </p>
-          <p style="color: #3182ce; font-size: 14px; word-break: break-all;">
-            ${reapplyUrl}
-          </p>
         </div>
         <div style="text-align: center; margin-top: 16px;">
           <p style="color: #9ca3af; font-size: 12px;">
