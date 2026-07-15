@@ -58,12 +58,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Defense in depth: only ACTIVE, non-suspended accounts may reset. The
-    // forgot step already gates on this, but the account's status may have
-    // changed between link issue and click. The token holder is the account
-    // owner, so a specific message is safe here.
+    // Defense in depth: only ACTIVE or REJECTED, non-suspended accounts may
+    // reset. The forgot step already gates on this, but the account's status
+    // may have changed between link issue and click. REJECTED accounts are
+    // admitted (like the forgot step) because they still authenticate by
+    // password on the re-sign-up (reapply) flow; resetting does NOT change
+    // their accountStatus. The token holder is the account owner, so a
+    // specific message is safe here.
+    const status = resetRecord.alumni.accountStatus;
     if (
-      resetRecord.alumni.accountStatus !== "ACTIVE" ||
+      (status !== "ACTIVE" && status !== "REJECTED") ||
       resetRecord.alumni.suspendedAt
     ) {
       return NextResponse.json(

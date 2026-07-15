@@ -7,6 +7,7 @@ import { BASE_PATH, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { alumniSignupSchema, type AlumniSignupData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import PasswordInput from "@/components/form/PasswordInput";
 import FormSelect from "@/components/form/FormSelect";
 import BirthDateSelect from "@/components/form/BirthDateSelect";
 
@@ -278,7 +279,7 @@ function AlumniSignupForm() {
             </FormField>
 
             <FormField label="รหัสผ่าน" error={errors.password?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-              <FormInput
+              <PasswordInput
                 registration={register("password")}
                 error={errors.password?.message}
                 id="password"
@@ -290,7 +291,7 @@ function AlumniSignupForm() {
             </FormField>
 
             <FormField label="ยืนยันรหัสผ่าน" error={errors.confirmPassword?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-              <FormInput
+              <PasswordInput
                 registration={register("confirmPassword")}
                 error={errors.confirmPassword?.message}
                 id="confirmPassword"
