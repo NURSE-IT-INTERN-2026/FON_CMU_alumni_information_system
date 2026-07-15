@@ -8,7 +8,10 @@ import { logActivity } from "@/lib/activity-log";
 import { bustCache, bustCachePrefix } from "@/lib/cache";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
-import { buildSignupVerification } from "@/lib/signup-verification";
+import {
+  buildSignupVerification,
+  localAuthoritativeFromAlumni,
+} from "@/lib/signup-verification";
 import { DEGREE_LEVEL_VALUES } from "@/lib/validations/alumni";
 import { Prisma, type DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -104,6 +107,13 @@ export async function POST(request: Request) {
     } catch {
       cmuConsulted = false;
     }
+    // CMU has no record for some local/admin-created studentIds (e.g. 67676767).
+    // Fall back to the existing local record — the account itself when the id is
+    // unchanged — so the snapshot compares the re-submission against the data on
+    // file instead of the misleading "ไม่พบรหัสนักศึกษา" banner. A changed id was
+    // already verified unclaimed by the clash check above, so it has no record.
+    const local =
+      studentId === alumni.studentId ? localAuthoritativeFromAlumni(alumni) : null;
     const verification = buildSignupVerification(
       {
         studentId,
@@ -115,7 +125,7 @@ export async function POST(request: Request) {
       },
       cmuGrad,
       cmuConsulted,
-      null,
+      local,
     );
 
     // 4. Update identity fields + snapshot, flip to PENDING. Keep emailVerifiedAt
