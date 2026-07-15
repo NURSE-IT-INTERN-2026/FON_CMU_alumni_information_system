@@ -134,7 +134,7 @@ describe("buildSignupVerification", () => {
     firstName: "สมหญิง",
     lastName: "รักเรียน",
     birthDate: "01122540", // Buddhist DDMMYYYY, same form format as submitted
-    cohort: "2560",
+    graduationYear: 2560,
     degreeLevel: "BACHELOR" as const,
   };
 
@@ -150,13 +150,15 @@ describe("buildSignupVerification", () => {
     expect(v.fields.cohort.match).toBe(true);
     expect(v.fields.degreeLevel.match).toBe(true);
     expect(v.allMatchableMatch).toBe(true);
+    // The authoritative column surfaces the LOCAL record's graduation year.
+    expect(v.fields.cohort.authoritative).toBe("2560");
   });
 
   it("flags mismatches against the LOCAL record (case 4)", () => {
     const v = buildSignupVerification(submitted, null, true, {
       ...localMatch,
       firstName: "สมชาย",
-      cohort: "2559",
+      graduationYear: 2559,
     });
     expect(v.source).toBe("local");
     expect(v.fields.firstName.match).toBe(false);
@@ -165,6 +167,7 @@ describe("buildSignupVerification", () => {
     expect(v.allMatchableMatch).toBe(false);
     // The authoritative column shows the LOCAL record's value.
     expect(v.fields.firstName.authoritative).toBe("สมชาย");
+    expect(v.fields.cohort.authoritative).toBe("2559");
   });
 
   it("prefers CMU over local when both are available", () => {

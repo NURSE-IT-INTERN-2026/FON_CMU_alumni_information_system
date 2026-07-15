@@ -770,7 +770,7 @@ const VERIFICATION_FIELDS: {
   { key: "firstName", label: "ชื่อ", fmt: (x) => x },
   { key: "lastName", label: "นามสกุล", fmt: (x) => x },
   { key: "birthDate", label: "วันเกิด", fmt: (x) => (x ? formatBirthDateThaiSlash(x) ?? x : null) },
-  { key: "cohort", label: "ปีที่จบ / รุ่น", fmt: (x) => x },
+  { key: "cohort", label: "ปีที่จบ", fmt: (x) => x },
   { key: "degreeLevel", label: "ระดับการศึกษา", fmt: (x) => (x ? DEGREE_LABELS[x] ?? x : null) },
 ];
 
