@@ -48,8 +48,9 @@ export interface SubmittedSignupFields {
 /**
  * The local `alumni` record's identity fields, used as the authoritative source
  * when CMU has no record for the studentId. `birthDate` is DDMMYYYY (Buddhist) —
- * the SAME form format as `SubmittedSignupFields.birthDate` — and `cohort` is a
- * Buddhist year string, so both compare directly after canonicalization.
+ * the SAME form format as `SubmittedSignupFields.birthDate` — and
+ * `graduationYear` is the numeric Buddhist graduation year, so both compare
+ * directly after canonicalization.
  */
 export interface LocalAuthoritative {
   studentId: string;
@@ -57,8 +58,8 @@ export interface LocalAuthoritative {
   lastName: string | null;
   /** Buddhist-era DDMMYYYY, or null when the local record omits it. */
   birthDate: string | null;
-  /** Graduation/cohort year (Buddhist), or null. */
-  cohort: string | null;
+  /** Numeric Buddhist graduation year (`Alumni.graduationYear`), or null. */
+  graduationYear: number | null;
   degreeLevel: DegreeLevelValue | null;
 }
 
@@ -143,7 +144,7 @@ export function localAuthoritativeFromAlumni(a: {
   firstName: string | null;
   lastName: string | null;
   birthDate: string | null;
-  cohort: string | null;
+  graduationYear: number | null;
   degreeLevel: string | null;
 }): LocalAuthoritative {
   return {
@@ -151,7 +152,7 @@ export function localAuthoritativeFromAlumni(a: {
     firstName: a.firstName,
     lastName: a.lastName,
     birthDate: a.birthDate,
-    cohort: a.cohort,
+    graduationYear: a.graduationYear,
     degreeLevel: a.degreeLevel as DegreeLevelValue | null,
   };
 }
@@ -299,10 +300,14 @@ function buildLocalVerification(
   // Both sides are Buddhist DDMMYYYY → canonical Gregorian; compare directly.
   const birthMatch = locBirth ? (subBirth != null && subBirth === locBirth) : null;
 
-  const locCohortRaw = String(local.cohort ?? "").trim();
-  const locCohort = normalizeYear(locCohortRaw) ? locCohortRaw : null;
-  const cohortMatch = locCohort
-    ? normalizeYear(locCohort) === normalizeYear(submitted.cohort)
+  // The applicant submits a graduation year, so compare against the local
+  // record's `graduationYear` (numeric) — NOT `Alumni.cohort`, which is the
+  // "รุ่นที่" cohort label and would always mismatch a year.
+  const locGradYear =
+    local.graduationYear != null ? String(local.graduationYear).trim() : null;
+  const locYear = locGradYear && normalizeYear(locGradYear) ? locGradYear : null;
+  const cohortMatch = locYear
+    ? normalizeYear(locYear) === normalizeYear(submitted.cohort)
     : null;
 
   const studentIdMatch = locStudentId === submitted.studentId.trim();
@@ -321,7 +326,7 @@ function buildLocalVerification(
     firstName: { submitted: submitted.firstName.trim() || null, authoritative: locFirstName || null, match: firstNameMatch },
     lastName: { submitted: submitted.lastName.trim() || null, authoritative: locLastName || null, match: lastNameMatch },
     birthDate: { submitted: subBirth, authoritative: locBirth, match: birthMatch },
-    cohort: { submitted: submitted.cohort.trim() || null, authoritative: locCohort, match: cohortMatch },
+    cohort: { submitted: submitted.cohort.trim() || null, authoritative: locYear, match: cohortMatch },
     degreeLevel: { submitted: submitted.degreeLevel || null, authoritative: local.degreeLevel, match: degreeMatch },
   };
 

@@ -119,6 +119,8 @@ async function main() {
 
     if (fx.mode === "local") {
       // Pre-create the local alumni with the AUTHORITATIVE identity (no creds yet).
+      // `graduationYear` (numeric) is what the verification compares the
+      // applicant's submitted year against; `cohort` is just the display label.
       await prisma.alumni.create({
         data: {
           studentId: fx.studentId,
@@ -127,6 +129,7 @@ async function main() {
           lastName: fx.authoritativeLocal!.lastName,
           birthDate: fx.authoritativeLocal!.birthDate,
           cohort: fx.authoritativeLocal!.cohort,
+          graduationYear: Number(fx.authoritativeLocal!.cohort),
           degreeLevel: fx.authoritativeLocal!.degreeLevel as DegreeLevel,
         },
       });
