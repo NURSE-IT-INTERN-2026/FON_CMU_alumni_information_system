@@ -8,6 +8,7 @@ import { BASE_PATH } from "@/lib/constants";
 import { adminLoginSchema, alumniLoginSchema, type AdminLoginData, type AlumniLoginData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import PasswordInput from "@/components/form/PasswordInput";
 
 const ALUMNI_ERROR_KEYS = new Set(["alumni_not_found", "alumni_rejected"]);
 
@@ -315,7 +316,7 @@ function LoginForm() {
                   />
                 </FormField>
                 <FormField label="รหัสผ่าน" error={adminForm.formState.errors.password?.message} labelClassName={AUTH_LABEL_CLASS}>
-                  <FormInput
+                  <PasswordInput
                     registration={adminForm.register("password")}
                     error={adminForm.formState.errors.password?.message}
                     id="admin-password"
@@ -368,7 +369,7 @@ function LoginForm() {
                       ลืมรหัสผ่าน?
                     </a>
                   </div>
-                  <FormInput
+                  <PasswordInput
                     registration={alumniForm.register("password")}
                     error={alumniForm.formState.errors.password?.message}
                     id="alumni-password"

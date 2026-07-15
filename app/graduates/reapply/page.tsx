@@ -8,6 +8,7 @@ import { BASE_PATH, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
 import { alumniReapplySchema, type AlumniReapplyData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import PasswordInput from "@/components/form/PasswordInput";
 import FormSelect from "@/components/form/FormSelect";
 import BirthDateSelect from "@/components/form/BirthDateSelect";
 
@@ -183,17 +184,27 @@ function AlumniReapplyForm() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent text-[var(--foreground)] placeholder:text-[var(--muted)]"
                   />
                 </FormField>
-                <FormField label="รหัสผ่าน" labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-                  <input
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
+                      รหัสผ่าน
+                    </label>
+                    <a
+                      href={`${BASE_PATH}/graduates/forgot-password`}
+                      className="mb-1.5 text-xs text-[var(--primary)] hover:underline"
+                    >
+                      ลืมรหัสผ่าน?
+                    </a>
+                  </div>
+                  <PasswordInput
                     id="password"
-                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
                     placeholder="กรอกรหัสผ่าน"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent text-[var(--foreground)] placeholder:text-[var(--muted)]"
+                    className="px-4 py-2.5 text-[var(--foreground)] placeholder:text-[var(--muted)] border-[var(--border)]"
                   />
-                </FormField>
+                </div>
                 <button
                   type="submit"
                   disabled={credLoading}

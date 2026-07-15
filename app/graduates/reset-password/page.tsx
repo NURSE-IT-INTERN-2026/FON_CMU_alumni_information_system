@@ -8,6 +8,7 @@ import { BASE_PATH } from "@/lib/constants";
 import { resetPasswordSchema, type ResetPasswordData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import PasswordInput from "@/components/form/PasswordInput";
 
 export default function ResetPasswordPage() {
   return (
@@ -142,7 +143,7 @@ function ResetPasswordForm() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <FormField label="รหัสผ่านใหม่" error={errors.password?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-              <FormInput
+              <PasswordInput
                 registration={register("password")}
                 error={errors.password?.message}
                 id="password"
@@ -154,7 +155,7 @@ function ResetPasswordForm() {
             </FormField>
 
             <FormField label="ยืนยันรหัสผ่านใหม่" error={errors.confirmPassword?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
-              <FormInput
+              <PasswordInput
                 registration={register("confirmPassword")}
                 error={errors.confirmPassword?.message}
                 id="confirmPassword"

@@ -36,14 +36,17 @@ export async function POST(request: Request) {
     const successMessage =
       "หากอีเมลนี้ลงทะเบียนในระบบ ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลดังกล่าว";
 
-    // Look up an ACTIVE, non-suspended alumni by email who has a password.
-    // Only ACTIVE accounts can log in, so a reset link for any other status is
-    // a dead end — restrict here. Still enumeration-safe (same message below).
+    // Look up an ACTIVE or REJECTED, non-suspended alumni by email who has a
+    // password. ACTIVE accounts can log in; REJECTED accounts cannot log in but
+    // still authenticate by password on the re-sign-up (reapply) flow — so a
+    // reset is a live path for them too (resetting does NOT change their
+    // accountStatus). Other statuses (UNVERIFIED/PENDING) never had a usable
+    // password path, so they stay excluded. Enumeration-safe (same message below).
     const alumni = await prisma.alumni.findFirst({
       where: {
         email: validated.email.trim().toLowerCase(),
         passwordHash: { not: null },
-        accountStatus: "ACTIVE",
+        accountStatus: { in: ["ACTIVE", "REJECTED"] },
         suspendedAt: null,
       },
     });
