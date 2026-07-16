@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getIp } from "@/lib/activity-log";
 import { getCmuGraduatesLocal, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
 import { normalizeCmuBirthday, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
+import { getLocalAlumniStudentIdSet, isCmuLinked } from "@/lib/cmu-alumni-link";
 import { PAGE_SIZE } from "@/lib/constants";
 
 const RATE_LIMIT_MAX = 300;
@@ -72,8 +73,22 @@ export async function GET(request: NextRequest) {
     const cmuRaw = await getCmuGraduatesLocal();
     const graduates = dedupe ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
 
+    // 4b. Optional link-state filter (the cmu-sync "อยู่ในระบบแล้ว" /
+    //     "ยังไม่อยู่ในระบบ" tables). Applied before search/facets/sort/
+    //     pagination so `total` + pagination reflect the filtered set. Only the
+    //     cmu-sync tables send `linkState`; other callers (all-alumni page,
+    //     alumni search) omit it and are unaffected.
+    const linkState = searchParams.get("linkState");
+    let scoped = graduates;
+    if (linkState === "linked" || linkState === "unlinked") {
+      const localSidSet = await getLocalAlumniStudentIdSet();
+      scoped = graduates.filter(
+        (g) => isCmuLinked(g, localSidSet) === (linkState === "linked"),
+      );
+    }
+
     // 5. Apply search filter
-    let filtered = graduates;
+    let filtered = scoped;
     if (search) {
       filtered = graduates.filter((g: CmuGraduate) => {
         const haystack = [

@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { AlertTriangle, CheckCircle2, RefreshCw, CloudDownload } from "lucide-react";
+import SearchInput from "@/components/ui/search-input";
+import { DEGREE_LEVEL_OPTIONS, PAGE_SIZE } from "@/lib/constants";
+import { cmuLevelToDegree } from "@/lib/alumni-verify";
 
 // Shape returned by GET /api/cmu-alumni/sync (the auto-compare).
 interface CompareResult {
@@ -73,6 +76,20 @@ export default function CmuSyncPage() {
   const comparing = compareQuery.isPending;
   const syncing = syncMutation.isPending;
   const remoteUnreachable = !!compareQuery.error;
+
+  // Linked / unlinked split of the local cmu_graduates cache — drives the two
+  // tab badges + gates the tables section (hidden pre-first-sync). Reads local
+  // data only, so it works even when the Registrar is unreachable.
+  const linkCountsQuery = useQuery({
+    queryKey: queryKeys.cmuSync.linkCounts(),
+    queryFn: () =>
+      apiFetch<{ linked: number; unlinked: number }>("/api/cmu-alumni/link-counts"),
+  });
+  const linkedCount = linkCountsQuery.data?.linked ?? 0;
+  const unlinkedCount = linkCountsQuery.data?.unlinked ?? 0;
+
+  const [activeTab, setActiveTab] = useState<"linked" | "unlinked">("linked");
+  const showTables = (linkedCount > 0 || unlinkedCount > 0) && !comparing;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -227,6 +244,45 @@ export default function CmuSyncPage() {
         การดึงข้อมูลจะปรับปรุงข้อมูลศิษย์เก่าในระบบให้ตรงกับระบบทะเบียน
         (อาจใช้เวลาสักครู่สำหรับข้อมูลจำนวนมาก)
       </p>
+
+      {/* Linked vs unlinked tables — only once the local cache is populated. */}
+      {showTables && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-[var(--primary)]">
+            เปรียบเทียบกับศิษย์เก่าในระบบ
+          </h2>
+          <p className="mb-4 mt-1 text-sm text-[var(--muted)]">
+            ข้อมูลศิษย์เก่าจากระบบทะเบียนที่มีในระบบเราแล้ว และที่ยังไม่มีในระบบ
+          </p>
+
+          {/* Tabs */}
+          <div className="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+            <button
+              onClick={() => setActiveTab("linked")}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === "linked"
+                  ? "bg-white text-[var(--primary)] shadow-sm"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              อยู่ในระบบแล้ว ({linkedCount.toLocaleString()})
+            </button>
+            <button
+              onClick={() => setActiveTab("unlinked")}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === "unlinked"
+                  ? "bg-white text-[var(--primary)] shadow-sm"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              ยังไม่อยู่ในระบบ ({unlinkedCount.toLocaleString()})
+            </button>
+          </div>
+
+          {/* `key` remounts on tab switch so each tab has independent page/search. */}
+          <CmuLinkTable key={activeTab} linkState={activeTab} />
+        </div>
+      )}
     </div>
   );
 }
@@ -247,6 +303,157 @@ function StatCard({
         {value == null ? "—" : value.toLocaleString()}
       </p>
       <p className="mt-1 text-xs text-[var(--muted)]">{muted}</p>
+    </div>
+  );
+}
+
+// One CMU graduate row as returned by GET /api/cmu-alumni (snake_case shape).
+interface CmuGraduateItem {
+  student_id: string;
+  name_th: string;
+  surname_th: string;
+  level_id: string;
+  major_name_th: string;
+  grad_year: string;
+}
+
+// Degree enum value → Thai label. `DEGREE_LEVEL_OPTIONS` is the single source of
+// truth in constants.ts; build the lookup once at module scope (client-safe).
+const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
+  DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+function degreeLabel(levelId: string, major: string): string {
+  return DEGREE_LEVEL_LABELS[cmuLevelToDegree(levelId, major)] ?? "—";
+}
+
+/**
+ * Read-only, paginated, searchable table of CMU graduates for one link-state.
+ * The two tabs reuse this single component (parameterized by `linkState`); the
+ * parent remounts it on tab switch via `key` so each tab keeps its own
+ * page/search. Server-side pagination + search hit GET /api/cmu-alumni?linkState.
+ */
+function CmuLinkTable({ linkState }: { linkState: "linked" | "unlinked" }) {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const pageSize = PAGE_SIZE;
+
+  const { data, isPending } = useQuery({
+    queryKey: queryKeys.cmuSync.list({ linkState, page, search }),
+    queryFn: () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        linkState,
+      });
+      if (search) params.set("search", search);
+      return apiFetch<{
+        data: CmuGraduateItem[];
+        total: number;
+        page: number;
+        pageSize: number;
+      }>(`/api/cmu-alumni?${params.toString()}`);
+    },
+  });
+
+  const items = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const startIdx = (page - 1) * pageSize;
+
+  const applySearch = (v: string) => {
+    setSearch(v);
+    setPage(1);
+  };
+
+  return (
+    <div className="rounded-xl border bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchInput
+          value={search}
+          onSearch={applySearch}
+          placeholder="ค้นหา รหัสนักศึกษา / ชื่อ / นามสกุล"
+          formClassName="w-full sm:max-w-md"
+        />
+        <span className="text-sm text-[var(--muted)]">
+          ทั้งหมด {total.toLocaleString()} รายการ
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-sm">
+          <thead>
+            <tr className="bg-[var(--primary)] text-left text-white">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รหัสนักศึกษา</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">ชื่อ</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">นามสกุล</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ระดับการศึกษา</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">สาขาวิชา</th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ปีสำเร็จการศึกษา</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {isPending ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">
+                  <RefreshCw className="mx-auto h-5 w-5 animate-spin" />
+                </td>
+              </tr>
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">
+                  ไม่พบข้อมูล
+                </td>
+              </tr>
+            ) : (
+              items.map((g, idx) => (
+                <tr key={g.student_id || idx} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-center text-[var(--muted)]">
+                    {startIdx + idx + 1}
+                  </td>
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{g.student_id || "—"}</td>
+                  <td className="px-4 py-3">{g.name_th || "—"}</td>
+                  <td className="px-4 py-3">{g.surname_th || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {degreeLabel(g.level_id, g.major_name_th)}
+                  </td>
+                  <td className="px-4 py-3">{g.major_name_th || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{g.grad_year || "—"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3 sm:flex-row">
+          <span className="text-sm text-[var(--muted)]">
+            แสดง {total === 0 ? 0 : startIdx + 1}-{Math.min(page * pageSize, total)} จาก{" "}
+            {total.toLocaleString()} รายการ
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
+            >
+              ก่อนหน้า
+            </button>
+            <span className="text-sm text-[var(--muted)]">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

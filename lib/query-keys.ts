@@ -79,6 +79,12 @@ export const queryKeys = {
   cmuSync: {
     all: ["cmuSync"] as const,
     compare: () => ["cmuSync", "compare"] as const,
+    // Linked/unlinked split of the local cmu_graduates cache — drives the two
+    // tab badges on the cmu-sync page.
+    linkCounts: () => ["cmuSync", "linkCounts"] as const,
+    // The linked/unlinked graduate tables (paginated + searchable).
+    list: (o: { linkState: string; page: number; search: string }) =>
+      ["cmuSync", "list", o] as const,
   },
 
   // Alumni profile — graduates portal (me) + admin edit-by-id.
