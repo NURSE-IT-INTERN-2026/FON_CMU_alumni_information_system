@@ -19,6 +19,9 @@ import SearchInput from "@/components/ui/search-input";
 import { committeePageFormSchema, type CommitteePageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
+import { useResizableColumns } from "@/lib/use-resizable-columns";
+import { ColGroup } from "@/components/table-resize/ColGroup";
+import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 interface Committee {
   id: string;
@@ -90,6 +93,9 @@ export default function GraduateCommitteePage() {
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
+
+  const tableRef = useRef<HTMLTableElement>(null);
+  const resize = useResizableColumns("graduate-committee", 11);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
@@ -455,6 +461,9 @@ export default function GraduateCommitteePage() {
           >
             รอเชื่อมโยง
           </button>
+          {resize.isSuperAdmin && (
+            <button type="button" onClick={resize.resetAll} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50" title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น">รีเซ็ตความกว้าง</button>
+          )}
           {selectedCount > 0 && (
             <>
               <button
@@ -509,8 +518,9 @@ export default function GraduateCommitteePage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="relative overflow-x-auto">
+            <table className="w-full text-sm" ref={tableRef}>
+              <ColGroup count={11} widths={resize.widths} />
               <thead>
                 <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
@@ -582,6 +592,7 @@ export default function GraduateCommitteePage() {
                 ))}
               </tbody>
             </table>
+            <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
           </div>
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
