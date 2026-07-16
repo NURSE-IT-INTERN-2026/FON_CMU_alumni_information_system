@@ -98,21 +98,14 @@ export function useResizableColumns(
   }, [mutation, tableKey, currentWidths]);
 
   /**
-   * Returns an onPointerDown handler for column `i`. The handle element's parent
-   * is the `<th>`, whose rendered width seeds the resize.
+   * Begin dragging column `i`, seeded with its current rendered width (the
+   * caller — the overlay — measures the actual `<th>` by index and passes it in,
+   * since the grip element is NOT a child of the `<th>` in the overlay layout).
    */
-  const startResize = useCallback(
-    (i: number) => (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!isSuperAdmin) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const th = e.currentTarget.parentElement as HTMLTableCellElement | null;
-      if (!th) return;
-
-      const startX = e.clientX;
-      const rect = th.getBoundingClientRect();
-      const startWidth = rect.width || currentWidths()[String(i)] || 0;
-      if (!startWidth) return;
+  const beginResize = useCallback(
+    (i: number, startWidth: number, clientX: number) => {
+      if (!isSuperAdmin || !startWidth) return;
+      const startX = clientX;
 
       const onMove = (ev: PointerEvent) => {
         const dx = ev.clientX - startX;
@@ -132,7 +125,7 @@ export function useResizableColumns(
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
     },
-    [isSuperAdmin, setColumnWidth, flushPersist, currentWidths]
+    [isSuperAdmin, setColumnWidth, flushPersist]
   );
 
   /** Double-click a handle ⇒ auto-fit (drop that column's saved width). */
@@ -161,7 +154,7 @@ export function useResizableColumns(
     columnCount,
     widths,
     isSuperAdmin,
-    startResize,
+    beginResize,
     resetColumn,
     resetAll,
   };

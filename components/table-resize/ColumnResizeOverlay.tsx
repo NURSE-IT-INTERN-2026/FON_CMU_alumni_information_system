@@ -13,7 +13,7 @@ import { ColResizeHandle } from "./ColResizeHandle";
 export type ResizeApi = {
   widths: Record<string, number>;
   isSuperAdmin: boolean;
-  startResize: (i: number) => (e: React.PointerEvent<HTMLDivElement>) => void;
+  beginResize: (i: number, startWidth: number, clientX: number) => void;
   resetColumn: (i: number) => void;
 };
 
@@ -74,8 +74,10 @@ export function ColumnResizeOverlay({
     measure();
   }, [measure, resize.widths, resize.isSuperAdmin]);
 
-  // Track horizontal scroll + container/table resize (superadmins only — others
-  // can't resize, so skip the observers entirely).
+  // Track horizontal scroll + container/table/<th> resize, and re-observe the
+  // <th>s when the column set changes (e.g. alumni-agency/all-alumni mode
+  // switch) so grips stay glued to the real borders through data loads and
+  // reflows. Superadmins only — others can't resize.
   useEffect(() => {
     if (!resize.isSuperAdmin) return;
     const table = tableRef.current;
@@ -85,13 +87,26 @@ export function ColumnResizeOverlay({
     const onScrollOrResize = () => scheduleMeasure();
     container.addEventListener("scroll", onScrollOrResize, { passive: true });
     window.addEventListener("resize", onScrollOrResize);
-    const ro = new ResizeObserver(() => scheduleMeasure());
-    ro.observe(container);
-    ro.observe(table);
+    // Container + table size changes (scroll, window resize, major reflow).
+    const sizeRO = new ResizeObserver(() => scheduleMeasure());
+    sizeRO.observe(container);
+    sizeRO.observe(table);
+    // Per-column width changes (data load reflows auto-layout columns). Re-run
+    // whenever the <thead> column set changes so new <th>s get observed.
+    const thRO = new ResizeObserver(() => scheduleMeasure());
+    const observeThs = () => {
+      thRO.disconnect();
+      table.querySelectorAll<HTMLTableCellElement>("thead th").forEach((th) => thRO.observe(th));
+    };
+    observeThs();
+    const mo = new MutationObserver(observeThs);
+    mo.observe(table.querySelector("thead") ?? table, { childList: true, subtree: true });
     return () => {
       container.removeEventListener("scroll", onScrollOrResize);
       window.removeEventListener("resize", onScrollOrResize);
-      ro.disconnect();
+      sizeRO.disconnect();
+      thRO.disconnect();
+      mo.disconnect();
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, [tableRef, scheduleMeasure, resize.isSuperAdmin]);
@@ -113,7 +128,17 @@ export function ColumnResizeOverlay({
           }}
         >
           <ColResizeHandle
-            onPointerDown={resize.startResize(p.index)}
+            onPointerDown={(e) => {
+              // Seed the drag with the REAL column width: the grip is an overlay
+              // element (not a child of the <th>), so look the <th> up by index
+              // and measure it live — never use the grip's own ~10px width.
+              e.preventDefault();
+              e.stopPropagation();
+              const ths = tableRef.current?.querySelectorAll<HTMLTableCellElement>("thead th");
+              const th = ths?.[p.index];
+              const startWidth = th ? th.getBoundingClientRect().width : 0;
+              resize.beginResize(p.index, startWidth, e.clientX);
+            }}
             onReset={() => resize.resetColumn(p.index)}
           />
         </div>
