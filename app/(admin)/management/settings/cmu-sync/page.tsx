@@ -77,19 +77,15 @@ export default function CmuSyncPage() {
   const syncing = syncMutation.isPending;
   const remoteUnreachable = !!compareQuery.error;
 
-  // Linked / unlinked split of the local cmu_graduates cache — drives the two
-  // tab badges + gates the tables section (hidden pre-first-sync). Reads local
-  // data only, so it works even when the Registrar is unreachable.
-  const linkCountsQuery = useQuery({
-    queryKey: queryKeys.cmuSync.linkCounts(),
-    queryFn: () =>
-      apiFetch<{ linked: number; unlinked: number }>("/api/cmu-alumni/link-counts"),
-  });
-  const linkedCount = linkCountsQuery.data?.linked ?? 0;
-  const unlinkedCount = linkCountsQuery.data?.unlinked ?? 0;
-
-  const [activeTab, setActiveTab] = useState<"linked" | "unlinked">("linked");
-  const showTables = (linkedCount > 0 || unlinkedCount > 0) && !comparing;
+  // Local-cache vs live-CMU comparison tables. Tab counts come straight from the
+  // already-fetched compare (localCount / remoteCount) — no separate count call.
+  // Raw record counts (no dedupe) so the totals reconcile with the stat cards.
+  const localCount = data?.localCount ?? 0;
+  const remoteCount = data?.remoteCount ?? 0;
+  const [activeTab, setActiveTab] = useState<"local" | "live">("local");
+  // Show once the local cache has data (post-first-sync). The live table degrades
+  // to an inline error if CMU is unreachable — the local table still works.
+  const showTables = !comparing && localCount > 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -245,42 +241,46 @@ export default function CmuSyncPage() {
         (อาจใช้เวลาสักครู่สำหรับข้อมูลจำนวนมาก)
       </p>
 
-      {/* Linked vs unlinked tables — only once the local cache is populated. */}
+      {/* Local cache vs live CMU — only once the local cache is populated. */}
       {showTables && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-[var(--primary)]">
-            เปรียบเทียบกับศิษย์เก่าในระบบ
+            เปรียบเทียบข้อมูลในระบบกับระบบทะเบียน
           </h2>
           <p className="mb-4 mt-1 text-sm text-[var(--muted)]">
-            ข้อมูลศิษย์เก่าจากระบบทะเบียนที่มีในระบบเราแล้ว และที่ยังไม่มีในระบบ
+            “ข้อมูลในระบบ” คือข้อมูลที่ดึงเข้ามาแล้ว ({localCount.toLocaleString()} รายการ)
+            · “ข้อมูลล่าสุดจากทะเบียน” คือข้อมูลปัจจุบันจากระบบทะเบียน
+            {remoteCount > localCount
+              ? ` (ใหม่กว่าในระบบ ${(remoteCount - localCount).toLocaleString()} รายการ — กด “ดึงข้อมูล” เพื่ออัปเดต)`
+              : ""}
           </p>
 
-          {/* Tabs */}
+          {/* Tabs — counts from the compare result (localCount / remoteCount). */}
           <div className="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
             <button
-              onClick={() => setActiveTab("linked")}
+              onClick={() => setActiveTab("local")}
               className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === "linked"
+                activeTab === "local"
                   ? "bg-white text-[var(--primary)] shadow-sm"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              อยู่ในระบบแล้ว ({linkedCount.toLocaleString()})
+              ข้อมูลในระบบ ({localCount.toLocaleString()})
             </button>
             <button
-              onClick={() => setActiveTab("unlinked")}
+              onClick={() => setActiveTab("live")}
               className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === "unlinked"
+                activeTab === "live"
                   ? "bg-white text-[var(--primary)] shadow-sm"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              ยังไม่อยู่ในระบบ ({unlinkedCount.toLocaleString()})
+              ข้อมูลล่าสุดจากทะเบียน ({remoteCount.toLocaleString()})
             </button>
           </div>
 
           {/* `key` remounts on tab switch so each tab has independent page/search. */}
-          <CmuLinkTable key={activeTab} linkState={activeTab} />
+          <CmuSourceTable key={activeTab} source={activeTab} remoteUnreachable={remoteUnreachable} />
         </div>
       )}
     </div>
@@ -307,7 +307,7 @@ function StatCard({
   );
 }
 
-// One CMU graduate row as returned by GET /api/cmu-alumni (snake_case shape).
+// One CMU graduate row as returned by GET /api/cmu-alumni(/live) (snake_case).
 interface CmuGraduateItem {
   student_id: string;
   name_th: string;
@@ -315,6 +315,9 @@ interface CmuGraduateItem {
   level_id: string;
   major_name_th: string;
   grad_year: string;
+  // Live route only: true when this student_id is NOT in the local cache yet
+  // (the records a ดึงข้อมูล would add).
+  isNew?: boolean;
 }
 
 // Degree enum value → Thai label. `DEGREE_LEVEL_OPTIONS` is the single source of
@@ -328,38 +331,58 @@ function degreeLabel(levelId: string, major: string): string {
 }
 
 /**
- * Read-only, paginated, searchable table of CMU graduates for one link-state.
- * The two tabs reuse this single component (parameterized by `linkState`); the
- * parent remounts it on tab switch via `key` so each tab keeps its own
- * page/search. Server-side pagination + search hit GET /api/cmu-alumni?linkState.
+ * Read-only, paginated, searchable table of CMU graduates from one source.
+ * `local` reads the cmu_graduates cache via GET /api/cmu-alumni?dedupe=false
+ * (raw records, so the total matches `localCount`); `live` reads the current
+ * Registrar set via GET /api/cmu-alumni/live and badges rows not yet in the
+ * cache (isNew). The parent remounts on tab switch via `key` so each tab keeps
+ * its own page/search. If CMU is unreachable, the live table shows an inline
+ * error instead of crashing (the local table still works).
  */
-function CmuLinkTable({ linkState }: { linkState: "linked" | "unlinked" }) {
+function CmuSourceTable({
+  source,
+  remoteUnreachable,
+}: {
+  source: "local" | "live";
+  remoteUnreachable: boolean;
+}) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const pageSize = PAGE_SIZE;
 
-  const { data, isPending } = useQuery({
-    queryKey: queryKeys.cmuSync.list({ linkState, page, search }),
+  const queryKey =
+    source === "local"
+      ? queryKeys.cmuSync.local({ page, search })
+      : queryKeys.cmuSync.live({ page, search });
+
+  const { data, isPending, isError } = useQuery({
+    queryKey,
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
-        linkState,
       });
       if (search) params.set("search", search);
+      const path =
+        source === "local"
+          ? `/api/cmu-alumni?dedupe=false&${params.toString()}`
+          : `/api/cmu-alumni/live?${params.toString()}`;
       return apiFetch<{
         data: CmuGraduateItem[];
         total: number;
         page: number;
         pageSize: number;
-      }>(`/api/cmu-alumni?${params.toString()}`);
+      }>(path);
     },
+    // Don't retry a live table on a Registrar outage — surface the error fast.
+    retry: source === "live" ? false : 3,
   });
 
   const items = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const startIdx = (page - 1) * pageSize;
+  const showLiveError = source === "live" && (isError || remoteUnreachable);
 
   const applySearch = (v: string) => {
     setSearch(v);
@@ -394,7 +417,14 @@ function CmuLinkTable({ linkState }: { linkState: "linked" | "unlinked" }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {isPending ? (
+            {showLiveError ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-red-600">
+                  <AlertTriangle className="mx-auto mb-2 h-5 w-5" />
+                  ไม่สามารถติดต่อระบบทะเบียนเพื่อดึงข้อมูลได้ กรุณาลองใหม่ภายหลัง
+                </td>
+              </tr>
+            ) : isPending ? (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">
                   <RefreshCw className="mx-auto h-5 w-5 animate-spin" />
@@ -412,7 +442,14 @@ function CmuLinkTable({ linkState }: { linkState: "linked" | "unlinked" }) {
                   <td className="px-4 py-3 text-center text-[var(--muted)]">
                     {startIdx + idx + 1}
                   </td>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{g.student_id || "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="font-medium">{g.student_id || "—"}</span>
+                    {source === "live" && g.isNew && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        ใหม่
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">{g.name_th || "—"}</td>
                   <td className="px-4 py-3">{g.surname_th || "—"}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
