@@ -4,6 +4,7 @@ import { RoleProvider } from "@/lib/role-context";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import { DragScrollController } from "@/components/table-pan/DragScrollController";
 
 export default async function PublicLayout({
   children,
@@ -18,6 +19,7 @@ export default async function PublicLayout({
 
   return (
     <RoleProvider role={session.user.role}>
+      <DragScrollController />
       <div className="flex min-h-screen flex-col">
         <Header user={{ firstName: session.user.firstName, lastName: session.user.lastName }} />
         <div className="flex flex-1">
