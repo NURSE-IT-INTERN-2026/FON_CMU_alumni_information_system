@@ -1,91 +1,151 @@
-import nodemailer from "nodemailer";
+// Alumni mail goes through the CMU Email API (the university's SMTP relay):
+// a two-step OAuth flow — POST /EmailApi/GetToken (client credentials) returns
+// a 24h Bearer token, then POST /EmailApi/SendEmail sends the message.
+// All alumni notifications route through here: email verification, password
+// reset, signup approved/rejected. The four exported helpers keep their
+// signatures stable; only the transport lives in this file.
+//
+// Bodies are PLAIN TEXT (the API `message` field accepts `\n` / `<br/>` for
+// line breaks). Do not reintroduce HTML bodies — the relay renders `message`
+// as text, so markup would show up verbatim. Links are raw URLs.
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+type TokenCache = { token: string; expiresAt: number };
 
-// Escape user-provided text interpolated into email HTML (reason, name) so an
-// admin/alumni can't inject markup into the message body.
-const escapeHtml = (s: string): string =>
-  s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+// Token lives 24h; refresh 1h before expiry so a send never hits a stale token.
+const TOKEN_REFRESH_BUFFER_MS = 60 * 60 * 1000;
 
-// From address used for every alumni-facing email. SMTP_FROM is preferred,
-// falling back to a sensible default. Configure a real sending address in .env.
-const fromAddress =
-  process.env.SMTP_FROM ||
-  '"FON CMU Alumni" <noreply@cmu.ac.th>';
+let tokenCache: TokenCache | null = null;
 
-// nodemailer SMTP transporter — the sole email provider for alumni mail
-// (verification, password reset, signup approved/rejected). Configure via the
-// SMTP_* env vars (see .env.example).
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+type CmuEmailConfig = {
+  baseUrl: string;
+  apiUrl: string;
+  clientId: string;
+  clientSecret: string;
+  systemName: string;
+};
+
+// Read env at call time (not module load) so tests can set vars + fresh-import.
+function getConfig(): CmuEmailConfig {
+  return {
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+    apiUrl: process.env.CMU_EMAIL_API_BASE_URL || "",
+    clientId: process.env.CMU_EMAIL_CLIENT_ID || "",
+    clientSecret: process.env.CMU_EMAIL_CLIENT_SECRET || "",
+    systemName:
+      process.env.CMU_EMAIL_SYSTEM_NAME ||
+      "ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
+  };
+}
+
+function endpoint(apiUrl: string, path: string): string {
+  return `${apiUrl.replace(/\/$/, "")}${path}`;
+}
+
+/**
+ * Returns a cached Bearer access token, fetching a fresh one when none is
+ * cached or the cached token is within 1h of expiry. Throws if the API is not
+ * configured or GetToken fails — callers decide whether to swallow.
+ */
+async function getAccessToken(): Promise<string> {
+  const now = Date.now();
+  if (tokenCache && tokenCache.expiresAt > now + TOKEN_REFRESH_BUFFER_MS) {
+    return tokenCache.token;
+  }
+
+  const { apiUrl, clientId, clientSecret } = getConfig();
+  if (!apiUrl || !clientId || !clientSecret) {
+    throw new Error(
+      "CMU Email API not configured (set CMU_EMAIL_API_BASE_URL, CMU_EMAIL_CLIENT_ID, CMU_EMAIL_CLIENT_SECRET)"
+    );
+  }
+
+  const res = await fetch(endpoint(apiUrl, "/EmailApi/GetToken"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    access_token?: string;
+    expires_in?: number;
+    message?: string;
+  };
+  if (!res.ok || !data.success || !data.access_token) {
+    throw new Error(
+      `CMU Email GetToken failed: ${data.message ?? res.status}`
+    );
+  }
+
+  const expiresInSec = Number(data.expires_in) || 86400;
+  tokenCache = {
+    token: data.access_token,
+    expiresAt: now + expiresInSec * 1000,
+  };
+  return tokenCache.token;
+}
 
 type SendEmailInput = {
   to: string;
   subject: string;
-  html: string;
+  message: string;
 };
 
 /**
- * Shared email primitive. Sends alumni mail via the nodemailer SMTP
- * transporter. Throws on failure so callers can decide whether to swallow
+ * Shared email primitive. Sends alumni mail via the CMU Email API (GetToken →
+ * SendEmail). Throws on failure so callers can decide whether to swallow
  * (best-effort notifications) or surface the error.
  */
-async function sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {
-  await transporter.sendMail({ from: fromAddress, to, subject, html });
+async function sendEmail({ to, subject, message }: SendEmailInput): Promise<void> {
+  const token = await getAccessToken();
+  const { apiUrl, systemName } = getConfig();
+
+  const res = await fetch(endpoint(apiUrl, "/EmailApi/SendEmail"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      subject,
+      sent_to: to,
+      message,
+      system_name: systemName,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    message?: string;
+  };
+  if (!res.ok || data.success === false) {
+    throw new Error(
+      `CMU Email SendEmail failed: ${data.message ?? res.status}`
+    );
+  }
 }
 
 export async function sendPasswordResetEmail(
   to: string,
   resetToken: string
 ): Promise<void> {
+  const { baseUrl } = getConfig();
   const resetUrl = `${baseUrl}/alumni/graduates/reset-password?token=${resetToken}`;
 
   await sendEmail({
     to,
     subject:
       "รีเซ็ตรหัสผ่าน - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
-    html: `
-      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
-        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #5b21b6; margin: 0; font-size: 22px;">รีเซ็ตรหัสผ่าน</h2>
-          </div>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            ท่านได้รับอีเมลนี้เนื่องจากมีการขอรีเซ็ตรหัสผ่านสำหรับระบบสารสนเทศศิษย์เก่า
-            คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-          </p>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            กรุณาคลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่
-            <span style="color: #e53e3e; font-weight: 600;">(ลิงก์นี้จะหมดอายุใน 1 ชั่วโมง)</span>
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${resetUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
-              รีเซ็ตรหัสผ่าน
-            </a>
-          </div>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
-            หากท่านไม่ได้เป็นผู้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยต่ออีเมลนี้ รหัสผ่านของท่านจะยังคงเดิม
-          </p>
-        </div>
-        <div style="text-align: center; margin-top: 16px;">
-          <p style="color: #9ca3af; font-size: 12px;">
-            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-          </p>
-        </div>
-      </div>
-    `,
+    message: [
+      "รีเซ็ตรหัสผ่าน",
+      "",
+      "ท่านได้รับอีเมลนี้เนื่องจากมีการขอรีเซ็ตรหัสผ่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
+      "",
+      "กรุณาเปิดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่ (ลิงก์นี้จะหมดอายุใน 1 ชั่วโมง):",
+      resetUrl,
+      "",
+      "หากท่านไม่ได้เป็นผู้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยต่ออีเมลนี้ รหัสผ่านของท่านจะยังคงเดิม",
+      "",
+      "© คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
+    ].join("\n"),
   });
 }
 
@@ -99,43 +159,25 @@ export async function sendEmailVerificationEmail(
   name: string,
   verifyToken: string,
 ): Promise<void> {
+  const { baseUrl } = getConfig();
   const verifyUrl = `${baseUrl}/alumni/graduates/verify-email?token=${verifyToken}`;
 
   await sendEmail({
     to,
     subject:
       "ยืนยันอีเมล - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
-    html: `
-      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
-        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #5b21b6; margin: 0; font-size: 22px;">ยืนยันที่อยู่อีเมล</h2>
-          </div>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            เรียน ${name},
-          </p>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            ขอบคุณที่ลงทะเบียนในระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-            กรุณาคลิกปุ่มด้านล่างเพื่อยืนยันที่อยู่อีเมลของท่าน
-            <span style="color: #e53e3e; font-weight: 600;">(ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง)</span>
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${verifyUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
-              ยืนยันอีเมล
-            </a>
-          </div>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
-            หากท่านไม่ได้เป็นผู้ลงทะเบียน กรุณาเพิกเฉยต่ออีเมลนี้
-          </p>
-        </div>
-        <div style="text-align: center; margin-top: 16px;">
-          <p style="color: #9ca3af; font-size: 12px;">
-            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-          </p>
-        </div>
-      </div>
-    `,
+    message: [
+      "ยืนยันที่อยู่อีเมล",
+      "",
+      `เรียน ${name},`,
+      "",
+      "ขอบคุณที่ลงทะเบียนในระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่ กรุณาเปิดลิงก์ด้านล่างเพื่อยืนยันที่อยู่อีเมลของท่าน (ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง):",
+      verifyUrl,
+      "",
+      "หากท่านไม่ได้เป็นผู้ลงทะเบียน กรุณาเพิกเฉยต่ออีเมลนี้",
+      "",
+      "© คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
+    ].join("\n"),
   });
 }
 
@@ -144,89 +186,62 @@ export async function sendEmailVerificationEmail(
  * `name` is the alumni's current display name (prefix + first + last).
  */
 export async function sendSignupApprovedEmail(to: string, name: string): Promise<void> {
+  const { baseUrl } = getConfig();
   const loginUrl = `${baseUrl}/alumni/login`;
 
   await sendEmail({
     to,
     subject:
       "บัญชีของท่านได้รับอนุมัติแล้ว - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
-    html: `
-      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
-        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #2e7d32; margin: 0; font-size: 22px;">บัญชีของท่านได้รับอนุมัติแล้ว</h2>
-          </div>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            เรียน ${name},
-          </p>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-            ได้รับการอนุมัติแล้ว ท่านสามารถเข้าสู่ระบบได้ทันที
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${loginUrl}" style="display: inline-block; background-color: #2e7d32; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
-              เข้าสู่ระบบ
-            </a>
-          </div>
-        </div>
-        <div style="text-align: center; margin-top: 16px;">
-          <p style="color: #9ca3af; font-size: 12px;">
-            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-          </p>
-        </div>
-      </div>
-    `,
+    message: [
+      "บัญชีของท่านได้รับอนุมัติแล้ว",
+      "",
+      `เรียน ${name},`,
+      "",
+      "การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่ ได้รับการอนุมัติแล้ว ท่านสามารถเข้าสู่ระบบได้ทันที:",
+      loginUrl,
+      "",
+      "© คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
+    ].join("\n"),
   });
 }
 
 /**
- * Sent when an admin rejects a pending signup. Now carries the admin's reason
- * (required at the reject endpoint) and a "ยื่นคำขอใหม่" button so the alumni
- * can re-apply directly from the email. `to` is the recipient, so including it
- * in the reapply link's ?email= is safe (no leak beyond the inbox owner).
+ * Sent when an admin rejects a pending signup. Carries the admin's reason
+ * (required at the reject endpoint) and a ยื่นคำขอใหม่ link so the alumni can
+ * re-apply directly from the email. `to` is the recipient, so including it in
+ * the reapply link's ?email= is safe (no leak beyond the inbox owner).
  */
 export async function sendSignupRejectedEmail(
   to: string,
   name: string,
   reason?: string | null,
 ): Promise<void> {
+  const { baseUrl } = getConfig();
   const reapplyUrl = `${baseUrl}/alumni/graduates/reapply?email=${encodeURIComponent(to)}`;
+
+  const lines = [
+    "แจ้งผลการพิจารณาการลงทะเบียน",
+    "",
+    `เรียน ${name},`,
+    "",
+    "การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่ ยังไม่ได้รับการอนุมัติ",
+  ];
+  if (reason && reason.trim()) {
+    lines.push("", `เหตุผลที่ปฏิเสธ: ${reason}`);
+  }
+  lines.push(
+    "",
+    "ท่านสามารถแก้ไขข้อมูลและยื่นคำขอใหม่ได้ที่ลิงก์ด้านล่าง:",
+    reapplyUrl,
+    "",
+    "© คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่",
+  );
+
   await sendEmail({
     to,
     subject:
       "แจ้งผลการพิจารณาการลงทะเบียน - ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
-    html: `
-      <div style="font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f5f7fa; border-radius: 8px;">
-        <div style="background-color: #ffffff; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #c62828; margin: 0; font-size: 22px;">แจ้งผลการพิจารณาการลงทะเบียน</h2>
-          </div>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            เรียน ${escapeHtml(name)},
-          </p>
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            การลงทะเบียนของท่านสำหรับระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-            ยังไม่ได้รับการอนุมัติ
-          </p>
-          ${reason ? `
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            <strong>เหตุผลที่ปฏิเสธ:</strong> ${escapeHtml(reason)}
-          </p>` : ""}
-          <p style="color: #1a1a2e; font-size: 16px; line-height: 1.6;">
-            ท่านสามารถแก้ไขข้อมูลและยื่นคำขอใหม่ได้โดยคลิกปุ่มด้านล่าง
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="${reapplyUrl}" style="display: inline-block; background-color: #5b21b6; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">
-              ยื่นคำขอใหม่
-            </a>
-          </div>
-        </div>
-        <div style="text-align: center; margin-top: 16px;">
-          <p style="color: #9ca3af; font-size: 12px;">
-            © คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่
-          </p>
-        </div>
-      </div>
-    `,
+    message: lines.join("\n"),
   });
 }
