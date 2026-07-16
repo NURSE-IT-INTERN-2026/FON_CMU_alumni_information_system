@@ -87,7 +87,7 @@ export default function AwardsPage() {
 
   // Superadmin drag-to-resize column widths (13 columns: ลำดับ + 11 data + จัดการ).
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("awards", 13);
+  const resize = useResizableColumns("awards", 13, tableRef);
 
   const qc = useQueryClient();
   const { items: awards, total, totalPages, isPending: loading, isError } = useEntityList<Award>(
