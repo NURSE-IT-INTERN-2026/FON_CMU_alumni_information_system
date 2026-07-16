@@ -98,6 +98,16 @@ table {
   border-collapse: collapse;
 }
 
+/* Drag-to-pan horizontal scroll: the whole table is grabbable; `grabbing` is
+   forced (over the rows' cursor-pointer) only while a drag is in progress. */
+.overflow-x-auto:has(table) {
+  cursor: grab;
+}
+.drag-panning,
+.drag-panning * {
+  cursor: grabbing !important;
+}
+
 /* Rich text editor content */
 .prose img {
   max-width: 100%;
