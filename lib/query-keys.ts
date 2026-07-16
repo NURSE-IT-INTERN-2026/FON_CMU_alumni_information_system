@@ -75,16 +75,15 @@ export const queryKeys = {
     stats: () => ["alumniActivity", "stats"] as const,
   },
 
-  // CMU Registrar sync (การดึงข้อมูล page) — compare + materialize.
+  // CMU Registrar sync (การดึงข้อมูล page) — compare + materialize, plus the
+  // local-cache vs live-CMU comparison tables.
   cmuSync: {
     all: ["cmuSync"] as const,
     compare: () => ["cmuSync", "compare"] as const,
-    // Linked/unlinked split of the local cmu_graduates cache — drives the two
-    // tab badges on the cmu-sync page.
-    linkCounts: () => ["cmuSync", "linkCounts"] as const,
-    // The linked/unlinked graduate tables (paginated + searchable).
-    list: (o: { linkState: string; page: number; search: string }) =>
-      ["cmuSync", "list", o] as const,
+    // "ข้อมูลในระบบ" — local cmu_graduates cache (dedupe=false, raw records).
+    local: (o: { page: number; search: string }) => ["cmuSync", "local", o] as const,
+    // "ข้อมูลล่าสุดจากทะเบียน" — live CMU (server-paginated).
+    live: (o: { page: number; search: string }) => ["cmuSync", "live", o] as const,
   },
 
   // Alumni profile — graduates portal (me) + admin edit-by-id.
