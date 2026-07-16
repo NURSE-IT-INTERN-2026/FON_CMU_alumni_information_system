@@ -89,7 +89,7 @@ export default function PotentialsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("potentials", 10);
+  const resize = useResizableColumns("potentials", 10, tableRef);
 
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");

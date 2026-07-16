@@ -89,7 +89,7 @@ export default function AssociationsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("associations", 10);
+  const resize = useResizableColumns("associations", 10, tableRef);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();

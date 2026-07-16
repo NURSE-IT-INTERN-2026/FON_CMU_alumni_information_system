@@ -95,7 +95,7 @@ export default function GraduateCommitteePage() {
   const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
 
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("graduate-committee", 11);
+  const resize = useResizableColumns("graduate-committee", 11, tableRef);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);

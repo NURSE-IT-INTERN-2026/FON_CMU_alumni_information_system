@@ -394,7 +394,7 @@ export default function AlumniCountPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns(`all-alumni:${dedupeView ? "dedupe" : "all"}`, 14);
+  const resize = useResizableColumns(`all-alumni:${dedupeView ? "dedupe" : "all"}`, 14, tableRef);
 
   // CMU Registrar data (view mode only) — merge CMU + local overlay.
   const tableLoading = manageQuery.isPending;

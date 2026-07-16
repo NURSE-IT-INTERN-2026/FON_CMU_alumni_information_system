@@ -130,7 +130,7 @@ export default function ModelRepresentativesPage() {
   const [showCohortDropdown, setShowCohortDropdown] = useState(false);
   const cohortDropdownRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("model-representatives", 9);
+  const resize = useResizableColumns("model-representatives", 9, tableRef);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);

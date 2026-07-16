@@ -237,7 +237,7 @@ export default function AlumniAgencyPage() {
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns(`alumni-agency:${mode}`, 14);
+  const resize = useResizableColumns(`alumni-agency:${mode}`, 14, tableRef);
 
   const qc = useQueryClient();
   const { data, isPending: loading } = useQuery({
