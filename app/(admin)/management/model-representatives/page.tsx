@@ -18,9 +18,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
-import { useResizableColumns } from "@/lib/use-resizable-columns";
-import { ColGroup } from "@/components/table-resize/ColGroup";
-import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 interface ModelRepresentative {
   id: string;
@@ -129,8 +126,6 @@ export default function ModelRepresentativesPage() {
   const [nameSearch, setNameSearch] = useState("");
   const [showCohortDropdown, setShowCohortDropdown] = useState(false);
   const cohortDropdownRef = useRef<HTMLDivElement>(null);
-  const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("model-representatives", 9, tableRef);
 
   const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
     setValue("studentId", a.studentId);
@@ -715,9 +710,6 @@ export default function ModelRepresentativesPage() {
           >
             รอเชื่อมโยง
           </button>
-          {resize.isSuperAdmin && (
-            <button type="button" onClick={resize.resetAll} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50" title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น">รีเซ็ตความกว้าง</button>
-          )}
           {selectedCount > 0 && (
             <>
               <button
@@ -769,9 +761,8 @@ export default function ModelRepresentativesPage() {
             <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
           </div>
         ) : (
-          <div className="relative overflow-x-auto rounded-lg bg-white shadow-sm">
-            <table ref={tableRef} className="w-full text-sm">
-              <ColGroup count={9} widths={resize.widths} />
+          <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
@@ -857,7 +848,6 @@ export default function ModelRepresentativesPage() {
                 ))}
               </tbody>
             </table>
-            <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
             {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); deselectAll(); }, managePageStart, managePageEnd, mgmtSorted.length)}
           </div>
         )

@@ -95,10 +95,4 @@ export const queryKeys = {
     for: (o: { resourceType: string; idsKey: string }) =>
       ["fieldChanges", o] as const,
   },
-
-  // Superadmin column-width prefs (drag-to-resize) — per table/mode.
-  tablePrefs: {
-    all: ["tablePrefs"] as const,
-    for: (tableKey: string) => ["tablePrefs", tableKey] as const,
-  },
 } as const;
