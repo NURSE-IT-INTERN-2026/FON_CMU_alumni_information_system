@@ -134,6 +134,7 @@ app/
 │   ├── users/[id]/               # User management
 │   ├── trash/{restore,hard-delete}/   # Superadmin soft-delete recovery
 │   ├── field-changes/ · filter-facets/ · dashboard/ · logs/   # logs = read-only GET + superadmin-only bulk-delete
+│   ├── table-prefs/             # Superadmin drag-to-resize column widths (GET ?table= + PUT) — `table_column_widths`, no logging
 │   └── upload/                   # Image upload (PNG/JPG, max 5 MB)
 ```
 
@@ -215,7 +216,8 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 |---|---|
 | `components/Header.tsx` · `Sidebar.tsx` · `Footer.tsx` | Admin chrome (header w/ mobile hamburger, collapsible sidebar, footer) |
 | `components/AlumniHeader.tsx` · `AlumniSidebar.tsx` | Alumni-portal chrome |
-| `components/data-table.tsx` | Reusable sortable/paginated table |
+| `components/data-table.tsx` | Reusable sortable/paginated table (currently **unused** — every management table hand-rolls its own `<table>`; see the column-resize lesson) |
+| `components/table-resize/ColGroup.tsx` · `ColumnResizeOverlay.tsx` · `ColResizeHandle.tsx` | Superadmin drag-to-resize columns — `<ColGroup>` applies saved px widths via `<col>`; the overlay floats a drag grip over each header border (measured, so it tracks scroll/resize); only mounted for superadmins |
 | `components/OrangeCell.tsx` · `FieldHistoryModal.tsx` | Orange update indicators + per-field change-history modal |
 | `components/ui/*` | shadcn/ui primitives (button, dialog, table, select, pagination, …) |
 | `components/providers/query-provider.tsx` | TanStack Query client provider |
@@ -234,6 +236,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 | `lib/excel-export.ts` · `lib/excel-import.ts` | Shared ExcelJS import/export helpers |
 | `lib/validations/*.ts` | Zod schemas per entity (alumni, award, news, user, auth, …) |
 | `lib/query-keys.ts` | TanStack Query key definitions |
+| `lib/use-resizable-columns.ts` | Superadmin column-resize hook — widths live in the react-query cache (`setQueryData` during drag for instant feedback, debounced PUT to `/api/table-prefs` on drag end); `useRole()==="superadmin"` gates; returns `{ widths, isSuperAdmin, startResize, resetColumn, resetAll }` |
 | `lib/useBulkSelection.ts` · `lib/use-entity-list.ts` · `lib/useAlumniSearch.ts` | Client hooks (bulk select, entity list, search) |
 
 ## Key Constraints
@@ -557,5 +560,12 @@ Template for a ledger entry:
 - **Symptom:** A REJECTED alumni re-applying with a `studentId` that exists in the local `alumni` table but NOT in `cmu_graduates` (e.g. an admin-created/legacy id like `67676767`) was shown the red "ไม่พบรหัสนักศึกษานี้ในระบบทะเบียนและไม่มีข้อมูลในระบบ" banner in the admin review modal (`VerificationFields`, `settings/users/page.tsx`) — as if no such alumni existed, even though the data was on file.
 - **Root cause:** `buildSignupVerification(submitted, cmuGrad, cmuConsulted, local?)` (`lib/signup-verification.ts`) picks `source` from three branches: a CMU record → `"cmu"`, the `local` arg → `"local"`, else `null`. For a local-only studentId, CMU returns nothing WITHOUT throwing (`cmuConsulted=true`, `cmuGrad=null`), so the result is decided **entirely** by the `local` argument. The reapply route (`POST /api/alumni-auth/reapply`) was the only one of the 3 call-sites that hardcoded `null` (and never imported `localAuthoritativeFromAlumni`), so it collapsed to `source:null` → red banner. Signup and reverify already passed the local record.
 - **Prevention:** There are exactly **3** `buildSignupVerification` call-sites and **all must pass the local fallback** when a local alumni record is in scope: `signup/route.ts` (`findUnique({where:{studentId}})`), `alumni-accounts/[id]/reverify/route.ts` (the in-scope `alumni` row, guarded by `stored?.source === "local"` so a freshly-created-from-submitted account never self-matches), and `reapply/route.ts` (the in-scope `alumni` row when `studentId === alumni.studentId` — a changed id is necessarily unclaimed thanks to the clash check, so `null` stays correct there). When adding a 4th caller (or refactoring), pass `localAuthoritativeFromAlumni(<alumni row>)` — **never hardcode `null`** — or local-only studentIds silently render "not found". Verified with a throwaway script against the real `67676767` row: `source` flips `null` → `"local"`.
+
+### Superadmin column-resize — overlay-measured grips + `<colgroup>` widths; 7 hand-rolled tables opt in per-page
+- **What:** Superadmins can drag a column border (Excel-style) to resize columns on the 7 management data tables (awards, associations, graduate-committee, potentials, model-representatives, all-alumni, alumni-agency). Widths persist **per superadmin in the DB** (`table_column_widths`, JSON `{colIndex: px}` keyed by `userId`+`tableKey`). Non-superadmins see no grips and all-auto columns.
+- **Why an overlay, not per-`<th>` handles:** every management table **hand-rolls** its own `<table>`/`<thead>`/`<th>` (the shared `components/data-table.tsx` is unused dead code) — there is no column array or single chokepoint. Rather than inject a grip into ~80 individual `<th>`s, a single `<ColumnResizeOverlay>` (`components/table-resize/`) measures the rendered `thead th`s (`getBoundingClientRect`) and floats a drag grip over each header's right border. `<ColGroup>` applies saved widths via `<col>` (extra `<col>` beyond the real column count are harmless). The overlay self-gates on superadmin and re-measures on scroll/resize/width-change, so grips track the dividers without per-column bookkeeping.
+- **Wiring pattern (per table — all 7 are identical):** (1) `const tableRef = useRef<HTMLTableElement>(null); const resize = useResizableColumns("<tableKey>", <thCount>);` (2) add `relative` to the table's `overflow-x-auto` wrapper; (3) on `<table>` add `ref={tableRef}` and `<ColGroup count={N} widths={resize.widths} />` as its first child; (4) render `<ColumnResizeOverlay tableRef={resize={resize}} />` right after `</table>` inside that wrapper; (5) a superadmin-only `รีเซ็ตความกว้าง` button (`resize.resetAll`) in the action row. The hook (`lib/use-resizable-columns.ts`) keeps widths in the react-query cache (`setQueryData` during drag, debounced `PUT /api/table-prefs` on drag end); `useRole()==="superadmin"` gates; double-click a grip auto-fits that column.
+- **Mode-suffixed keys:** `tableKey` must differ when the column set changes — `all-alumni:${dedupeView ? "dedupe" : "all"}` and `alumni-agency:${mode}` (mode is `"thailand"|"abroad"`). The `?table=` allowlist in `app/api/table-prefs/route.ts` lists all 9 keys; add a key there when introducing a new table/mode. **When you add/remove a column on one of these tables**, bump the `<ColGroup count>` (over-count is safe; under-count leaves trailing cols auto) — the overlay needs no change (it measures live).
+- **API:** `/api/table-prefs` is superadmin-only (`checkSuperAdminPermission`), `GET ?table=` + `PUT {table, widths}`; empty widths ⇒ delete the row (all-auto). **No activity logging** — it's a high-frequency UI pref, not an auditable data mutation.
 
 

@@ -21,6 +21,9 @@ import SearchInput from "@/components/ui/search-input";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+import { useResizableColumns } from "@/lib/use-resizable-columns";
+import { ColGroup } from "@/components/table-resize/ColGroup";
+import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 /** Thai display labels for degree-level enum values. */
 const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
@@ -390,6 +393,8 @@ export default function AlumniCountPage() {
   const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const resize = useResizableColumns(`all-alumni:${dedupeView ? "dedupe" : "all"}`, 14);
 
   // CMU Registrar data (view mode only) — merge CMU + local overlay.
   const tableLoading = manageQuery.isPending;
@@ -827,6 +832,9 @@ export default function AlumniCountPage() {
                 </svg>
                 เพิ่มข้อมูล
               </button>
+              {resize.isSuperAdmin && (
+                <button type="button" onClick={resize.resetAll} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50" title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น">รีเซ็ตความกว้าง</button>
+              )}
               <button
                 onClick={handleExport}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
@@ -925,8 +933,9 @@ export default function AlumniCountPage() {
 
           {/* Alumni table */}
           <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="relative overflow-x-auto">
+              <table ref={tableRef} className="w-full text-sm">
+                <ColGroup count={14} widths={resize.widths} />
                 <thead>
                   <tr
                     className="text-white text-left"
@@ -1082,6 +1091,7 @@ export default function AlumniCountPage() {
                   )}
                 </tbody>
               </table>
+              <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
             </div>
             {/* Pagination */}
             {totalPages > 1 && (

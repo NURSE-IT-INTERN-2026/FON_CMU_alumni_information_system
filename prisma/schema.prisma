@@ -343,10 +343,27 @@ model AdminUser {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sessions     Session[]
-  activityLogs ActivityLog[]
+  sessions          Session[]
+  activityLogs      ActivityLog[]
+  tableColumnWidths TableColumnWidths[]
 
   @@map("admin_users")
+}
+
+/// Per-superadmin saved column widths for a management table (drag-to-resize).
+/// `tableKey` may encode a view/mode suffix (e.g. "alumni-agency:thailand").
+/// `widths` is a JSON map of column index (string) → px width; absent ⇒ auto.
+model TableColumnWidths {
+  id        String    @id @default(uuid())
+  userId    String
+  tableKey  String
+  widths    Json
+  updatedAt DateTime  @updatedAt
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tableKey])
+  @@index([userId])
+  @@map("table_column_widths")
 }
 
 model ActivityLog {

@@ -21,6 +21,9 @@ import FacetFilter from "@/components/ui/facet-filter";
 import SearchInput from "@/components/ui/search-input";
 import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 import { assetUrl } from "@/lib/asset-url";
+import { useResizableColumns } from "@/lib/use-resizable-columns";
+import { ColGroup } from "@/components/table-resize/ColGroup";
+import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 interface Award {
   id: string;
@@ -81,6 +84,10 @@ export default function AwardsPage() {
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const filtersKey = facetQueryParams(filters).toString();
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
+
+  // Superadmin drag-to-resize column widths (13 columns: ลำดับ + 11 data + จัดการ).
+  const tableRef = useRef<HTMLTableElement>(null);
+  const resize = useResizableColumns("awards", 13);
 
   const qc = useQueryClient();
   const { items: awards, total, totalPages, isPending: loading, isError } = useEntityList<Award>(
@@ -640,6 +647,16 @@ export default function AwardsPage() {
           >
             รอเชื่อมโยง
           </button>
+          {resize.isSuperAdmin && (
+            <button
+              type="button"
+              onClick={resize.resetAll}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50"
+              title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น"
+            >
+              รีเซ็ตความกว้าง
+            </button>
+          )}
           {selectedCount > 0 && (
             <>
               <button
@@ -663,8 +680,9 @@ export default function AwardsPage() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="relative overflow-x-auto">
+          <table ref={tableRef} className="w-full text-sm">
+            <ColGroup count={13} widths={resize.widths} />
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
@@ -782,6 +800,7 @@ export default function AwardsPage() {
               )}
             </tbody>
           </table>
+          <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
         </div>
         {(
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
