@@ -19,9 +19,6 @@ import SearchInput from "@/components/ui/search-input";
 import { associationPageFormSchema, type AssociationPageFormData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
-import { useResizableColumns } from "@/lib/use-resizable-columns";
-import { ColGroup } from "@/components/table-resize/ColGroup";
-import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 interface Association {
   id: string;
@@ -88,8 +85,6 @@ export default function AssociationsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; warnings?: { row: number; message: string }[]; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns("associations", 10, tableRef);
   const [alumniSearchField, setAlumniSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
@@ -427,9 +422,6 @@ export default function AssociationsPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             เพิ่มข้อมูล
           </button>
-          {resize.isSuperAdmin && (
-            <button type="button" onClick={resize.resetAll} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50" title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น">รีเซ็ตความกว้าง</button>
-          )}
           <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
             ส่งออก Excel
@@ -500,9 +492,8 @@ export default function AssociationsPage() {
           <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
         </div>
       ) : (
-        <div className="relative overflow-x-auto rounded-lg bg-white shadow-sm">
-          <table className="w-full text-sm" ref={tableRef}>
-            <ColGroup count={10} widths={resize.widths} />
+        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+          <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
@@ -570,7 +561,6 @@ export default function AssociationsPage() {
               ))}
             </tbody>
           </table>
-          <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
           {(
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>

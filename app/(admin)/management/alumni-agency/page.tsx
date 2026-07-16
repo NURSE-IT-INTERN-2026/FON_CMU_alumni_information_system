@@ -19,9 +19,6 @@ import FormTextarea from "@/components/form/FormTextarea";
 import SearchInput from "@/components/ui/search-input";
 import { isThailandCountry } from "@/lib/alumni-agency-region";
 import { THAI_PROVINCES } from "@/lib/thai-provinces";
-import { useResizableColumns } from "@/lib/use-resizable-columns";
-import { ColGroup } from "@/components/table-resize/ColGroup";
-import { ColumnResizeOverlay } from "@/components/table-resize/ColumnResizeOverlay";
 
 interface AlumniAgency {
   id: string;
@@ -236,8 +233,6 @@ export default function AlumniAgencyPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; pending?: number; errors: { row: number; message: string }[] } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
-  const tableRef = useRef<HTMLTableElement>(null);
-  const resize = useResizableColumns(`alumni-agency:${mode}`, 14, tableRef);
 
   const qc = useQueryClient();
   const { data, isPending: loading } = useQuery({
@@ -666,9 +661,6 @@ export default function AlumniAgencyPage() {
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m16.5-12L12 7.5m0 0L7.5 4.5M12 7.5V21" /></svg>
           {importing ? "กำลังนำเข้า..." : "นำเข้า Excel"}
         </button>
-        {resize.isSuperAdmin && (
-          <button type="button" onClick={resize.resetAll} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-gray-50" title="คืนค่าความกว้างคอลัมน์ทั้งหมดเป็นค่าเริ่มต้น">รีเซ็ตความกว้าง</button>
-        )}
         {selectedCount > 0 && (
           <>
             <button
@@ -697,9 +689,8 @@ export default function AlumniAgencyPage() {
         <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
       ) : (
         <div className="overflow-hidden rounded-lg bg-white shadow-sm">
-          <div className="relative overflow-x-auto">
-            <table ref={tableRef} className="w-full text-sm">
-              <ColGroup count={14} widths={resize.widths} />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
                   <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
@@ -750,7 +741,6 @@ export default function AlumniAgencyPage() {
                 ))}
               </tbody>
             </table>
-            <ColumnResizeOverlay tableRef={tableRef} resize={resize} />
           </div>
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
