@@ -31,7 +31,13 @@ export default function OrangeCell({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          // Stop the click from bubbling to a parent row's onClick (e.g. the
+          // management tables' "click row → view profile" navigation) so a
+          // click on an orange value only opens this history modal.
+          e.stopPropagation();
+          setOpen(true);
+        }}
         className="cursor-pointer font-medium text-orange-600 underline decoration-dotted underline-offset-2 hover:text-orange-700"
       >
         {value}

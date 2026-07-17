@@ -998,7 +998,7 @@ export default function AlumniCountPage() {
                     alumni.map((a, idx) => (
                       <tr
                         key={`${a.id}-${a.studentId}`}
-                        onClick={() => { if (selectMode) toggleSelect(a.id); else router.push(`/management/alumni/${a.id}`); }}
+                        onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else router.push(`/management/alumni/${a.id}`); }}
                         className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}
                       >
                         <td className="px-4 py-3 text-center">
