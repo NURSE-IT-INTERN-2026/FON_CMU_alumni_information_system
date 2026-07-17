@@ -166,6 +166,7 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
         firstName: string | null;
         lastName: string | null;
         samePersonWarning?: string | null;
+        alreadyClaimed?: string | null;
       }>(`/api/cmu-alumni/lookup?studentId=${encodeURIComponent(sid)}&alumniId=${encodeURIComponent(alumniId)}`);
       const patch: EducationFormState = {
         studentId: sid,
@@ -178,8 +179,11 @@ export default function EducationSection({ alumniId, listPath, canWrite, onChang
       };
       if (target === "add") setAddForm(patch);
       else setEditForm((f) => ({ ...patch, studentId: f.studentId }));
-      if (res.samePersonWarning) {
-        setMsg({ kind: "error", text: res.samePersonWarning });
+      // Prefer the "already claimed by another alumni" warning (contact admin)
+      // over the birthday (same-person) warning when both apply.
+      const claimOrIdentityMsg = res.alreadyClaimed ?? res.samePersonWarning;
+      if (claimOrIdentityMsg) {
+        setMsg({ kind: "error", text: claimOrIdentityMsg });
       } else {
         setMsg({ kind: "success", text: "ดึงข้อมูลจากระบบทะเบียนสำเร็จ" });
       }

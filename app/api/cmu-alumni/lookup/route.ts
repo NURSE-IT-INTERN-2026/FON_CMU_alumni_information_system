@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession, getAlumniSession } from "@/lib/auth";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import { cmuToAlumniFields } from "@/lib/ensure-alumni";
-import { assertEducationSamePerson } from "@/lib/education-identity";
+import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 
 // GET /api/cmu-alumni/lookup?studentId=… — look up one CMU Registrar record by
 // studentId and return the education-relevant fields, for the add-education
@@ -32,7 +32,27 @@ export async function GET(request: NextRequest) {
     const f = cmuToAlumniFields(grad);
 
     let samePersonWarning: string | null = null;
+    let alreadyClaimed: string | null = null;
     if (alumniId && (admin || alumni?.alumni?.id === alumniId)) {
+      // Claim preview: is this studentId already another alumni's education
+      // record? Deterministic (DB-only), so it warns even when the birthday
+      // (same-person) check below can't verify. Admins are told who owns it.
+      const claimOwner = await findStudentIdClaimOwner(studentId);
+      if (claimOwner && claimOwner.alumniId !== alumniId) {
+        if (admin) {
+          const o = await prisma.alumni.findUnique({
+            where: { id: claimOwner.alumniId },
+            select: { prefix: true, firstName: true, lastName: true },
+          });
+          alreadyClaimed = claimedByOtherMessage({
+            forAdmin: true,
+            ownerName: o ? `${o.prefix}${o.firstName} ${o.lastName}`.trim() : undefined,
+          });
+        } else {
+          alreadyClaimed = claimedByOtherMessage({ forAdmin: false });
+        }
+      }
+
       const a = await prisma.alumni.findUnique({
         where: { id: alumniId },
         select: { birthDate: true, educations: { select: { studentId: true } } },
@@ -55,6 +75,7 @@ export async function GET(request: NextRequest) {
       firstName: f.firstName,
       lastName: f.lastName,
       samePersonWarning,
+      alreadyClaimed,
     });
   } catch (error) {
     console.error("GET /api/cmu-alumni/lookup error:", error);

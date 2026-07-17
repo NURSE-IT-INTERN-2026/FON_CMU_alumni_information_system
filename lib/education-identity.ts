@@ -23,6 +23,7 @@
  * cheap; if CMU is unreachable the check fails open (returns null = allow) so a
  * registrar outage doesn't block all education edits.
  */
+import prisma from "@/lib/prisma";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import { normalizeCmuBirthday, normalizeFormBirthDate } from "@/lib/alumni-verify";
 
@@ -75,4 +76,50 @@ export async function assertEducationSamePerson(
     return "รหัสนักศึกษานี้เป็นของบุคคลอื่น (วันเกิดไม่ตรงกับข้อมูลของท่าน) ไม่สามารถบันทึกเป็นหลักสูตรของท่านได้";
   }
   return null;
+}
+
+/**
+ * Claim guard — separate from the birthday (same-person) check above. The
+ * birthday guard intentionally FAILS OPEN (returns null = allow) whenever CMU
+ * can't supply a birthday for both sides (registrar outage, studentId not in
+ * CMU, sparse record). That leaves a gap: a `studentId` that is ALREADY another
+ * alumni's education record would slip past it and only be caught at insert
+ * time by the `studentId @unique` constraint, with a generic message and no
+ * pre-save preview. This guard closes that gap: it is DB-only and deterministic,
+ * so it always knows whether the `studentId` is already claimed.
+ *
+ * `Education.studentId` is globally `@unique`, so a studentId can belong to at
+ * most ONE alumni. `excludeEducationId` skips the row currently being edited
+ * (an edit that keeps the same studentId must not trip its own row).
+ */
+export interface EducationClaimOwner {
+  educationId: string;
+  alumniId: string;
+}
+
+export async function findStudentIdClaimOwner(
+  studentId: string,
+  excludeEducationId?: string,
+): Promise<EducationClaimOwner | null> {
+  const row = await prisma.education.findUnique({
+    where: { studentId },
+    select: { id: true, alumniId: true },
+  });
+  if (!row) return null;
+  if (excludeEducationId && row.id === excludeEducationId) return null;
+  return { educationId: row.id, alumniId: row.alumniId };
+}
+
+/**
+ * The message shown when the `studentId` is already another alumni's education.
+ * Alumni are told to contact the admin (they can't resolve a claim themselves);
+ * admins are told WHO owns it so they can fix the conflict directly.
+ */
+export function claimedByOtherMessage(opts: {
+  forAdmin: boolean;
+  ownerName?: string;
+}): string {
+  return opts.forAdmin
+    ? `รหัสนักศึกษานี้ถูกลงทะเบียนเป็นประวัติการศึกษาของศิษย์เก่า ${opts.ownerName ?? "ท่านอื่น"} แล้ว กรุณาตรวจสอบและแก้ไขข้อมูลให้ถูกต้อง`
+    : "รหัสนักศึกษานี้ถูกลงทะเบียนเป็นประวัติการศึกษาของศิษย์เก่าท่านอื่นแล้ว หากท่านพบว่าเป็นข้อมูลของท่าน กรุณาติดต่อผู้ดูแลระบบ";
 }

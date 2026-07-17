@@ -7,7 +7,7 @@ import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
-import { assertEducationSamePerson } from "@/lib/education-identity";
+import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 import { educationRecordDetails } from "@/lib/log-payload";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -42,6 +42,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = educationCreateSchema.parse(body);
+
+    // Claim guard: this studentId must not already be another alumni's
+    // education record (Education.studentId is globally unique). The birthday
+    // guard below can fail open (CMU/sparse); this one is deterministic, so it
+    // runs first and surfaces a clear "contact admin" message.
+    const claimOwner = await findStudentIdClaimOwner(validated.studentId);
+    if (claimOwner && claimOwner.alumniId !== alumni.id) {
+      return NextResponse.json(
+        { error: claimedByOtherMessage({ forAdmin: false }) },
+        { status: 400 },
+      );
+    }
 
     // Identity guard: the studentId must belong to the SAME person as this
     // alumni (birthday match) — never attach a stranger's degree.
