@@ -39,7 +39,12 @@ function redirectToLogin() {
   if (redirectingToLogin) return; // Duplicate guard (several queries 401 at once).
   if (window.location.pathname.startsWith(`${BASE_PATH}/login`)) return; // Loop guard.
   redirectingToLogin = true;
-  window.location.href = `${BASE_PATH}/login?expired=1`;
+  // The admin + alumni login forms share /login. If the expired request came
+  // from the graduates (alumni) area, open the alumni tab; else the admin tab.
+  const audience = window.location.pathname.startsWith(`${BASE_PATH}/graduates`)
+    ? "&audience=alumni"
+    : "";
+  window.location.href = `${BASE_PATH}/login?expired=1${audience}`;
 }
 
 export async function apiFetch<T>(
