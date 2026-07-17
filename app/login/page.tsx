@@ -45,11 +45,13 @@ function LoginForm() {
   const verifySuccess = searchParams.get("verify") === "success";
   // Shown when an expired session redirected a protected API call here (apiFetch).
   const expired = searchParams.get("expired") === "1";
+  // An alumni's expired session redirected here — open the alumni login tab.
+  const expiredAlumni = searchParams.get("audience") === "alumni";
 
   // Auto-switch to alumni tab if the error/params are alumni-specific
   const isAlumniError = oauthError ? ALUMNI_ERROR_KEYS.has(oauthError) : false;
   const [mode, setMode] = useState<LoginMode>(
-    isAlumniError || resetSuccess || verifySuccess ? "alumni" : "admin"
+    isAlumniError || resetSuccess || verifySuccess || expiredAlumni ? "alumni" : "admin"
   );
 
   const [error, setError] = useState(
