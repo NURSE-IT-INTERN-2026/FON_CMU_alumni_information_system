@@ -40,7 +40,7 @@ export default function Header({ user }: HeaderProps = {}) {
           className="pointer-events-none absolute inset-y-0 left-0 w-2/5"
           style={{
             background:
-              "linear-gradient(to right, rgba(0, 188, 212, 0.7) 0%, rgba(0, 188, 212, 0.4) 40%, transparent 100%)",
+              "linear-gradient(to right, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.4) 40%, transparent 100%)",
           }}
         />
 
