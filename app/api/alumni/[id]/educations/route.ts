@@ -7,7 +7,7 @@ import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
-import { assertEducationSamePerson } from "@/lib/education-identity";
+import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 import { educationRecordDetails } from "@/lib/log-payload";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -63,6 +63,25 @@ export async function POST(
 
     const body = await request.json();
     const validated = educationCreateSchema.parse(body);
+
+    // Claim guard: this studentId must not already be another alumni's
+    // education record (Education.studentId is globally unique). Deterministic,
+    // runs before the birthday guard (which can fail open). Admins are told
+    // WHO owns it so they can resolve the conflict directly.
+    const claimOwner = await findStudentIdClaimOwner(validated.studentId);
+    if (claimOwner && claimOwner.alumniId !== alumni.id) {
+      const owner = await prisma.alumni.findUnique({
+        where: { id: claimOwner.alumniId },
+        select: { prefix: true, firstName: true, lastName: true },
+      });
+      const ownerName = owner
+        ? `${owner.prefix}${owner.firstName} ${owner.lastName}`.trim()
+        : undefined;
+      return NextResponse.json(
+        { error: claimedByOtherMessage({ forAdmin: true, ownerName }) },
+        { status: 400 },
+      );
+    }
 
     // Identity guard: the studentId must belong to the SAME person as this
     // alumni (birthday match) — never attach a stranger's degree.

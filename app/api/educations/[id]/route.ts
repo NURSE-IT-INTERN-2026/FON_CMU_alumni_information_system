@@ -6,7 +6,7 @@ import { logActivity } from "@/lib/activity-log";
 import { educationUpdateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
-import { assertEducationSamePerson } from "@/lib/education-identity";
+import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
 type WriterCtx =
@@ -84,6 +84,29 @@ export async function PUT(
     // belong to the SAME person (birthday match) — never re-point to a
     // stranger's degree.
     if (validated.studentId && validated.studentId !== existing.studentId) {
+      // Claim guard: the new studentId must not already be another alumni's
+      // education record (Education.studentId is globally unique). Deterministic,
+      // runs before the birthday guard (which can fail open). `existing.id` is
+      // excluded so the row being edited never trips itself.
+      const claimOwner = await findStudentIdClaimOwner(validated.studentId, existing.id);
+      if (claimOwner && claimOwner.alumniId !== existing.alumniId) {
+        const forAdmin = ctx.kind === "admin";
+        let ownerName: string | undefined;
+        if (forAdmin) {
+          const owner = await prisma.alumni.findUnique({
+            where: { id: claimOwner.alumniId },
+            select: { prefix: true, firstName: true, lastName: true },
+          });
+          ownerName = owner
+            ? `${owner.prefix}${owner.firstName} ${owner.lastName}`.trim()
+            : undefined;
+        }
+        return NextResponse.json(
+          { error: claimedByOtherMessage({ forAdmin, ownerName }) },
+          { status: 400 },
+        );
+      }
+
       const alumni = await prisma.alumni.findUnique({
         where: { id: existing.alumniId },
         select: { birthDate: true, educations: { select: { studentId: true } } },
