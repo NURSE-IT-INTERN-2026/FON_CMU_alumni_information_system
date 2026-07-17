@@ -43,6 +43,8 @@ function LoginForm() {
   const oauthError = searchParams.get("error");
   const resetSuccess = searchParams.get("reset") === "success";
   const verifySuccess = searchParams.get("verify") === "success";
+  // Shown when an expired session redirected a protected API call here (apiFetch).
+  const expired = searchParams.get("expired") === "1";
 
   // Auto-switch to alumni tab if the error/params are alumni-specific
   const isAlumniError = oauthError ? ALUMNI_ERROR_KEYS.has(oauthError) : false;
@@ -234,6 +236,12 @@ function LoginForm() {
               ศิษย์เก่า
             </button>
           </div>
+
+          {expired && (
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง
+            </div>
+          )}
 
           {error && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[var(--danger)]">

@@ -23,6 +23,25 @@ export class ApiError extends Error {
   }
 }
 
+// Once a 401 triggers a redirect to /login, suppress duplicate redirects from
+// concurrent failing requests on the same (unloading) page.
+let redirectingToLogin = false;
+
+/**
+ * A 401 reaching apiFetch always means the session is gone (expired/missing).
+ * The shared login page submits auth via raw `fetch`, never apiFetch, so
+ * auth-endpoint 401s (wrong password) don't reach here — redirect to login
+ * instead of letting the calling query render a generic "load failed".
+ * 403 = logged-in-but-forbidden, so it is intentionally NOT redirected.
+ */
+function redirectToLogin() {
+  if (typeof window === "undefined") return; // SSR — nothing to redirect.
+  if (redirectingToLogin) return; // Duplicate guard (several queries 401 at once).
+  if (window.location.pathname.startsWith(`${BASE_PATH}/login`)) return; // Loop guard.
+  redirectingToLogin = true;
+  window.location.href = `${BASE_PATH}/login?expired=1`;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit & { json?: unknown },
@@ -38,6 +57,10 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
+    // Session expired/missing: bounce to login rather than surfacing a
+    // per-query "load failed". Still throw so react-query/callers reject cleanly.
+    if (res.status === 401) redirectToLogin();
+
     let message = `${res.status} ${res.statusText}`;
     try {
       const data = await res.json();
