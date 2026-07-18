@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
-import { assetUrl, prefixUploadsInHtml, stripUploadsInHtml } from "@/lib/asset-url";
+import { assetUrl, prefixUploadsInHtml } from "@/lib/asset-url";
 import { ImageEditorDialog } from "@/components/news/ImageEditorDialog";
+import RichTextEditor from "@/components/news/RichTextEditor";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -63,15 +64,6 @@ const EMPTY_FORM: {
   status: "DRAFT",
 };
 
-// Rich-text execCommand identifiers the toolbar reflects/pins. Module-scope so
-// the `updateToolbarState` callback below has a stable reference (and no dep).
-const TOOLBAR_COMMANDS = [
-  "bold", "italic", "underline", "strikeThrough",
-  "insertUnorderedList", "insertOrderedList",
-  "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
-  "createLink",
-];
-
 export default function NewsListPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -106,119 +98,8 @@ export default function NewsListPage() {
   const [coverDragOver, setCoverDragOver] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
 
-  const editorRef = useRef<HTMLDivElement>(null);
-  // Last in-editor text selection. The px number input steals focus and discards the
-  // contentEditable selection, so we capture it on mouseup/keyup and restore it in
-  // applyFontSize before running execCommand.
-  const savedRangeRef = useRef<Range | null>(null);
-  // The last size we actually applied, so a guarded commit (Enter/blur) after a +/− click
-  // doesn't re-apply the same size and double-wrap the selection.
-  const lastAppliedPxRef = useRef<number | null>(null);
-  const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
-  const [showTablePicker, setShowTablePicker] = useState(false);
-  const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
-  const tablePickerRef = useRef<HTMLDivElement>(null);
-
-  // Cover image crop/resize editor + px text size.
+  // Cover image crop/resize editor.
   const [coverEditing, setCoverEditing] = useState(false);
-  const [fontSizePx, setFontSizePx] = useState<string>("16");
-
-  const updateToolbarState = useCallback(() => {
-    const states: Record<string, boolean> = {};
-    for (const cmd of TOOLBAR_COMMANDS) {
-      try { states[cmd] = document.queryCommandState(cmd); } catch { states[cmd] = false; }
-    }
-    setActiveStates(states);
-  }, []);
-
-  const execFormat = useCallback((command: string, value?: string) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.focus();
-    // If no selection in editor, place cursor at end
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)) {
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
-    document.execCommand(command, false, value);
-    setFormValue("body", editor.innerHTML);
-    updateToolbarState();
-  }, [updateToolbarState, setFormValue]);
-
-  // Remember the editor's current text selection so it survives the px input grabbing focus.
-  // Focusing the number input discards the contentEditable selection, so without this the
-  // font-size command would run on an empty selection and apply nothing.
-  const captureSelection = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount && !sel.isCollapsed) {
-      const node = sel.anchorNode;
-      if (node && editor.contains(node)) {
-        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-      }
-    }
-  }, []);
-
-  // Apply an arbitrary pixel font size to the CURRENT SELECTION ONLY. execCommand("fontSize")
-  // only accepts the legacy 1–7 scale, so use "7" as a marker then swap each marker for a
-  // px-sized <span style="font-size"> (sanitize-html allows style on all tags → survives render).
-  // If nothing is selected, this is a no-op — we never silently restyle the whole body.
-  const applyFontSize = useCallback((px: number) => {
-    const editor = editorRef.current;
-    if (!editor || !Number.isFinite(px) || px <= 0) return;
-    editor.focus();
-    const sel = window.getSelection();
-    // Prefer a live, non-collapsed in-editor selection (the toolbar still has focus, e.g. a
-    // +/− button). Otherwise restore the selection captured on mouseup/keyup — focusing the px
-    // input discards the live selection, so we need the cached range back.
-    const hasLiveSel = !!(sel && sel.rangeCount && !sel.isCollapsed && editor.contains(sel.anchorNode));
-    if (!hasLiveSel) {
-      if (savedRangeRef.current && editor.contains(savedRangeRef.current.commonAncestorContainer)) {
-        sel?.removeAllRanges();
-        sel?.addRange(savedRangeRef.current);
-      } else {
-        return; // nothing selected → leave the body untouched
-      }
-    }
-    document.execCommand("fontSize", false, "7");
-    const created: HTMLSpanElement[] = [];
-    editor.querySelectorAll('font[size="7"]').forEach((f) => {
-      const span = document.createElement("span");
-      span.style.fontSize = `${px}px`;
-      while (f.firstChild) span.appendChild(f.firstChild);
-      f.replaceWith(span);
-      created.push(span);
-    });
-    lastAppliedPxRef.current = px;
-    setFormValue("body", editor.innerHTML);
-    // execCommand collapses/invalidates the prior selection, so a second +/− click would target
-    // a stale range. Re-select the span(s) we just created and cache THAT range — it references
-    // live nodes, so the next adjustment keeps targeting the same text.
-    if (created.length && sel) {
-      const range = document.createRange();
-      range.setStartBefore(created[0]);
-      range.setEndAfter(created[created.length - 1]);
-      savedRangeRef.current = range.cloneRange();
-      sel.removeAllRanges();
-      sel.addRange(savedRangeRef.current);
-    }
-    updateToolbarState();
-  }, [updateToolbarState, setFormValue]);
-
-  // Bump the font size by `delta` and apply IMMEDIATELY. Used by the toolbar −/+ buttons,
-  // which call preventDefault on mousedown so the editor never loses focus/selection —
-  // applyFontSize then runs on the live selection with no focus juggling.
-  const stepFontSize = useCallback((delta: number) => {
-    const base = lastAppliedPxRef.current ?? (Math.round(Number(fontSizePx)) || 16);
-    const next = Math.max(8, Math.min(96, base + delta));
-    setFontSizePx(String(next));
-    applyFontSize(next);
-  }, [fontSizePx, applyFontSize]);
 
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) {
@@ -252,19 +133,6 @@ export default function NewsListPage() {
     setCoverUploading(false);
   };
 
-  // react-hook-form's `watch()` opts this component out of the React Compiler
-  // (benign — the component still works, it just isn't compiler-optimized).
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const formBody = watch("body");
-
-  const bodyStats = useMemo(() => {
-    const text = stripHtml(formBody || "");
-    return {
-      chars: text.length,
-      words: text.trim() ? text.trim().split(/\s+/).length : 0,
-    };
-  }, [formBody]);
-
   const qc = useQueryClient();
   const { data: newsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.news.list({ page, search, statusFilter }),
@@ -291,24 +159,6 @@ export default function NewsListPage() {
       ),
   });
   const pinnedItems = pinnedData?.data ?? [];
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (tablePickerRef.current && !tablePickerRef.current.contains(e.target as Node)) {
-        setShowTablePicker(false);
-        setTableHover({ rows: 0, cols: 0 });
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  useEffect(() => {
-    if (showForm && editorRef.current) {
-      editorRef.current.innerHTML = prefixUploadsInHtml(getValues("body") || "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showForm, editingId]);
 
   const openCreate = () => {
     formReset(EMPTY_FORM);
@@ -338,12 +188,12 @@ export default function NewsListPage() {
     setSaving(true);
     setErrorMsg("");
     try {
-      // Serialize the live editor HTML (some formatting changes don't fire onInput,
-      // so read fresh rather than trusting data.body).
-      const editor = editorRef.current;
+      // data.body is kept current by the editor's onChange (Tiptap fires onUpdate on
+      // every transaction — unlike execCommand's onInput gaps), and is already
+      // basePath-stripped inside the editor, so it's ready for storage as-is.
       const payload = {
         title: data.title.trim(),
-        body: stripUploadsInHtml(editor ? editor.innerHTML : data.body),
+        body: data.body,
         coverImageUrl: data.coverImageUrl?.trim() || null,
         status: data.status,
       };
@@ -612,193 +462,17 @@ export default function NewsListPage() {
               )}
             </div>
 
-            {/* Body with toolbar */}
+            {/* Body — Tiptap rich-text editor */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 เนื้อหา <span className="text-red-500">*</span>
               </label>
-              {/* Formatting toolbar */}
-              <div className="flex flex-wrap items-center gap-px rounded-t-lg border border-b-0 border-gray-300 bg-gray-50 px-1.5 py-1">
-                {/* Bold */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("bold")} title="ตัวหนา" className={`rounded p-1.5 ${activeStates.bold ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
-                </button>
-                {/* Italic */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("italic")} title="ตัวเอียง" className={`rounded p-1.5 ${activeStates.italic ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
-                </button>
-                {/* Underline */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("underline")} title="ขีดเส้นใต้" className={`rounded p-1.5 ${activeStates.underline ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
-                </button>
-                {/* Link */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = prompt("URL:"); if (url) execFormat("createLink", url); }} title="แทรกลิงก์" className={`rounded p-1.5 ${activeStates.createLink ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                </button>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Bulleted list */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertUnorderedList")} title="รายการแบบ bullet" className={`rounded p-1.5 ${activeStates.insertUnorderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
-                </button>
-                {/* Numbered list */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertOrderedList")} title="รายการแบบลำดับเลข" className={`rounded p-1.5 ${activeStates.insertOrderedList ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="3" y="8" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="3" y="14" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="3" y="20" fontSize="7" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
-                </button>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Decrease indent */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("outdent")} title="ลดการเยื้อง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="11 17 6 12 11 7"/><line x1="6" y1="12" x2="20" y2="12"/><line x1="3" y1="6" x2="3" y2="18"/></svg>
-                </button>
-                {/* Increase indent */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("indent")} title="เพิ่มการเยื้อง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="21" y1="6" x2="21" y2="18"/></svg>
-                </button>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Font color */}
-                <label title="สีตัวอักษร" className="relative flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <span className="text-xs font-bold">A</span>
-                  <input type="color" defaultValue="#000000" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => execFormat("foreColor", e.target.value)} />
-                </label>
-                {/* Highlight color */}
-                <label title="สีพื้นหลังข้อความ" className="relative flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-                  <input type="color" defaultValue="#FFFF00" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => execFormat("hiliteColor", e.target.value)} />
-                </label>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Insert table */}
-                <div className="relative" ref={tablePickerRef}>
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowTablePicker((v) => !v)} title="แทรกตาราง" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-                  </button>
-                  {showTablePicker && (
-                    <div className="absolute left-0 top-full z-20 mt-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                      <div className="mb-1 text-center text-xs text-gray-500">
-                        {tableHover.rows > 0 ? `${tableHover.rows}×${tableHover.cols} ตาราง` : "เลือกขนาดตาราง"}
-                      </div>
-                      <div className="grid" style={{ gridTemplateColumns: `repeat(8, 1fr)` }}>
-                        {Array.from({ length: 64 }, (_, i) => {
-                          const r = Math.floor(i / 8) + 1;
-                          const c = (i % 8) + 1;
-                          const hovered = r <= tableHover.rows && c <= tableHover.cols;
-                          return (
-                            <div
-                              key={i}
-                              className={`h-4 w-4 border ${hovered ? "border-[var(--primary)] bg-[var(--primary)]/20" : "border-gray-200"}`}
-                              onMouseEnter={() => setTableHover({ rows: r, cols: c })}
-                              onClick={() => {
-                                let html = '<table style="border-collapse:collapse;width:100%"><tbody>';
-                                for (let ri = 0; ri < r; ri++) {
-                                  html += '<tr>';
-                                  for (let ci = 0; ci < c; ci++) html += '<td style="border:1px solid #ccc;padding:6px">&nbsp;</td>';
-                                  html += '</tr>';
-                                }
-                                html += '</tbody></table><br/>';
-                                execFormat("insertHTML", html);
-                                setShowTablePicker(false);
-                                setTableHover({ rows: 0, cols: 0 });
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Undo */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("undo")} title="เลิกทำ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                </button>
-                {/* Clear formatting */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("removeFormat")} title="ล้างรูปแบบ" className="rounded p-1.5 text-gray-600 hover:bg-gray-200">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16l9-9 8 8-4 4"/><path d="M6 11l4 4"/><line x1="17" y1="4" x2="21" y2="8"/></svg>
-                </button>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Strikethrough */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("strikeThrough")} title="ขีดทับ" className={`rounded p-1.5 ${activeStates.strikeThrough ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H9a3 3 0 0 0-3 3 3 3 0 0 0 3 3h6"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M15 12a3 3 0 1 1 0 6H8"/></svg>
-                </button>
-                {/* Font size (px) — −/+ buttons apply immediately to the selection; the number
-                    field is for exact entry and commits on Enter/blur. */}
-                <div className="flex items-center gap-0.5 rounded p-1 text-gray-600" title="ขนาดตัวอักษร (px)">
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => stepFontSize(-1)}
-                    title="ลดขนาดตัวอักษร"
-                    className="rounded p-1 hover:bg-gray-200"
-                    aria-label="ลดขนาดตัวอักษร"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={fontSizePx}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onChange={(e) => setFontSizePx(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    onBlur={() => {
-                      const n = Math.round(Number(fontSizePx));
-                      const clamped = Number.isFinite(n) ? Math.max(8, Math.min(96, n)) : 16;
-                      setFontSizePx(String(clamped));
-                      // Commit the typed value. Guarded so re-focusing/blurring without changing
-                      // the value doesn't re-apply and double-wrap the selection.
-                      if (clamped !== lastAppliedPxRef.current) applyFontSize(clamped);
-                    }}
-                    className="w-10 border-none bg-transparent text-center text-xs text-gray-600 outline-none"
-                    aria-label="ขนาดตัวอักษร (px)"
-                  />
-                  <span className="text-[10px] text-gray-400">px</span>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => stepFontSize(1)}
-                    title="เพิ่มขนาดตัวอักษร"
-                    className="rounded p-1 hover:bg-gray-200"
-                    aria-label="เพิ่มขนาดตัวอักษร"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </button>
-                </div>
-                <span className="mx-1 h-5 w-px bg-gray-300" />
-                {/* Align left */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyLeft")} title="ชิดซ้าย" className={`rounded p-1.5 ${activeStates.justifyLeft ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-                </button>
-                {/* Align center */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyCenter")} title="กึ่งกลาง" className={`rounded p-1.5 ${activeStates.justifyCenter ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-                </button>
-                {/* Align right */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyRight")} title="ชิดขวา" className={`rounded p-1.5 ${activeStates.justifyRight ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
-                </button>
-                {/* Align justify */}
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("justifyFull")} title="เต็มแนว" className={`rounded p-1.5 ${activeStates.justifyFull ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`}>
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </button>
-              </div>
-              {/* Editor area */}
-              <div
-                ref={editorRef}
-                contentEditable
-                onInput={() => {
-                  if (editorRef.current) {
-                    setFormValue("body", editorRef.current!.innerHTML);
-                  }
-                  updateToolbarState();
-                }}
-                onKeyUp={() => { lastAppliedPxRef.current = null; captureSelection(); updateToolbarState(); }}
-                onMouseUp={() => { lastAppliedPxRef.current = null; captureSelection(); updateToolbarState(); }}
-                className={`min-h-[240px] rounded-b-lg border p-6 sm:p-8 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] prose prose-sm sm:prose !max-w-none ${formErrors.body ? "border-red-400" : "border-gray-300"}`}
-                suppressContentEditableWarning
+              <RichTextEditor
+                key={editingId ?? "new"}
+                value={prefixUploadsInHtml(getValues("body") || "")}
+                onChange={(html) => setFormValue("body", html, { shouldDirty: true })}
+                ariaLabel="เนื้อหาข่าวสาร"
+                error={formErrors.body?.message}
               />
             </div>
 
@@ -834,10 +508,7 @@ export default function NewsListPage() {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3">
-            <span className="text-xs text-gray-400">
-              ตัวอักษร: {bodyStats.chars} &nbsp;|&nbsp; คำ: {bodyStats.words}
-            </span>
+          <div className="flex items-center justify-end border-t border-gray-100 px-6 py-3">
             <div className="flex gap-3">
               <button
                 onClick={closeForm}
