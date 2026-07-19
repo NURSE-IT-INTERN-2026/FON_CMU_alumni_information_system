@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { clearSessionCookie } from "@/lib/auth";
 import { BASE_PATH } from "@/lib/constants";
+import { getBaseUrl } from "@/lib/base-url";
 
 async function performLogout() {
   const cookieStore = await cookies();
@@ -13,7 +14,7 @@ async function performLogout() {
   }
 
   const response = NextResponse.redirect(
-    new URL(`${BASE_PATH}/login`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
+    new URL(`${BASE_PATH}/login`, getBaseUrl())
   );
   response.cookies.set(clearSessionCookie());
 

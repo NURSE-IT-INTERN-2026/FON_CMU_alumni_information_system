@@ -9,6 +9,8 @@
 // line breaks). Do not reintroduce HTML bodies — the relay renders `message`
 // as text, so markup would show up verbatim. Links are raw URLs.
 
+import { getBaseUrl, validateBaseUrl } from "@/lib/base-url";
+
 type TokenCache = { token: string; expiresAt: number };
 
 // Token lives 24h; refresh 1h before expiry so a send never hits a stale token.
@@ -27,7 +29,7 @@ type CmuEmailConfig = {
 // Read env at call time (not module load) so tests can set vars + fresh-import.
 function getConfig(): CmuEmailConfig {
   return {
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+    baseUrl: getBaseUrl(),
     apiUrl: process.env.CMU_EMAIL_API_BASE_URL || "",
     clientId: process.env.CMU_EMAIL_CLIENT_ID || "",
     clientSecret: process.env.CMU_EMAIL_CLIENT_SECRET || "",
@@ -96,6 +98,13 @@ type SendEmailInput = {
  * (best-effort notifications) or surface the error.
  */
 async function sendEmail({ to, subject, message }: SendEmailInput): Promise<void> {
+  // Fail-safe: never mail a link built on a missing/localhost base URL in
+  // production. Throws here → best-effort callers catch + log, suppressing the
+  // send so no broken link reaches a user.
+  const baseCheck = validateBaseUrl();
+  if (!baseCheck.ok) {
+    throw new Error("Refusing to send email: " + baseCheck.reason);
+  }
   const token = await getAccessToken();
   const { apiUrl, systemName } = getConfig();
 
