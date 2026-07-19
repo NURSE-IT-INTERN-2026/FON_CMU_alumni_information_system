@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { clearSessionCookie } from "@/lib/auth";
 import { BASE_PATH } from "@/lib/constants";
+import { getBaseUrl } from "@/lib/base-url";
 
 export async function POST() {
   try {
@@ -17,8 +18,8 @@ export async function POST() {
 
     cookieStore.set(clearSessionCookie());
 
-    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"));
+    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, getBaseUrl()));
   } catch {
-    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"));
+    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, getBaseUrl()));
   }
 }

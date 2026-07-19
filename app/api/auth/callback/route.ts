@@ -7,15 +7,16 @@ import {
   clearOAuthCookies,
 } from "@/lib/oauth";
 import { BASE_PATH } from "@/lib/constants";
+import { getBaseUrl } from "@/lib/base-url";
 
 function loginRedirect(error: string) {
   return NextResponse.redirect(
-    new URL(`${BASE_PATH}/login?error=${error}`, process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000")
+    new URL(`${BASE_PATH}/login?error=${error}`, getBaseUrl())
   );
 }
 
 export async function GET(request: NextRequest) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   try {
     const { searchParams } = new URL(request.url);
