@@ -27,7 +27,7 @@ type CmuEmailConfig = {
 // Read env at call time (not module load) so tests can set vars + fresh-import.
 function getConfig(): CmuEmailConfig {
   return {
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+    baseUrl: getEmailBaseUrl(),
     apiUrl: process.env.CMU_EMAIL_API_BASE_URL || "",
     clientId: process.env.CMU_EMAIL_CLIENT_ID || "",
     clientSecret: process.env.CMU_EMAIL_CLIENT_SECRET || "",
@@ -35,6 +35,51 @@ function getConfig(): CmuEmailConfig {
       process.env.CMU_EMAIL_SYSTEM_NAME ||
       "ระบบสารสนเทศศิษย์เก่า คณะพยาบาลศาสตร์ มช.",
   };
+}
+
+// Hostnames that are never valid for a production email link. The deploy must
+// set EMAIL_BASE_URL to the real public origin; reaching localhost in production
+// means a misconfiguration that would mail broken links.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+// Resolve the email base URL at RUNTIME. EMAIL_BASE_URL is a server-only,
+// non-NEXT_PUBLIC_ var, so Next.js does NOT build-time-inline it (unlike
+// NEXT_PUBLIC_BASE_URL, which is baked at `next build` and cannot be overridden
+// at `docker run`). Falls back to NEXT_PUBLIC_BASE_URL, then localhost (dev).
+export function getEmailBaseUrl(): string {
+  return (
+    process.env.EMAIL_BASE_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, "");
+}
+
+export type EmailBaseUrlCheck =
+  | { ok: true; url: string }
+  | { ok: false; url: string; reason: string };
+
+// Production fail-safe. Returns ok:false when the resolved base URL is missing
+// or a loopback host. sendEmail() uses this to refuse to send (best-effort
+// callers log + suppress, so no broken link is ever mailed); instrumentation.ts
+// uses it to warn loudly at boot. Dev (NODE_ENV !== "production") always passes.
+export function validateEmailBaseUrl(): EmailBaseUrlCheck {
+  const url = getEmailBaseUrl();
+  if (process.env.NODE_ENV === "production") {
+    let host = "";
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      host = "";
+    }
+    if (!host || LOCAL_HOSTS.has(host)) {
+      return {
+        ok: false,
+        url,
+        reason: `email base URL resolves to "${url}" (missing or localhost) in production — set the server-only EMAIL_BASE_URL to the public URL (e.g. https://alumni.nurse.cmu.ac.th). NEXT_PUBLIC_BASE_URL is build-time-inlined and will NOT override this at runtime.`,
+      };
+    }
+  }
+  return { ok: true, url };
 }
 
 function endpoint(apiUrl: string, path: string): string {
@@ -96,6 +141,13 @@ type SendEmailInput = {
  * (best-effort notifications) or surface the error.
  */
 async function sendEmail({ to, subject, message }: SendEmailInput): Promise<void> {
+  // Fail-safe: never mail a link built on a missing/localhost base URL in
+  // production. Throws here → best-effort callers catch + log, suppressing the
+  // send so no broken link reaches a user.
+  const baseCheck = validateEmailBaseUrl();
+  if (!baseCheck.ok) {
+    throw new Error("Refusing to send email: " + baseCheck.reason);
+  }
   const token = await getAccessToken();
   const { apiUrl, systemName } = getConfig();
 
