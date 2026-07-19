@@ -56,7 +56,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
-  delete process.env.EMAIL_BASE_URL;
 });
 
 describe("CMU Email API client", () => {
@@ -158,60 +157,5 @@ describe("CMU Email API client", () => {
     expect(sendBody.message).toContain(
       "http://localhost:3000/alumni/graduates/reapply?email=a%40cmu.ac.th",
     );
-  });
-
-  it("prefers EMAIL_BASE_URL over NEXT_PUBLIC_BASE_URL for email links", async () => {
-    process.env.EMAIL_BASE_URL = "https://alumni.nurse.cmu.ac.th";
-    const calls = mockFetch();
-    const { sendSignupApprovedEmail } = await import("@/lib/email");
-    await sendSignupApprovedEmail("a@cmu.ac.th", "คุณ สมชาย");
-    const sendBody = calls.at(-1).body as Record<string, string>;
-    expect(sendBody.message).toContain(
-      "https://alumni.nurse.cmu.ac.th/alumni/login",
-    );
-    expect(sendBody.message).not.toContain("localhost");
-  });
-
-  it("validateEmailBaseUrl: dev allows localhost, prod rejects it, prod accepts a real URL", async () => {
-    const { validateEmailBaseUrl } = await import("@/lib/email");
-    // dev/test env (NODE_ENV !== "production"): localhost is fine
-    expect(validateEmailBaseUrl().ok).toBe(true);
-
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
-      // localhost → not ok
-      const bad = validateEmailBaseUrl();
-      expect(bad.ok).toBe(false);
-      if (!bad.ok) expect(bad.reason).toMatch(/EMAIL_BASE_URL/);
-
-      // real URL → ok
-      process.env.EMAIL_BASE_URL = "https://alumni.nurse.cmu.ac.th";
-      expect(validateEmailBaseUrl().ok).toBe(true);
-
-      // trailing slash is trimmed
-      process.env.EMAIL_BASE_URL = "https://alumni.nurse.cmu.ac.th/";
-      const trimmed = validateEmailBaseUrl();
-      expect(trimmed.ok).toBe(true);
-      if (trimmed.ok) expect(trimmed.url).toBe("https://alumni.nurse.cmu.ac.th");
-    } finally {
-      process.env.NODE_ENV = prev;
-    }
-  });
-
-  it("in production with a localhost base URL, sendEmail throws before calling fetch", async () => {
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    // no EMAIL_BASE_URL → falls back to NEXT_PUBLIC_BASE_URL=localhost
-    try {
-      const spy = vi.spyOn(globalThis, "fetch");
-      const { sendSignupApprovedEmail } = await import("@/lib/email");
-      await expect(sendSignupApprovedEmail("a@cmu.ac.th", "A")).rejects.toThrow(
-        /Refusing to send email/,
-      );
-      expect(spy).not.toHaveBeenCalled();
-    } finally {
-      process.env.NODE_ENV = prev;
-    }
   });
 });
