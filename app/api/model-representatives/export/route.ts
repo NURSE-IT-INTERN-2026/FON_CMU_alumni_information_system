@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
     const searchField = searchParams.get("searchField") || "";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     const validSearchFields = ["studentId", "name", "firstName", "lastName", "cohort"];
     const where: Record<string, unknown> = {};
@@ -49,21 +51,21 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: [{ cohort: "asc" }, { generation: "asc" }],
     });
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "model_representative",
-      null,
-      { count: items.length, mode: "filtered", search: search || undefined },
-    );
-
-    const rows = items.map((a) => ({
+    const { start, end } = resolveRowRange(startRow, endRow, items.length);
+    const rows = items.slice(start - 1, end).map((a) => ({
       "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
       "เครือข่าย": a.cohort,
       "ลำดับรุ่น": a.generation,
     }));
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "model_representative",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: items.length } },
+    );
 
     return buildExcelResponse(rows, "ผู้แทนรุ่น", "model_representatives_export");
   } catch (error) {

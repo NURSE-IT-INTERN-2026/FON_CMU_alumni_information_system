@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const country = searchParams.get("country") || "";
     const searchFieldParam = searchParams.get("searchField") || "all";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     // Mirror the GET list's region split (PRD §3.9) so an abroad export never
     // includes Thailand-valued records and vice versa.
@@ -60,15 +62,8 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: [{ country: "asc" }, { order: "asc" }],
     });
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "alumni_agency",
-      null,
-      { count: items.length, mode: "filtered", search: search || undefined },
-    );
-
-    const rows = items.map((a) => ({
+    const { start, end } = resolveRowRange(startRow, endRow, items.length);
+    const rows = items.slice(start - 1, end).map((a) => ({
       "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       "รุ่น": a.cohort || "",
       "คำนำหน้า": a.prefix || "",
@@ -84,6 +79,13 @@ export async function GET(request: NextRequest) {
       "หมายเหตุ": a.notes || "",
       "ลำดับ": a.order,
     }));
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "alumni_agency",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: items.length } },
+    );
 
     return buildExcelResponse(rows, "ข้อมูลการทำงานศิษย์เก่า", "alumni_agency_export");
   } catch (error) {

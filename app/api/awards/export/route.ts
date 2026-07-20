@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     const searchFieldParam = searchParams.get("searchField") || "all";
     const sortField = searchParams.get("sortField") || "year";
     const sortDir = searchParams.get("sortDir") || "desc";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     const validSearchFields = ["awardName", "firstName", "lastName", "description", "name", "year"];
 
@@ -71,15 +73,8 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { [orderKey]: dir },
     });
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "award",
-      null,
-      { count: items.length, mode: "filtered", search: search || undefined },
-    );
-
-    const rows = items.map((a) => ({
+    const { start, end } = resolveRowRange(startRow, endRow, items.length);
+    const rows = items.slice(start - 1, end).map((a) => ({
       "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       "คำนำหน้า": a.prefix ?? "",
       "ชื่อ": a.firstName ?? "",
@@ -92,6 +87,13 @@ export async function GET(request: NextRequest) {
       "รูปภาพ": a.imageUrl || "",
       "รายละเอียด": a.description || "",
     }));
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "award",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: items.length } },
+    );
 
     return buildExcelResponse(rows, "รางวัล", "awards_export");
   } catch (error) {

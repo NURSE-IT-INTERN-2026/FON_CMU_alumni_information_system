@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
     const searchField = searchParams.get("searchField") || "";
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     const validSortFields = ["termYear", "createdAt", "studentId", "prefix", "firstName", "lastName", "cohort", "position"];
     const validSortField = validSortFields.includes(sortBy) ? sortBy : "termYear";
@@ -71,15 +73,8 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { [validSortField]: sortOrder },
     });
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "graduate_committee",
-      null,
-      { count: items.length, mode: "filtered", search: search || undefined },
-    );
-
-    const rows = items.map((a) => ({
+    const { start, end } = resolveRowRange(startRow, endRow, items.length);
+    const rows = items.slice(start - 1, end).map((a) => ({
       "ปี พ.ศ.": a.termYear,
       "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
@@ -88,6 +83,13 @@ export async function GET(request: NextRequest) {
       "ตำแหน่ง": a.position,
       "หมายเหตุ": a.remarks || "",
     }));
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "graduate_committee",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: items.length } },
+    );
 
     return buildExcelResponse(rows, "กรรมการบัณฑิต", "graduate_committee_export");
   } catch (error) {

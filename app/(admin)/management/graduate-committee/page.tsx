@@ -10,6 +10,7 @@ import { useEntityList } from "@/lib/use-entity-list";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import OrangeCell from "@/components/OrangeCell";
+import { ExportRangeButton } from "@/components/ExportRangeButton";
 import { useHotFields } from "@/lib/use-hot-fields";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useAlumniSearch } from "@/lib/useAlumniSearch";
@@ -240,13 +241,15 @@ export default function GraduateCommitteePage() {
     }
   };
 
-  const handleExport = () => {
+  const buildExportHref = (startRow: number | null, endRow: number | null) => {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     facetQueryParams(filters).forEach((v, k) => params.set(k, v));
     params.set("sortBy", sortField);
     params.set("sortOrder", sortDir);
-    window.location.href = `${BASE_PATH}/api/graduate-committee/export?${params}`;
+    if (startRow != null) params.set("startRow", String(startRow));
+    if (endRow != null) params.set("endRow", String(endRow));
+    return `${BASE_PATH}/api/graduate-committee/export?${params}`;
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -442,10 +445,7 @@ export default function GraduateCommitteePage() {
               เพิ่มข้อมูล
             </button>
           )}
-          <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-            ส่งออก Excel
-          </button>
+          <ExportRangeButton buildHref={buildExportHref} />
           {canWrite && (
             <>
               <input type="file" accept=".xlsx,.xls" ref={importFileRef} onChange={handleImport} className="hidden" />

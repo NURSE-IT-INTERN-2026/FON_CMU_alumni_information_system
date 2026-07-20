@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 import { joinPhones } from "@/lib/parse-phone";
 
 const MAX_EXPORT_COUNT = 10000;
@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || "";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     const where: Prisma.AlumniWhereInput = {};
 
@@ -56,13 +58,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    const rows = mapRows(alumni);
+    const { start, end } = resolveRowRange(startRow, endRow, alumni.length);
+    const rows = mapRows(alumni.slice(start - 1, end));
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "EXPORT",
       "alumni",
       null,
-      { count: rows.length, mode: "filtered", search: search || undefined },
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: alumni.length } },
     );
 
     return buildExcelResponse(rows, "ศิษย์เก่า", "alumni_export");

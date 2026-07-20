@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
-import { buildExcelResponse } from "@/lib/excel-export";
+import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const searchField = searchParams.get("searchField") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+    const startRow = searchParams.get("startRow");
+    const endRow = searchParams.get("endRow");
 
     const validSortFields = ["createdAt", "studentId", "prefix", "firstName", "lastName", "associationName", "position", "recordedYear"];
     const validSortField = validSortFields.includes(sortField) ? sortField : "createdAt";
@@ -58,15 +60,8 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { [validSortField]: sortOrder },
     });
-    await logActivity(
-      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
-      "EXPORT",
-      "association",
-      null,
-      { count: items.length, mode: "filtered", search: search || undefined },
-    );
-
-    const rows = items.map((a) => ({
+    const { start, end } = resolveRowRange(startRow, endRow, items.length);
+    const rows = items.slice(start - 1, end).map((a) => ({
       "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
       ...NAME_ROW(a),
       "สาขาวิชา": a.major || "",
@@ -74,6 +69,13 @@ export async function GET(request: NextRequest) {
       "ตำแหน่ง": a.position,
       "ปีที่บันทึก (พ.ศ.)": a.recordedYear,
     }));
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "EXPORT",
+      "association",
+      null,
+      { count: rows.length, mode: "filtered", search: search || undefined, range: { start, end, total: items.length } },
+    );
 
     return buildExcelResponse(rows, "สมาคม/ชมรม", "associations_export");
   } catch (error) {
