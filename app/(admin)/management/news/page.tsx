@@ -136,17 +136,6 @@ export default function NewsListPage() {
   };
 
   const qc = useQueryClient();
-
-  // Refresh news queries after a mutation. The pinned-section query is
-  // `enabled: page===1 && !search && !statusFilter`, so while the admin is
-  // filtered/searched/paged its observer is in standby and the default
-  // (refetchType: "active") invalidation marks it stale but does NOT refetch
-  // it — making the pinned section lag behind a pin/discontinue until a filter
-  // change re-enables it. refetchType: "all" forces it to refresh immediately.
-  const invalidateNews = () => {
-    qc.invalidateQueries({ queryKey: queryKeys.news.all });
-    qc.invalidateQueries({ queryKey: queryKeys.news.pinned(), refetchType: "all" });
-  };
   const { data: newsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.news.list({ page, search, statusFilter }),
     queryFn: () => {
@@ -164,12 +153,16 @@ export default function NewsListPage() {
   const total = newsData?.total ?? 0;
   const totalPages = newsData?.totalPages ?? 1;
 
-  // Pinned "ประชาสัมพันธ์สำคัญ" section — only fetched on page 1 with no
-  // search/status filter (the section is hidden otherwise). PUBLISHED-only so
-  // it mirrors exactly what alumni see at the top of their news page.
+  // Pinned "ประชาสัมพันธ์สำคัญ" section — PUBLISHED-only so it mirrors exactly
+  // what alumni see at the top of their news page. NOTE: this query is
+  // intentionally NOT `enabled`-gated. A standby `useQuery` (`enabled: false`)
+  // does not reflect force-refetched data — neither invalidateQueries nor
+  // refetchQueries updates its rendered output until it re-enables — so a pin
+  // made while filtered/searched/paged left this section stale until a filter
+  // change. Keeping it always-active means every news mutation's invalidate
+  // refetches it immediately. The section is render-gated on pinnedItems.length.
   const { data: pinnedData } = useQuery({
     queryKey: queryKeys.news.pinned(),
-    enabled: page === 1 && !search && !statusFilter,
     queryFn: () =>
       apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(
         `/api/news?${new URLSearchParams({ pinned: "true", status: "PUBLISHED", pageSize: "100" })}`
@@ -220,7 +213,7 @@ export default function NewsListPage() {
         await apiFetch(`/api/news`, { method: "POST", json: payload });
       }
       closeForm();
-      invalidateNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -233,7 +226,7 @@ export default function NewsListPage() {
     try {
       await apiFetch(`/api/news/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      invalidateNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข่าวสาร");
     }
@@ -246,7 +239,7 @@ export default function NewsListPage() {
         method: "POST",
         json: { pinned: !item.pinnedAt },
       });
-      invalidateNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการปักหมุดข่าวสาร");
     }
@@ -261,7 +254,7 @@ export default function NewsListPage() {
       await apiFetch(`/api/news/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      invalidateNews();
+      qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
