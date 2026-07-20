@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkNonExecutivePermission } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   try {
+    const permErr = await checkNonExecutivePermission();
+    if (permErr) return permErr;
+
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });

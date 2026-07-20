@@ -17,6 +17,7 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import SearchInput from "@/components/ui/search-input";
+import { useCanWrite } from "@/lib/role-context";
 
 // PRD §3.12: news lists show at most 9 cards per page.
 const NEWS_PAGE_SIZE = 9;
@@ -65,6 +66,7 @@ const EMPTY_FORM: {
 };
 
 export default function NewsListPage() {
+  const canWrite = useCanWrite();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -139,7 +141,11 @@ export default function NewsListPage() {
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(NEWS_PAGE_SIZE) });
       if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
+      // The read-only "executive" role sees news like alumni (published only).
+      // The server already enforces this; the client param keeps the UI honest
+      // and means the status filter never applies for executives.
+      if (!canWrite) params.set("status", "PUBLISHED");
+      else if (statusFilter) params.set("status", statusFilter);
       return apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(`/api/news?${params}`);
     },
   });
@@ -308,22 +314,24 @@ export default function NewsListPage() {
             {summary && <p className="line-clamp-3 text-sm text-[var(--muted)]">{summary}{stripHtml(item.body).length > 150 ? "..." : ""}</p>}
           </div>
         </Link>
-        <div className="mt-auto flex items-center justify-end border-t border-gray-100 px-4 py-2.5">
-          <div className="flex items-center gap-1">
-            <button onClick={() => togglePin(item)} className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium ${pinned ? "bg-amber-50 text-amber-700" : "text-gray-400 hover:bg-gray-100 hover:text-amber-600"}`} title={pinned ? "ยกเลิกปักหมุด" : "ปักหมุดเป็นประชาสัมพันธ์สำคัญ"}>
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pinned ? 1 : 1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
-              {pinned ? "ปักหมุดแล้ว" : "ปักหมุด"}
-            </button>
-            <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-              แก้ไข
-            </button>
-            <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-              ยุติการเผยแพร่
-            </button>
+        {canWrite && (
+          <div className="mt-auto flex items-center justify-end border-t border-gray-100 px-4 py-2.5">
+            <div className="flex items-center gap-1">
+              <button onClick={() => togglePin(item)} className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium ${pinned ? "bg-amber-50 text-amber-700" : "text-gray-400 hover:bg-gray-100 hover:text-amber-600"}`} title={pinned ? "ยกเลิกปักหมุด" : "ปักหมุดเป็นประชาสัมพันธ์สำคัญ"}>
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth={pinned ? 1 : 1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+                {pinned ? "ปักหมุดแล้ว" : "ปักหมุด"}
+              </button>
+              <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50" title="แก้ไข">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                แก้ไข
+              </button>
+              <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                ยุติการเผยแพร่
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -335,7 +343,7 @@ export default function NewsListPage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           ข่าวสารและกิจกรรม
         </h1>
-        {selectMode ? (
+        {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
             <button onClick={() => (isAllSelected(news.map((n) => n.id)) ? deselectAll() : selectAll(news.map((n) => n.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
               เลือกทั้งหมดในหน้านี้
@@ -348,7 +356,7 @@ export default function NewsListPage() {
           <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
           </button>
-        )}
+        ))}
       </div>
 
       {errorMsg && (
@@ -358,7 +366,7 @@ export default function NewsListPage() {
         </div>
       )}
 
-      {showForm && (
+      {showForm && canWrite && (
         <div className="mb-6 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           {/* Header bar */}
           <div className="flex items-center justify-between bg-[var(--primary)] px-6 py-3">
@@ -552,7 +560,7 @@ export default function NewsListPage() {
           placeholder="ค้นหาข่าว..."
           formClassName="flex-1"
         />
-        {(
+        {canWrite && (
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -566,7 +574,7 @@ export default function NewsListPage() {
         )}
       </div>
 
-      {(
+      {canWrite && (
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>

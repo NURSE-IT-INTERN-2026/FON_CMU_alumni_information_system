@@ -41,6 +41,12 @@ export default async function NewsDetailPage({
     notFound();
   }
 
+  // The read-only "executive" role sees news the way alumni do — published
+  // only. Admins/superadmins still preview DRAFT/DISCONTINUED here.
+  if (adminSession.user.role === "executive" && news!.status !== "PUBLISHED") {
+    notFound();
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link

@@ -95,6 +95,18 @@ export default function UsersPage() {
       ? statusParam
       : null;
 
+  // The read-only "executive" role is excluded from account management.
+  if (!canWrite) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">จัดการผู้ใช้งาน</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
@@ -160,7 +172,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const members = membersData ?? [];
 
   const openCreate = () => { formReset(EMPTY_FORM); setEditingId(null); setShowForm(true); };
-  const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role as "superadmin" | "admin" }); setEditingId(m.id); setShowForm(true); };
+  const openEdit = (m: AdminUser) => { formReset({ firstName: m.firstName, lastName: m.lastName, email: m.email, role: m.role as "superadmin" | "admin" | "executive" }); setEditingId(m.id); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditingId(null); formReset(EMPTY_FORM); };
 
   const toggleSuspend = async (m: AdminUser) => {
@@ -194,8 +206,8 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
   const formatDate = (d: string) => new Date(d).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
 
   const roleBadge = (role: string) => {
-    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", admin: "bg-purple-100 text-purple-700" };
-    const l: Record<string, string> = { superadmin: "ผู้ดูแลระบบสูงสุด", admin: "ผู้ดูแลระบบ" };
+    const s: Record<string, string> = { superadmin: "bg-purple-100 text-purple-700", admin: "bg-purple-100 text-purple-700", executive: "bg-amber-100 text-amber-700" };
+    const l: Record<string, string> = { superadmin: "ผู้ดูแลระบบสูงสุด", admin: "ผู้ดูแลระบบ", executive: "ผู้บริหาร" };
     return <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${s[role] || "bg-gray-100 text-gray-700"}`}>{l[role] || role}</span>;
   };
 
@@ -234,6 +246,7 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
               <FormSelect registration={register("role")}>
                 <option value="admin">ผู้ดูแลระบบ</option>
                 <option value="superadmin">ผู้ดูแลระบบสูงสุด</option>
+                <option value="executive">ผู้บริหาร (ดูอย่างเดียว)</option>
               </FormSelect>
             </FormField>
           </div>

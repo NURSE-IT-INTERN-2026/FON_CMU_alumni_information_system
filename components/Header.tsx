@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_ITEMS, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
-import { useRole, roleLabel } from "@/lib/role-context";
+import { useRole, useCanWrite, useIsAdmin, roleLabel } from "@/lib/role-context";
 
 interface HeaderProps {
   user?: {
@@ -19,12 +19,21 @@ export default function Header({ user }: HeaderProps = {}) {
   const router = useRouter();
   const role = useRole();
   const isSuperAdmin = role === "superadmin";
+  const canWrite = useCanWrite();
+  const isAdmin = useIsAdmin();
   const showLogout = pathname !== "/login";
   const showSettings = pathname.startsWith("/management/settings");
   const displayName = user ? `${user.firstName} ${user.lastName}` : "";
 
+  // Keep this filter identical to Sidebar's so the mobile hamburger menu and
+  // the desktop sidebar never disagree on which settings pages a role sees.
   const items = showSettings
-    ? SETTINGS_NAV_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
+    ? SETTINGS_NAV_ITEMS.filter((item) => {
+        if (item.superAdminOnly && !isSuperAdmin) return false;
+        if (item.adminOnly && !isAdmin) return false;
+        if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
+        return true;
+      })
     : NAV_ITEMS;
 
   const toggleSettings = () => {

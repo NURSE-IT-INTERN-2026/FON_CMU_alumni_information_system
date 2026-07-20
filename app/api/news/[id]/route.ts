@@ -34,8 +34,10 @@ export async function GET(
       );
     }
 
-    // Alumni can only read published news; staff can preview any status.
-    if (!adminSession && news.status !== "PUBLISHED") {
+    // Alumni (no admin session) and the read-only "executive" role can only
+    // read published news; other staff can preview any status.
+    const isExecutive = !!adminSession && adminSession.user.role === "executive";
+    if ((!adminSession || isExecutive) && news.status !== "PUBLISHED") {
       return NextResponse.json(
         { error: "ไม่พบข่าวสาร" },
         { status: 404 }

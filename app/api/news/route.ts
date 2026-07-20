@@ -42,13 +42,13 @@ export async function GET(request: NextRequest) {
       where.pinnedAt = null;
     }
 
-    if (adminSession) {
+    if (adminSession && adminSession.user.role !== "executive") {
       // Staff: honor an explicit status filter, otherwise return all statuses.
       if (statusParam) {
         where.status = statusParam as Prisma.EnumNewsStatusFilter["equals"];
       }
     } else {
-      // Alumni: published news only.
+      // Alumni (no admin session) AND the read-only "executive" role: published news only.
       where.status = "PUBLISHED";
     }
 

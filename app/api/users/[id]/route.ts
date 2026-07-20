@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { checkSuperAdminPermission } from "@/lib/permissions";
+import { checkNonExecutivePermission, checkSuperAdminPermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, userUpdateSchema } from "@/lib/validations";
 
@@ -11,6 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const permErr = await checkNonExecutivePermission();
+    if (permErr) return permErr;
+
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
