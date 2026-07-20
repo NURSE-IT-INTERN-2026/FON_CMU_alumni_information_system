@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getSession, getAlumniSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
+import { computeFieldChanges, recordFieldChanges, TRACKED_FIELDS } from "@/lib/field-changes";
 import { handleZodError, newsUpdateSchema } from "@/lib/validations";
 
 export async function GET(
@@ -98,13 +99,21 @@ export async function PUT(
       data: updateData,
     });
 
-    await logActivity(
+    const changes = computeFieldChanges(existing, news, TRACKED_FIELDS.news);
+    const logId = await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "UPDATE",
       "news",
       id,
-      { title: news.title, status: news.status },
+      { changes },
     );
+    await recordFieldChanges({
+      resourceType: "news",
+      resourceId: id,
+      changes,
+      actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email },
+      activityLogId: logId,
+    });
 
     return NextResponse.json(news);
   } catch (error) {

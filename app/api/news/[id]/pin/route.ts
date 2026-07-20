@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
+import { computeFieldChanges, recordFieldChanges, TRACKED_FIELDS } from "@/lib/field-changes";
 
 // Pin (or unpin) a news article so it surfaces in the "ประชาสัมพันธ์สำคัญ"
 // section at the top of the news pages. Admin-only. `pinnedAt` doubles as the
@@ -33,13 +34,21 @@ export async function POST(
       data: { pinnedAt: pinned ? new Date() : null },
     });
 
-    await logActivity(
+    const changes = computeFieldChanges(existing, news, TRACKED_FIELDS.news);
+    const logId = await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "UPDATE",
       "news",
       id,
-      { title: news.title, pinned },
+      { changes },
     );
+    await recordFieldChanges({
+      resourceType: "news",
+      resourceId: id,
+      changes,
+      actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email },
+      activityLogId: logId,
+    });
 
     return NextResponse.json({ success: true, pinnedAt: news.pinnedAt });
   } catch (error) {
