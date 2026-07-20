@@ -147,16 +147,6 @@ export default function LogsPage() {
     setPage(1);
   };
 
-  function handleRowClick(id: string) {
-    if (!selectionMode) {
-      // First click enters selection mode and selects the clicked row.
-      setSelectionMode(true);
-      toggleSelect(id);
-    } else {
-      toggleSelect(id);
-    }
-  }
-
   function exitSelectionMode() {
     setSelectionMode(false);
     deselectAll();
@@ -306,16 +296,6 @@ export default function LogsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {selectionMode && (
-                  <th className="w-10 px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected(pageIds)}
-                      onChange={() => (isAllSelected(pageIds) ? deselectAll() : selectAll(pageIds))}
-                      className="h-4 w-4 cursor-pointer accent-purple-600"
-                    />
-                  </th>
-                )}
                 <th className="px-4 py-3">วันที่/เวลา</th>
                 <th className="px-4 py-3">ผู้ใช้งาน</th>
                 <th className="px-4 py-3">กิจกรรม</th>
@@ -347,19 +327,14 @@ export default function LogsPage() {
                 return (
                   <tr
                     key={log.id}
-                    onClick={canDeleteLogs ? () => handleRowClick(log.id) : undefined}
-                    className={`${selected ? "bg-purple-50" : ""} ${canDeleteLogs ? "cursor-pointer" : ""} hover:bg-gray-50`}
+                    onClick={(e) => {
+                      // Eye-icon / badge buttons keep working in any mode.
+                      if ((e.target as HTMLElement).closest("button, input, a")) return;
+                      if (selectionMode) toggleSelect(log.id);
+                      else setDetailLog(log);
+                    }}
+                    className={`cursor-pointer transition-colors ${selected ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}
                   >
-                    {selectionMode && (
-                      <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleSelect(log.id)}
-                          className="h-4 w-4 cursor-pointer accent-purple-600"
-                        />
-                      </td>
-                    )}
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDate(log.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{actorName}</div>
