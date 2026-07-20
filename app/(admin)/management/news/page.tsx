@@ -136,6 +136,17 @@ export default function NewsListPage() {
   };
 
   const qc = useQueryClient();
+
+  // Refresh news queries after a mutation. The pinned-section query is
+  // `enabled: page===1 && !search && !statusFilter`, so while the admin is
+  // filtered/searched/paged its observer is in standby and the default
+  // (refetchType: "active") invalidation marks it stale but does NOT refetch
+  // it — making the pinned section lag behind a pin/discontinue until a filter
+  // change re-enables it. refetchType: "all" forces it to refresh immediately.
+  const invalidateNews = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.news.all });
+    qc.invalidateQueries({ queryKey: queryKeys.news.pinned(), refetchType: "all" });
+  };
   const { data: newsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.news.list({ page, search, statusFilter }),
     queryFn: () => {
@@ -209,7 +220,7 @@ export default function NewsListPage() {
         await apiFetch(`/api/news`, { method: "POST", json: payload });
       }
       closeForm();
-      qc.invalidateQueries({ queryKey: queryKeys.news.all });
+      invalidateNews();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -222,7 +233,7 @@ export default function NewsListPage() {
     try {
       await apiFetch(`/api/news/${deleteId}`, { method: "DELETE" });
       setDeleteId(null);
-      qc.invalidateQueries({ queryKey: queryKeys.news.all });
+      invalidateNews();
     } catch {
       setErrorMsg("เกิดข้อผิดพลาดในการลบข่าวสาร");
     }
@@ -235,7 +246,7 @@ export default function NewsListPage() {
         method: "POST",
         json: { pinned: !item.pinnedAt },
       });
-      qc.invalidateQueries({ queryKey: queryKeys.news.all });
+      invalidateNews();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการปักหมุดข่าวสาร");
     }
@@ -250,7 +261,7 @@ export default function NewsListPage() {
       await apiFetch(`/api/news/bulk-delete`, { method: "POST", json: { ids } });
       deselectAll();
       setShowBulkDeleteDialog(false);
-      qc.invalidateQueries({ queryKey: queryKeys.news.all });
+      invalidateNews();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบข้อมูล");
     } finally {
