@@ -62,6 +62,7 @@ export const TRACKED_FIELDS: Record<string, string[]> = {
     "homeAddress",
     "remarks",
   ],
+  news: ["title", "status", "pinnedAt"],
 };
 
 function coerce(v: unknown): string | null {

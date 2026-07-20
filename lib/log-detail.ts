@@ -52,6 +52,8 @@ export const FIELD_LABELS: Record<string, string> = {
   // misc
   title: "ชื่อเรื่อง",
   status: "สถานะ",
+  pinnedAt: "การปักหมุด",
+  pinned: "การปักหมุด",
   role: "บทบาท",
   remarks: "หมายเหตุ",
   notes: "หมายเหตุ",
@@ -101,6 +103,11 @@ function labelFor(field: string): string {
 
 /** Pretty-print a single value, typed by the field it belongs to. */
 export function formatValue(field: string, value: unknown): string {
+  // pinnedAt is a timestamp-or-null whose meaning is the pin STATE, not a date;
+  // the legacy `pinned` boolean carries the same meaning. Handle before the
+  // null early-return so "unpinned" shows as "ไม่ได้ปักหมุด" instead of "—".
+  if (field === "pinnedAt") return value == null || value === "" ? "ไม่ได้ปักหมุด" : "ปักหมุด";
+  if (field === "pinned") return value === true || value === "true" ? "ปักหมุด" : "ไม่ได้ปักหมุด";
   if (value === null || value === undefined || value === "") return "—";
   switch (field) {
     case "awardType":
@@ -443,6 +450,13 @@ export function describeActivityLog(args: {
   if (action === "UPDATE") {
     // Alumni core edits name the field(s); everything else is action + resource.
     if (resource === "alumni") {
+      const changes = extractChanges(details);
+      if (changes && changes.length > 0) {
+        return "แก้ไข" + changes.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ");
+      }
+    }
+    // News edits name the changed field(s) — e.g. "แก้ไขการปักหมุด", "แก้ไขสถานะ".
+    if (resource === "news") {
       const changes = extractChanges(details);
       if (changes && changes.length > 0) {
         return "แก้ไข" + changes.map((c) => FIELD_LABELS[c.field] ?? c.field).join(", ");
