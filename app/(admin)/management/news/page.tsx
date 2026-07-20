@@ -292,9 +292,11 @@ export default function NewsListPage() {
               ปักหมุด
             </span>
           )}
-          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
-            {STATUS_LABELS[item.status]}
-          </span>
+          {canWrite && (
+            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
+              {STATUS_LABELS[item.status]}
+            </span>
+          )}
         </div>
         <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); toggleSelect(item.id); } }}>
           <div className="aspect-video w-full overflow-hidden bg-gray-100">
