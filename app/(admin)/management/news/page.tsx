@@ -285,19 +285,19 @@ export default function NewsListPage() {
     const pinned = !!item.pinnedAt;
     return (
       <div key={item.id} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : pinned ? "ring-2 ring-amber-400" : ""}`}>
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-          {pinned && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 shadow-sm" title="ปักหมุดแล้ว">
-              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
-              ปักหมุด
-            </span>
-          )}
-          {canWrite && (
+        {canWrite && (
+          <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+            {pinned && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 shadow-sm" title="ปักหมุดแล้ว">
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+                ปักหมุด
+              </span>
+            )}
             <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${item.status === "PUBLISHED" ? "bg-green-100 text-green-700" : item.status === "DISCONTINUED" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700"}`}>
               {STATUS_LABELS[item.status]}
             </span>
-          )}
-        </div>
+          </div>
+        )}
         <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); toggleSelect(item.id); } }}>
           <div className="aspect-video w-full overflow-hidden bg-gray-100">
             {item.coverImageUrl ? (
