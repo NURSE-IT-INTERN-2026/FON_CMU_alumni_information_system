@@ -144,7 +144,7 @@ Each data entity follows a consistent route structure:
 - `POST /api/{entity}` — create
 - `GET/PUT/DELETE /api/{entity}/[id]` — read/update/delete
 - `POST /api/{entity}/import` — Excel import
-- `GET /api/{entity}/export` — Excel export
+- `GET /api/{entity}/export` — Excel export. Accepts optional `?startRow=`/`?endRow=` (1-based, clamped server-side against the total matching-row count via `resolveRowRange` in `lib/excel-export.ts`: start `>N`/`<1`/missing → 1, end `>N`/`<1`/missing → N; both empty → all). The "ส่งออก Excel" button is the shared `<ExportRangeButton>` (`components/ExportRangeButton.tsx`) popover. Applies only to GET filtered export — the POST bulk-export (`/export` with `{ ids }`) is id-scoped and unaffected. Sheet names are sanitized in `buildExcelResponse` (Excel forbids `* ? : \ / [ ]` and 31-char max — the Thai label "สมาคม/ชมรม" had a `/`).
 - `POST /api/{entity}/bulk-delete` — bulk delete by IDs
 - `POST /api/alumni/create-with-related` + `PUT /api/alumni/update-with-related/[id]` — create/update an alumni together with related records (full-form; one save can affect other pages)
 - DELETE is a **soft delete**; recovery is superadmin-only via `POST /api/trash/restore` and `POST /api/trash/hard-delete`
