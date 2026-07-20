@@ -33,7 +33,7 @@ async function main() {
   console.log("Upserting admin users...");
   const passwordHash = await hashPassword("password123");
 
-  const [admin, superadmin] = await Promise.all([
+  const [admin, superadmin, executive] = await Promise.all([
     prisma.adminUser.upsert({
       where: { email: "admin@cmu.ac.th" },
       update: { firstName: "ผู้ดูแล", lastName: "ระบบ", passwordHash, role: "admin" },
@@ -44,11 +44,17 @@ async function main() {
       update: { firstName: "ผู้ดูแลระบบ", lastName: "สูงสุด", passwordHash, role: "superadmin" },
       create: { firstName: "ผู้ดูแลระบบ", lastName: "สูงสุด", email: "superadmin@cmu.ac.th", passwordHash, role: "superadmin" },
     }),
+    prisma.adminUser.upsert({
+      where: { email: "executive@cmu.ac.th" },
+      update: { firstName: "ผู้บริหาร", lastName: "ระบบ", passwordHash, role: "executive" },
+      create: { firstName: "ผู้บริหาร", lastName: "ระบบ", email: "executive@cmu.ac.th", passwordHash, role: "executive" },
+    }),
   ]);
 
   console.log(`  ${admin.email} (admin)`);
-  console.log(`  ${superadmin.email} (superadmin)\n`);
-  console.log("Reset complete. Database now contains only the 2 admin users.");
+  console.log(`  ${superadmin.email} (superadmin)`);
+  console.log(`  ${executive.email} (executive)\n`);
+  console.log("Reset complete. Database now contains only the 3 admin users.");
 }
 
 main()

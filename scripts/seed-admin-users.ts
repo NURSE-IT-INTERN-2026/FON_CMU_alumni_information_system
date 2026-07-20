@@ -11,6 +11,7 @@
  * Credentials (same as `prisma/seed.ts` §1):
  *   admin@cmu.ac.th      / password123  (role: admin)
  *   superadmin@cmu.ac.th / password123  (role: superadmin)
+ *   executive@cmu.ac.th  / password123  (role: executive — read-only)
  */
 import prisma from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
@@ -29,6 +30,12 @@ const USERS = [
     firstName: "ผู้ดูแลระบบ",
     lastName: "สูงสุด",
     role: "superadmin",
+  },
+  {
+    email: "executive@cmu.ac.th",
+    firstName: "ผู้บริหาร",
+    lastName: "ระบบ",
+    role: "executive",
   },
 ] as const;
 

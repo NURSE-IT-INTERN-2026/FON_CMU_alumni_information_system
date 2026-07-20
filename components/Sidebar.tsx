@@ -63,7 +63,7 @@ export default function Sidebar() {
             );
           })}
         </ul>
-        {!showSettings && (
+        {!showSettings && canWrite && (
           <Link
             href="/management/settings/users"
             className="mb-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--background)]"

@@ -8,6 +8,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw, CloudDownload } from "lucide-re
 import SearchInput from "@/components/ui/search-input";
 import { DEGREE_LEVEL_OPTIONS, PAGE_SIZE } from "@/lib/constants";
 import { cmuLevelToDegree } from "@/lib/alumni-verify";
+import { useRole } from "@/lib/role-context";
 
 // Shape returned by GET /api/cmu-alumni/sync (the auto-compare).
 interface CompareResult {
@@ -46,10 +47,12 @@ export default function CmuSyncPage() {
   const qc = useQueryClient();
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const role = useRole();
 
   // Auto-compare on load: fetch remote + diff against local cmu_graduates.
   const compareQuery = useQuery({
     queryKey: queryKeys.cmuSync.compare(),
+    enabled: role !== "executive",
     queryFn: () => apiFetch<CompareResult>("/api/cmu-alumni/sync"),
     retry: false,
   });
@@ -86,6 +89,17 @@ export default function CmuSyncPage() {
   // Show once the local cache has data (post-first-sync). The live table degrades
   // to an inline error if CMU is unreachable — the local table still works.
   const showTables = !comparing && localCount > 0;
+
+  if (role === "executive") {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">การดึงข้อมูล</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">

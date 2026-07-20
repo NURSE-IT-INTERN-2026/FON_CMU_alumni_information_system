@@ -8,6 +8,7 @@ const RoleContext = createContext<string>("admin");
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "ผู้ดูแลระบบสูงสุด",
   admin: "ผู้ดูแลระบบ",
+  executive: "ผู้บริหาร",
 };
 
 export function roleLabel(role: string): string {

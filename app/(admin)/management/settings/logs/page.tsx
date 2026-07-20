@@ -110,7 +110,8 @@ export default function LogsPage() {
   const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
 
   // Log deletion is superadmin-only (irreversible audit changes).
-  const canDeleteLogs = useRole() === "superadmin";
+  const role = useRole();
+  const canDeleteLogs = role === "superadmin";
   const [selectionMode, setSelectionMode] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -128,6 +129,7 @@ export default function LogsPage() {
 
   const { data: logsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, source: sourceFilter }),
+    enabled: role !== "executive",
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
       if (resourceFilter) params.set("resource", resourceFilter);
@@ -189,6 +191,17 @@ export default function LogsPage() {
     if (await deleteLogs([id])) {
       setDetailLog(null);
     }
+  }
+
+  if (role === "executive") {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">บันทึกกิจกรรม</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+        </div>
+      </div>
+    );
   }
 
   return (
