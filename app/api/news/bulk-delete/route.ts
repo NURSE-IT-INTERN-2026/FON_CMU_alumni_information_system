@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -25,6 +27,18 @@ export async function POST(request: NextRequest) {
       where: { id: { in: ids } },
       data: { status: "DISCONTINUED", pinnedAt: null },
     });
+
+    const session = await getSession();
+    if (session) {
+      await logActivity(
+        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        "BULK_DELETE",
+        "news",
+        null,
+        { count: result.count, ids },
+      );
+    }
+
     return NextResponse.json({ updated: result.count });
   } catch (error) {
     console.error("Bulk delete error:", error);
