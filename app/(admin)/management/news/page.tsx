@@ -171,7 +171,12 @@ export default function NewsListPage() {
   // Pinned news are excluded (they live in the separate pinned section); on a
   // mixed-status page with no status locked yet, returns no target → button disabled.
   const selectAllTarget = resolveSelectAllTargetIds(news, selectionStatus);
-  const selectAllStatusLabel = selectAllTarget.status ? STATUS_LABELS[selectAllTarget.status] : null;
+  // Phrase for the "เลือกข่าวที่…ทั้งหมดในหน้านี้" label. DRAFT needs "เป็นฉบับร่าง"
+  // (the bare noun "ฉบับร่าง" doesn't follow "ที่" grammatically); PUBLISHED /
+  // DISCONTINUED are verb phrases that already fit.
+  const selectAllStatusPhrase = selectAllTarget.status
+    ? selectAllTarget.status === "DRAFT" ? "เป็นฉบับร่าง" : STATUS_LABELS[selectAllTarget.status]
+    : null;
   const allOnPageSelected = selectAllTarget.ids.length > 0 && isAllSelected(selectAllTarget.ids);
 
   // Pinned "ประชาสัมพันธ์สำคัญ" section — PUBLISHED-only so it mirrors exactly
@@ -458,8 +463,8 @@ export default function NewsListPage() {
               className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {allOnPageSelected
-                ? selectAllStatusLabel ? `ยกเลิกเลือก${selectAllStatusLabel}ในหน้านี้` : "ยกเลิกเลือกหน้านี้"
-                : selectAllStatusLabel ? `เลือก${selectAllStatusLabel}ทั้งหมดในหน้านี้` : "เลือกทั้งหมดในหน้านี้"}
+                ? selectAllStatusPhrase ? `ยกเลิกเลือกข่าวที่${selectAllStatusPhrase}ในหน้านี้` : "ยกเลิกเลือกหน้านี้"
+                : selectAllStatusPhrase ? `เลือกข่าวที่${selectAllStatusPhrase}ทั้งหมดในหน้านี้` : "เลือกทั้งหมดในหน้านี้"}
             </button>
             <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
               เสร็จสิ้น
