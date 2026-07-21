@@ -29,6 +29,17 @@ export async function POST(
       return NextResponse.json({ error: "ไม่พบข่าวสาร" }, { status: 404 });
     }
 
+    // Only published news can be pinned — the card hides the pin button on
+    // drafts/discontinued; this guard enforces the same rule at the API so the
+    // rule can't be bypassed. Unpinning (`pinned: false`) stays allowed for any
+    // status so stale pins can still be cleared.
+    if (pinned && existing.status !== "PUBLISHED") {
+      return NextResponse.json(
+        { error: "ไม่สามารถปักหมุดข่าวที่ยังไม่เผยแพร่ได้" },
+        { status: 400 }
+      );
+    }
+
     const news = await prisma.news.update({
       where: { id },
       data: { pinnedAt: pinned ? new Date() : null },
