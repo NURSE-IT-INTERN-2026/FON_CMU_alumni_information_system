@@ -347,9 +347,9 @@ export default function NewsListPage() {
                 แก้ไข
               </button>
               {item.status !== "PUBLISHED" ? (
-                <button onClick={() => publishNews(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-green-600 hover:bg-green-50" title="เผยแพร่">
+                <button onClick={() => publishNews(item)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-green-600 hover:bg-green-50" title="เผยแพร่ข่าว">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  เผยแพร่
+                  เผยแพร่ข่าว
                 </button>
               ) : (
                 <button onClick={() => setDeleteId(item.id)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50" title="ยุติการเผยแพร่">
