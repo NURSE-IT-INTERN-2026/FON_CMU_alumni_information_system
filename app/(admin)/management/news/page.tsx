@@ -330,7 +330,10 @@ export default function NewsListPage() {
     setErrorMsg("");
     try {
       await apiFetch(`/api/news/bulk-pin`, { method: "POST", json: { ids } });
-      deselectAll();
+      // Keep the selection so the user can toggle back. Pin/unpin doesn't change
+      // status (items stay PUBLISHED), so the selection + selectionStatus stay
+      // coherent; the invalidate refreshes pinnedItems so the toggle label
+      // recomputes. (Publish/discontinue still clear, since they change status.)
       qc.invalidateQueries({ queryKey: queryKeys.news.all });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการปักหมุดข้อมูล");
