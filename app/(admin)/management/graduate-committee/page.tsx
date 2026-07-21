@@ -76,6 +76,7 @@ export default function GraduateCommitteePage() {
     toggleSelect,
     selectAll,
     deselectAll,
+    deselectPage,
     isSelected,
     isAllSelected,
     getSelectedArray,
@@ -300,8 +301,8 @@ export default function GraduateCommitteePage() {
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กรรมการบัณฑิต</h1>
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
-            <button onClick={() => (isAllSelected(committees.map((c) => c.id)) ? deselectAll() : selectAll(committees.map((c) => c.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-              เลือกทั้งหมดในหน้านี้
+            <button onClick={() => (isAllSelected(committees.map((c) => c.id)) ? deselectPage(committees.map((c) => c.id)) : selectAll(committees.map((c) => c.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              {isAllSelected(committees.map((c) => c.id)) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหมดในหน้านี้"}
             </button>
             <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
               เสร็จสิ้น
@@ -597,19 +598,19 @@ export default function GraduateCommitteePage() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => { setPage(Math.max(1, page - 1)); deselectAll(); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
+                <button onClick={() => { setPage(Math.max(1, page - 1)); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
                 {paginationNumbers.map((p, i) =>
                   p === "..." ? (
                     <span key={`dot-${i}`} className="px-2 text-gray-400">...</span>
                   ) : (
-                    <button key={p} onClick={() => { setPage(p); deselectAll(); }} className={`rounded-md px-3 py-1.5 text-sm ${
+                    <button key={p} onClick={() => { setPage(p); }} className={`rounded-md px-3 py-1.5 text-sm ${
                       page === p
                         ? "bg-[var(--primary)] text-white"
                         : "border border-[var(--border)] bg-white hover:bg-gray-100"
                     }`}>{p}</button>
                   )
                 )}
-                <button onClick={() => { setPage(Math.min(totalPages, page + 1)); deselectAll(); }} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
+                <button onClick={() => { setPage(Math.min(totalPages, page + 1)); }} disabled={page === totalPages} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ถัดไป</button>
               </div>
             </div>
           )}

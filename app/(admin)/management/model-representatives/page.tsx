@@ -109,6 +109,7 @@ export default function ModelRepresentativesPage() {
     toggleSelect,
     selectAll,
     deselectAll,
+    deselectPage,
     isSelected,
     isAllSelected,
     getSelectedArray,
@@ -499,8 +500,8 @@ export default function ModelRepresentativesPage() {
         </h1>
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
-            <button onClick={() => (isAllSelected(managePageItems.map((i) => i.id)) ? deselectAll() : selectAll(managePageItems.map((i) => i.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
-              เลือกทั้งหมดในหน้านี้
+            <button onClick={() => (isAllSelected(managePageItems.map((i) => i.id)) ? deselectPage(managePageItems.map((i) => i.id)) : selectAll(managePageItems.map((i) => i.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
+              {isAllSelected(managePageItems.map((i) => i.id)) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหมดในหน้านี้"}
             </button>
             <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
               เสร็จสิ้น
@@ -862,7 +863,7 @@ export default function ModelRepresentativesPage() {
                 ))}
               </tbody>
             </table>
-            {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); deselectAll(); }, managePageStart, managePageEnd, mgmtSorted.length)}
+            {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); }, managePageStart, managePageEnd, mgmtSorted.length)}
           </div>
         )
       )}
