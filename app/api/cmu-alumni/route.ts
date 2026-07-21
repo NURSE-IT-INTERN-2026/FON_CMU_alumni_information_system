@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getIp } from "@/lib/activity-log";
-import { getCmuGraduatesLocal, cmuLevelToEnum, type CmuGraduate } from "@/lib/cmu-registrar";
+import { getCmuGraduatesLocal, applyCmuGraduateFilters, type CmuGraduate } from "@/lib/cmu-registrar";
 import { normalizeCmuBirthday, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { PAGE_SIZE } from "@/lib/constants";
 
@@ -72,38 +72,14 @@ export async function GET(request: NextRequest) {
     const cmuRaw = await getCmuGraduatesLocal();
     const graduates = dedupe ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
 
-    // 5. Apply search filter
-    let filtered = graduates;
-    if (search) {
-      filtered = graduates.filter((g: CmuGraduate) => {
-        const haystack = [
-          g.name_th,
-          g.surname_th,
-          g.student_id,
-          g.name_en,
-          g.surname_en,
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(search);
-      });
-    }
-
-    // 5b. Apply facet filters (degree level, major, graduation year) — AND-semantics.
-    if (degreeLevels.length || majors.length || graduationYears.length) {
-      filtered = filtered.filter((g: CmuGraduate) => {
-        if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id, g.major_name_th) ?? "")) {
-          return false;
-        }
-        if (majors.length && !majors.includes((g.major_name_th ?? "").trim())) {
-          return false;
-        }
-        if (graduationYears.length && !graduationYears.includes((g.grad_year ?? "").trim())) {
-          return false;
-        }
-        return true;
-      });
-    }
+    // 5. Apply search + facet filters (shared with the alumni Excel export so the
+    //    merged set filters identically — see lib/cmu-registrar.ts).
+    const filtered = applyCmuGraduateFilters(graduates, {
+      search,
+      degreeLevels,
+      majors,
+      graduationYears,
+    });
 
     // 5c. Sort
     const sortFieldMap: Record<string, string> = {
