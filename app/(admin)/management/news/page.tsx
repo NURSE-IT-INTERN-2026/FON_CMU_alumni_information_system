@@ -542,22 +542,6 @@ export default function NewsListPage() {
         </div>
       )}
 
-      {/* Pinned — ประชาสัมพันธ์สำคัญ (admin pin control lives on each card; the
-          alumni news page shows this same section read-only) */}
-      {pinnedItems.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
-            </span>
-            <h2 className="text-lg font-bold text-[var(--primary)]">ประชาสัมพันธ์สำคัญ</h2>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {pinnedItems.map(renderNewsCard)}
-          </div>
-        </section>
-      )}
-
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <SearchInput
@@ -581,7 +565,7 @@ export default function NewsListPage() {
       </div>
 
       {canWrite && (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-6 flex flex-wrap gap-2">
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             สร้างข่าวใหม่
@@ -596,6 +580,23 @@ export default function NewsListPage() {
             </button>
           )}
         </div>
+      )}
+
+      {/* Pinned — ประชาสัมพันธ์สำคัญ (shown below the search bar + create button;
+          admin pin control lives on each card; the alumni news page shows this
+          same section read-only) */}
+      {pinnedItems.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
+            </span>
+            <h2 className="text-lg font-bold text-[var(--primary)]">ประชาสัมพันธ์สำคัญ</h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {pinnedItems.map(renderNewsCard)}
+          </div>
+        </section>
       )}
 
       {loading ? (
