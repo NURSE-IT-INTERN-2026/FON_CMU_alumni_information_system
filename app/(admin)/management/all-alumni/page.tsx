@@ -15,7 +15,8 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { normalizeCmuBirthday, formatBirthDateThai, bachelorCohortFromGradYear, cmuLevelToDegree } from "@/lib/alumni-verify";
+import { formatBirthDateThai } from "@/lib/alumni-verify";
+import { mergeAlumniTableRows } from "@/lib/alumni-merge";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import FacetFilter from "@/components/ui/facet-filter";
 import SearchInput from "@/components/ui/search-input";
@@ -104,62 +105,6 @@ interface CmuAlumni {
   birthDate?: string | null;
 }
 
-/** Build a studentId → Alumni map covering EVERY education studentId of each
- *  local alumni (plus its primary snapshot), so a CMU record can be bridged to a
- *  local alumni on any of the alumni's degrees — collapsing multi-degree alumni
- *  to one row (matching the dashboard's person grouping). */
-function buildEduSidToLocalMap(local: Alumni[]): Map<string, Alumni> {
-  const m = new Map<string, Alumni>();
-  for (const a of local) {
-    const sids = new Set<string>();
-    if (a.studentId) sids.add(a.studentId.trim());
-    for (const e of a.educations ?? []) if (e.studentId) sids.add(e.studentId.trim());
-    for (const s of sids) if (s) m.set(s, a);
-  }
-  return m;
-}
-
-/** Find the local alumni bridged to a CMU record — the alumni whose ANY
- *  education studentId appears in the CMU person's student_ids. Returns the
- *  alumni (to overlay + mark used) or undefined (CMU-only row). */
-function findLocalByCmuRecord(c: CmuAlumni, eduSidToLocal: Map<string, Alumni>): Alumni | undefined {
-  const sids = c.student_ids?.length ? c.student_ids : c.student_id ? [c.student_id] : [];
-  for (const s of sids) {
-    const a = eduSidToLocal.get(String(s).trim());
-    if (a) return a;
-  }
-  return undefined;
-}
-
-/** Set of every student_id across the given CMU records (every person's whole
- *  degree set), trimmed. A local alumni is "represented by a CMU row" (so it is
- *  NOT shown as a local-only row) when ANY of its education studentIds is in
- *  this set — matching the dashboard's person grouping, including the case of
- *  two local rows for the same CMU person (both suppressed, one CMU row). */
-function buildCmuSidSet(cmu: CmuAlumni[]): Set<string> {
-  const set = new Set<string>();
-  for (const c of cmu) {
-    const sids = c.student_ids?.length ? c.student_ids : c.student_id ? [c.student_id] : [];
-    for (const sid of sids) {
-      const t = String(sid).trim();
-      if (t) set.add(t);
-    }
-  }
-  return set;
-}
-
-/** Ids of local alumni that have ANY education studentId in the CMU sid set —
- *  i.e. represented by a CMU row, so excluded from the local-only pass. */
-function buildUsedAlumniIds(local: Alumni[], cmuSidSet: Set<string>, deletedStudentIds: Set<string>): Set<string> {
-  const used = new Set<string>();
-  for (const a of local) {
-    if (deletedStudentIds.has(a.studentId)) continue;
-    const sids = [a.studentId.trim(), ...(a.educations ?? []).map((e) => e.studentId.trim())];
-    if (sids.some((s) => s && cmuSidSet.has(s))) used.add(a.id);
-  }
-  return used;
-}
-
 
 const EMPTY_EDIT_FORM: AlumniEditFormData = {
   studentId: "",
@@ -223,130 +168,17 @@ export default function AlumniCountPage() {
 
       const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true", search });
       facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      const localMap: Record<string, Alumni> = {};
-      const deletedStudentIds = new Set<string>();
+      let localData: Alumni[] = [];
       try {
         const localJson = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
-        for (const a of localJson.data) {
-          if (a.studentId) {
-            localMap[a.studentId] = a;
-            if ((a as Alumni & { deletedAt?: string | null }).deletedAt) deletedStudentIds.add(a.studentId);
-          }
-        }
+        localData = localJson.data || [];
       } catch {}
 
-      const merged: Alumni[] = [];
-      const eduSidToLocal = buildEduSidToLocalMap(Object.values(localMap));
-      // An alumni is represented by a CMU row (excluded from local-only) when ANY
-      // of its education studentIds is in CMU — collapsing multi-degree alumni
-      // AND duplicate local rows for the same CMU person to one row, like the
-      // dashboard. The overlay below picks which alumni's data a CMU row shows.
-      const cmuSidSet = buildCmuSidSet(cmuData);
-      const usedAlumni = buildUsedAlumniIds(Object.values(localMap), cmuSidSet, deletedStudentIds);
-      for (const c of cmuData) {
-        if (deletedStudentIds.has(c.student_id)) continue;
-        // Bridge on ANY of the CMU person's student_ids so a multi-degree alumni
-        // (whose education matches a non-kept CMU degree) still overlays its CMU
-        // row instead of rendering a duplicate local-only row.
-        const local = findLocalByCmuRecord(c, eduSidToLocal);
-        // CMU returns no cohort. For Bachelor graduates (level_id "1") derive
-        // "DN{YY}" from grad_year (YY = last two digits of grad_year - 3), used
-        // as a fallback so the column isn't blank. Mirrors the view-mode merge —
-        // uses the CMU record's level/year so a person shows the same cohort in
-        // both tables.
-        const derivedCohort =
-          c.level_id === "1" && c.grad_year ? bachelorCohortFromGradYear(c.grad_year) : null;
-        if (!dedupeView) {
-          // "Show all degrees": list every CMU degree record. Degree fields come
-          // from THIS record (a multi-degree person appears once per degree);
-          // local identity/contact is overlaid where the alumni exists, and the
-          // row id stays the local UUID so edit/delete/navigation treat it as the
-          // real alumni. The row key is made unique with the degree studentId so
-          // a person's degree rows don't collide.
-          const cmuDegreeLevel = cmuLevelToDegree(c.level_id, c.major_name_th);
-          if (local) {
-            merged.push({
-              ...local,
-              studentId: c.student_id,
-              degreeLevel: cmuDegreeLevel,
-              major: c.major_name_th || local.major,
-              graduationYear: c.grad_year ? Number(c.grad_year) : local.graduationYear,
-              cohort: local.cohort || derivedCohort,
-              birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate,
-            });
-          } else {
-            merged.push({
-              id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
-              lastName: c.surname_th || "", cohort: derivedCohort,
-              degreeLevel: cmuDegreeLevel, major: c.major_name_th || null,
-              graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
-              email: null, contactEmail: null, phones: [], homeAddress: null,
-              isPotential: false, isModelRepresentative: false, photoUrl: null,
-            });
-          }
-        } else if (local) {
-          merged.push({ ...local, cohort: local.cohort || derivedCohort, birthDate: normalizeCmuBirthday(c.birthday) ?? local.birthDate });
-        } else {
-          merged.push({
-            id: c.student_id, studentId: c.student_id, prefix: "", firstName: c.name_th || "",
-            lastName: c.surname_th || "", cohort: derivedCohort,
-            degreeLevel: null, major: c.major_name_th || null,
-            graduationYear: c.grad_year ? Number(c.grad_year) : null, birthDate: normalizeCmuBirthday(c.birthday), remarks: null,
-            email: null, contactEmail: null, phones: [], homeAddress: null,
-            isPotential: false, isModelRepresentative: false, photoUrl: null,
-          });
-        }
-      }
-      const q = search.trim().toLowerCase();
-      for (const a of Object.values(localMap)) {
-        if (deletedStudentIds.has(a.studentId)) continue;
-        // No CMU record for this alumni — derive cohort from the local snapshot.
-        const derivedLocal =
-          a.degreeLevel === "BACHELOR" && a.graduationYear ? bachelorCohortFromGradYear(a.graduationYear) : null;
-
-        if (dedupeView) {
-          // Highest-only (default): one row per alumni not already overlaid on a
-          // CMU row, using the primary snapshot.
-          if (usedAlumni.has(a.id)) continue;
-          merged.push({ ...a, cohort: a.cohort || derivedLocal });
-          continue;
-        }
-
-        // "Show all degrees": render one row per LOCAL education that the CMU
-        // loop hasn't already rendered (studentId not in CMU). Degree fields
-        // come from the education; identity/contact/birthDate from the alumni.
-        const eduList = (a.educations ?? []).filter((e) => e.studentId);
-        if (eduList.length === 0) {
-          // No education rows — fall back to the primary snapshot.
-          merged.push({ ...a, cohort: a.cohort || derivedLocal });
-          continue;
-        }
-        const firstNameLc = (a.firstName || "").toLowerCase();
-        const lastNameLc = (a.lastName || "").toLowerCase();
-        for (const e of eduList) {
-          if (cmuSidSet.has(e.studentId)) continue; // CMU loop rendered this degree
-          // When searching, keep only the degree row that matches (its studentId
-          // or the alumni's name) — mirrors CMU's server-side search.
-          if (q) {
-            const matches =
-              e.studentId.toLowerCase().includes(q) || firstNameLc.includes(q) || lastNameLc.includes(q);
-            if (!matches) continue;
-          }
-          const derivedEduCohort =
-            e.degreeLevel === "BACHELOR" && e.graduationYear ? bachelorCohortFromGradYear(e.graduationYear) : null;
-          merged.push({
-            ...a,
-            studentId: e.studentId,
-            degreeLevel: e.degreeLevel,
-            major: e.major ?? a.major,
-            graduationYear: e.graduationYear ?? a.graduationYear,
-            cohort: e.cohort || derivedEduCohort || a.cohort,
-          });
-        }
-      }
-      // Sort the full merged CMU+local result client-side so local-only fields
-      // (birthDate, prefix, …) reorder correctly; the CMU proxy can't sort them.
-      // We hold the complete set, so the total is simply its length.
+      // Merge CMU + local into the table's row set. Shared with the Excel export
+      // (`lib/alumni-merge`) so the table and the export can never drift apart.
+      // Soft-deleted alumni are fetched (includeDeleted) and skipped inside the
+      // merge, matching the prior inline behavior. Returned unsorted — sorted below.
+      const merged = mergeAlumniTableRows(cmuData, localData, { dedupeView, search });
       return { merged: sortAlumni(merged, sortField, sortDir), total: merged.length };
     },
   });
@@ -607,7 +439,7 @@ export default function AlumniCountPage() {
       const res = await fetch(`${BASE_PATH}/api/alumni/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ ids, dedupe: dedupeView }),
       });
       if (!res.ok) throw new Error("เกิดข้อผิดพลาด");
       const blob = await res.blob();
@@ -627,6 +459,11 @@ export default function AlumniCountPage() {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     facetQueryParams(filters).forEach((v, k) => params.set(k, v));
+    // Mirror the table's current view so the export contains exactly the rows
+    // the admin sees (dedupe mode + sort), not just the local-only set.
+    params.set("dedupe", dedupeView ? "true" : "false");
+    params.set("sortField", String(sortField));
+    params.set("sortDir", sortDir);
     if (startRow != null) params.set("startRow", String(startRow));
     if (endRow != null) params.set("endRow", String(endRow));
     return `${BASE_PATH}/api/alumni/export?${params}`;

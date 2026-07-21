@@ -337,6 +337,52 @@ export function cmuLevelToEnum(
   }
 }
 
+/** Facet/search filters applied to a CMU graduate list. `search` is a substring
+ *  (trimmed + lower-cased internally). The three facet arrays are AND-ed; each
+ *  matches the same way the `/api/cmu-alumni` list route filters. */
+export interface CmuGraduateFilters {
+  search?: string;
+  degreeLevels?: string[]; // DegreeLevel enum values, via `cmuLevelToEnum`
+  majors?: string[]; // trimmed `major_name_th`
+  graduationYears?: string[]; // trimmed `grad_year`
+}
+
+/**
+ * Apply the search + facet filters to a CMU graduate list — the exact logic the
+ * `/api/cmu-alumni` list route uses, factored out so the alumni Excel export can
+ * filter the merged set the same way (no drift). Pure; returns a new array.
+ */
+export function applyCmuGraduateFilters(
+  graduates: readonly CmuGraduate[],
+  { search, degreeLevels = [], majors = [], graduationYears = [] }: CmuGraduateFilters,
+): CmuGraduate[] {
+  const q = (search ?? "").trim().toLowerCase();
+  let filtered: CmuGraduate[] = q
+    ? graduates.filter((g) => {
+        const haystack = [g.name_th, g.surname_th, g.student_id, g.name_en, g.surname_en]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+    : [...graduates];
+
+  if (degreeLevels.length || majors.length || graduationYears.length) {
+    filtered = filtered.filter((g) => {
+      if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id, g.major_name_th) ?? "")) {
+        return false;
+      }
+      if (majors.length && !majors.includes((g.major_name_th ?? "").trim())) {
+        return false;
+      }
+      if (graduationYears.length && !graduationYears.includes((g.grad_year ?? "").trim())) {
+        return false;
+      }
+      return true;
+    });
+  }
+  return filtered;
+}
+
 // ---------------------------------------------------------------------------
 // Public read API (names kept; bodies now read LOCAL)
 // ---------------------------------------------------------------------------
