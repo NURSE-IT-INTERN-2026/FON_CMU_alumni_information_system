@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useBulkSelection } from "@/lib/useBulkSelection";
-import { statusGroup, canSelect, resolveSelectAllTargetIds, type SelectionGroup } from "@/lib/news-selection";
+import { canSelect, resolveSelectAllTargetIds, pinToggleKind, type NewsStatus } from "@/lib/news-selection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
 import { assetUrl, prefixUploadsInHtml } from "@/lib/asset-url";
@@ -94,18 +94,18 @@ export default function NewsListPage() {
     getSelectedArray,
   } = useBulkSelection();
   const [selectMode, setSelectMode] = useState(false);
-  // Locked status group for the current selection (publishable vs published).
-  // The first card clicked picks the group; cards of the other group are blocked.
+  // Locked status for the current selection (DRAFT / DISCONTINUED / PUBLISHED).
+  // The first card clicked picks the status; cards of any other status are blocked.
   // Reset to null whenever the selection becomes empty (render-phase "adjust state
   // on change" pattern — NOT an effect; mirrors components/ui/search-input.tsx).
-  const [selectionGroup, setSelectionGroup] = useState<SelectionGroup | null>(null);
+  const [selectionStatus, setSelectionStatus] = useState<NewsStatus | null>(null);
   const [prevSelectedCount, setPrevSelectedCount] = useState(selectedCount);
   if (selectedCount !== prevSelectedCount) {
     setPrevSelectedCount(selectedCount);
-    if (selectedCount === 0 && selectionGroup !== null) setSelectionGroup(null);
+    if (selectedCount === 0 && selectionStatus !== null) setSelectionStatus(null);
   }
   const enterSelect = () => setSelectMode(true);
-  const exitSelect = () => { setSelectMode(false); deselectAll(); setSelectionGroup(null); };
+  const exitSelect = () => { setSelectMode(false); deselectAll(); setSelectionStatus(null); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
@@ -167,9 +167,12 @@ export default function NewsListPage() {
   const total = newsData?.total ?? 0;
   const totalPages = newsData?.totalPages ?? 1;
 
-  // Which on-page ids "select all on this page" targets (and the group it locks).
-  // On a mixed-status page with no group locked yet, returns no target → button disabled.
-  const selectAllTarget = resolveSelectAllTargetIds(news, selectionGroup);
+  // Which on-page ids "select all on this page" targets (and the status it locks).
+  // Pinned news are excluded (they live in the separate pinned section); on a
+  // mixed-status page with no status locked yet, returns no target → button disabled.
+  const selectAllTarget = resolveSelectAllTargetIds(news, selectionStatus);
+  const selectAllStatusLabel = selectAllTarget.status ? STATUS_LABELS[selectAllTarget.status] : null;
+  const allOnPageSelected = selectAllTarget.ids.length > 0 && isAllSelected(selectAllTarget.ids);
 
   // Pinned "ประชาสัมพันธ์สำคัญ" section — PUBLISHED-only so it mirrors exactly
   // what alumni see at the top of their news page. NOTE: this query is
@@ -187,6 +190,17 @@ export default function NewsListPage() {
       ),
   });
   const pinnedItems = pinnedData?.data ?? [];
+
+  // Bulk pin/unpin toggle label for the PUBLISHED group: count how many of the
+  // selected (published) items are currently pinned. Pinned items only ever sit
+  // in the pinned section above, so intersecting the selection with pinnedItems
+  // is reliable for the label (the endpoint toggles each server-side regardless).
+  const pinnedIdSet = new Set(pinnedItems.map((p) => p.id));
+  const selectedPinnedCount = selectionStatus === "PUBLISHED"
+    ? getSelectedArray().filter((id) => pinnedIdSet.has(id)).length
+    : 0;
+  const pinKind = pinToggleKind(selectedPinnedCount, selectedCount);
+  const pinButtonLabel = pinKind === "unpin" ? "เลิกปักหมุดที่เลือก" : pinKind === "toggle" ? "ปักหมุด/เลิกปักหมุดที่เลือก" : "ปักหมุดที่เลือก";
 
   const openCreate = () => {
     formReset(EMPTY_FORM);
@@ -350,9 +364,9 @@ export default function NewsListPage() {
   const renderNewsCard = (item: NewsItem) => {
     const summary = stripHtml(item.body).slice(0, 150);
     const pinned = !!item.pinnedAt;
-    const selectable = !selectMode || canSelect(item.status, selectionGroup);
+    const selectable = !selectMode || canSelect(item.status, selectionStatus);
     return (
-      <div key={item.id} title={selectMode && !selectable ? "ไม่สามารถเลือกรวมข่าวที่เผยแพร่และไม่เผยแพร่พร้อมกันได้" : undefined} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : pinned ? "ring-2 ring-amber-400" : ""} ${!selectable ? "opacity-40 cursor-not-allowed" : ""}`}>
+      <div key={item.id} title={selectMode && !selectable ? "ไม่สามารถเลือกรวมข่าวต่างสถานะกันได้" : undefined} className={`group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isSelected(item.id) ? "ring-2 ring-orange-400" : pinned ? "ring-2 ring-amber-400" : ""} ${!selectable ? "opacity-40 cursor-not-allowed" : ""}`}>
 
         {canWrite && (
           <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
@@ -367,7 +381,7 @@ export default function NewsListPage() {
             </span>
           </div>
         )}
-        <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); if (!selectable) return; if (selectionGroup === null) setSelectionGroup(statusGroup(item.status)); toggleSelect(item.id); } }}>
+        <Link href={`/news/${item.id}`} className="block" onClick={(e) => { if (selectMode) { e.preventDefault(); if (!selectable) return; if (selectionStatus === null) setSelectionStatus(item.status); toggleSelect(item.id); } }}>
           <div className="aspect-video w-full overflow-hidden bg-gray-100">
             {item.coverImageUrl ? (
               <img src={assetUrl(item.coverImageUrl)} alt={item.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
@@ -426,21 +440,23 @@ export default function NewsListPage() {
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
             <button
-              disabled={!(selectAllTarget.group !== null && selectAllTarget.ids.length > 0)}
-              title={selectAllTarget.group === null ? "เลือกการ์ดใดการ์ดหนึ่งก่อนเพื่อเลือกแบบกลุ่ม (เผยแพร่ หรือ ฉบับร่าง/ยุติการเผยแพร่)" : undefined}
+              disabled={!(selectAllTarget.status !== null && selectAllTarget.ids.length > 0)}
+              title={selectAllTarget.status === null ? "เลือกการ์ดใดการ์ดหนึ่งก่อนเพื่อเลือกตามสถานะ" : undefined}
               onClick={() => {
-                const { ids: tids, group: g } = selectAllTarget;
-                if (g === null || tids.length === 0) return;
+                const { ids: tids, status } = selectAllTarget;
+                if (status === null || tids.length === 0) return;
                 if (isAllSelected(tids)) {
                   deselectPage(tids);
                 } else {
-                  if (selectionGroup === null) setSelectionGroup(g);
+                  if (selectionStatus === null) setSelectionStatus(status);
                   selectAll(tids);
                 }
               }}
               className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {selectAllTarget.ids.length > 0 && isAllSelected(selectAllTarget.ids) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหมดในหน้านี้"}
+              {allOnPageSelected
+                ? selectAllStatusLabel ? `ยกเลิกเลือก${selectAllStatusLabel}ในหน้านี้` : "ยกเลิกเลือกหน้านี้"
+                : selectAllStatusLabel ? `เลือก${selectAllStatusLabel}ทั้งหมดในหน้านี้` : "เลือกทั้งหมดในหน้านี้"}
             </button>
             <button onClick={exitSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
               เสร็จสิ้น
@@ -658,7 +674,7 @@ export default function NewsListPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             สร้างข่าวใหม่
           </button>
-          {selectedCount > 0 && selectionGroup === "unpublished" && (
+          {selectedCount > 0 && (selectionStatus === "DRAFT" || selectionStatus === "DISCONTINUED") && (
             <button
               onClick={handleBulkPublish}
               disabled={bulkPublishing}
@@ -668,7 +684,16 @@ export default function NewsListPage() {
               เผยแพร่ข่าวที่เลือก ({selectedCount})
             </button>
           )}
-          {selectedCount > 0 && selectionGroup === "published" && (
+          {selectedCount > 0 && selectionStatus === "DRAFT" && (
+            <button
+              onClick={() => setShowBulkDeleteDialog(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+              ยุติการเผยแพร่ที่เลือก ({selectedCount})
+            </button>
+          )}
+          {selectedCount > 0 && selectionStatus === "PUBLISHED" && (
             <>
               <button
                 onClick={handleBulkPin}
@@ -676,7 +701,7 @@ export default function NewsListPage() {
                 className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
-                ปักหมุดที่เลือก ({selectedCount})
+                {pinButtonLabel} ({selectedCount})
               </button>
               <button
                 onClick={() => setShowBulkDeleteDialog(true)}
