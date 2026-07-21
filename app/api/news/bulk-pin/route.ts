@@ -4,11 +4,17 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 
-// Bulk-pin published news articles into the "ประชาสัมพันธ์สำคัญ" section. Admin-only.
-// `status: "PUBLISHED"` is defense-in-depth (only published news may be pinned,
-// matching POST /api/news/[id]/pin). `pinnedAt: null` makes already-pinned items
-// in the selection a TRUE no-op (their timestamp isn't refreshed → the pinned
-// section order is preserved). Pin-only; bulk-unpin is a separate follow-up.
+// Toggle the pin on each selected published news article (pin the unpinned,
+// unpin the pinned). Admin-only. One click performs BOTH: this is what powers
+// the adaptive "ปักหมุด/เลิกปักหมุดที่เลือก" button when the selection mixes pinned
+// and unpinned items.
+//
+// Toggling can't be a single updateMany — a second `pinnedAt: null` filter would
+// re-pin what a first just unpinned. So read each item's current pinnedAt, partition
+// into disjoint to-pin / to-unpin id sets, and run two updateMany inside a
+// $transaction. `status: "PUBLISHED"` is defense-in-depth (only published news may
+// be pinned, matching POST /api/news/[id]/pin); the client's status-lock already
+// restricts the ids to PUBLISHED.
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
   if (permErr) return permErr;
@@ -26,9 +32,20 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const result = await prisma.news.updateMany({
-      where: { id: { in: ids }, status: "PUBLISHED", pinnedAt: null },
-      data: { pinnedAt: new Date() },
+
+    const now = new Date();
+    const { pinned, unpinned } = await prisma.$transaction(async (tx) => {
+      const items = await tx.news.findMany({
+        where: { id: { in: ids }, status: "PUBLISHED" },
+        select: { id: true, pinnedAt: true },
+      });
+      const toPin = items.filter((i) => !i.pinnedAt).map((i) => i.id);
+      const toUnpin = items.filter((i) => i.pinnedAt).map((i) => i.id);
+      const [pinResult, unpinResult] = await Promise.all([
+        toPin.length ? tx.news.updateMany({ where: { id: { in: toPin } }, data: { pinnedAt: now } }) : Promise.resolve({ count: 0 }),
+        toUnpin.length ? tx.news.updateMany({ where: { id: { in: toUnpin } }, data: { pinnedAt: null } }) : Promise.resolve({ count: 0 }),
+      ]);
+      return { pinned: pinResult.count, unpinned: unpinResult.count };
     });
 
     const session = await getSession();
@@ -38,13 +55,13 @@ export async function POST(request: NextRequest) {
         "UPDATE",
         "news",
         null,
-        { bulk: "pin", count: result.count, ids },
+        { bulk: "pin", pinned, unpinned, ids },
       );
     }
 
-    return NextResponse.json({ updated: result.count });
+    return NextResponse.json({ pinned, unpinned });
   } catch (error) {
-    console.error("Bulk pin error:", error);
+    console.error("Bulk pin toggle error:", error);
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาดในการปักหมุดข้อมูล" },
       { status: 500 },
