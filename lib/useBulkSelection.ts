@@ -12,12 +12,24 @@ export function useBulkSelection() {
     });
   }, []);
 
+  // Merge the given ids into the selection — used by "select all on this page",
+  // so selecting-all on page 2 ADDS to page 1's selection instead of replacing it.
   const selectAll = useCallback((ids: string[]) => {
-    setSelectedIds(new Set(ids));
+    setSelectedIds((prev) => new Set([...prev, ...ids]));
   }, []);
 
   const deselectAll = useCallback(() => {
     setSelectedIds(new Set());
+  }, []);
+
+  // Remove only the given ids (the current page) — the toggle's "deselect this
+  // page" branch, so it doesn't wipe other pages' selections. Unknown ids ignored.
+  const deselectPage = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
   }, []);
 
   const isSelected = useCallback(
@@ -44,6 +56,7 @@ export function useBulkSelection() {
     toggleSelect,
     selectAll,
     deselectAll,
+    deselectPage,
     isSelected,
     isAllSelected,
     getSelectedArray,

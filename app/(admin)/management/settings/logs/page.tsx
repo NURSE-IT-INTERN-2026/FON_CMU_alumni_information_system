@@ -121,6 +121,7 @@ export default function LogsPage() {
     toggleSelect,
     selectAll,
     deselectAll,
+    deselectPage,
     isSelected,
     isAllSelected,
     getSelectedArray,
@@ -260,11 +261,11 @@ export default function LogsPage() {
             เลือกแล้ว <span className="font-bold">{selectedCount}</span> รายการ
           </span>
           <button
-            onClick={() => (isAllSelected(pageIds) ? deselectAll() : selectAll(pageIds))}
+            onClick={() => (isAllSelected(pageIds) ? deselectPage(pageIds) : selectAll(pageIds))}
             disabled={logs.length === 0}
             className="rounded-lg border border-purple-300 bg-white px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-40 cursor-pointer"
           >
-            {isAllSelected(pageIds) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหน้า"}
+            {isAllSelected(pageIds) ? "ยกเลิกเลือกหน้านี้" : "เลือกทั้งหมดในหน้านี้"}
           </button>
           <div className="ml-auto flex items-center gap-2">
             <button
