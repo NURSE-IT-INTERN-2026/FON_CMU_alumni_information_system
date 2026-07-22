@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/activity-log";
 import { educationUpdateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
 
@@ -142,6 +143,12 @@ export async function PUT(
         // denormalized snapshot (studentId/degree/year/major/cohort) that the 6
         // related tables join on.
         await recomputePrimaryEducation(existing.alumniId, tx);
+        // A degreeLevel/studentId edit can change the primary → link any pending
+        // rows that now match the (possibly new) primary studentId.
+        const afterPut = await tx.alumni.findUnique({ where: { id: existing.alumniId }, select: { studentId: true } });
+        if (afterPut) {
+          await autoLinkPendingForAlumni({ alumniId: existing.alumniId, studentId: afterPut.studentId, ctx: actorOf(ctx), tx });
+        }
         return edu;
       });
 
@@ -194,6 +201,12 @@ export async function DELETE(
       // otherwise block the delete of the current primary.
       await recomputePrimaryEducation(existing.alumniId, tx, id);
       await tx.education.delete({ where: { id } });
+      // Removing the primary promotes the next-highest (a different studentId) —
+      // link any pending rows that now match the new primary studentId.
+      const afterDelete = await tx.alumni.findUnique({ where: { id: existing.alumniId }, select: { studentId: true } });
+      if (afterDelete) {
+        await autoLinkPendingForAlumni({ alumniId: existing.alumniId, studentId: afterDelete.studentId, ctx: actorOf(ctx), tx });
+      }
     });
 
     await logActivity(

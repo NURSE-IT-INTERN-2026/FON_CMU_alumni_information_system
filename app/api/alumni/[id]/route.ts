@@ -5,9 +5,11 @@ import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
-import { getCmuGraduatesLocal, type CmuGraduate } from "@/lib/cmu-registrar";
+import { getCmuGraduatesLocal } from "@/lib/cmu-registrar";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
+import { isSamePersonByBirthday } from "@/lib/alumni-verify";
 
 export async function GET(
   request: NextRequest,
@@ -92,10 +94,12 @@ export async function PUT(
     // highest-degree re-syncs won't clobber a manually-edited value.
     updateData.nameManuallyUpdated = true;
 
+    let studentIdChanged = false;
     if (updateData.studentId && updateData.studentId !== existing.studentId) {
       const newStudentId = updateData.studentId as string;
+      studentIdChanged = true;
 
-      // Case 3: another local alumni already uses this studentId.
+      // Can't take another local alumni's studentId (would merge two records).
       const localDuplicate = await prisma.alumni.findUnique({
         where: { studentId: newStudentId },
       });
@@ -106,23 +110,19 @@ export async function PUT(
         );
       }
 
-      // Cases 1 & 2: the studentId matches a CMU Registrar record — whether
-      // that CMU record is CMU-only (1) or already overlaid by a local alumni
-      // (2). Re-keying onto another person's CMU record would corrupt the
-      // merged view (the local row would overlay a different person), so
-      // reject. The new studentId can't be the *current* alumni's own CMU
-      // record (we only get here when it differs from `existing.studentId`),
-      // so any match is a different person. CMU `student_id` carries trailing
-      // spaces — trim before comparing (same convention as `ensure-alumni`).
-      // Reads the LOCAL cmu_graduates table (refreshed on demand from
-      // /management/settings/cmu-sync).
-      const cmuGraduates: CmuGraduate[] = await getCmuGraduatesLocal();
-      const cmuDuplicate = cmuGraduates.some(
+      // A CMU-registered id is allowed ONLY when it is the SAME person (a typo
+      // correction to the alumni's own registrar record) — verified by birthday,
+      // the one constant identity signal. Block a confirmed different-person id;
+      // when we can't verify (no birthday on either side) fail OPEN (admin is
+      // trusted — same posture as `assertEducationSamePerson`). CMU student_id
+      // carries trailing spaces — trim. Reads the LOCAL cmu_graduates cache
+      // (refreshed on demand from /management/settings/cmu-sync).
+      const cmuMatch = (await getCmuGraduatesLocal()).find(
         (g) => String(g.student_id ?? "").trim() === newStudentId,
       );
-      if (cmuDuplicate) {
+      if (cmuMatch && isSamePersonByBirthday(cmuMatch.birthday, existing.birthDate) === false) {
         return NextResponse.json(
-          { error: "รหัสนักศึกษานี้ตรงกับข้อมูลในระบบทะเบียนของมหาวิทยาลัย" },
+          { error: "รหัสนักศึกษานี้เป็นของบุคคลอื่นในระบบทะเบียน" },
           { status: 409 }
         );
       }
@@ -159,6 +159,34 @@ export async function PUT(
     // (alumni.studentId is post-update; an FK re-key cascades to agency rows.)
     if ("homeAddress" in updateData) {
       await mirrorAlumniHomeAddressToAgencies({ studentId: alumni.studentId, alumniHomeAddress: alumni.homeAddress ?? null });
+    }
+
+    // studentId was corrected → (1) keep the snapshot consistent with the
+    // primary Education (recomputePrimaryEducation re-syncs Alumni.studentId
+    // from it, so a snapshot-only edit would revert on the next education
+    // touch), and (2) link any pending rows that now match the new id.
+    if (studentIdChanged && session) {
+      if (existing.primaryEducationId) {
+        const primaryEdu = await prisma.education.findUnique({
+          where: { id: existing.primaryEducationId },
+          select: { studentId: true },
+        });
+        // Re-point only when the primary Education still holds the OLD id (the
+        // common typo case). Under the same-person guard the new id is this
+        // alumni's own, so no @unique (P2002) collision is possible.
+        if (primaryEdu && primaryEdu.studentId === existing.studentId) {
+          await prisma.education.update({
+            where: { id: existing.primaryEducationId },
+            data: { studentId: alumni.studentId },
+          });
+        }
+      }
+      await autoLinkPendingForAlumni({
+        alumniId: alumni.id,
+        studentId: alumni.studentId,
+        ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        tx: prisma,
+      });
     }
 
     return NextResponse.json(alumni);
