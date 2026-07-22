@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { TRACKED_FIELDS } from "@/lib/field-changes";
 import { recordDetailsFromFields } from "@/lib/log-payload";
+import { syncAgencyHomeAddressToAlumni } from "@/lib/alumni-agency-home-sync";
 import { handleZodError, alumniAgencyCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
@@ -38,13 +39,19 @@ export async function POST(request: NextRequest) {
 
     const session = await getSession();
     if (session) {
+      const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
       await logActivity(
-        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        ctx,
         "CREATE",
         "alumni_agency",
         item.id,
         { source: "admin_create", ...recordDetailsFromFields(item as unknown as Record<string, unknown>, TRACKED_FIELDS.alumni_agency) },
       );
+      // Sync the agency ที่อยู่บ้าน onto the linked Alumni's ที่อยู่ปัจจุบัน (the
+      // all-alumni table reads Alumni.homeAddress). No-op when unlinked/empty/
+      // unchanged; otherwise updates the alumni row + records an alumni-scoped
+      // field change (orange indicator) and an alumni UPDATE activity log.
+      await syncAgencyHomeAddressToAlumni({ ctx, studentId: item.studentId, agencyHomeAddress: item.homeAddress });
     }
 
     return NextResponse.json(item, { status: 201 });

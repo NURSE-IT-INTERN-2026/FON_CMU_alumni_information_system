@@ -14,6 +14,7 @@ import {
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
 import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
+import { syncAgencyHomeAddressToAlumni } from "@/lib/alumni-agency-home-sync";
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
 
     const errors: { row: number; message: string }[] = [];
     const warnings: { row: number; message: string }[] = [];
@@ -113,6 +116,9 @@ export async function POST(request: NextRequest) {
           imported++;
           importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
         }
+        // Sync this row's homeAddress onto the linked Alumni (no-op when unlinked,
+        // empty, or unchanged). `data.studentId` is the resolved linked id.
+        await syncAgencyHomeAddressToAlumni({ ctx, studentId: data.studentId, agencyHomeAddress: data.homeAddress });
       } catch (err) {
         console.error("Import row error:", err);
         errors.push({
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     await logImport({
-      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      ctx,
       resource: "alumni_agency",
       fileName: captureFileName(file),
       attempted: parsed.length,

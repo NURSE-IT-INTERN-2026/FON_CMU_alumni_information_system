@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniAgencyUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
+import { syncAgencyHomeAddressToAlumni } from "@/lib/alumni-agency-home-sync";
 
 export async function PUT(
   request: NextRequest,
@@ -50,8 +51,9 @@ export async function PUT(
     const changes = computeFieldChanges(old, item, TRACKED_FIELDS.alumni_agency);
     const session = await getSession();
     if (session) {
+      const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
       const logId = await logActivity(
-        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        ctx,
         "UPDATE",
         "alumni_agency",
         id,
@@ -59,6 +61,11 @@ export async function PUT(
         validated.reason
       );
       await recordFieldChanges({ resourceType: "alumni_agency", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason, activityLogId: logId });
+      // Sync the agency ที่อยู่บ้าน onto the linked Alumni's ที่อยู่ปัจจุบัน (the
+      // all-alumni table reads Alumni.homeAddress). Uses the post-update
+      // studentId/homeAddress so a fresh link to an already-addressed row still
+      // propagates, while an unchanged homeAddress is a no-op.
+      await syncAgencyHomeAddressToAlumni({ ctx, studentId: item.studentId, agencyHomeAddress: item.homeAddress, reason: validated.reason });
     }
 
     return NextResponse.json(item);
