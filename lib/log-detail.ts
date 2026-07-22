@@ -276,6 +276,7 @@ const LOG_ACTION_LABELS: Record<string, string> = {
   PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
   EMAIL_VERIFY: "ยืนยันอีเมล",
   EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
+  LINK: "เชื่อมโยงรายการที่ค้างอยู่",
 };
 
 const LOG_RESOURCE_LABELS: Record<string, string> = {
@@ -479,6 +480,12 @@ export function describeActivityLog(args: {
   if (action === "DELETE" || action === "HARD_DELETE") return "ลบ" + resourceLabel;
 
   if (action === "IMPORT") return "นำเข้า" + resourceLabel;
+
+  if (action === "LINK") {
+    const count = details?.linkedCount;
+    const base = LOG_ACTION_LABELS.LINK;
+    return typeof count === "number" ? `${base} ${count} รายการ` : base;
+  }
 
   const actionLabel = LOG_ACTION_LABELS[action] ?? action;
   return actionLabel + resourceLabel;

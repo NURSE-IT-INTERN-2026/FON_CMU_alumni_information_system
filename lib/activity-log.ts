@@ -20,7 +20,8 @@ export type LogAction =
   | "VERIFY_IDENTITY"
   | "RESTORE"
   | "SUSPEND"
-  | "HARD_DELETE";
+  | "HARD_DELETE"
+  | "LINK";
 
 export type LogResource =
   | "alumni"

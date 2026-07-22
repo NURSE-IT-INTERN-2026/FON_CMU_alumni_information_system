@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedCreateSchema } from "@/lib/validations";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { alumniRecordDetails } from "@/lib/log-payload";
 
 export async function POST(request: NextRequest) {
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
     const hasModelReps =
       (validated.modelRepresentatives?.length ?? 0) > 0;
 
+    // Session is needed inside the transaction (for the auto-link log actor) as
+    // well as after it (for the CREATE log), so fetch it once up front.
+    const session = await getSession();
+
     const alumni = await prisma.$transaction(async (tx) => {
       const created = await tx.alumni.create({
         data: {
@@ -54,6 +59,18 @@ export async function POST(request: NextRequest) {
       });
       // Give the new alumni a primary Education row mirroring its snapshot.
       await ensurePrimaryEducationFromSnapshot(created.id, tx);
+
+      // The alumni is now canonical — link any PRE-EXISTING pending rows
+      // (pendingStudentId === studentId) before creating this form's own
+      // related rows (which carry studentId directly, so they're never pending).
+      if (session) {
+        await autoLinkPendingForAlumni({
+          alumniId: created.id,
+          studentId: created.studentId,
+          ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+          tx,
+        });
+      }
 
       if (validated.awards && validated.awards.length > 0) {
         await tx.award.createMany({
@@ -154,7 +171,6 @@ export async function POST(request: NextRequest) {
     // This full-form route is what the new-alumni page posts to; without this
     // call, creating an alumni via the form left no activity-log entry (the
     // single POST /api/alumni route logs, but this one didn't).
-    const session = await getSession();
     if (session) {
       await logActivity(
         { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },

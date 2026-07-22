@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniUpdateSchema } from "@/lib/validations";
 import { getCmuGraduatesLocal, type CmuGraduate } from "@/lib/cmu-registrar";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
+import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
 
 export async function GET(
   request: NextRequest,
@@ -151,6 +152,13 @@ export async function PUT(
         validated.reason
       );
       await recordFieldChanges({ resourceType: "alumni", resourceId: id, changes, actor: { actorType: "ADMIN", userId: session.user.id, actorName: session.user.email }, reason: validated.reason, activityLogId: logId });
+    }
+
+    // homeAddress unification: when the alumni's address was edited, mirror it
+    // onto the linked agency rows so the agency form/column stay current.
+    // (alumni.studentId is post-update; an FK re-key cascades to agency rows.)
+    if ("homeAddress" in updateData) {
+      await mirrorAlumniHomeAddressToAgencies({ studentId: alumni.studentId, alumniHomeAddress: alumni.homeAddress ?? null });
     }
 
     return NextResponse.json(alumni);

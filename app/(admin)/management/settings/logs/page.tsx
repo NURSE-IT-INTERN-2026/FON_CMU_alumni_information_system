@@ -55,6 +55,7 @@ const ACTION_LABELS: Record<string, string> = {
   EMAIL_VERIFY: "ยืนยันอีเมล",
   EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
   REAPPLY: "ยื่นคำขอใหม่",
+  LINK: "เชื่อมโยงรายการ",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -71,6 +72,7 @@ const ACTION_COLORS: Record<string, string> = {
   EMAIL_VERIFY: "bg-emerald-100 text-emerald-700",
   EMAIL_VERIFY_REQUEST: "bg-sky-100 text-sky-700",
   REAPPLY: "bg-sky-100 text-sky-700",
+  LINK: "bg-violet-100 text-violet-700",
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
