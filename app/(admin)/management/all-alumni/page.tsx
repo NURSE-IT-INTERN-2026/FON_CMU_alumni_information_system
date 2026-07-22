@@ -30,7 +30,7 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
   DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "contactEmail" | "phones" | "remarks";
+type ManageSortField = "studentId" | "prefix" | "firstName" | "lastName" | "cohort" | "degreeLevel" | "major" | "graduationYear" | "birthDate" | "contactEmail" | "phones" | "homeAddress" | "remarks";
 type ViewSortField = "studentId" | "name" | "surname" | "degreeLevel" | "major" | "year" | "cohort" | "birthDate";
 type SortDir = "asc" | "desc";
 
@@ -801,6 +801,9 @@ export default function AlumniCountPage() {
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("phones")}>
                       เบอร์โทร {renderSortIcon("phones")}
                     </th>
+                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("homeAddress")}>
+                      ที่อยู่ปัจจุบัน {renderSortIcon("homeAddress")}
+                    </th>
                     <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
                       หมายเหตุ {renderSortIcon("remarks")}
                     </th>
@@ -814,7 +817,7 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={14} className="px-4 py-12 text-center">
+                      <td colSpan={15} className="px-4 py-12 text-center">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
@@ -823,7 +826,7 @@ export default function AlumniCountPage() {
                   ) : alumni.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={14}
+                        colSpan={15}
                         className="px-4 py-12 text-center text-[var(--muted)]"
                       >
                         ไม่พบข้อมูล
@@ -866,6 +869,9 @@ export default function AlumniCountPage() {
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)] whitespace-nowrap">
                           {joinPhones(a.phones) || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--muted)]">
+                          <OrangeCell resourceType="alumni" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} />
                         </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />
