@@ -45,6 +45,7 @@ function mapRows(alumni: MergedAlumni[]) {
     "วันเกิด": formatBirthDateThai(a.birthDate) ?? "",
     "อีเมลติดต่อ": a.contactEmail || a.email || "",
     "เบอร์โทร": joinPhones(a.phones),
+    "ที่อยู่ปัจจุบัน": a.homeAddress || "",
     "หมายเหตุ": a.remarks || "",
   }));
 }
