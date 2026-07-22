@@ -13,6 +13,7 @@ import {
   matchCmuGraduate,
   dedupeCmuGraduatesByPerson,
   bachelorCohortFromGradYear,
+  isSamePersonByBirthday,
 } from "../lib/alumni-verify";
 import type { CmuGraduate } from "../lib/cmu-registrar";
 
@@ -83,6 +84,30 @@ describe("birthDatesMatch", () => {
   it("rejects mismatches", () => {
     expect(birthDatesMatch("01122540", "02-12-1997")).toBe(false);
     expect(birthDatesMatch("02122540", "01-12-1997")).toBe(false);
+  });
+});
+
+describe("isSamePersonByBirthday", () => {
+  it("returns true when CMU DD-MM-YYYY equals the alumni's Buddhist DDMMYYYY", () => {
+    expect(isSamePersonByBirthday("01-12-1997", "01122540")).toBe(true);
+  });
+  it("returns false on a confirmed different birthday", () => {
+    expect(isSamePersonByBirthday("02-12-1997", "01122540")).toBe(false);
+  });
+  it("returns null (can't determine) when the CMU birthday is missing", () => {
+    expect(isSamePersonByBirthday(null, "01122540")).toBeNull();
+    expect(isSamePersonByBirthday("", "01122540")).toBeNull();
+  });
+  it("returns null (can't determine) when the alumni birthday is missing", () => {
+    expect(isSamePersonByBirthday("01-12-1997", null)).toBeNull();
+    expect(isSamePersonByBirthday("01-12-1997", "")).toBeNull();
+  });
+  it("returns null when both are missing", () => {
+    expect(isSamePersonByBirthday(null, null)).toBeNull();
+  });
+  it("returns null when either side is unparseable", () => {
+    expect(isSamePersonByBirthday("not-a-date", "01122540")).toBeNull();
+    expect(isSamePersonByBirthday("01-12-1997", "abc")).toBeNull();
   });
 });
 

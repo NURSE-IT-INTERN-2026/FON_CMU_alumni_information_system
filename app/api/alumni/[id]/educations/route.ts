@@ -7,6 +7,7 @@ import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
 import { syncNameFromHighestDegree } from "@/lib/name-sync";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { assertEducationSamePerson, findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 import { educationRecordDetails } from "@/lib/log-payload";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
@@ -125,6 +126,17 @@ export async function POST(
       // Primary = highest degree; if this new degree outranks the current one,
       // it becomes the primary (and the snapshot re-syncs).
       await recomputePrimaryEducation(alumni.id);
+      // A promotion can change Alumni.studentId — link any pending rows that now
+      // match the (possibly new) primary studentId. No-op when nothing matches.
+      const afterAdd = await prisma.alumni.findUnique({ where: { id: alumni.id }, select: { studentId: true } });
+      if (afterAdd) {
+        await autoLinkPendingForAlumni({
+          alumniId: alumni.id,
+          studentId: afterAdd.studentId,
+          ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+          tx: prisma,
+        });
+      }
 
       return NextResponse.json(created, { status: 201 });
     } catch (error) {

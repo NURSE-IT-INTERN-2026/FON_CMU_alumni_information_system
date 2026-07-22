@@ -176,6 +176,26 @@ export function birthDatesMatch(
   return a === b;
 }
 
+/**
+ * Tri-state same-person check by birthday (the one constant identity signal —
+ * names can change between degrees). Used by the studentId-correction guard:
+ *   - `true`  → same person (same Gregorian day)
+ *   - `false` → confirmed DIFFERENT person
+ *   - `null`  → can't determine (either birthday missing/unparseable) → the
+ *               caller fails OPEN (allows), matching `assertEducationSamePerson`.
+ * `cmuBirthdayRaw` is the registrar "DD-MM-YYYY" string; `alumniBirthDate` is
+ * the stored Buddhist-era DDMMYYYY. Both normalize to canonical "YYYY-MM-DD".
+ */
+export function isSamePersonByBirthday(
+  cmuBirthdayRaw: string | null | undefined,
+  alumniBirthDate: string | null | undefined,
+): boolean | null {
+  const cmu = normalizeCmuBirthday(cmuBirthdayRaw);
+  const alumni = normalizeFormBirthDate(alumniBirthDate);
+  if (!cmu || !alumni) return null;
+  return cmu === alumni;
+}
+
 // ---------------------------------------------------------------------------
 // Cohort / graduation year helpers
 // ---------------------------------------------------------------------------
