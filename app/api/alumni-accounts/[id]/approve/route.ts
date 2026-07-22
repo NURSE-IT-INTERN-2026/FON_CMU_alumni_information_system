@@ -5,6 +5,7 @@ import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import { recomputePrimaryEducation } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { sendSignupApprovedEmail } from "@/lib/email";
 import { cmuLevelToDegree } from "@/lib/alumni-verify";
 import type { DegreeLevel } from "@/app/generated/prisma/client";
@@ -47,6 +48,8 @@ export async function POST(
       : alumni.degreeLevel;
     const gy = cmuGrad?.grad_year ? Number(cmuGrad.grad_year) : NaN;
 
+    const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
+
     await prisma.$transaction(async (tx) => {
       await tx.alumni.update({
         where: { id },
@@ -88,6 +91,12 @@ export async function POST(
       // Primary = highest degree; assign it (and re-sync the snapshot) for the
       // signup degree. Idempotent on re-approve.
       await recomputePrimaryEducation(id, tx);
+
+      // The account is now canonical (ACTIVE) — link any pre-existing pending
+      // rows across the 6 related entities (pendingStudentId === studentId),
+      // overwriting their names with this alumni's. Deferred from signup so a
+      // rejected signup never gets wired up.
+      await autoLinkPendingForAlumni({ alumniId: id, studentId: alumni.studentId, ctx, tx });
     });
 
     // The dashboard "pending approvals" card counts accountStatus — bust so it's
@@ -95,12 +104,7 @@ export async function POST(
     bustCache("dashboard");
 
     await logActivity(
-      {
-        actorType: "ADMIN",
-        userId: session.user.id,
-        userEmail: session.user.email,
-        userRole: session.user.role,
-      },
+      ctx,
       "APPROVE",
       "alumni_auth",
       id,

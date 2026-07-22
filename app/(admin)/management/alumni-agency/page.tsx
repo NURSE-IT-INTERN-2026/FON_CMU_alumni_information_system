@@ -41,6 +41,8 @@ interface AlumniAgency {
   major: string | null;
   notes: string | null;
   order: number;
+  // Linked rows reflect the alumni's homeAddress (single source of truth).
+  alumni?: { id: string; homeAddress: string | null } | null;
 }
 
 interface ApiResponse {
@@ -138,7 +140,7 @@ function getFieldValue(a: AlumniAgency, field: SortField): string {
     case "province": return a.province || "";
     case "workplace": return a.workplace || "";
     case "position": return a.position || "";
-    case "homeAddress": return a.homeAddress || "";
+    case "homeAddress": return a.alumni?.homeAddress ?? a.homeAddress ?? "";
     case "notes": return a.notes || "";
     case "order": return String(a.order);
   }
@@ -268,6 +270,10 @@ export default function AlumniAgencyPage() {
   const pagedAlumni = sortedAlumni.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const visibleAgencyIds = pagedAlumni.map((a) => a.id);
   const hot = useHotFields("alumni_agency", visibleAgencyIds);
+  // Linked rows read the alumni-scoped orange history for homeAddress (single
+  // source of truth) — fetch it alongside the agency-scoped one.
+  const visibleAlumniIds = pagedAlumni.map((a) => a.alumni?.id).filter((id): id is string => !!id);
+  const alumniHot = useHotFields("alumni", visibleAlumniIds);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -738,7 +744,7 @@ export default function AlumniAgencyPage() {
                     )}
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="workplace" value={a.workplace || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="position" value={a.position || "-"} hotFields={hot[a.id]} /></td>
-                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="homeAddress" value={a.homeAddress || "-"} hotFields={hot[a.id]} /></td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType={a.alumni ? "alumni" : "alumni_agency"} recordId={a.alumni ? a.alumni.id : a.id} field="homeAddress" value={getFieldValue(a, "homeAddress") || "-"} hotFields={a.alumni ? alumniHot[a.alumni.id] : hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="notes" value={a.notes || "-"} hotFields={hot[a.id]} /></td>
                     {canWrite && (
                       <td className="px-4 py-3 text-center">

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { shouldSyncAgencyHomeAddress } from "@/lib/alumni-agency-home-sync";
+import {
+  shouldSyncAgencyHomeAddress,
+  shouldMirrorAlumniHomeAddress,
+} from "@/lib/alumni-agency-home-sync";
 
 describe("shouldSyncAgencyHomeAddress", () => {
   it("is false when the row is not linked (no studentId)", () => {
@@ -54,5 +57,40 @@ describe("shouldSyncAgencyHomeAddress", () => {
     expect(
       shouldSyncAgencyHomeAddress({ studentId: "1", agencyHomeAddress: "  new  ", alumniHomeAddress: "old" })
     ).toBe(true);
+  });
+});
+
+describe("shouldMirrorAlumniHomeAddress (alumni → agency)", () => {
+  it("is true when the agency address differs from the alumni's (overwrite)", () => {
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: "old agency", alumniHomeAddress: "new alumni" }),
+    ).toBe(true);
+  });
+
+  it("is true when clearing — alumni empty propagates a clear to the agency (opposite of the agency→alumni policy)", () => {
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: "still here", alumniHomeAddress: null }),
+    ).toBe(true);
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: "still here", alumniHomeAddress: "   " }),
+    ).toBe(true);
+  });
+
+  it("is false when they already match", () => {
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: "same", alumniHomeAddress: "same" }),
+    ).toBe(false);
+  });
+
+  it("is false when both are empty (null vs whitespace normalize to empty)", () => {
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: null, alumniHomeAddress: "  " }),
+    ).toBe(false);
+  });
+
+  it("trims the alumni value before comparing", () => {
+    expect(
+      shouldMirrorAlumniHomeAddress({ agencyHomeAddress: "same", alumniHomeAddress: "same  " }),
+    ).toBe(false);
   });
 });

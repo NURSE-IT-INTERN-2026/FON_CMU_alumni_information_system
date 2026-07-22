@@ -140,6 +140,10 @@ export async function GET(request: NextRequest) {
       prisma.alumniAgency.findMany({
         where,
         orderBy: [{ country: "asc" }, { order: "asc" }],
+        // Linked rows reflect the alumni's homeAddress (single source of truth);
+        // include it so the table can show the unified value + light up the
+        // alumni-scoped orange indicator for linked rows.
+        include: { alumni: { select: { id: true, homeAddress: true } } },
       }),
       prisma.alumniAgency.findMany({
         where: countryListWhere,

@@ -7,6 +7,8 @@ import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-lo
 import { readExcelRows } from "@/lib/excel-import";
 import { parsePhones } from "@/lib/parse-phone";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
+import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
     let created = 0;
     let updated = 0;
     const importedRecords: ImportedRecord[] = [];
+    const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
 
     for (const record of records) {
       const result = await prisma.alumni.upsert({
@@ -137,6 +140,20 @@ export async function POST(request: NextRequest) {
         // createdAt and updatedAt to the same instant, so equal timestamps ⇒ created.
         const op: ImportedRecord["op"] =
           result.createdAt.getTime() === result.updatedAt.getTime() ? "created" : "updated";
+
+        // homeAddress unification: mirror the imported address onto this
+        // alumni's linked agency rows (both create + update set homeAddress).
+        await mirrorAlumniHomeAddressToAgencies({
+          studentId: record.studentId,
+          alumniHomeAddress: record.homeAddress,
+        });
+        // A freshly created alumni is now canonical — link any pre-existing
+        // pending rows across the 6 related entities (no-op on re-import where
+        // the alumni already existed and was linked long ago).
+        if (op === "created") {
+          await autoLinkPendingForAlumni({ alumniId: result.id, studentId: record.studentId, ctx, tx: prisma });
+        }
+
         if (op === "created") created++;
         else updated++;
         imported++;

@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniCreateSchema } from "@/lib/validations";
 import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 import { ensurePrimaryEducationFromSnapshot } from "@/lib/education-sync";
+import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { alumniRecordDetails } from "@/lib/log-payload";
 
 export async function GET(request: NextRequest) {
@@ -156,13 +157,21 @@ export async function POST(request: NextRequest) {
 
     const session = await getSession();
     if (session) {
+      const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
       await logActivity(
-        { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+        ctx,
         "CREATE",
         "alumni",
         alumni.id,
         { source: "admin_create", ...alumniRecordDetails(alumni) },
       );
+      // The alumni is now canonical — link any pre-existing pending rows
+      // (pendingStudentId === studentId) across the 6 related entities.
+      // Best-effort, outside a transaction (this route is non-tx); a crash here
+      // just leaves rows pending for the backfill / next event to catch.
+      if (!validated.softDelete) {
+        await autoLinkPendingForAlumni({ alumniId: alumni.id, studentId: alumni.studentId, ctx, tx: prisma });
+      }
     }
 
     return NextResponse.json(alumni, { status: 201 });

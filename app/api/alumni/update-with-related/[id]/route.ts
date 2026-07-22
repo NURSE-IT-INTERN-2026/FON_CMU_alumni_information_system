@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniWithRelatedUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
+import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
 
 export async function PUT(
   request: NextRequest,
@@ -54,6 +55,11 @@ export async function PUT(
           adminEditedAt: new Date(),
         },
       });
+
+      // homeAddress unification: this form always (re)writes homeAddress — mirror
+      // it onto the linked agency rows (this route does not touch agency rows,
+      // so they persist and just need their column re-synced).
+      await mirrorAlumniHomeAddressToAgencies({ studentId: updated.studentId, alumniHomeAddress: updated.homeAddress ?? null, tx });
 
       // --- Replace all related data ---
 

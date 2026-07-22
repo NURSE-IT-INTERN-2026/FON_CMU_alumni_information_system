@@ -6,6 +6,7 @@ import { getAlumniSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, alumniProfileUpdateSchema } from "@/lib/validations";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
+import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
 import { buildSectionChanges } from "@/lib/log-payload";
 
 const RELATED_INCLUDE = {
@@ -201,6 +202,11 @@ export async function PUT(request: NextRequest) {
             })),
           });
         }
+
+        // homeAddress unification: alumni is the single source of truth — mirror
+        // it onto the (just-recreated) linked agency rows so they reflect it.
+        // Runs AFTER the agency recreate so it covers the fresh rows.
+        await mirrorAlumniHomeAddressToAgencies({ studentId, alumniHomeAddress: updated.homeAddress ?? null, tx });
 
         return updated;
       });

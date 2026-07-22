@@ -19,6 +19,25 @@ export async function PUT(
     const body = await request.json();
     const validated = alumniAgencyUpdateSchema.parse(body);
 
+    const old = await prisma.alumniAgency.findUnique({ where: { id } });
+
+    // Detect a MANUAL link event: admin typed a real studentId into a row that
+    // was previously pending (pendingStudentId set). On that event we match the
+    // auto-link semantics — the alumni's canonical name wins (overwrite the
+    // row's prefix/firstName/lastName). Plain edits to already-linked rows keep
+    // the form's name values. (homeAddress already flows agency→alumni via the
+    // syncAgencyHomeAddressToAlumni call below.)
+    const linkingStudentId = validated.studentId?.trim() || null;
+    const isManualLink = !!linkingStudentId && !!old?.pendingStudentId;
+    let linkedName: { prefix: string | null; firstName: string; lastName: string } | null = null;
+    if (isManualLink) {
+      const linked = await prisma.alumni.findUnique({
+        where: { studentId: linkingStudentId },
+        select: { prefix: true, firstName: true, lastName: true },
+      });
+      if (linked) linkedName = linked;
+    }
+
     const updateData: Record<string, unknown> = {};
     if (validated.cohort !== undefined) updateData.cohort = validated.cohort?.trim() || null;
     if (validated.prefix !== undefined) updateData.prefix = validated.prefix?.trim() || null;
@@ -40,8 +59,12 @@ export async function PUT(
       // real link). pendingStudentId is otherwise never written from the form.
       if (validated.studentId && validated.studentId.trim()) updateData.pendingStudentId = null;
     }
-
-    const old = await prisma.alumniAgency.findUnique({ where: { id } });
+    // Manual link → alumni's name wins (matches auto-link).
+    if (linkedName) {
+      updateData.prefix = linkedName.prefix;
+      updateData.firstName = linkedName.firstName;
+      updateData.lastName = linkedName.lastName;
+    }
 
     const item = await prisma.alumniAgency.update({
       where: { id },

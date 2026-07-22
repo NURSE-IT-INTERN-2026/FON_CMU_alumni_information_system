@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { Prisma } from "@/app/generated/prisma/client";
 import { logActivity, type LogContext } from "@/lib/activity-log";
 import { recordFieldChanges, type FieldChange } from "@/lib/field-changes";
 
@@ -81,5 +82,54 @@ export async function syncAgencyHomeAddressToAlumni(args: {
         : { actorType: "ALUMNI", alumniId: args.ctx.alumniId, actorName: args.ctx.alumniName },
     reason: args.reason ?? null,
     activityLogId: logId,
+  });
+}
+
+/**
+ * REVERSE direction — the second half of homeAddress unification. When the
+ * alumni's own `homeAddress` is edited (profile / admin / import), mirror the
+ * new value onto every linked `AlumniAgency` row so the agency form input and
+ * the agency-table column stay current. `Alumni.homeAddress` is the single
+ * source of truth; linked agency rows REFLECT it.
+ *
+ * Unlike `shouldSyncAgencyHomeAddress` (agency→alumni, which skips empty to
+ * protect an alumni that has several agency rows), the alumni→agency mirror
+ * DOES propagate a clear — "one home address per person" means clearing the
+ * alumni address clears the linked agencies too.
+ *
+ * No activity log / field-change rows here: the alumni write route already logs
+ * the `homeAddress` change under `resourceType:"alumni"`, and the agency table
+ * reads that alumni-scoped history for linked rows — so the orange indicator
+ * fires from the route's own logging. This function only keeps the agency
+ * COLUMN in sync (so the agency form input is current).
+ */
+export function shouldMirrorAlumniHomeAddress(args: {
+  agencyHomeAddress: string | null;
+  alumniHomeAddress: string | null;
+}): boolean {
+  const next = args.alumniHomeAddress?.trim() || null;
+  return (args.agencyHomeAddress ?? null) !== next;
+}
+
+export async function mirrorAlumniHomeAddressToAgencies(args: {
+  studentId: string;
+  alumniHomeAddress: string | null;
+  tx?: Prisma.TransactionClient;
+}): Promise<void> {
+  const tx = args.tx ?? prisma;
+  const next = args.alumniHomeAddress?.trim() || null; // propagate clears
+
+  const rows = await tx.alumniAgency.findMany({
+    where: { studentId: args.studentId, deletedAt: null },
+    select: { id: true, homeAddress: true },
+  });
+  if (rows.length === 0) return;
+
+  const changed = rows.filter((r) => shouldMirrorAlumniHomeAddress({ agencyHomeAddress: r.homeAddress, alumniHomeAddress: next }));
+  if (changed.length === 0) return;
+
+  await tx.alumniAgency.updateMany({
+    where: { id: { in: changed.map((r) => r.id) } },
+    data: { homeAddress: next },
   });
 }
