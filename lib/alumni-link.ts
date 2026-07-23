@@ -364,3 +364,150 @@ export async function autoLinkPendingForAlumni(args: {
 
   return { studentId, alumniId, linkedCount, perEntity, homeMigrated, homeMigratedFrom };
 }
+
+/**
+ * Bulk sibling of `autoLinkPendingForAlumni` for the alumni IMPORT create
+ * partition. The per-alumni version probes all 6 entities (≈7 ops) for EVERY new
+ * alumni — pure waste when most new alumni have zero pending rows. This version
+ * probes each entity ONCE for the whole created set (`pendingStudentId IN
+ * createdStudentIds`, 6 `findMany` total), groups the pending rows by alumni,
+ * and only then does the flip+rename+log work for alumni that actually have rows.
+ *
+ * Semantics are identical to `autoLinkPendingForAlumni`:
+ *   - alumni-wins name overwrite (per-row change computed in-memory via
+ *     `reconcilePendingRow`, unchanged)
+ *   - one `updateMany` per (alumni, entity) — the flip data is uniform per alumni
+ *     (`{studentId, pendingStudentId:null, prefix, firstName, lastName}`)
+ *   - `pickHomeAddressMigrationCandidate` per alumni for the agency homeAddress
+ *     one-time backfill (unchanged pure helper)
+ *   - ONE `LINK` activity log PER alumni with ≥1 flip (keeps the merged-profile
+ *     timeline + orange `FieldChangeHistory` rows correct)
+ *
+ * The caller passes each created alumni's canonical name + current homeAddress
+ * (the values just written to the Alumni row) so no extra `findUnique` is needed.
+ * The per-alumni `autoLinkPendingForAlumni` stays for the single-create paths.
+ */
+export async function autoLinkPendingForAlumniBatch(args: {
+  alumniList: {
+    alumniId: string;
+    studentId: string;
+    prefix: string | null;
+    firstName: string;
+    lastName: string;
+    homeAddress: string | null;
+  }[];
+  ctx: LogContext;
+  tx: Prisma.TransactionClient;
+}): Promise<AutoLinkSummary[]> {
+  const { alumniList, ctx, tx } = args;
+  if (alumniList.length === 0) return [];
+
+  const studentIds = alumniList.map((a) => a.studentId);
+  const pendingWhere = { pendingStudentId: { in: studentIds }, deletedAt: null };
+  const sel = { id: true, prefix: true, firstName: true, lastName: true, studentId: true, pendingStudentId: true } as const;
+
+  // Probe each entity ONCE for the whole created set.
+  const awardRows = await tx.award.findMany({ where: pendingWhere, select: sel });
+  const associationRows = await tx.association.findMany({ where: pendingWhere, select: sel });
+  const committeeRows = await tx.graduateCommittee.findMany({ where: pendingWhere, select: sel });
+  const potentialRows = await tx.potential.findMany({ where: pendingWhere, select: sel });
+  const modelRows = await tx.modelRepresentative.findMany({ where: pendingWhere, select: sel });
+  const agencyRows = await tx.alumniAgency.findMany({
+    where: pendingWhere,
+    select: { ...sel, homeAddress: true, updatedAt: true },
+  });
+
+  const summaries: AutoLinkSummary[] = [];
+
+  for (const a of alumniList) {
+    const alumniName = { prefix: a.prefix, firstName: a.firstName, lastName: a.lastName };
+    const perEntity = emptyPerEntity();
+    const collected: { resourceType: string; resourceId: string; changes: FieldChange[] }[] = [];
+    let linkedCount = 0;
+    let homeMigrated = false;
+    let homeMigratedFrom: string | null = null;
+
+    // The 5 uniform name entities share one flip+rename+updateMany path.
+    const processUniform = async (
+      kind: "award" | "association" | "graduate_committee" | "potential" | "model_representative",
+      rows: typeof awardRows,
+      updateMany: (ids: string[], data: Record<string, unknown>) => Promise<unknown>,
+    ) => {
+      const mine = rows.filter((r) => r.pendingStudentId === a.studentId);
+      if (mine.length === 0) return;
+      const first = reconcilePendingRow(mine[0] as PendingNameRow, alumniName, a.studentId, kind);
+      await updateMany(mine.map((r) => r.id), first.updateData);
+      for (const r of mine) {
+        const { changes } = reconcilePendingRow(r as PendingNameRow, alumniName, a.studentId, kind);
+        linkedCount += 1;
+        perEntity[kind].flipped += 1;
+        if (changes.length) {
+          perEntity[kind].renamed += 1;
+          collected.push({ resourceType: kind, resourceId: r.id, changes });
+        }
+      }
+    };
+
+    await processUniform("award", awardRows, (ids, data) => tx.award.updateMany({ where: { id: { in: ids } }, data: data as never }));
+    await processUniform("association", associationRows, (ids, data) => tx.association.updateMany({ where: { id: { in: ids } }, data: data as never }));
+    await processUniform("graduate_committee", committeeRows, (ids, data) => tx.graduateCommittee.updateMany({ where: { id: { in: ids } }, data: data as never }));
+    await processUniform("potential", potentialRows, (ids, data) => tx.potential.updateMany({ where: { id: { in: ids } }, data: data as never }));
+    await processUniform("model_representative", modelRows, (ids, data) => tx.modelRepresentative.updateMany({ where: { id: { in: ids } }, data: data as never }));
+
+    // alumni_agency: same flip+rename, plus a one-time homeAddress backfill.
+    const myAgency = agencyRows.filter((r) => r.pendingStudentId === a.studentId);
+    if (myAgency.length > 0) {
+      const first = reconcilePendingRow(myAgency[0] as PendingNameRow, alumniName, a.studentId, "alumni_agency");
+      await tx.alumniAgency.updateMany({ where: { id: { in: myAgency.map((r) => r.id) } }, data: first.updateData });
+      for (const r of myAgency) {
+        const { changes } = reconcilePendingRow(r as PendingNameRow, alumniName, a.studentId, "alumni_agency");
+        linkedCount += 1;
+        perEntity.alumni_agency.flipped += 1;
+        if (changes.length) {
+          perEntity.alumni_agency.renamed += 1;
+          collected.push({ resourceType: "alumni_agency", resourceId: r.id, changes });
+        }
+      }
+      const migration = pickHomeAddressMigrationCandidate({ alumniHomeAddress: a.homeAddress, agencyRows: myAgency });
+      if (migration) {
+        homeMigrated = true;
+        homeMigratedFrom = migration.id;
+        await tx.alumni.update({ where: { id: a.alumniId }, data: { homeAddress: migration.homeAddress } });
+        collected.push({
+          resourceType: "alumni",
+          resourceId: a.alumniId,
+          changes: [{ field: "homeAddress", from: a.homeAddress, to: migration.homeAddress }],
+        });
+      }
+    }
+
+    if (linkedCount > 0) {
+      const reason = `auto-link to ${a.studentId}`;
+      const logId = await logActivity(
+        ctx,
+        "LINK",
+        "alumni",
+        a.alumniId,
+        { source: "auto_link_pending", studentId: a.studentId, linkedCount, perEntity, homeMigrated, homeMigratedFrom },
+        reason,
+        tx,
+      );
+      const actor =
+        ctx.actorType === "ADMIN"
+          ? { actorType: "ADMIN" as const, userId: ctx.userId, actorName: ctx.userEmail }
+          : { actorType: "ALUMNI" as const, alumniId: ctx.alumniId, actorName: ctx.alumniName };
+      for (const c of collected) {
+        await recordFieldChanges({
+          resourceType: c.resourceType,
+          resourceId: c.resourceId,
+          changes: c.changes,
+          actor,
+          reason,
+          activityLogId: logId,
+        });
+      }
+      summaries.push({ studentId: a.studentId, alumniId: a.alumniId, linkedCount, perEntity, homeMigrated, homeMigratedFrom });
+    }
+  }
+  return summaries;
+}

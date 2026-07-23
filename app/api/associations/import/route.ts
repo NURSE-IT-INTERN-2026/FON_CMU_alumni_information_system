@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { resolveAlumniLink, buildAlumniEntityMatchWhere } from "@/lib/alumni-link";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
 import { splitFullName } from "@/lib/parse-name";
-import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
+import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import {
+  fetchAlumniByStudentIds,
+  fetchExistingEntityRows,
+  linkResultFromMap,
+  existingIdentityKey,
+  incomingIdentityKeys,
+  buildExistingKeyMap,
+  partitionImport,
+  chunkedCreateMany,
+  type Identity,
+} from "@/lib/import-batch";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-type NameRow = { studentId: string; prefix: string; firstName: string; lastName: string };
+type NameRow = { prefix: string; firstName: string; lastName: string };
 
-/** Read ชื่อ/นามสกุล/คำนำหน้า columns; fall back to a legacy combined ชื่อ-สกุล column. */
+/** Read คำนำหน้า/ชื่อ/นามสกุล columns; fall back to a legacy combined ชื่อ-สกุล column. */
 function readName(row: Record<string, unknown>): NameRow {
   const prefixCol = row["คำนำหน้า"]?.toString().trim() || "";
   const firstNameCol = row["ชื่อ"]?.toString().trim() || "";
@@ -19,9 +29,59 @@ function readName(row: Record<string, unknown>): NameRow {
   const legacyFull = row["ชื่อ-สกุล"]?.toString().trim() || "";
   if (!firstNameCol && !lastNameCol && legacyFull) {
     const parsed = splitFullName(legacyFull);
-    return { studentId: "", prefix: parsed.prefix || "", firstName: parsed.firstName, lastName: parsed.lastName };
+    return { prefix: parsed.prefix || "", firstName: parsed.firstName, lastName: parsed.lastName };
   }
-  return { studentId: "", prefix: prefixCol, firstName: firstNameCol, lastName: lastNameCol };
+  return { prefix: prefixCol, firstName: firstNameCol, lastName: lastNameCol };
+}
+
+/** A parsed association row with its resolved alumni link. */
+type Resolved = {
+  rowNumber: number;
+  attemptedStudentId: string; // raw id from the row (for the warning + link call)
+  studentId: string | null; // resolved (linked) FK
+  pendingStudentId: string | null;
+  major: string | null;
+  prefix: string;
+  firstName: string;
+  lastName: string;
+  associationName: string;
+  position: string;
+  recordedYear: number;
+};
+
+const identityOf = (r: Resolved): Identity => ({
+  studentId: r.studentId,
+  pendingStudentId: r.pendingStudentId,
+  firstName: r.firstName,
+  lastName: r.lastName,
+});
+const naturalKey = (r: Resolved) => `${r.associationName}|${r.position}|${r.recordedYear}`;
+const candidates = (r: Resolved) => incomingIdentityKeys(identityOf(r)).map((k) => `${k}|${naturalKey(r)}`);
+
+/** Create sets the full row (incl. the natural-key columns). */
+function buildCreate(r: Resolved): Record<string, unknown> {
+  return {
+    studentId: r.studentId,
+    pendingStudentId: r.pendingStudentId,
+    prefix: r.prefix || null,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    associationName: r.associationName,
+    position: r.position,
+    recordedYear: r.recordedYear,
+    major: r.major,
+  };
+}
+/** Update sets the identity fields only (natural-key cols are the match key). */
+function buildUpdate(r: Resolved): Record<string, unknown> {
+  return {
+    studentId: r.studentId,
+    pendingStudentId: r.pendingStudentId,
+    prefix: r.prefix || null,
+    firstName: r.firstName,
+    lastName: r.lastName,
+    major: r.major,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -41,23 +101,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (file.size > MAX_IMPORT_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "ไฟล์มีขนาดเกิน 5MB" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ไฟล์มีขนาดเกิน 5MB" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const rows = await readExcelRows(buffer);
 
-    const errors: { row: number; message: string }[] = [];
-    const records: { studentId: string; prefix: string; firstName: string; lastName: string; associationName: string; position: string; recordedYear: number }[] = [];
+    const errors: ImportErrorRow[] = [];
+    const warnings: ImportErrorRow[] = [];
 
+    // 1) Parse + validate every row up front (invalid rows never reach the batch).
+    const raw: Omit<Resolved, "studentId" | "pendingStudentId" | "major">[] = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNumber = i + 2;
 
-      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
+      const studentId = row["รหัสนักศึกษา"]?.toString().trim() || "";
       const name = readName(row);
       const associationName = row["ชื่อสมาคม/ชมรม"]?.toString().trim();
       const position = row["ตำแหน่ง"]?.toString().trim();
@@ -74,82 +133,91 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      records.push({ studentId, prefix: name.prefix, firstName: name.firstName, lastName: name.lastName, associationName, position, recordedYear });
+      raw.push({ rowNumber, attemptedStudentId: studentId, prefix: name.prefix, firstName: name.firstName, lastName: name.lastName, associationName, position, recordedYear });
     }
+
+    const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
+
+    // 2) ONE findMany resolves every studentId against existing alumni.
+    const alumniByStudentId = await fetchAlumniByStudentIds(raw.map((r) => r.attemptedStudentId || null));
+
+    // 3) Resolve each row's link in-memory + collect pending (unlinked) warnings.
+    let pending = 0;
+    const resolved: Resolved[] = raw.map((r) => {
+      const link = linkResultFromMap(r.attemptedStudentId || null, null, alumniByStudentId);
+      if (!link.linked && r.attemptedStudentId) {
+        pending++;
+        warnings.push({ row: -1, message: `รหัสนักศึกษา ${r.attemptedStudentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง` });
+      }
+      return { ...r, studentId: link.studentId, pendingStudentId: link.pendingStudentId, major: link.major };
+    });
+
+    // 4) ONE findMany for existing association rows that could match any parsed row.
+    const linkedIds = resolved.map((r) => r.studentId).filter((s): s is string => !!s);
+    const pendingIds = resolved.map((r) => r.pendingStudentId).filter((s): s is string => !!s);
+    const namePairs = [
+      ...new Set(resolved.filter((r) => r.firstName && r.lastName).map((r) => `${r.firstName}|${r.lastName}`)),
+    ].map((s) => { const [firstName, lastName] = s.split("|"); return { firstName, lastName }; });
+
+    const existingRows = await fetchExistingEntityRows<{
+      id: string; studentId: string | null; pendingStudentId: string | null; firstName: string; lastName: string;
+      associationName: string; position: string; recordedYear: number;
+    }>({
+      model: "association",
+      linkedStudentIds: linkedIds,
+      pendingStudentIds: pendingIds,
+      namePairs,
+      select: { id: true, studentId: true, pendingStudentId: true, firstName: true, lastName: true, associationName: true, position: true, recordedYear: true },
+    });
+
+    // 5) Partition create vs update in-memory (with within-file dedup, last-wins).
+    const existingByKey = buildExistingKeyMap(
+      existingRows,
+      (e) => `${existingIdentityKey({ studentId: e.studentId, pendingStudentId: e.pendingStudentId, firstName: e.firstName, lastName: e.lastName })}|${e.associationName}|${e.position}|${e.recordedYear}`,
+      (e) => e.id,
+    );
+    const { toCreate, toUpdate } = partitionImport(resolved, existingByKey, candidates, (r) => candidates(r)[0]);
 
     let imported = 0;
     let updated = 0;
-    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
-    const warnings: { row: number; message: string }[] = [];
     const importedRecords: ImportedRecord[] = [];
-    for (const record of records) {
+
+    const recordOf = (r: Resolved, op: ImportedRecord["op"]): ImportedRecord => ({
+      id: r.studentId ?? r.pendingStudentId ?? null,
+      name: [r.prefix, r.firstName, r.lastName].filter(Boolean).join(" "),
+      op,
+    });
+
+    // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
+    await chunkedCreateMany(toCreate, buildCreate, {
+      createMany: (payloads) => prisma.association.createMany({ data: payloads as never }),
+      createOne: (payload) => prisma.association.create({ data: payload as never }),
+      onCreated: (r) => { imported++; importedRecords.push(recordOf(r, "created")); },
+      onError: (r, e) => {
+        console.error("Import create row error:", e);
+        const who = [r.firstName, r.lastName].filter(Boolean).join(" ") || (r.pendingStudentId ?? "");
+        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${who}: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
+      },
+    });
+
+    // 7) Per-row update for matched rows (non-uniform payload ⇒ irreducible 1 op/row).
+    for (const { row, existingId } of toUpdate) {
       try {
-        const displayName = [record.prefix, record.firstName, record.lastName].filter(Boolean).join(" ");
-        // Resolve against EXISTING Alumni only — no stub creation. An unknown id
-        // is flagged via `pendingStudentId` (รอเชื่อมโยง).
-        const link = await resolveAlumniLink(record.studentId, null);
-        if (!link.linked && record.studentId) {
-          pending++;
-          warnings.push({
-            row: -1,
-            message: `รหัสนักศึกษา ${record.studentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
-          });
-        }
-        const { studentId, pendingStudentId, major } = link;
-        // Match by the resolved person AND the natural key (association +
-        // position + year) so re-importing updates instead of duplicating.
-        const existing = await prisma.association.findFirst({
-          where: {
-            AND: [
-              buildAlumniEntityMatchWhere({ studentId, pendingStudentId, firstName: record.firstName, lastName: record.lastName }),
-              { associationName: record.associationName, position: record.position, recordedYear: record.recordedYear },
-            ],
-          },
-        });
-        const effectiveId = studentId ?? pendingStudentId;
-        if (existing) {
-          await prisma.association.update({
-            where: { id: existing.id },
-            data: {
-              studentId,
-              pendingStudentId,
-              prefix: record.prefix || null,
-              firstName: record.firstName,
-              lastName: record.lastName,
-              major,
-            },
-          });
-          updated++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
-        } else {
-          await prisma.association.create({
-            data: {
-              studentId,
-              pendingStudentId,
-              prefix: record.prefix || null,
-              firstName: record.firstName,
-              lastName: record.lastName,
-              associationName: record.associationName,
-              position: record.position,
-              recordedYear: record.recordedYear,
-              major,
-            },
-          });
-          imported++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
-        }
-      } catch (err) {
-        console.error("Import row error:", err);
-        const who = [record.firstName, record.lastName].filter(Boolean).join(" ") || record.studentId;
-        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${who}: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}` });
+        await prisma.association.update({ where: { id: existingId }, data: buildUpdate(row) as never });
+        updated++;
+        importedRecords.push(recordOf(row, "updated"));
+      } catch (e) {
+        console.error("Import update row error:", e);
+        const who = [row.firstName, row.lastName].filter(Boolean).join(" ") || (row.pendingStudentId ?? "");
+        errors.push({ row: -1, message: `ไม่สามารถนำเข้าข้อมูล ${who}: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
       }
     }
 
     await logImport({
-      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      ctx,
       resource: "association",
       fileName: captureFileName(file),
-      attempted: records.length,
+      attempted: resolved.length,
       created: imported,
       updated,
       failed: errors.length,
@@ -160,9 +228,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/associations/import error:", error);
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" }, { status: 500 });
   }
 }
