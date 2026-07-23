@@ -10,11 +10,32 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
-  alumniAgencyMatchWhere,
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
-import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
-import { syncAgencyHomeAddressToAlumni } from "@/lib/alumni-agency-home-sync";
+import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import { syncAgencyHomeAddressToAlumniBulk } from "@/lib/alumni-agency-home-sync";
+import {
+  fetchAlumniByStudentIds,
+  fetchExistingEntityRows,
+  existingIdentityKey,
+  incomingIdentityKeys,
+  buildExistingKeyMap,
+  partitionImport,
+  chunkedCreateMany,
+  type Identity,
+} from "@/lib/import-batch";
+
+type Row = { data: ParsedAlumniAgencyRow; rowNumber: number };
+
+const identityOf = (r: Row): Identity => ({
+  studentId: r.data.studentId,
+  pendingStudentId: r.data.pendingStudentId,
+  firstName: r.data.firstName,
+  lastName: r.data.lastName,
+});
+// alumni-agency matches by identity ONLY (no natural key — one row per person),
+// so the composite key is the bare identity key.
+const candidates = (r: Row) => incomingIdentityKeys(identityOf(r));
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -33,106 +54,126 @@ export async function POST(request: NextRequest) {
     }
 
     if (file.size > MAX_IMPORT_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "ไฟล์มีขนาดเกิน 5MB" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ไฟล์มีขนาดเกิน 5MB" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
 
-    const errors: { row: number; message: string }[] = [];
-    const warnings: { row: number; message: string }[] = [];
-    let imported = 0;
-    let updated = 0;
-    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
-    const importedRecords: ImportedRecord[] = [];
+    const errors: ImportErrorRow[] = [];
+    const warnings: ImportErrorRow[] = [];
 
-    // Read raw rows to detect format
+    // 1) Detect format + parse every row.
     const rawRows = await readExcelRawRows(buffer);
+    const parsed: Row[] = isOriginalFormat(rawRows)
+      ? parseOriginalFormat(rawRows)
+      : parseExportFormat(await readExcelRows(buffer));
 
-    let parsed: { data: ParsedAlumniAgencyRow; rowNumber: number }[];
+    // 2) Validate + ONE findMany to resolve every studentId against existing alumni.
+    const alumniByStudentId = await fetchAlumniByStudentIds(parsed.map((p) => p.data.studentId));
 
-    if (isOriginalFormat(rawRows)) {
-      parsed = parseOriginalFormat(rawRows);
-    } else {
-      const objectRows = await readExcelRows(buffer);
-      parsed = parseExportFormat(objectRows);
-    }
-
-    for (const { data, rowNumber } of parsed) {
+    // 3) Resolve each row's link in-memory (alumni-agency keeps its parsed `major`
+    //    unless empty — differs from resolveAlumniLink, so the logic is inlined).
+    let pending = 0;
+    const resolved: Row[] = [];
+    for (const p of parsed) {
+      const data = p.data;
       if (!data.firstName && !data.lastName && !data.englishName) {
-        errors.push({ row: rowNumber, message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ" });
+        errors.push({ row: p.rowNumber, message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ" });
         continue;
       }
-
-      try {
-        const displayName =
-          [data.firstName, data.lastName].filter(Boolean).join(" ") ||
-          data.englishName ||
-          data.studentId ||
-          "—";
-        // Resolve the studentId against EXISTING Alumni only — we do NOT auto-
-        // create a stub alumni (the old ensureAlumni behavior). If no Alumni has
-        // this id, the row is FLAGGED via `pendingStudentId` ("no Alumni to link
-        // to"). `studentId` is a FK to Alumni.studentId, so it must stay null
-        // while the id is only pending.
-        const attemptedId = data.studentId;
-        if (attemptedId) {
-          const linked = await prisma.alumni.findUnique({ where: { studentId: attemptedId } });
-          if (linked) {
-            data.studentId = linked.studentId;
-            data.pendingStudentId = null;
-            if (!data.major) data.major = linked.major ?? null;
-          } else {
-            data.pendingStudentId = attemptedId;
-            data.studentId = null;
-            pending++;
-            warnings.push({
-              row: rowNumber,
-              message: `รหัสนักศึกษา ${attemptedId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
-            });
-          }
-        } else {
+      const attemptedId = data.studentId;
+      if (attemptedId) {
+        const linked = alumniByStudentId.get(attemptedId);
+        if (linked) {
+          data.studentId = attemptedId;
           data.pendingStudentId = null;
-        }
-        // Find an existing active row to UPDATE (not duplicate): by the resolved
-        // id (studentId OR pendingStudentId), OR by name when the existing row is
-        // id-less — so re-importing data that now has an id (e.g. a mock fixture
-        // over the real name-only records) updates the existing row instead of
-        // creating a duplicate. See alumniAgencyMatchWhere for the exact clauses.
-        const existing = await prisma.alumniAgency.findFirst({
-          where: alumniAgencyMatchWhere(data),
-        });
-        const effectiveId = data.studentId ?? data.pendingStudentId ?? null;
-        if (existing) {
-          await prisma.alumniAgency.update({ where: { id: existing.id }, data });
-          updated++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
+          if (!data.major) data.major = linked.major ?? null;
         } else {
-          await prisma.alumniAgency.create({ data });
-          imported++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
+          data.pendingStudentId = attemptedId;
+          data.studentId = null;
+          pending++;
+          warnings.push({ row: p.rowNumber, message: `รหัสนักศึกษา ${attemptedId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง` });
         }
-        // Sync this row's homeAddress onto the linked Alumni (no-op when unlinked,
-        // empty, or unchanged). `data.studentId` is the resolved linked id.
-        await syncAgencyHomeAddressToAlumni({ ctx, studentId: data.studentId, agencyHomeAddress: data.homeAddress });
-      } catch (err) {
-        console.error("Import row error:", err);
-        errors.push({
-          row: rowNumber,
-          message: `ไม่สามารถนำเข้าข้อมูล: ${err instanceof Error ? err.message : "ข้อผิดพลาด"}`,
-        });
+      } else {
+        data.pendingStudentId = null;
+      }
+      resolved.push(p);
+    }
+
+    // 4) ONE findMany for existing alumni-agency rows that could match any parsed
+    //    row. Name pairs include null/null so englishName-only rows match too.
+    const linkedIds = resolved.map((r) => r.data.studentId).filter((s): s is string => !!s);
+    const pendingIds = resolved.map((r) => r.data.pendingStudentId).filter((s): s is string => !!s);
+    const namePairs = [
+      ...new Set(resolved.map((r) => `${r.data.firstName ?? ""}|${r.data.lastName ?? ""}`)),
+    ].map((s) => { const [firstName, lastName] = s.split("|"); return { firstName: firstName || null, lastName: lastName || null }; });
+
+    const existingRows = await fetchExistingEntityRows<{
+      id: string; studentId: string | null; pendingStudentId: string | null; firstName: string | null; lastName: string | null;
+    }>({
+      model: "alumniAgency",
+      linkedStudentIds: linkedIds,
+      pendingStudentIds: pendingIds,
+      namePairs,
+      select: { id: true, studentId: true, pendingStudentId: true, firstName: true, lastName: true },
+    });
+
+    // 5) Partition create vs update in-memory (with within-file dedup, last-wins).
+    const existingByKey = buildExistingKeyMap(
+      existingRows,
+      (e) => existingIdentityKey({ studentId: e.studentId, pendingStudentId: e.pendingStudentId, firstName: e.firstName, lastName: e.lastName }),
+      (e) => e.id,
+    );
+    const { toCreate, toUpdate } = partitionImport(resolved, existingByKey, candidates, (r) => candidates(r)[0]);
+
+    let imported = 0;
+    let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
+
+    const displayName = (r: Row): string =>
+      [r.data.firstName, r.data.lastName].filter(Boolean).join(" ") || r.data.englishName || r.data.studentId || r.data.pendingStudentId || "—";
+    const effectiveId = (r: Row): string | null => r.data.studentId ?? r.data.pendingStudentId ?? null;
+    const payloadOf = (r: Row): Record<string, unknown> => ({ ...r.data });
+
+    // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
+    await chunkedCreateMany(toCreate, payloadOf, {
+      createMany: (payloads) => prisma.alumniAgency.createMany({ data: payloads as never }),
+      createOne: (payload) => prisma.alumniAgency.create({ data: payload as never }),
+      onCreated: (r) => { imported++; importedRecords.push({ id: effectiveId(r), name: displayName(r), op: "created" }); },
+      onError: (r, e) => {
+        console.error("Import create row error:", e);
+        errors.push({ row: r.rowNumber, message: `ไม่สามารถนำเข้าข้อมูล: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
+      },
+    });
+
+    // 7) Per-row update for matched rows (the parsed `data` is the full payload).
+    for (const { row, existingId } of toUpdate) {
+      try {
+        await prisma.alumniAgency.update({ where: { id: existingId }, data: payloadOf(row) as never });
+        updated++;
+        importedRecords.push({ id: effectiveId(row), name: displayName(row), op: "updated" });
+      } catch (e) {
+        console.error("Import update row error:", e);
+        errors.push({ row: row.rowNumber, message: `ไม่สามารถนำเข้าข้อมูล: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
       }
     }
+
+    // 8) Bulk reverse homeAddress sync: ONE findMany for the linked alumni, push
+    //    each agency address onto its alumni where it differs (one UPDATE log +
+    //    field-change per real change — orange indicator unchanged).
+    const addressesByStudentId = new Map<string, string | null>();
+    for (const r of [...toCreate, ...toUpdate.map((t) => t.row)]) {
+      if (r.data.studentId) addressesByStudentId.set(r.data.studentId, r.data.homeAddress);
+    }
+    await syncAgencyHomeAddressToAlumniBulk({ ctx, addressesByStudentId });
 
     await logImport({
       ctx,
       resource: "alumni_agency",
       fileName: captureFileName(file),
-      attempted: parsed.length,
+      attempted: resolved.length,
       created: imported,
       updated,
       failed: errors.length,
@@ -143,10 +184,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/alumni-agency/import error:", error);
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" }, { status: 500 });
   }
 }
-

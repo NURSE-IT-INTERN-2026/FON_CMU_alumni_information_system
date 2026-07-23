@@ -2,14 +2,60 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { AwardType } from "@/app/generated/prisma/client";
-import { resolveAlumniLink, buildAlumniEntityMatchWhere } from "@/lib/alumni-link";
 import { checkWritePermission } from "@/lib/permissions";
 import { readExcelRows } from "@/lib/excel-import";
+import { parseAwardRow, type ParsedAwardRow } from "@/lib/award-import-parse";
+import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import {
+  fetchAlumniByStudentIds,
+  fetchExistingEntityRows,
+  linkResultFromMap,
+  existingIdentityKey,
+  incomingIdentityKeys,
+  buildExistingKeyMap,
+  partitionImport,
+  chunkedCreateMany,
+  type Identity,
+} from "@/lib/import-batch";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-import { parseAwardRow } from "@/lib/award-import-parse";
-import { logImport, captureFileName, type ImportedRecord } from "@/lib/import-log";
+/** A parsed award row with its resolved alumni link. */
+type ResolvedAward = {
+  data: ParsedAwardRow;
+  rowNumber: number;
+  studentId: string | null;
+  pendingStudentId: string | null;
+  major: string | null;
+};
+
+const identityOf = (r: ResolvedAward): Identity => ({
+  studentId: r.studentId,
+  pendingStudentId: r.pendingStudentId,
+  firstName: r.data.firstName,
+  lastName: r.data.lastName,
+});
+const naturalKey = (r: ResolvedAward) => `${r.data.awardName}|${r.data.year}`;
+const compositeCandidates = (r: ResolvedAward) =>
+  incomingIdentityKeys(identityOf(r)).map((k) => `${k}|${naturalKey(r)}`);
+
+/** The award payload written on both create and update (identical — same fields). */
+function awardPayload(r: ResolvedAward): Record<string, unknown> {
+  return {
+    studentId: r.studentId,
+    pendingStudentId: r.pendingStudentId,
+    prefix: r.data.prefix,
+    firstName: r.data.firstName,
+    lastName: r.data.lastName,
+    awardName: r.data.awardName,
+    awardType: r.data.awardType as AwardType,
+    year: r.data.year,
+    link: r.data.link,
+    imageUrl: r.data.imageUrl,
+    description: r.data.description,
+    major: r.major,
+  };
+}
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -28,93 +74,129 @@ export async function POST(request: NextRequest) {
     }
 
     if (file.size > MAX_IMPORT_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "ไฟล์มีขนาดเกิน 5MB" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ไฟล์มีขนาดเกิน 5MB" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const rows = await readExcelRows(buffer);
 
-    const errors: { row: number; message: string }[] = [];
-    const warnings: { row: number; message: string }[] = [];
-    let imported = 0;
-    let updated = 0;
-    let pending = 0; // rows saved with `pendingStudentId` (no matching Alumni to link)
-    const importedRecords: ImportedRecord[] = [];
+    const errors: ImportErrorRow[] = [];
+    const warnings: ImportErrorRow[] = [];
+    const parsed: { data: ParsedAwardRow; rowNumber: number }[] = [];
 
+    // 1) Parse + validate every row up front (invalid rows never reach the batch).
     for (let i = 0; i < rows.length; i++) {
       const rowNumber = i + 2;
       const { data, error } = parseAwardRow(rows[i], rowNumber);
-
       if (error) {
         errors.push(error);
         continue;
       }
+      parsed.push({ data: data!, rowNumber });
+    }
 
+    const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
+
+    // 2) ONE findMany resolves every studentId against existing alumni.
+    const alumniByStudentId = await fetchAlumniByStudentIds(parsed.map((p) => p.data.studentId));
+
+    // 3) Resolve each row's link in-memory + collect pending (unlinked) warnings.
+    let pending = 0;
+    const resolved: ResolvedAward[] = parsed.map((p) => {
+      const link = linkResultFromMap(p.data.studentId, null, alumniByStudentId);
+      if (!link.linked && p.data.studentId) {
+        pending++;
+        warnings.push({
+          row: p.rowNumber,
+          message: `รหัสนักศึกษา ${p.data.studentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
+        });
+      }
+      return {
+        data: p.data,
+        rowNumber: p.rowNumber,
+        studentId: link.studentId,
+        pendingStudentId: link.pendingStudentId,
+        major: link.major,
+      };
+    });
+
+    // 4) ONE findMany for existing award rows that could match any parsed row.
+    const linkedIds = resolved.map((r) => r.studentId).filter((s): s is string => !!s);
+    const pendingIds = resolved.map((r) => r.pendingStudentId).filter((s): s is string => !!s);
+    const namePairs = [
+      ...new Set(
+        resolved
+          .filter((r) => r.data.firstName && r.data.lastName)
+          .map((r) => `${r.data.firstName}|${r.data.lastName}`),
+      ),
+    ].map((s) => {
+      const [firstName, lastName] = s.split("|");
+      return { firstName, lastName };
+    });
+
+    const existingRows = await fetchExistingEntityRows<{
+      id: string;
+      studentId: string | null;
+      pendingStudentId: string | null;
+      firstName: string;
+      lastName: string;
+      awardName: string;
+      year: number;
+    }>({
+      model: "award",
+      linkedStudentIds: linkedIds,
+      pendingStudentIds: pendingIds,
+      namePairs,
+      select: { id: true, studentId: true, pendingStudentId: true, firstName: true, lastName: true, awardName: true, year: true },
+    });
+
+    // 5) Partition create vs update in-memory (with within-file dedup, last-wins).
+    const existingByKey = buildExistingKeyMap(
+      existingRows,
+      (e) => `${existingIdentityKey({ studentId: e.studentId, pendingStudentId: e.pendingStudentId, firstName: e.firstName, lastName: e.lastName })}|${e.awardName}|${e.year}`,
+      (e) => e.id,
+    );
+    const { toCreate, toUpdate } = partitionImport(resolved, existingByKey, compositeCandidates, (r) => compositeCandidates(r)[0]);
+
+    let imported = 0;
+    let updated = 0;
+    const importedRecords: ImportedRecord[] = [];
+
+    const recordOf = (r: ResolvedAward, op: ImportedRecord["op"]): ImportedRecord => ({
+      id: r.studentId ?? r.pendingStudentId ?? null,
+      name: [r.data.prefix, r.data.firstName, r.data.lastName].filter(Boolean).join(" ") || r.data.awardName,
+      op,
+    });
+
+    // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
+    await chunkedCreateMany(toCreate, awardPayload, {
+      createMany: (payloads) => prisma.award.createMany({ data: payloads as never }),
+      createOne: (payload) => prisma.award.create({ data: payload as never }),
+      onCreated: (r) => {
+        imported++;
+        importedRecords.push(recordOf(r, "created"));
+      },
+      onError: (r, e) => {
+        console.error("Import create row error:", e);
+        errors.push({ row: r.rowNumber, message: "ไม่สามารถนำเข้าข้อมูลแถวนี้ได้" });
+      },
+    });
+
+    // 7) Per-row update for matched rows (non-uniform payload ⇒ irreducible 1 op/row;
+    //    the read-side bulk above already removed the per-row findFirst).
+    for (const { row, existingId } of toUpdate) {
       try {
-        const displayName = [data!.prefix, data!.firstName, data!.lastName]
-          .filter(Boolean)
-          .join(" ") || data!.awardName;
-        // Resolve the studentId against EXISTING Alumni only — no stub creation.
-        // An unknown id is flagged via `pendingStudentId` (รอเชื่อมโยง).
-        const link = await resolveAlumniLink(data!.studentId, null);
-        if (!link.linked && data!.studentId) {
-          pending++;
-          warnings.push({
-            row: rowNumber,
-            message: `รหัสนักศึกษา ${data!.studentId} ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง — บันทึกเป็นรอเชื่อมโยง`,
-          });
-        }
-        const { studentId, pendingStudentId, major } = link;
-
-        const payload = {
-          studentId,
-          pendingStudentId,
-          prefix: data!.prefix,
-          firstName: data!.firstName,
-          lastName: data!.lastName,
-          awardName: data!.awardName,
-          awardType: data!.awardType as AwardType,
-          year: data!.year,
-          link: data!.link,
-          imageUrl: data!.imageUrl,
-          description: data!.description,
-          major,
-        };
-
-        // No DB unique — match by the resolved person (studentId OR
-        // pendingStudentId, OR name for id-less rows) AND the natural key
-        // (awardName + year) so re-importing updates instead of duplicating.
-        const existing = await prisma.award.findFirst({
-          where: {
-            AND: [
-              buildAlumniEntityMatchWhere({ studentId, pendingStudentId, firstName: data!.firstName, lastName: data!.lastName }),
-              { awardName: data!.awardName, year: data!.year },
-            ],
-          },
-        });
-        const effectiveId = studentId ?? pendingStudentId ?? null;
-        if (existing) {
-          await prisma.award.update({ where: { id: existing.id }, data: payload });
-          updated++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "updated" });
-        } else {
-          await prisma.award.create({ data: payload });
-          imported++;
-          importedRecords.push({ id: effectiveId, name: displayName, op: "created" });
-        }
-      } catch {
-        errors.push({
-          row: rowNumber,
-          message: `ไม่สามารถนำเข้าข้อมูลแถวนี้ได้`,
-        });
+        await prisma.award.update({ where: { id: existingId }, data: awardPayload(row) as never });
+        updated++;
+        importedRecords.push(recordOf(row, "updated"));
+      } catch (e) {
+        console.error("Import update row error:", e);
+        errors.push({ row: row.rowNumber, message: "ไม่สามารถนำเข้าข้อมูลแถวนี้ได้" });
       }
     }
 
     await logImport({
-      ctx: { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      ctx,
       resource: "award",
       fileName: captureFileName(file),
       attempted: rows.length,
@@ -128,10 +210,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imported, updated, skipped: 0, pending, warnings, errors });
   } catch (error) {
     console.error("POST /api/awards/import error:", error);
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล" }, { status: 500 });
   }
 }
-

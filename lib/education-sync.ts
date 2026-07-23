@@ -187,3 +187,65 @@ export async function ensurePrimaryEducationFromSnapshot(
   // Primary = highest degree (for a single row, that's the one we just made).
   await recomputePrimaryEducation(alumniId, tx);
 }
+
+/**
+ * Bulk sibling of `ensurePrimaryEducationFromSnapshot` for the alumni IMPORT
+ * create partition. Each freshly-created alumni has NO Education rows yet and a
+ * snapshot already written on the `Alumni` row, so — unlike the heavyweight
+ * single-alumni path — we skip `recomputePrimaryEducation` entirely and just:
+ *   1. create one primary Education row per alumni from its snapshot (chunked
+ *      `createMany`), then
+ *   2. point each alumni's `primaryEducationId` at the row we just made.
+ * The per-alumni `primaryEducationId` set is irreducible at 1 op/alumni (each
+ * gets a distinct FK value; no `updateMany` trick) — but the Education CREATES
+ * collapse to a few `createMany` calls instead of N. `ensurePrimaryEducationFromSnapshot`
+ * stays for the single-create paths (base POST, create-with-related, approve).
+ */
+export async function ensurePrimaryEducationBulk(
+  createdAlumni: {
+    alumniId: string;
+    studentId: string;
+    degreeLevel: DegreeLevelValue;
+    graduationYear: number | null;
+    major: string | null;
+    cohort: string | null;
+    firstName: string;
+    lastName: string;
+  }[],
+  tx: Prisma.TransactionClient = prisma,
+): Promise<void> {
+  if (createdAlumni.length === 0) return;
+
+  for (let i = 0; i < createdAlumni.length; i += IMPORT_EDU_CHUNK) {
+    const slice = createdAlumni.slice(i, i + IMPORT_EDU_CHUNK);
+    await tx.education.createMany({
+      data: slice.map((a) => ({
+        alumniId: a.alumniId,
+        studentId: a.studentId,
+        degreeLevel: a.degreeLevel,
+        graduationYear: a.graduationYear,
+        major: a.major,
+        cohort: a.cohort,
+        firstName: a.firstName,
+        lastName: a.lastName,
+      })) as never,
+    });
+  }
+
+  // Re-fetch the new Education rows to map alumniId → educationId (createMany
+  // returns no ids), then set each alumni's primaryEducationId.
+  const eduRows = await tx.education.findMany({
+    where: { alumniId: { in: createdAlumni.map((a) => a.alumniId) } },
+    select: { id: true, alumniId: true },
+  });
+  const eduByAlumni = new Map(eduRows.map((e) => [e.alumniId, e.id]));
+  for (const a of createdAlumni) {
+    const eduId = eduByAlumni.get(a.alumniId);
+    if (eduId) {
+      await tx.alumni.update({ where: { id: a.alumniId }, data: { primaryEducationId: eduId } });
+    }
+  }
+}
+
+/** Chunk size for the bulk education createMany (Postgres ~65535 param cap). */
+const IMPORT_EDU_CHUNK = 500;
