@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cleanupExpiredSessions } from "@/lib/auth";
+import { cleanupExpiredSessions, constantTimeEqual } from "@/lib/auth";
 
 // Prune expired sessions. Secured by the CLEANUP_SECRET env var (bearer token).
 // Accepts GET or DELETE so a cron job may use either method.
@@ -12,7 +12,7 @@ async function runCleanup(request: Request) {
   }
 
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
+  if (!constantTimeEqual(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

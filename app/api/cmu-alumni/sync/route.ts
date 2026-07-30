@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, constantTimeEqual } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logImport, type ImportedRecord } from "@/lib/import-log";
 import { bustCache, bustCachePrefix } from "@/lib/cache";
@@ -26,7 +26,7 @@ async function authorize(request: Request): Promise<
   | { ok: false; response: NextResponse }
 > {
   const secret = process.env.CMU_SYNC_SECRET;
-  if (secret && request.headers.get("authorization") === `Bearer ${secret}`) {
+  if (secret && constantTimeEqual(request.headers.get("authorization"), `Bearer ${secret}`)) {
     return { ok: true, session: null };
   }
   const permErr = await checkWritePermission();
