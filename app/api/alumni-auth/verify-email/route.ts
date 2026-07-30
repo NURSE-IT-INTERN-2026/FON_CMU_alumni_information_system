@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { bustCache } from "@/lib/cache";
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
     const validated = verifyEmailSchema.parse(body);
 
     const record = await prisma.emailVerification.findUnique({
-      where: { token: validated.token },
+      // Token is stored as a hash at rest — hash the submitted token to match.
+      where: { token: hashToken(validated.token) },
       include: { alumni: true },
     });
 

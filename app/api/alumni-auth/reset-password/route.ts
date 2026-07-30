@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
 
     // Find valid reset token
     const resetRecord = await prisma.passwordReset.findUnique({
-      where: { token: validated.token },
+      // Token is stored as a hash at rest — hash the submitted token to match.
+      where: { token: hashToken(validated.token) },
       include: { alumni: true },
     });
 

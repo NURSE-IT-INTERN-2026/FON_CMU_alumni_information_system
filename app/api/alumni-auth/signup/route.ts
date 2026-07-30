@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, passwordField } from "@/lib/validations/helpers";
@@ -186,7 +186,8 @@ export async function POST(request: Request) {
     const verifyToken = randomBytes(32).toString("hex");
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await prisma.emailVerification.create({
-      data: { alumniId, token: verifyToken, expiresAt: verifyExpiresAt },
+      // Store the token HASH at rest; the raw token goes into the email link.
+      data: { alumniId, token: hashToken(verifyToken), expiresAt: verifyExpiresAt },
     });
     try {
       await sendEmailVerificationEmail(email, `${firstName} ${lastName}`, verifyToken);

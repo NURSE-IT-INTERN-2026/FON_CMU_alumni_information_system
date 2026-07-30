@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { Session, AdminUser, Alumni } from "@/app/generated/prisma/client";
 import { compare, hash } from "bcryptjs";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 // Explicit types for narrowed session returns
 type AdminSession = Session & { user: AdminUser };
@@ -19,12 +19,25 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return compare(password, hash);
 }
 
+/**
+ * SHA-256 hex digest of an auth token for AT-REST storage only. The raw token
+ * stays in the cookie / email link (which the client already carries); only the
+ * DB column stores the hash, so a stolen token table is worthless. No salt or
+ * stretching is needed — these are high-entropy random values (randomUUID for
+ * sessions, randomBytes(32) for reset/verify). Mirrors the createHash pattern
+ * in lib/oauth.ts.
+ */
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export async function createSession(userId: string): Promise<string> {
   const token = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
 
   await prisma.session.create({
-    data: { userId, token, expiresAt, sessionType: "ADMIN", alumniId: null },
+    // Store the token HASH at rest; the raw token is returned below for the cookie.
+    data: { userId, token: hashToken(token), expiresAt, sessionType: "ADMIN", alumniId: null },
   });
 
   return token;
@@ -35,7 +48,8 @@ export async function createAlumniSession(alumniId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000);
 
   await prisma.session.create({
-    data: { alumniId, token, expiresAt, sessionType: "ALUMNI", userId: null },
+    // Store the token HASH at rest; the raw token is returned below for the cookie.
+    data: { alumniId, token: hashToken(token), expiresAt, sessionType: "ALUMNI", userId: null },
   });
 
   return token;
@@ -60,7 +74,7 @@ export async function getSession(): Promise<AdminSession | null> {
   }
 
   const session = await prisma.session.findUnique({
-    where: { token },
+    where: { token: hashToken(token) },
     include: { user: true },
   });
 
@@ -87,7 +101,7 @@ export async function getAlumniSession(): Promise<AlumniSession | null> {
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
-    where: { token },
+    where: { token: hashToken(token) },
     include: { alumni: true },
   });
 
