@@ -26,9 +26,17 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", cspHeader);
 
-  // Auth check: redirect to login if no session cookie
+  // Auth check: redirect to login if no session cookie — but only for protected
+  // routes. Public routes (/login and the /graduates auth-flow pages) must be
+  // reachable without a session, so skip the redirect there (the CSP/nonce
+  // headers above still apply to every branch). Authed /graduates/* pages are
+  // under /graduates too, so they also skip this redirect and rely on their
+  // own layout guard.
+  const { pathname } = new URL(request.url);
+  const path = pathname.startsWith(BASE_PATH) ? pathname.slice(BASE_PATH.length) : pathname;
+  const isPublicRoute = path === "/login" || path.startsWith("/graduates");
   const session = request.cookies.get(SESSION_COOKIE);
-  if (!session) {
+  if (!session && !isPublicRoute) {
     const response = NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
     response.headers.set("Content-Security-Policy", cspHeader);
     return response;
@@ -44,6 +52,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|graduates|api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
+    "/((?!api/auth|api/alumni-auth|api/alumni-profile|api/alumni-accounts|_next/static|_next/image|favicon\\.ico|robots\\.txt|.*\\.(?:png|jpg|jpeg|svg|gif|ico|webp)).*)",
   ],
 };
