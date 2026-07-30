@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-import { clearSessionCookie } from "@/lib/auth";
+import { clearSessionCookie, hashToken } from "@/lib/auth";
 import { BASE_PATH } from "@/lib/constants";
 import { getBaseUrl } from "@/lib/base-url";
 
@@ -12,7 +12,8 @@ export async function POST() {
 
     if (token) {
       await prisma.session.deleteMany({
-        where: { token },
+        // Token is stored as a hash at rest — hash the cookie value to match.
+        where: { token: hashToken(token) },
       });
     }
 

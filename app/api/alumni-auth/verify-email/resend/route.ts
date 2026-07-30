@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
+import { hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { sendEmailVerificationEmail } from "@/lib/email";
@@ -59,7 +60,8 @@ export async function POST(request: Request) {
       data: { used: true },
     });
     await prisma.emailVerification.create({
-      data: { alumniId: alumni.id, token: verifyToken, expiresAt: verifyExpiresAt },
+      // Store the token HASH at rest; the raw token goes into the email link.
+      data: { alumniId: alumni.id, token: hashToken(verifyToken), expiresAt: verifyExpiresAt },
     });
 
     try {

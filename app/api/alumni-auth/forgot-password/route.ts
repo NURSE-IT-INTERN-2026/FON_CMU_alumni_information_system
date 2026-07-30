@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity-log";
@@ -70,7 +71,8 @@ export async function POST(request: Request) {
     await prisma.passwordReset.create({
       data: {
         alumniId: alumni.id,
-        token,
+        // Store the token HASH at rest; the raw token goes into the email link.
+        token: hashToken(token),
         expiresAt,
       },
     });

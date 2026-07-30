@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-import { clearSessionCookie } from "@/lib/auth";
+import { clearSessionCookie, hashToken } from "@/lib/auth";
 import { BASE_PATH } from "@/lib/constants";
 import { getBaseUrl } from "@/lib/base-url";
 
@@ -10,7 +10,8 @@ async function performLogout() {
   const token = cookieStore.get("fon-cmu-session")?.value;
 
   if (token) {
-    await prisma.session.deleteMany({ where: { token } });
+    // Token is stored as a hash at rest — hash the cookie value to match.
+    await prisma.session.deleteMany({ where: { token: hashToken(token) } });
   }
 
   const response = NextResponse.redirect(
