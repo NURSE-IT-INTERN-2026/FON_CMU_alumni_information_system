@@ -28,7 +28,7 @@ const API_ROOT = path.resolve(process.cwd(), "app/api");
 const PUBLIC_ALLOWLIST = new Set([
   "app/api/auth/cmu-login/route.ts", // starts the CMU OAuth login flow
   "app/api/auth/callback/route.ts", // Microsoft Entra ID OAuth callback (redirect URI)
-  "app/api/alumni-auth/logout/route.ts", // clears the session cookie (no session needed)
+  "app/api/auth/cleanup/route.ts", // cron session cleanup — gated by CLEANUP_SECRET bearer, not a session
 ]);
 
 /** A session/permission gate call inside a handler body. */

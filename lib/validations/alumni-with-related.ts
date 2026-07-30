@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isThailandCountry } from "@/lib/alumni-agency-region";
 import { alumniFormSchema, profileFormSchema } from "./alumni";
 import { editReasonField } from "./helpers";
 import { awardFormSchema } from "./award";
@@ -18,7 +19,15 @@ const alumniAgencyFormSchema = z.object({
   workplace: z.string().optional().default(""),
   homeAddress: z.string().optional().default(""),
   notes: z.string().optional().default(""),
-});
+}).refine(
+  // This simplified agency schema (used by the alumni self-service profile and
+  // the new-alumni full-form's agency sub-section) collects only country — no
+  // จังหวัด. A Thailand country would create a province-less in-country row,
+  // which violates PRD §3.9 (province required for Thailand). Block it here;
+  // in-country rows belong on the dedicated Thailand tab (with province).
+  (v) => !isThailandCountry(v.country),
+  { message: "ข้อมูลในประเทศไทยให้ผู้ดูแลระบบบันทึกให้เท่านั้น หากนี่เป็นข้อมูลในประเทศ กรุณาติดต่อผู้ดูแลระบบ", path: ["country"] },
+);
 
 // --- Form schema (composite: alumni core + nested arrays, all strings) ---
 

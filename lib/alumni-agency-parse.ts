@@ -48,7 +48,9 @@ export function inferCountry(wp: string): string {
     w.includes("kansas")
   )
     return "สหรัฐอเมริกา";
-  return "สหรัฐอเมริกา";
+  // Unknown workplace — don't fabricate a country (was "สหรัฐอเมริกา"). Blank
+  // lands the row on the abroad tab with an empty country for an admin to fix.
+  return "";
 }
 
 export function isOriginalFormat(rawRows: (string | number)[][]): boolean {

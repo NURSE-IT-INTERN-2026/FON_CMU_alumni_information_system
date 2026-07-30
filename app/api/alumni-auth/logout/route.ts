@@ -21,17 +21,6 @@ async function performLogout() {
   return response;
 }
 
-export async function GET() {
-  try {
-    return await performLogout();
-  } catch {
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในการออกจากระบบ" },
-      { status: 500 }
-    );
-  }
-}
-
 export async function POST() {
   try {
     return await performLogout();

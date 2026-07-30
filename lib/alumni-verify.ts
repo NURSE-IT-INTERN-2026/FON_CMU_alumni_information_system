@@ -57,13 +57,18 @@ export function bachelorCohortFromGradYear(
 /**
  * Parse the signup form's birthDate (Buddhist-era DDMMYYYY, e.g. "01122540")
  * into canonical Gregorian "YYYY-MM-DD". Buddhist years (>= 2400) get - 543.
- * Returns null if unparseable.
+ * Also accepts an already-canonical Gregorian "YYYY-MM-DD" (e.g. rows written by
+ * `ensureAlumni` via `normalizeCmuBirthday`) so they aren't mis-parsed as
+ * Buddhist DDMMYYYY. Returns null if unparseable.
  */
 export function normalizeFormBirthDate(
   input: string | null | undefined,
 ): string | null {
   if (!input) return null;
-  const digits = input.replace(/\D/g, "");
+  const s = String(input).trim();
+  // Already-canonical Gregorian YYYY-MM-DD — accept as-is.
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const digits = s.replace(/\D/g, "");
   if (digits.length !== 8) return null;
   const dd = digits.slice(0, 2);
   const mm = digits.slice(2, 4);

@@ -48,7 +48,6 @@ interface AlumniAccount {
   prefix: string;
   firstName: string;
   lastName: string;
-  newLastName: string | null;
   cohort: string | null;
   degreeLevel: string;
   email: string | null;
@@ -566,7 +565,7 @@ function AlumniAccountsTab({
                   >
                     <td className="px-4 py-3 text-center text-gray-500">{(page - 1) * pageSize + i + 1}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.studentId}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{a.prefix}{a.firstName} {a.newLastName || a.lastName}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{a.prefix}{a.firstName} {a.lastName}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{a.cohort || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{DEGREE_LABELS[a.degreeLevel] || a.degreeLevel}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -621,7 +620,7 @@ function AlumniAccountsTab({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="mb-4 text-lg font-semibold text-gray-900">
-              เปลี่ยนอีเมล — {emailEdit.firstName} {emailEdit.newLastName || emailEdit.lastName}
+              เปลี่ยนอีเมล — {emailEdit.firstName} {emailEdit.lastName}
             </h3>
             <label className="mb-1 block text-sm font-medium text-gray-700">อีเมลใหม่</label>
             <input

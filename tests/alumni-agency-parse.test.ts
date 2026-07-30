@@ -43,9 +43,9 @@ describe("inferCountry", () => {
     expect(inferCountry("U.S.A. hospital")).toBe("สหรัฐอเมริกา");
   });
 
-  it("defaults to USA for unknown workplaces", () => {
-    expect(inferCountry("Unknown Hospital")).toBe("สหรัฐอเมริกา");
-    expect(inferCountry("")).toBe("สหรัฐอเมริกา");
+  it("returns empty string for unknown workplaces (no fabricated country)", () => {
+    expect(inferCountry("Unknown Hospital")).toBe("");
+    expect(inferCountry("")).toBe("");
   });
 
   it("is case-insensitive", () => {
