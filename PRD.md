@@ -1,293 +1,310 @@
 # Product Requirements Document (PRD)
 # Alumni Information System — Faculty of Nursing, Chiang Mai University (FON CMU)
 
-**Date:** 2026-05-29 (revised 2026-06-16)
+**Date:** 2026-05-29 (revised 2026-07-30)
 **Author:** Lead Supervisor, Faculty of Nursing CMU
 **Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS 4, Prisma 7, PostgreSQL
+
+> This document describes the system **as built**. It is kept in sync with the shipped product; the authoritative field-level schema is `prisma/schema.prisma`. A log of decisions that diverged from the original 2026-05-29 spec is in **§10 (Changes from the original spec)**.
 
 ---
 
 ## 1. Overview
 
-A web-based alumni information system for the Faculty of Nursing, Chiang Mai University (FON CMU). The system is built by the faculty's lead supervisor and serves two audiences:
+A web-based alumni information system for the Faculty of Nursing, Chiang Mai University (FON CMU), built and maintained by the faculty's lead supervisor. It serves two audiences:
 
-1. **Administrators** — manage alumni data through an admin dashboard: display data in filterable/sortable tables, perform full CRUD on alumni data, and import/export Excel.
-2. **Alumni** — log in, update their own data, and socialize with other alumni.
+1. **Staff** (administrators) — manage alumni data through an admin workspace: filterable/sortable tables, full CRUD, Excel import/export, and a dashboard overview.
+2. **Graduates** (alumni) — sign up, log in, and maintain their own profile and education records, and read news published by the faculty.
 
-**Primary goal:** let admins export/import Excel tables of alumni, display the data in tables that can be filtered and sorted, and perform CRUD actions on alumni data — plus an alumni side where alumni log in, update their own data, and interact with other alumni.
+**Primary goal:** let staff display alumni data in tables that can be filtered, sorted, searched, exported, and edited (including Excel import/export), and to give each graduate a self-service account over their own record.
 
-> **Access policy (revised 2026-06-30):** There is **no public/anonymous browsing** — the system serves only the two audiences above. Every content page and data API requires an authenticated session (a staff member: admin/superadmin/executive, or a graduate/alumni). Only the **login page, sign-up, password-reset, and the authentication API endpoints** (`/api/auth/*`, `/api/alumni-auth/{signup,login,forgot/reset-password}`) are reachable without logging in. The previously-listed "Public" pages and GET endpoints are now **gated behind login**; an anonymous visitor sees only the login page.
+Two capabilities that have grown beyond the original MVP scope are now core to the product:
+
+- **Alumni account self-service lifecycle** — graduates sign themselves up and verify email ownership, then a staff member approves the account before it can log in (§3.1.2–3.1.3).
+- **CMU Registrar materialization** — the faculty's graduate universe is pulled from the CMU Registrar into a local cache on demand; the all-alumni table, dashboard counts, and facets are all built on that cache (§3.19).
+
+> **Access policy:** there is **no public/anonymous browsing**. The system serves only the two audiences above. Every content page and data API requires an authenticated session (staff or graduate). Only the login page, sign-up, password-reset, and the authentication API endpoints are reachable without a session; an anonymous visitor sees only the login page.
 
 ---
 
 ## 2. Users & Roles
 
-### 2.1 Admin Roles
+### 2.1 Staff Roles
 
 | Role | Description |
 |------|-------------|
-| **Superadmin** | Full CRUD on all data and user account management. Confirms/restores/hard-deletes soft-deleted records. |
-| **Admin** | Full CRUD on all data. Can import/export Excel. |
-| **Executive** | Read-only access — can view and search data but cannot add, edit, or delete anything. |
+| **Superadmin** | Full CRUD on all data; user-account management; confirms/restores/hard-deletes soft-deleted records; the only role that can delete an alumni *account* (keeping the data record) or bulk-delete logs. |
+| **Admin** | Full CRUD on all data; can import/export Excel; approves/rejects/suspends alumni accounts; manages alumni email. |
+| **Executive** (ผู้บริหาร) | **Read-only everywhere.** Can view, search, filter, sort, and **export** data, but cannot create/edit/delete/import/bulk-delete. Excluded from System Logs, Account Management, and CMU sync. |
 
-> Admins authenticate via **CMU OAuth** only. *(During development/testing, email–password login is used instead for convenience.)*
+> Staff authenticate via **CMU OAuth** (Microsoft Entra ID, PKCE). During development/testing, email–password login is used instead for convenience.
 
 ### 2.2 Alumni Role
 
 | Role | Description |
 |------|-------------|
-| **Alumni** | Logs in with email + password. Can self-register (sign up) by verifying their identity against an existing record, then view and edit their own profile data only. No access to admin pages or other alumni's data. |
+| **Alumni** | Logs in with email + password. Self-registers by signing up (§3.1.2); the account is **not** usable until the graduate verifies email ownership **and** a staff member approves it. An approved alumni can view and edit only their own profile and education records. No access to admin pages or other alumni's data. |
 
-- Alumni are **not** pre-registered by an admin account-wise; instead, an alumni record must already exist in the system (imported/created by an admin), and the alumni **claims** that record by verifying their identity at sign-up (see §3.1.2).
-- Alumni can only view and edit the `Alumni` record linked to them.
+- An alumni record does **not** need to pre-exist for someone to sign up. The graduate enters their identity at sign-up; the system captures a verification snapshot for the staff reviewer, who decides whether to approve (§3.1.3).
+- An alumni can only ever view and edit the `Alumni` record linked to their account.
 
 ---
 
-## 3. Functional Requirements (MVP)
+## 3. Functional Requirements
 
 ### 3.1 Authentication & Login
 
-The login page has **two separate login sections — Admin and Alumni** — and a button to toggle between them.
+The login page has **two sections — Staff and Alumni** — toggled by a pair of tabs. The page auto-switches to the Alumni tab when an alumni-specific link or error brings the user there.
 
-#### 3.1.1 Admin Login
+#### 3.1.1 Staff Login
 
-- Admins use **CMU OAuth** to log in.
-- *(Current/testing mode: email–password login for easier testing.)*
+- Staff use **CMU OAuth** to log in (email–password in testing mode).
 - Access is granted only if the CMU account has been pre-registered by a superadmin/admin.
-- Session-based authentication with HTTP-only cookies (`fon-cmu-session`); sessions expire after 7 days.
-- Write endpoints require a valid admin/superadmin session (`checkWritePermission`).
+- Session-based authentication with HTTP-only cookies (`fon-cmu-session`); sessions expire after **7 days**.
+- Write endpoints require a valid staff (admin/superadmin) session (`checkWritePermission`); the executive role is refused writes.
 
-#### 3.1.2 Alumni Login & Sign-up
+#### 3.1.2 Alumni Sign-up (two-gate)
 
-- Alumni log in using **email and password**.
-- If they have not signed up yet, they can choose to **sign up**. The sign-up form collects:
-  - ชื่อ (first name)
-  - นามสกุล (last name)
-  - รหัสนักศึกษา (student ID)
-  - ปีที่จบ (graduation year)
-  - วันเกิด in `วว/ดด/ปปปป` (DD/MM/YYYY) format
-  - (plus the email + password they will use to log in)
-- The system **verifies** whether the provided data matches a record already in the app.
-- **If the data matches an existing record**, sign-up is **approved automatically** and the alumni is logged in (the account is linked to that record).
-- If no match is found, the alumni is told their data is not in the system and should contact the faculty.
-- Rate limiting is applied to prevent brute-forcing of the verification fields.
+Sign-up has **two sequential gates**: (1) email-ownership verification, then (2) staff approval. There is **no automatic approval and no auto-login** on sign-up.
 
-#### 3.1.3 Alumni First-Login & Terms of Service
+- The sign-up form collects: รหัสนักศึกษา, ปีที่จบ (พ.ศ.), **ระดับการศึกษา** (select), ชื่อ / สกุล (ขณะศึกษา), วันเกิด (`ววปปปป` พ.ศ.), and the email + password the graduate will log in with.
+- Submitting creates an **UNVERIFIED** account and emails a verification link (best-effort; a send failure is logged, not fatal). No session is created and the graduate is **not** logged in.
+- A **verification snapshot** is stored with the account — a field-by-field comparison of the submitted data against the CMU Registrar record (with a local-database fallback when CMU has no record). This drives the staff review modal later.
+- Clicking the verification link flips the account to **PENDING** and it enters the staff approval queue.
+- The graduate may **resend** the verification email while still UNVERIFIED.
 
-- On **first login** (after the alumni's identity is verified/claimed), the alumni is greeted with a **Terms of Service (TOS)** page. The alumni must **agree to the TOS** to use the app; the only other choice is to **logout**.
-- After accepting, subsequent logins skip the TOS.
+#### 3.1.3 Alumni Account Lifecycle & Staff Approval
 
-#### 3.1.4 Alumni Profile (Default Landing)
+Account statuses (enum `AccountStatus`): **UNVERIFIED → PENDING → ACTIVE** (usable) or **REJECTED**. Only **ACTIVE** accounts may log in; the login endpoint returns a structured 403 for UNVERIFIED (offer resend), PENDING (no action offered), and REJECTED (offer re-apply).
 
-- After logging in (and accepting the TOS), the alumni lands on their **personal profile page**.
-- The profile is **auto-filled** from the linked record (data linking across pages), and the alumni is **notified that the data has been auto-filled**.
-- The profile page has **view mode** and **edit mode**.
-- **First-time data-found notice:** if the alumni's record already existed in the system, a modal notifies them to review/edit the auto-filled data:
-  > "พบข้อมูลของท่านในระบบแล้ว กรุณาตรวจสอบและแก้ไขข้อมูลตามต้องการ"
-- **Admin-edit notification:** if an admin has edited the profile since the alumni's last login (tracked via `adminEditedAt`), a modal appears on next login (presented as a popup on the alumni side informing them their data was edited by an admin):
-  > "ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน กรุณาตรวจสอบความถูกต้อง หากไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ"
+- **Approve** (PENDING/REJECTED → ACTIVE): creates the deferred `Education`/primary-degree records, sends an approval email.
+- **Reject** (→ REJECTED): **requires a reason**; sends a rejection email containing the reason and a re-apply link. Re-approvable.
+- **Re-verify** (staff action): re-fetches the CMU record and refreshes the verification snapshot.
+- **Re-apply** (graduate action, REJECTED → PENDING): the graduate re-proves identity with email + password (email was already verified, so no re-verification); a corrected application re-enters the queue.
+- **Forgot / reset password**: a 1-hour token is emailed to ACTIVE or REJECTED (non-suspended) accounts; resetting invalidates prior tokens and forces re-login.
+- **Suspend**: toggles suspension and kills the account's active sessions.
+- **Delete account** (superadmin only): nulls the login credentials but **keeps the data record** (`studentId`/name/education untouched) so the graduate can sign up again to re-test the signup email.
 
-**Profile sections** — sections with no data are hidden:
+#### 3.1.4 First Login & Terms of Service
 
-| Section | Fields |
-|---------|--------|
-| ข้อมูลส่วนตัว | คำนำหน้า, ชื่อ, นามสกุล, วันเกิด, ที่อยู่ |
-| ข้อมูลการติดต่อ | อีเมล, เบอร์โทรศัพท์ |
-| ข้อมูลการศึกษา | Grouped into subsections by ระดับการศึกษา (one per degree studied at FON CMU). Fields per subsection: รหัสนักศึกษา, รุ่น, สาขาวิชา, ระดับการศึกษา |
-| ข้อมูลรางวัล *(hidden if empty)* | Table: ชื่อรางวัล, ประเภท, ลิงค์, รูปภาพ, รายละเอียด |
-| ข้อมูลศักยภาพ *(hidden if empty)* | อาชีพ, ตำแหน่ง, หมายเหตุ |
-| ข้อมูลสมาคม/ชมรม *(hidden if empty)* | ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก, หมายเหตุ |
-| ข้อมูลดำรงตำแหน่งกรรมการบัณฑิต *(hidden if empty)* | ปีพ.ศ., รุ่นที่ *(graduate-committee-exclusive cohort)*, ตำแหน่ง, หมายเหตุ |
-| ข้อมูลการเป็นผู้แทนรุ่น *(hidden if empty)* | เครือข่าย, รุ่นที่ *(model-representative-exclusive cohort)*, หมายเหตุ |
-| ข้อมูลการทำงาน *(hidden if empty)* | ชื่ออังกฤษ, ประเทศ, สถานที่ทำงาน, ที่อยู่บ้าน, หมายเหตุ |
+- On **first entry** to the alumni portal (before `tosAcceptedAt` is set), the layout redirects to a **Terms of Service (TOS)** page. The graduate must **accept** to continue; the only other choice is to **log out**.
+- After accepting (and on subsequent logins), the alumni lands on **`/graduates/news`** (the news page), not the profile. The profile is reached from the sidebar.
 
-- Editable by alumni: prefix, firstName, lastName, cohort, degreeLevel, major, email, phone, currentWorkplace, country, etc.
-- **Not** editable by alumni: `studentId`, `birthDate`, `citizenId` (read-only).
-- **Self-edit Reason field:** every alumni profile edit requires the alumni to choose a **Reason** from [แก้ไขให้ถูกต้อง, อัปเดตข้อมูล] for logging (no default value).
-- All alumni edits are written to the `ActivityLog`; admins can filter logs to alumni-only activities.
+#### 3.1.5 Alumni Profile
 
-### 3.2 Admin Main Page (หน้าหลัก) — Dashboard
+- The profile has **view** and **edit** modes. View order is three sections plus up to six related sections (empty sections are hidden):
+  1. **ข้อมูลส่วนตัว** — คำนำหน้า, ชื่อ, นามสกุล, วันเกิด (`วว/ดด/ปปปป` พ.ศ.)
+  2. **ประวัติการศึกษา** — one card per FON degree (§3.22), with the **primary (highest) degree badged**; each card offers a "ดึงจากทะเบียน" CMU lookup when adding/editing.
+  3. **ข้อมูลติดต่อ** — อีเมล (เข้าสู่ระบบ), อีเมลติดต่อ, เบอร์โทรศัพท์, ที่อยู่ปัจจุบัน (`homeAddress`)
+  4. Related sections (when non-empty): รางวัล, สมาคม/ชมรม, กรรมการบัณฑิต, ศักยภาพ, ผู้แทนรุ่น, ข้อมูลการทำงานศิษย์เก่า.
+- **Editable** by the alumni: prefix, firstName, lastName, cohort, degreeLevel, email (login), contactEmail, phones, homeAddress, and the related sections (including alumni-agency abroad fields) and education records.
+- **Read-only**: `studentId`, `citizenId`, `birthDate` (shown in a "cannot edit" block).
+- **First-time data-found modal**: if the alumni's record already existed, a modal on first visit prompts them to review the auto-filled data ("พบข้อมูลของท่านในระบบแล้ว กรุณาตรวจสอบและแก้ไขข้อมูลตามต้องการ").
+- **Admin-edit notification modal**: if a staff member edited the profile since the alumni's last login (tracked via `adminEditedAt`), a modal appears on next visit ("ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน …").
+- **Self-delete**: the alumni may delete their own record from a danger-zone action (logs out to the login page).
+- All alumni edits are written to the activity log.
 
-- Route: `/`
-- A dashboard that displays a summarized card view for each of the other admin pages.
-- **All-alumni summary:** a **line graph** with X-axis = cohort (รุ่น) and Y-axis = alumni count, with **5 lines** grouped by degree level, in this order:
-  1. หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล
-  2. อนุปริญญา
-  3. ปริญญาตรี
-  4. ปริญญาโท
-  5. ปริญญาเอก
-  - Plus **5 mini cards** showing each group's count, ordered the same as above.
-- **Awards summary:** the page name + record counts grouped by award type [ระดับท้องถิ่น, ระดับชาติ, ระดับนานาชาติ].
-- **Other pages (excluding news):** the page name + the total record count.
-- **Latest news section:** the 3 latest published news items.
+### 3.2 Dashboard (แผงควบคุม)
+
+- Route: **`/management/dashboard`** (also reached from `/` and `/management`, which redirect here).
+- A summarized overview, top-to-bottom:
+  1. **CMU-not-synced banner** — when the registrar cache is empty, an amber banner notes that counts reflect only locally-recorded alumni and links to the CMU sync page (§3.19).
+  2. **Pending-accounts banner** — pills for รออนุมัติ / ใช้งาน / ปฏิเสธ counts, linking to the account-management page filtered to pending.
+  3. **Alumni-count card** — total alumni count + **5 degree-level mini-cards** + a **line chart** (X-axis = **ปีที่จบ / graduation year**, Y-axis = count; one line per degree level, in the standard order).
+  4. **Awards card** — total + 3 award-type mini-cards (ระดับท้องถิ่น / ระดับชาติ / ระดับนานาชาติ).
+  5. **Five count cards** — ศักยภาพ, สมาคม/ชมรม, กรรมการบัณฑิต, ผู้แทนรุ่น, ข้อมูลการทำงานศิษย์เก่า.
+  6. **Latest news** — the 3 most recent published news.
+- **Counting invariant:** each **person** is counted **once**, under their **highest** degree, by merging CMU Registrar records with local records. Dashboard counts, the all-alumni table totals, and the filter facets therefore reconcile.
 
 ### 3.3 All-alumni Page (ข้อมูลนักศึกษาเก่า)
 
-- Route: `/alumni-count` (all-alumni data table)
-- Table columns: รหัสนักศึกษา, รุ่น, คำนำหน้า, ชื่อ, นามสกุล, ระดับการศึกษา, สาขาวิชา, ปีสำเร็จการศึกษา, วันเกิด (`วว/ดด/ปปปป`), หมายเหตุ
-- **Filters:** ระดับการศึกษา, สาขาวิชา, ปีที่สำเร็จการศึกษา
-- *(Note: the dashboard's line graph + 5 mini count cards also live on the dashboard, see §3.2.)*
-- **Row click:** clicking a row opens that alumni's profile view (§3.18). Manage rows link by alumni id; View (CMU) rows link by `student_id` (the profile shows "ไม่พบข้อมูลศิษย์เก่า" if the alumni isn't in the local DB yet).
+- Route: **`/management/all-alumni`** (the dashboard's graph lives on the dashboard, not here).
+- Table columns (order): ลำดับ · รหัสนักศึกษา · รุ่น · คำนำหน้า · ชื่อ · นามสกุล · ระดับการศึกษา · สาขาวิชา · ปีสำเร็จการศึกษา · วันเกิด · อีเมลติดต่อ · เบอร์โทร · ที่อยู่ปัจจุบัน · หมายเหตุ · (จัดการ, write-only).
+- **Filters:** ระดับการศึกษา, สาขาวิชา, ปีที่สำเร็จการศึกษา. Plus a search box (submit on Enter) and a **dedupe toggle**: แสดงวุฒิสูงสุด (one row per person, highest degree) ↔ แสดงทุกวุฒิ (one row per degree).
+- **Row click** opens that alumni's profile view (§3.18). Rows whose only source is the CMU cache are edited/deleted by creating a local override (the studentId is locked on those rows).
+- **Create** opens the full-form at `/management/new-alumni`. **Import / range-export / bulk-select** as in §3.11.
 
 ### 3.4 Awards Page (รางวัล)
 
-- Route: `/awards`
-- **3 cards** displaying counts of each award type [ระดับท้องถิ่น, ระดับชาติ, ระดับนานาชาติ].
-- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ชื่อรางวัล, ประเภท, ลิงค์, รูปภาพ, รายละเอียด
-- **Image upload:** `.jpg` and `.png` only, max **5 MB**.
-- **Filters:** สาขาวิชา, ประเภท
+- Route: **`/management/awards`**. Three cards show counts per award type [ระดับท้องถิ่น, ระดับชาติ, ระดับนานาชาติ].
+- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ชื่อรางวัล, ประเภท, ลิงค์, รูปภาพ, รายละเอียด.
+- **Image upload:** PNG/JPG only, max **5 MB** (§3.23). **Filters:** สาขาวิชา, ประเภท.
 
 ### 3.5 Potentials Page (ศักยภาพ)
 
-- Route: `/potentials`
-- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, อาชีพ, ตำแหน่ง, ปีที่บันทึก, หมายเหตุ
-- **Filters:** สาขาวิชา, อาชีพ, ตำแหน่ง, ปีที่บันทึก
+- Route: **`/management/potentials`**.
+- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, อาชีพ, ตำแหน่ง, ปีที่บันทึก, หมายเหตุ.
+- **Filters:** สาขาวิชา, อาชีพ, ตำแหน่ง, ปีที่บันทึก.
 
 ### 3.6 Association / Club Page (สมาคม/ชมรม)
 
-- Route: `/associations`
-- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก, หมายเหตุ
-- **Filters:** ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก, สาขาวิชา
+- Route: **`/management/associations`**.
+- Table columns: รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก, หมายเหตุ.
+- **Filters:** ชื่อสมาคม/ชมรม, ตำแหน่ง, ปีที่บันทึก, สาขาวิชา.
 
 ### 3.7 Graduate Committee Page (กรรมการบัณฑิต)
 
-- Route: `/graduate-committee`
-- Table columns: ปีพ.ศ., รุ่นที่ *(graduate-committee-exclusive cohort value)*, รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ตำแหน่ง, หมายเหตุ
-- **Filters:** ปีพ.ศ., รุ่นที่ *(graduate-committee-exclusive cohort value)*, ตำแหน่ง, สาขาวิชา
+- Route: **`/management/graduate-committee`**.
+- Table columns: ปีพ.ศ., รุ่นที่, รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, ตำแหน่ง, หมายเหตุ.
+- **Filters:** ปีพ.ศ., รุ่นที่, ตำแหน่ง, สาขาวิชา.
 
 ### 3.8 Model Representative Page (ผู้แทนรุ่น)
 
-- Route: `/model-representatives`
-- Table columns: เครือข่าย, รุ่นที่ *(model-representative-exclusive cohort value)*, รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, หมายเหตุ
-- **Filters:** เครือข่าย, รุ่นที่ *(model-representative-exclusive cohort value)*, สาขาวิชา
+- Route: **`/management/model-representatives`**.
+- Table columns: เครือข่าย, รุ่นที่, รหัสนักศึกษา, สาขาวิชา, คำนำหน้า, ชื่อ, นามสกุล, หมายเหตุ.
+- **Filters:** เครือข่าย, รุ่นที่, สาขาวิชา.
+- **Field mapping (differs from sibling entities):** เครือข่าย → `cohort`, รุ่นที่ → `generation`, สาขา → `major`. The เครือข่าย is one of 5 fixed networks: ปริญญาพยาบาล, ผู้ช่วยพยาบาล, อนุปริญญาพยาบาล, ปริญญาโท, ปริญญาเอก.
+
+#### 3.4–3.8 shared behavior
+
+- Each related row carries a `studentId` foreign key to an alumni. When an import references a studentId that has no alumni yet, the id is parked in `pendingStudentId` and the row shows an amber **รอเชื่อมโยง** badge; it is **auto-linked** to the alumni once that alumni becomes canonical (created/approved/primary-degree changed). A toggle filters to unlinked rows only.
+- In create/edit forms, entering รหัสนักศึกษา / ชื่อ / นามสกุล triggers an auto-fill dropdown that links the row to an alumni.
 
 ### 3.9 Alumni-Agency Page (ข้อมูลการทำงานศิษย์เก่า)
 
-- Route: `/alumni-agency`
-- A **toggle** between two modes: **Thailand** and **Abroad**. Both modes share the same columns; **Abroad mode adds ประเทศ (country)**.
-- **Thailand mode** — table of alumni and the domestic agency they work at:
-  - รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, สถานที่ทำงาน, ที่อยู่บ้าน, หมายเหตุ
-- **Abroad mode** — table of alumni working abroad:
-  - รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, ประเทศ, สถานที่ทำงาน, ที่อยู่บ้าน, หมายเหตุ
-- **Filters:** สถานที่ทำงาน, ประเทศ *(Abroad mode only)*
+- Route: **`/management/alumni-agency`**.
+- A **Thailand / Abroad toggle** over a **single model** (`AlumniAgency`) split by `country`: a Thailand-valued country → in-country tab; everything else → abroad tab. (The in-country tab is **not** the `alumni` table.)
+- Both tabs have full CRUD + import/export + selection. Shared columns: รหัสนักศึกษา, รุ่น, สาขาวิชา, คำนำหน้า, ชื่อ-นามสกุล, ชื่ออังกฤษ, สถานที่ทำงาน, ตำแหน่ง, ที่อยู่บ้าน, หมายเหตุ. **Abroad** also shows **ประเทศ**; **Thailand** shows **จังหวัด** (required, chosen from the 77 provinces).
+- **จังหวัด** is required for in-country rows and hidden for abroad; **ประเทศ** is shown for abroad and defaulted/hidden for in-country; **ตำแหน่ง** is optional on both.
+- **Filters:** สถานที่ทำงาน (both), ประเทศ (abroad only).
+- **`homeAddress` (ที่อยู่บ้าน) is unified** with `Alumni.homeAddress` (ที่อยู่ปัจจุบัน): the alumni's home address is the single source of truth; all of a person's linked agency rows reflect it. Editing either side shows on the all-alumni table, the alumni-agency table, and the profile.
+- Unlinked rows show the รอเชื่อมโยง badge as in §3.4–3.8.
 
 ### 3.10 Filters (Behavior)
 
-- **Non-number filters** (e.g. สาขาวิชา, อาชีพ, ตำแหน่ง, ชื่อสมาคม/ชมรม, เครือข่าย): display filter value choices for the user to pick. Show the **5 most frequent values** (by record count) in **descending order**, in a paginated dropdown where the user can click to see more choices.
-- **Number filters** (e.g. ปีที่บันทึก, ปีที่สำเร็จการศึกษา): behave as above, but instead of "5 most frequent", they list the **years in descending order**.
+- **Non-number filters** (สาขาวิชา, อาชีพ, ตำแหน่ง, ชื่อสมาคม/ชมรม, เครือข่าย, etc.): a single scrollable panel listing **all** values, ordered by **record count descending** (ties broken alphabetically, Thai collation). The panel has its own search box to narrow the list. (Not a top-5 list, not paginated.) Each value shows a count badge.
+- **Number/year filters** (ปีที่บันทึก, ปีที่สำเร็จการศึกษา, ปีพ.ศ., etc.): values listed **descending**; no count badge.
+- Alumni facets merge CMU Registrar data with local records.
 
-### 3.11 Management Mode (CRUD)
+### 3.11 Table CRUD & Selection
 
-Each admin page that displays alumni data has a **management mode toggle**. After toggling into management mode, the admin can:
+Each admin data table is a **single CRUD-always-on surface** (there is no separate "management mode" toggle). Write affordances are gated on the staff role — the executive role sees them hidden and is refused by the server.
 
-- Choose to **add a record**, **import records**, or **export records**.
-- The table remains visible; the admin can **edit** a record, **delete** a record, or **select multiple records** to delete.
-- **Edit Reason field:** editing a record requires the admin to choose a **Reason** from [แก้ไขให้ถูกต้อง, อัปเดตข้อมูล] (no default value, to prevent false logs). The reason is recorded with the activity-log entry.
-- **Delete is a soft delete** — the record is marked deleted and the deletion is logged for a **superadmin to confirm**. The superadmin can then **restore** the record or **hard-delete** it (hard delete requires an additional confirmation to avoid accidental permanent deletion).
-- **Add a record** toggles a **modal form** to create a record.
-  - The **All-alumni page** shows a **full-form**: the admin can also **optionally add additional data for the other pages** at the same time, so creating one record here can affect other pages too (every page except news).
-  - For **other pages** (except all-alumni and news), entering values for **รหัสนักศึกษา, ชื่อ, นามสกุล** triggers a **dropdown** that auto-fills the form and **links the data to an alumni record**. The dropdown displays the values in order: **รหัสนักศึกษา, ชื่อ, นามสกุล**.
+- Available actions: **add** a record, **edit** a record, **delete** (soft delete), **import** Excel, **export** Excel (with an optional row range), and **bulk-delete** by selection.
+- **Add a record** opens a modal form. On the all-alumni page this is a **full-form** (at `/management/new-alumni`) that can also add related data for the other pages in one save. On the other pages, entering รหัสนักศึกษา/ชื่อ/นามสกุล triggers the alumni auto-fill/link dropdown.
+- **Delete is a soft delete** — the record is marked deleted and logged for a superadmin to confirm. The superadmin can **restore** or **hard-delete** (with extra confirmation) from the Trash Bin (§3.15). *(Exception: deleting news sets its status to ยุติการเผยแพร่ and is not trash-recoverable.)*
+- **Selection is opt-in and checkbox-free:** a "เลือก" button enters select mode (clicking rows toggles selection with an orange highlight and pauses row navigation); "เสร็จสิ้น" exits and clears. Selection is **global across pages** (it accumulates as the user pages around).
 
-### 3.12 News Page
+### 3.12 News Page (ข่าวสาร)
 
-- Route: `/news`
-- **Access:** viewable only by **logged-in staff and alumni** (alumni see it read-only at `/alumni/news`, §3.17). **Not** accessible to anonymous/visitor traffic — there is no public news page.
-- Displays **published** news cards, ordered by **published date** from latest to oldest.
-- Each news card can be clicked to see the details (at `/news/[id]`).
-- **3 news statuses** used to create and filter news:
-  1. ฉบับร่าง (draft)
-  2. เผยแพร่ (published)
-  3. ยุติการเผยแพร่ (discontinued/archived)
-- **Pagination:** each page shows **at most 9 news cards**.
-- **Management mode** does **not** turn the cards into a table. Instead, it adds an **edit** button (to edit the news) and a **delete** button (which changes the news status to **ยุติการเผยแพร่**).
-- **News form:** a **WYSIWYG** editor to customize the news display.
-  - Can upload a **thumbnail** image and **in-news images (max 4 images)**.
-  - Each image: max **5 MB**, `.png` or `.jpg` only.
+- Route: **`/management/news`**. Viewable by **logged-in staff and alumni** (alumni see it read-only at `/graduates/news`, §3.17); not accessible anonymously.
+- Displays published news cards, newest first. Clicking a card opens the detail at `/news/[id]`. **9 cards per page.**
+- **3 statuses:** ฉบับร่าง (draft), เผยแพร่ (published), ยุติการเผยแพร่ (discontinued). The create/edit form offers only ฉบับร่าง/เผยแพร่; ยุติการเผยแพร่ is reached via the dedicated ยุติ action (and "delete" means setting this status — there is no hard delete and it is not trash-recoverable).
+- **Pinned news ("ประชาสัมพันธ์สำคัญ"):** a pinned item appears in a top-of-page section on both the staff and alumni news pages. Admins pin/unpin per published card and via bulk-pin (which toggles each selected published item). Only **published** news can be pinned; discontinuing clears the pin.
+- **Bulk actions:** bulk-publish, bulk-pin (toggle), bulk-delete (→ discontinued). Selection on the news page is **status-locked** (one status at a time); pin/unpin keeps the selection, while publish/discontinue clears it.
+- **News form / body editor:** a **Tiptap** WYSIWYG editor (bold/italic/underline/strike, H1–H3, bullet/numbered lists, 4-way alignment, link, text color, highlight, undo/redo, clear-formatting; live character/word count). A **cover/thumbnail image** is uploadable (drag-drop / click / paste, with crop+resize). There is **no inline in-news image upload** (legacy inline images in old bodies still render).
+- Each image upload: PNG/JPG only, max **5 MB** (§3.23).
 
 ### 3.13 Pagination
 
 - Each data table displays a **maximum of 10 records per page**.
-- *(News cards: maximum 9 per page, see §3.12.)*
+- *Exceptions:* news cards = 9 per page (§3.12); the system-logs table = 20 per page.
 
 ### 3.14 Sorting
 
-- Every data-field column header on every table can be clicked to **sort by that field**, toggling the sort style between **ascending** and **descending**.
+- Every sortable column header can be clicked to sort by that field, toggling ascending/descending.
 
-### 3.15 Admin Account Management System
+### 3.15 Settings
 
-Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation (left navbar) with the following pages:
+Reached via the settings navigation:
 
-- **My Account** — displays the logged-in admin's ชื่อ, นามสกุล, CMU account, ตำแหน่ง (role).
-- **Account Management** — manage admin and alumni accounts.
-- **System Logs** — activity logs (see §3.16).
-- **Trash Bin** *(superadmin exclusive)* — review/confirm/restore/hard-delete soft-deleted records (see §3.11).
+- **ข้อมูลส่วนตัว** (`/management/settings/profile`) — the logged-in staff member's name, email/CMU account, and role.
+- **จัดการผู้ใช้งาน** (`/management/settings/users`, admin+superadmin) — two tabs:
+  - **บัญชีผู้ดูแลระบบ** (staff accounts): columns ชื่อ-นามสกุล, วันที่เพิ่ม, ตำแหน่ง. Create/edit (firstName/lastName/email/role). **Suspend** is superadmin-only.
+  - **บัญชีศิษย์เก่า** (alumni accounts): columns รหัสนักศึกษา, ชื่อ-สกุล, รุ่นที่, ระดับปริญญา, สถานะ, อีเมล, เบอร์โทรศัพท์, เข้าสู่ระบบล่าสุด. Statuses shown are **PENDING / ACTIVE / REJECTED** (UNVERIFIED is excluded — it's a transient pre-verification state). Per-row actions: a **review modal** (the verification snapshot comparison + prior rejection history; **approve / reject [requires a reason] / re-verify**), **change email**, **suspend**, and (superadmin-only) **delete account** (keeps the data record, §3.1.3). Searching, a status filter, and pagination are provided; a pending-count banner deep-links from the dashboard.
+- **บันทึกกิจกรรม** (`/management/settings/logs`, admin+superadmin) — System Logs (§3.16).
+- **การดึงข้อมูล** (`/management/settings/cmu-sync`, admin+superadmin) — CMU Registrar sync (§3.19).
+- **รายการที่ถูกลบ** (`/management/settings/trash`, superadmin only) — Trash Bin: review/restore/hard-delete soft-deleted records (§3.11).
 
-#### Account Management
-
-- **Admin/Executive accounts table:** ชื่อ, นามสกุล, CMU acc, ตำแหน่ง. A **superadmin** can **suspend** admin accounts.
-- **Alumni accounts table:** รหัสนักศึกษา, รุ่น, ชื่อ, นามสกุล, วันเกิด, อีเมล. Searchable, paginated.
-  - Admins can click an **eye icon** on an alumni row to **view the alumni profile** (full detail at `/settings/alumni/[id]`).
-  - Admins can **change an alumni's email** (e.g., forgotten email).
-  - Admins can **edit alumni profile data** with an additional **Reason field** [แก้ไขให้ถูกต้อง, อัปเดตข้อมูล] for logging; admins can edit the same fields the alumni can edit, plus `citizenId`/`birthDate` which only admins can edit. Saving sets `adminEditedAt`, which triggers the admin-edit popup on the alumni's next login (§3.1.4).
-  - Admins can **suspend alumni accounts**.
+> Alumni profile data is edited at **`/management/alumni/[id]`** (§3.18), reached by clicking an ACTIVE alumni row — there is no longer a separate `/settings/alumni/[id]` page.
 
 ### 3.16 System Logs
 
-- Logs every action in a table with columns: ชื่อ, นามสกุล, ตำแหน่ง (role), กิจกรรม, รายละเอียด.
-- **กิจกรรม (activity) types:** create, edit, update, import, export, delete, suspend.
-- **รายละเอียด (details):** an **eye icon** opens a modal explaining the changes (e.g., editing first name: สมศักดิ์ → สมศรี).
-- **Update indicators (orange values):** when a record's data is **updated**, each admin alumni-data page also logs the update. If a change affects every page (e.g., updating first or last name), it is logged on **every** page. The updated value is rendered in **orange and is clickable**; clicking opens a modal showing the **update history** (old value, new value, update date).
-- Supports filtering to alumni-only activities.
+- Logs every action in a table: ชื่อ นามสกุล, ตำแหน่ง (role), กิจกรรม, รายละเอียด. 20 rows per page.
+- **กิจกรรม (activity) types:** เพิ่ม (CREATE), แก้ไข (UPDATE), ลบ (DELETE), ลบหลายรายการ (BULK_DELETE), นำเข้า (IMPORT), ส่งออก (EXPORT), กู้คืน (RESTORE), ลบถาวร (HARD_DELETE), สมัครสมาชิก (SIGNUP), อนุมัติ (APPROVE), ปฏิเสธ (REJECT), ยื่นคำขอใหม่ (REAPPLY), ยืนยันตัวตน (VERIFY_IDENTITY), ขอรีเซ็ตรหัสผ่าน (PASSWORD_RESET_REQUEST), รีเซ็ตรหัสผ่าน (PASSWORD_RESET_COMPLETE), ยืนยันอีเมล (EMAIL_VERIFY), ส่งอีเมลยืนยัน (EMAIL_VERIFY_REQUEST), เชื่อมโยงรายการที่ค้างอยู่ (LINK), ระงับ (SUSPEND).
+- **รายละเอียด (details):** an eye icon opens a modal explaining the change (field-level old/new values; for imports, a searchable per-record list of created/updated/failed rows).
+- **Update indicators (orange values):** when a record's data is updated, each admin alumni-data page reflects it. If a change affects every page (e.g. first/last name), it shows on **every** page. The updated value renders in **orange and is clickable**; clicking opens the per-field **update history** (old → new, who, when). Indicators cover both staff edits (`alumni`) and alumni self-edits (`alumni_profile`).
+- Supports filtering to alumni-only activities. Superadmin-only: bulk **hard-delete** of log entries (which is deliberately not itself logged).
 
 ### 3.17 Alumni News Page
 
-- Alumni can **view news** created by admins (published news cards, same display as the admin news page), but cannot create or edit news.
+- Alumni view published news created by staff (same card display as the staff news page, plus the pinned "ประชาสัมพันธ์สำคัญ" section), but cannot create, edit, pin, or delete news. Reached at `/graduates/news` and `/graduates/news/[id]`.
 
 ### 3.18 Admin Alumni Profile View
 
-- Route: `/management/alumni/[id]` — the route param accepts the alumni UUID **or** `studentId`.
-- **Entry:** reached by **clicking any row** in the all-alumni table and every alumni-related table (alumni-agency, awards, associations, graduate-committee, model-representatives, potentials). Clicks on a checkbox, edit/delete button, an orange value, or a link/image inside a row do not navigate.
-- **Layout** mirrors the alumni-portal profile page: ข้อมูลพื้นฐาน / ข้อมูลติดต่อ / ข้อมูลการทำงาน + related sections (รางวัล, สมาคม/ชมรม, กรรมการบัณฑิต, ศักยภาพ, ผู้แทนรุ่น, ข้อมูลการทำงานศิษย์เก่า).
-- **Orange edit-history indicators:** core fields changed by an admin (`resourceType: alumni`) **or** by the alumni themselves (`resourceType: alumni_profile`) render orange; clicking opens the per-field edit-history modal (old → new, who, when, reason).
-- **Edit mode** (roles with write permission): edits core fields + the 5 related sections via `PUT /api/alumni/update-with-related/[id]` (requires เหตุผลในการแก้ไข; sets `adminEditedAt`). ข้อมูลการทำงานศิษย์เก่า is view-only here (the route does not persist it).
-- **ประวัติการเปลี่ยนแปลง toggle:** switches the page to a merged change timeline — field-change history (alumni core `alumni`/`alumni_profile` + this alumni's related rows) ∪ activity-log events for the alumni; newest first (see §9.3 `/api/alumni/[id]/activity`).
+- Route: **`/management/alumni/[id]`** — the param accepts the alumni UUID **or** `studentId`.
+- **Entry:** reached by clicking any row in the all-alumni table and every alumni-related table. Clicks on an edit/delete button, an orange value, a checkbox, or a link/image inside a row do not navigate.
+- **Layout** mirrors the alumni-portal profile (§3.1.5): ข้อมูลส่วนตัว / ประวัติการศึกษา / ข้อมูลติดต่อ + the 6 related sections.
+- **Orange edit-history indicators:** fields changed by staff (`resourceType: alumni`) **or** by the alumni themselves (`resourceType: alumni_profile`) render orange; clicking opens the per-field history (old → new, who, when).
+- **Edit mode** (roles with write permission): edits core fields + **5 related sections** (awards, associations, graduate-committee, potentials, model-representatives) via the full-form save; **ข้อมูลการทำงานศิษย์เก่า is view-only here**. Saving sets `adminEditedAt` (which triggers the alumni-side admin-edit modal).
+- **ประวัติการเปลี่ยนแปลง toggle:** switches the page to a merged change timeline — field-change history (alumni core + this alumni's related rows) ∪ activity-log events; newest first.
+
+### 3.19 CMU Registrar Materialization & Sync
+
+- The FON graduate universe is **materialized locally** (the `cmu_graduates` table — one row per registrar degree record, keyed by `studentId`) and **refreshed on demand** by staff from **การดึงข้อมูล** (`/management/settings/cmu-sync`). This local cache is the source for the all-alumni table, the dashboard person counts, the filter facets, and identity checks.
+- The sync page **auto-compares** the local cache vs the live registrar on load (counts + new/removed samples), offers a **ดึงข้อมูล** button to upsert the full remote set, and shows two read-only comparison tables: ข้อมูลในระบบ (local cache) vs ข้อมูลล่าสุดจากทะเบียน (live, with cache-missing rows badged ใหม่).
+- Until the first sync, the dashboard shows an amber "ยังไม่ได้ดึงข้อมูล CMU" banner and counts degrade to local-only.
+
+### 3.20 Alumni-Activity Analytics
+
+- Route: **`/management/alumni-activity`** (nav label สถิติการเข้าใช้). Read-only engagement stats.
+- **3 KPI cards:** บัญชีศิษย์เก่าทั้งหมด (with active/pending/rejected pills), ศิษย์เก่าที่ใช้งานเดือนนี้ (distinct alumni who logged in this month), การเข้าสู่ระบบเดือนนี้ (login events this month).
+- **2 trailing-12-month line charts** (one line per degree level): จำนวนศิษย์เก่าที่ใช้งานต่อเดือน, and จำนวนการเข้าสู่ระบบต่อเดือน (X-axis = Thai month + Buddhist-era year).
+- **Engagement recency:** logged-in within 7 days, within 30 days, and suspended count.
+
+### 3.21 Email Notifications
+
+- The system emails graduates for: signup verification, password reset, and signup approved/rejected (the rejection email includes the reason and a re-apply link).
+- Mail is sent through the **CMU Email API** (a two-step OAuth token flow → send). Bodies are **plain text with raw URLs** (the relay treats `message` as text, so HTML/tags render literally — no styled buttons). Sends are best-effort: a delivery failure is logged, not surfaced as an error to the user.
+
+### 3.22 Education & Primary Degree
+
+- An alumni's FON degrees are stored one row per degree (`Education`: studentId, degreeLevel, graduationYear, major, cohort, and the name at study time).
+- The **primary degree** is the **highest** level (auto-derived, never set by hand) and is mirrored as a denormalized snapshot on the `Alumni` record; the 6 related tables and the all-alumni table join on it. Adding/editing/deleting any degree re-derives the primary.
+- A new degree is validated for identity (its CMU birthday must match the alumni's) and must not already belong to another alumni; a CMU lookup pre-fills and warns before save.
+
+### 3.23 Image Upload
+
+- A single upload endpoint accepts one image at a time: **PNG/JPG only** (validated by file signature, not the reported type), **max 5 MB**, stored under `public/uploads/` with a generated filename. Requires a write-permission staff session. Used by the news cover image and the awards image fields.
 
 ---
 
 ## 4. Access Control Summary
 
-### 4.1 Admin Access
+### 4.1 Staff Access
 
 | Feature | Superadmin | Admin | Executive |
 |---------|-----------|-------|-----------|
 | View all pages | ✓ | ✓ | ✓ |
-| Search / filter / sort data | ✓ | ✓ | ✓ |
+| Search / filter / sort | ✓ | ✓ | ✓ |
 | Export `.xlsx` | ✓ | ✓ | ✓ |
-| Create / Edit / Delete records (soft delete) | ✓ | ✓ | ✗ |
-| Import `.xlsx` | ✓ | ✓ | ✗ |
-| Confirm/restore/hard-delete soft-deleted records | ✓ | ✗ | ✗ |
-| Manage user accounts | ✓ | ✓ | ✗ |
-| Suspend admin accounts | ✓ | ✗ | ✗ |
-| Suspend alumni accounts | ✓ | ✓ | ✗ |
-| View/edit alumni profiles (from account management) | ✓ | ✓ | ✗ |
+| Create / Edit / Delete (soft delete) | ✓ | ✓ | ✗ |
+| Import `.xlsx` / Bulk-delete | ✓ | ✓ | ✗ |
+| Approve / reject / suspend alumni accounts | ✓ | ✓ | ✗ |
+| Delete an alumni *account* (keep data) | ✓ | ✗ | ✗ |
+| Confirm/restore/hard-delete soft-deleted records (Trash) | ✓ | ✗ | ✗ |
+| Manage staff accounts; suspend staff | ✓ | ✗ | ✗ |
+| Bulk hard-delete logs | ✓ | ✗ | ✗ |
+| Access System Logs / Account Mgmt / CMU sync | ✓ | ✓ | ✗ |
 | View alumni activity logs / filter to alumni-only | ✓ | ✓ | ✓ |
 
 ### 4.2 Alumni Access
 
 | Feature | Alumni |
 |---------|--------|
-| Sign up (verify identity against existing record) | ✓ |
-| View / edit own profile | ✓ |
+| Sign up (verify email, then await staff approval) | ✓ |
+| View / edit own profile + education | ✓ |
+| Re-apply after rejection; forgot/reset password | ✓ |
 | View other alumni's data | ✗ |
-| Access admin pages | ✗ |
+| Access staff pages | ✗ |
 | Import / Export | ✗ |
-| Manage user accounts | ✗ |
+| Manage accounts | ✗ |
 
 ---
 
 ## 5. Data Model
 
-> **Note:** Several fields/enum values below reflect the revised spec (§3). They imply schema migrations beyond what is currently implemented (e.g. 5 degree levels, 3 news statuses, `major`/`graduationYear`/`password` on Alumni). See the schema in `prisma/schema.prisma` for current state.
+> Entity-level overview with key fields and relationships. The authoritative, exhaustive column list (types, nullability, indices) is `prisma/schema.prisma`.
 
 ### Enums
 
@@ -296,186 +313,48 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 | **DegreeLevel** | NURSING_ASSISTANT (หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล), ASSOCIATE (อนุปริญญา), BACHELOR (ปริญญาตรี), MASTER (ปริญญาโท), DOCTORAL (ปริญญาเอก) |
 | **AwardType** | LOCAL (ระดับท้องถิ่น), NATIONAL (ระดับชาติ), INTERNATIONAL (ระดับนานาชาติ) |
 | **NewsStatus** | DRAFT (ฉบับร่าง), PUBLISHED (เผยแพร่), DISCONTINUED (ยุติการเผยแพร่) |
-| **UserRole** | SUPERADMIN, ADMIN, EXECUTIVE |
+| **AccountStatus** | UNVERIFIED, PENDING, ACTIVE, REJECTED (alumni account lifecycle, §3.1.3) |
 | **SessionType** | ADMIN, ALUMNI |
+| **ActorType** | ADMIN, ALUMNI, SYSTEM |
 
 ### Alumni
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| studentId | String | Unique |
-| citizenId | String? | Thai national ID (13 digits). Unique if provided. |
-| birthDate | String? | Birthday `วว/ดด/ปปปป` / `DDMMYYYY`. Read-only for alumni. Used for sign-up verification. |
-| email | String? | Login email for alumni |
-| passwordHash | String? | Hashed login password for alumni (spec — pending schema) |
-| prefix | String | นางสาว, นาง, นาย, ดร., อื่นๆ |
-| firstName | String | ชื่อ |
-| lastName | String | นามสกุล |
-| cohort | String? | รุ่นที่ |
-| degreeLevel | DegreeLevel | ระดับการศึกษา |
-| major | String? | สาขาวิชา (spec — pending schema) |
-| graduationYear | Int? | ปีสำเร็จการศึกษา (spec — pending schema) |
-| province | String? | |
-| phone | String? | |
-| currentWorkplace | String? | สถานที่ทำงาน |
-| country | String? | |
-| remarks | String? | หมายเหตุ |
-| deletedAt | DateTime? | Soft-delete timestamp (spec-aligned; migration in progress) |
-| hasLoggedIn | Boolean | Default `false`. Set `true` after first alumni login. |
-| adminEditedAt | DateTime? | Last admin edit; triggers notification modal on next alumni login; cleared after viewed. |
-| lastLoginAt | DateTime? | |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+Identity + login account for a graduate.
+- **Identity:** `studentId` (unique), `citizenId`?, `birthDate`?, `prefix`/`firstName`/`lastName`.
+- **Contact:** `email` (login identity, unique) **vs** `contactEmail` (contact, distinct); `phones` (list); `homeAddress` (unified contact address, §3.9).
+- **Account lifecycle:** `passwordHash`?, `accountStatus`, `signupVerification` (JSON snapshot), `emailVerifiedAt`?, `rejectionReason`?/`rejectedAt`?, `suspendedAt`?, `tosAcceptedAt`?, `hasLoggedIn`, `lastLoginAt`?, `adminEditedAt`?.
+- **Primary-degree snapshot** (highest, auto-derived, §3.22): `degreeLevel`, `graduationYear`, `major`, `cohort`, `primaryEducationId` → `Education`.
+- **Relationships:** 1:N `Education`, `Award`, `Association`, `GraduateCommittee`, `Potential`, `ModelRepresentative`, `AlumniAgency`; soft-delete via `deletedAt`.
+- *Note: workplace / country / province are **not** on `Alumni` — they live on `AlumniAgency` (§3.9, §10).*
 
-### Award
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| studentId | String? | FK → Alumni.studentId |
-| major | String? | สาขาวิชา |
-| prefix | String? | คำนำหน้า |
-| firstName | String? | ชื่อ |
-| lastName | String? | นามสกุล |
-| awardName | String | ชื่อรางวัล |
-| awardType | AwardType | ประเภท |
-| link | String? | ลิงค์ |
-| imageUrl | String? | รูปภาพ |
-| year | Int | Buddhist year (พ.ศ.) |
-| description | String? | รายละเอียด |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+### Education
+One row per FON degree an alumni earned (`studentId` unique; one row per `(alumni, degreeLevel)`): `degreeLevel`, `graduationYear`, `major`, `cohort`, and `firstName`/`lastName` at study time. Drives the primary-degree snapshot.
 
-### Association
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId |
-| major | String? | สาขาวิชา |
-| prefix | String? | |
-| firstName | String? | |
-| lastName | String? | |
-| associationName | String | ชื่อสมาคม/ชมรม |
-| position | String | ตำแหน่ง |
-| recordedYear | Int | ปีที่บันทึก |
-| remarks | String? | หมายเหตุ |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+### Award · Association · GraduateCommittee · Potential · ModelRepresentative
+Person-name entities with split `prefix`/`firstName`/`lastName`. Each carries a **nullable** `studentId` FK to an alumni **plus** a `pendingStudentId` for unlinked rows (รอเชื่อมโยง, §3.4–3.8), and is soft-deletable. Natural-key uniqueness per entity (e.g. award name + year; association name + position + year). **ModelRepresentative** stores เครือข่าย in `cohort` and รุ่นที่ in `generation` (§3.8).
 
-### GraduateCommittee
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| termYear | Int | ปีพ.ศ. |
-| cohort | String | รุ่นที่ *(graduate-committee-exclusive cohort value)* |
-| studentId | String | FK → Alumni.studentId |
-| major | String? | สาขาวิชา |
-| prefix | String? | |
-| firstName | String? | |
-| lastName | String? | |
-| position | String | ตำแหน่ง |
-| remarks | String? | หมายเหตุ |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
-
-### Potential
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId |
-| major | String? | สาขาวิชา |
-| prefix | String? | |
-| firstName | String? | |
-| lastName | String? | |
-| career | String | อาชีพ |
-| position | String | ตำแหน่ง |
-| recordedYear | Int | ปีที่บันทึก |
-| remarks | String? | หมายเหตุ |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
-
-### ModelRepresentative
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| network | String | เครือข่าย |
-| cohort | String | รุ่นที่ *(model-representative-exclusive cohort value)* |
-| studentId | String | FK → Alumni.studentId |
-| major | String? | สาขาวิชา |
-| prefix | String? | |
-| firstName | String? | |
-| lastName | String? | |
-| remarks | String? | หมายเหตุ |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
-
-### AbroadAlumni
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| studentId | String | FK → Alumni.studentId |
-| cohort | String | รุ่น |
-| major | String? | สาขาวิชา |
-| prefix | String? | |
-| fullName | String | ชื่อ-นามสกุล |
-| fullNameEn | String? | ชื่ออังกฤษ |
-| country | String | ประเทศ |
-| workplace | String? | สถานที่ทำงาน |
-| homeAddress | String? | ที่อยู่บ้าน |
-| remarks | String? | หมายเหตุ |
-| order | Int | Display ordering within group |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
-
-> The **Thailand** and **Abroad** modes (§3.9) share the same column set. Both are sourced from the `AbroadAlumni` model (the page/API was renamed to **alumni-agency**): **Thailand** rows are domestic (no `country`), **Abroad** rows carry a `country` value. The model already holds `fullName`, `fullNameEn`, `workplace`, `homeAddress`, and `remarks` for both modes.
+### AlumniAgency
+Domestic + abroad work info (was `AbroadAlumni`). Split `prefix`/`firstName`/`lastName` (nullable) + `englishName`, `workplace`, `country`, `province` (in-country only), `position` (optional), `homeAddress` (unified with Alumni), `notes`, `order`. Nullable `studentId` FK + `pendingStudentId`. Thailand/Abroad are this one model split by `country` (§3.9).
 
 ### News
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| title | String | |
-| body | String | Rich text (HTML) |
-| coverImageUrl | String? | Thumbnail |
-| images | String[]? | In-news images (max 4) |
-| status | NewsStatus | DRAFT, PUBLISHED, or DISCONTINUED |
-| publishedAt | DateTime? | |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+`title`, `body` (rich-text HTML), `coverImageUrl`?, `status`, `publishedAt`?, **`pinnedAt`?** (non-null ⇒ pinned into ประชาสัมพันธ์สำคัญ). *(There is no in-news `images` array — cover image only.)*
+
+### CmuGraduate
+Materialized CMU Registrar record (`studentId` unique): core identity (name/birthday/level/major/grad year) plus optional enrichment (sex, cmuit account, English name, grad date); `birthday` stored raw and normalized at read.
 
 ### AdminUser
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| name | String | |
-| email | String | Unique (CMU email) |
-| passwordHash | String? | Used only for email–password testing mode |
-| role | UserRole | SUPERADMIN, ADMIN, EXECUTIVE |
-| isActive | Boolean | |
-| lastLoginAt | DateTime? | |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+Staff account: `firstName`/`lastName`, `email` (unique, CMU email), `passwordHash` (testing mode), `role` (superadmin/admin/executive), `isActive`.
 
 ### Session
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| userId | String? | FK → AdminUser.id (cascade delete). Null for alumni sessions. |
-| alumniId | String? | FK → Alumni.id. Set when session type is ALUMNI. |
-| token | String | Unique |
-| sessionType | SessionType | `ADMIN` or `ALUMNI` |
-| expiresAt | DateTime | |
-| createdAt | DateTime | |
+Browser session: `token` (unique), `sessionType` (ADMIN/ALUMNI), `expiresAt`, linked to `AdminUser` (staff) and/or `Alumni` (alumni).
 
 ### ActivityLog
-| Field | Type | Notes |
-|-------|------|-------|
-| id | String (UUID) | Primary key |
-| userId | String? | FK → AdminUser.id (admin who performed the action) |
-| alumniId | String? | FK → Alumni.id (alumni self-action) |
-| actorName | String? | Denormalized ชื่อ นามสกุล of the actor |
-| actorRole | String? | ตำแหน่ง (role) of the actor |
-| action | String | create, edit, update, import, export, delete, suspend |
-| details | JSON | Change details (field-level old/new values, reason); shown in the details modal |
-| createdAt | DateTime | |
+Audit entry: `actorType`, `userId`?/`userEmail`?/`userRole`?, `alumniId`?/`alumniName`?, `action`, `resource`/`resourceId`, `reason`?, `details` (JSON). Append-only; linked 1:N to `FieldChangeHistory`.
+
+### FieldChangeHistory
+Per-field old/new change rows (`resourceType`/`resourceId`/`field`/`oldValue`/`newValue`, actor, `reason`?, linked to an `ActivityLog`). Drives the orange update indicators (§3.16).
+
+### PasswordReset · EmailVerification
+Token tables (one row per token) for the password-reset and signup email-verification flows: `alumniId`, unique `token`, `used`, `expiresAt`.
 
 ---
 
@@ -483,136 +362,178 @@ Accessed via the **cog (⚙) icon** on the top navbar, opening a sub-navigation 
 
 - **Language:** Thai primary — all UI labels, column headers, validation messages, and enum display values use Thai.
 - **Calendar:** Buddhist calendar years (e.g., 2569, not 2026).
-- **Responsive:** Desktop, tablet, and mobile.
-- **Performance:** Tables and Excel import/export should handle up to 10,000 records without noticeable lag.
-- **Security:** HTTP-only session cookies. Input sanitization on all forms. CMU OAuth for admin auth (email–password in testing mode). Alumni sign-up verification and login are rate-limited to prevent brute-force attacks.
-- **File storage:** Uploaded images stored locally in `public/uploads/` with UUID filenames. Max 5 MB, PNG/JPG only, enforced at client and server. News allows 1 thumbnail + up to 4 in-news images.
+- **Responsive:** desktop, tablet, and mobile.
+- **Performance:** tables and Excel import/export handle tens of thousands of records (the CMU universe is ~20k persons); read-heavy summary endpoints are short-TTL-cached.
+- **Security:** HTTP-only session cookies; input validation on all forms; HTML sanitization for news bodies; CMU OAuth for staff auth (email–password in testing); rate limiting on signup, login, and password-reset endpoints; no public/anonymous access.
+- **File storage:** uploaded images stored locally in `public/uploads/` with generated filenames; PNG/JPG only (signature-checked), max 5 MB, enforced at client and server; news uses a cover image only (§3.23).
 
 ---
 
 ## 7. Out of Scope (Post-MVP)
 
-- Email notifications.
 - Multi-language support (English).
-- Advanced analytics dashboard.
-- API for external integrations.
-- Alumni-to-alumni socializing features beyond profile editing (captured as a long-term goal in §1; detailed MVP scope is profile self-service only).
+- Alumni-to-alumni socializing features beyond profile self-service (a long-term goal; current MVP scope is profile + education self-service and news).
+- A public/external API for third-party integrations.
+
+*(Email notifications and an alumni-activity analytics view were previously listed here; both are now shipped — §3.20, §3.21.)*
 
 ---
 
 ## 8. Page Route Summary
 
-> **Auth policy (revised 2026-06-30):** no anonymous/public browsing (see §1). "Public" below applies **only** to `/login` and the sign-up/password-reset auth surfaces — every content page requires a staff or alumni session.
+> The app is deployed under **`basePath: /alumni`** — every path below is therefore served at `/alumni<route>` (e.g. `/alumni/management/dashboard`). Anonymous visitors see only `/login`; all other pages require a staff or alumni session.
 
-### 8.1 Admin Routes
+### 8.1 Staff Routes
 
-| Route | Auth Required | Description |
-|-------|--------------|-------------|
-| `/login` | Public | Login page with **Admin/Alumni toggle**. Admin uses CMU OAuth (email–password in testing) |
-| `/` | Admin session | Main dashboard — summarized cards + line graph + latest news |
-| `/news` | Admin session | News cards (published), 9 per page |
-| `/news/[id]` | Admin session | Full news article |
-| `/alumni-count` | Admin session | All-alumni table (filters: degree level, major, graduation year) + dashboard graph |
-| `/awards` | Admin session | 3 award-type count cards + awards table |
-| `/potentials` | Admin session | Potentials table |
-| `/associations` | Admin session | Associations/clubs table |
-| `/graduate-committee` | Admin session | Graduate committee table |
-| `/model-representatives` | Admin session | Model representatives table |
-| `/alumni-agency` | Admin session | Alumni-agency page with **Thailand/Abroad toggle** (columns now shared; Abroad adds ประเทศ) |
-| `/settings/profile` | Any admin | My account — ชื่อ, นามสกุล, CMU account, ตำแหน่ง |
-| `/settings/users` | Superadmin/Admin | Account management (admin/exec accounts + alumni accounts); suspend accounts, change alumni email, view alumni profile |
-| `/management/alumni/[id]` | Any admin (write for edit) | Individual alumni profile view — orange edit-history indicators, edit mode, and ประวัติการเปลี่ยนแปลง toggle (replaces the old `/settings/alumni/[id]`) |
-| `/settings/logs` | Superadmin/Admin/Executive | System logs — activity types incl. update/suspend; orange clickable updated values show history |
-| `/settings/trash` | Superadmin exclusive | Trash bin — review/restore/hard-delete soft-deleted records |
+| Route | Auth | Description |
+|-------|------|-------------|
+| `/login` | Public | Login page (Staff/Alumni toggle). Staff use CMU OAuth (email–password in testing) |
+| `/` | — | Redirects to `/management/dashboard` |
+| `/management/dashboard` | Staff | Dashboard — cards, line graph, latest news (§3.2) |
+| `/management/alumni-activity` | Staff | Alumni engagement analytics (§3.20) |
+| `/management/all-alumni` | Staff | All-alumni table (§3.3) |
+| `/management/new-alumni` | Staff (write) | Full-form alumni creation (§3.3) |
+| `/management/alumni/[id]` | Staff (write to edit) | Alumni profile view — orange indicators, edit mode, ประวัติการเปลี่ยนแปลง toggle (§3.18) |
+| `/management/awards` | Staff | Awards (§3.4) |
+| `/management/potentials` | Staff | Potentials (§3.5) |
+| `/management/associations` | Staff | Associations/clubs (§3.6) |
+| `/management/graduate-committee` | Staff | Graduate committee (§3.7) |
+| `/management/model-representatives` | Staff | Model representatives (§3.8) |
+| `/management/alumni-agency` | Staff | Thailand/Abroad agency (§3.9) |
+| `/management/news` | Staff | News cards (§3.12) |
+| `/news/[id]` | Staff session | Full news article (staff see all statuses) |
+| `/management/settings/profile` | Staff | My account |
+| `/management/settings/users` | Admin/Superadmin | Account management — staff + alumni accounts (§3.15) |
+| `/management/settings/logs` | Admin/Superadmin | System logs (§3.16) |
+| `/management/settings/cmu-sync` | Admin/Superadmin | CMU Registrar sync (§3.19) |
+| `/management/settings/trash` | Superadmin | Trash bin (§3.15) |
 
 ### 8.2 Alumni Routes
 
-| Route | Auth Required | Description |
-|-------|--------------|-------------|
-| `/login` (Alumni section) | Public | Alumni login (email + password) + sign-up/verification |
-| TOS page | First-time alumni | Terms of Service on first login — accept to continue, or logout |
-| `/alumni/profile` | Alumni session | Alumni profile view/edit (default landing after login) |
-| `/alumni/news` | Alumni session | View published news created by admins (read-only) |
+| Route | Auth | Description |
+|-------|------|-------------|
+| `/login` (Alumni tab) | Public | Alumni login (email + password) + sign-up |
+| `/graduates/signup` | Public | Sign-up (§3.1.2) |
+| `/graduates/verify-email` | Public | Email-verification landing |
+| `/graduates/forgot-password` · `/graduates/reset-password` | Public | Password reset |
+| `/graduates/reapply` | Alumni (rejected) | Re-apply after rejection (§3.1.3) |
+| `/graduates/tos` | First-time alumni | Terms of Service — accept to continue, or logout (§3.1.4) |
+| `/graduates/news` · `/graduates/news/[id]` | Alumni | Published news, read-only (default landing) (§3.17) |
+| `/graduates/profile` | Alumni | Self profile view/edit (§3.1.5) |
 
 ---
 
 ## 9. API Route Summary
 
-All API routes are under `/api/`.
+All endpoints are under `/api/` (served at `/alumni/api/...`). Every data endpoint requires a session and returns 401 to anonymous callers.
 
-### 9.1 Auth Routes
+### 9.1 Auth
 
 | Endpoint | Methods | Auth | Description |
 |----------|---------|------|-------------|
-| `/api/auth/login` | POST | Public | Admin login — CMU OAuth (email–password in testing) |
+| `/api/auth/login` | POST | Public | Staff login (CMU OAuth; email–password in testing) |
 | `/api/auth/cmu-login` | POST | Public | Initiate CMU OAuth login |
-| `/api/auth/callback` | GET | Public | OAuth callback (admin) |
-| `/api/auth/logout` | POST | Authenticated | Logout |
-| `/api/alumni-auth/signup` | POST | Public | Alumni sign-up + identity verification (ชื่อ, นามสกุล, รหัสนักศึกษา, ปีที่จบ, วันเกิด). Approves + logs in if a matching record exists |
-| `/api/alumni-auth/login` | POST | Public | Alumni login via email + password |
-| `/api/alumni-auth/logout` | POST | Alumni session | Logout alumni |
+| `/api/auth/callback` | GET | Public | OAuth callback |
+| `/api/auth/logout` | POST | Authenticated | Staff logout |
+| `/api/auth/cleanup` | GET | Secret (`CLEANUP_SECRET`) | Cron session cleanup |
 
-### 9.2 Alumni Profile Routes
+### 9.2 Alumni Auth
 
 | Endpoint | Methods | Auth | Description |
 |----------|---------|------|-------------|
-| `/api/alumni-profile` | GET | Alumni session | Get logged-in alumni's own profile |
-| `/api/alumni-profile` | PUT | Alumni session | Update logged-in alumni's own profile (editable fields only) |
+| `/api/alumni-auth/signup` | POST | Public | Sign-up → UNVERIFIED + verification email (§3.1.2) |
+| `/api/alumni-auth/verify-email` | POST | Public | Verify email → PENDING |
+| `/api/alumni-auth/verify-email/resend` | POST | Public | Resend verification email |
+| `/api/alumni-auth/login-email` | POST | Public | Alumni login (email + password); 403 for non-ACTIVE |
+| `/api/alumni-auth/logout` | POST | Public | Alumni logout |
+| `/api/alumni-auth/accept-tos` | POST | Alumni | Accept TOS |
+| `/api/alumni-auth/forgot-password` | POST | Public | Issue password-reset token |
+| `/api/alumni-auth/reset-password` | POST | Public | Reset password with token |
+| `/api/alumni-auth/reapply` · `/reapply/prepare` | POST | Alumni | Re-apply after rejection (§3.1.3) |
 
-### 9.3 Admin Alumni Management Routes
-
-| Endpoint | Methods | Auth | Description |
-|----------|---------|------|-------------|
-| `/api/alumni-accounts` | GET | Admin | List all alumni who have logged in at least once (paginated, searchable) |
-| `/api/alumni-accounts/[id]` | GET, PUT | Admin | View/update an alumni's profile (admins can edit `citizenId`/`birthDate`; sets `adminEditedAt` on save) |
-| `/api/alumni/[id]/activity` | GET | Admin | Merged change timeline for one alumni — field-change history (alumni core `alumni`/`alumni_profile` + related rows) ∪ activity-log events; newest first (powers §3.18 data-logs toggle) |
-
-### 9.4 Data Entity Routes (Admin)
-
-Each entity follows the pattern: `/` (GET list / POST create), `/[id]` (GET/PUT/DELETE), `/import` (POST Excel), `/export` (GET Excel), `/bulk-delete` (POST by IDs). DELETE is a **soft delete**; `/restore` (POST) and hard-delete confirmation are superadmin-only.
+### 9.3 Alumni Account Management (staff)
 
 | Endpoint | Methods | Auth | Description |
 |----------|---------|------|-------------|
-| `/api/alumni` | GET, POST | Admin | List/create alumni (POST supports create-with-related for the full-form) |
-| `/api/alumni/[id]` | GET, PUT, DELETE | Admin | Read/update/soft-delete alumni |
-| `/api/alumni/import` | POST | Admin | Import alumni from Excel |
-| `/api/alumni/export` | GET | Admin | Export alumni to Excel |
-| `/api/alumni/bulk-delete` | POST | Admin | Soft-delete alumni by IDs |
-| `/api/alumni-count` | GET | Admin | Alumni counts grouped by degree level (dashboard graph + cards) |
-| `/api/news` | GET, POST | Admin | List/create news |
-| `/api/news/[id]` | GET, PUT, DELETE | Admin | Read/update/delete (delete → DISCONTINUED status) |
-| `/api/news/bulk-delete` | POST | Admin | Bulk set news to DISCONTINUED |
-| `/api/awards` | GET, POST | Admin | List/create awards |
-| `/api/awards/[id]` | PUT, DELETE | Admin | Update/soft-delete award |
-| `/api/awards/import` | POST | Admin | Import awards from Excel |
-| `/api/awards/export` | GET | Admin | Export awards to Excel |
-| `/api/awards/bulk-delete` | POST | Admin | Soft-delete awards by IDs |
-| `/api/potentials` | GET, POST | Admin | List/create potentials |
-| `/api/potentials/[id]` | PUT, DELETE | Admin | Update/soft-delete potential |
-| `/api/potentials/import` | POST | Admin | Import potentials from Excel |
-| `/api/potentials/export` | GET | Admin | Export potentials to Excel |
-| `/api/potentials/bulk-delete` | POST | Admin | Soft-delete potentials by IDs |
-| `/api/associations` | GET, POST | Admin | List/create associations |
-| `/api/associations/[id]` | PUT, DELETE | Admin | Update/soft-delete association |
-| `/api/associations/import` | POST | Admin | Import associations from Excel |
-| `/api/associations/export` | GET | Admin | Export associations to Excel |
-| `/api/associations/bulk-delete` | POST | Admin | Soft-delete associations by IDs |
-| `/api/graduate-committee` | GET, POST | Admin | List/create committees |
-| `/api/graduate-committee/[id]` | PUT, DELETE | Admin | Update/soft-delete committee |
-| `/api/graduate-committee/import` | POST | Admin | Import committees from Excel |
-| `/api/graduate-committee/export` | GET | Admin | Export committees to Excel |
-| `/api/graduate-committee/bulk-delete` | POST | Admin | Soft-delete committees by IDs |
-| `/api/model-representatives` | GET, POST | Admin | List/create model reps |
-| `/api/model-representatives/[id]` | PUT, DELETE | Admin | Update/soft-delete model rep |
-| `/api/model-representatives/import` | POST | Admin | Import model reps from Excel |
-| `/api/model-representatives/export` | GET | Admin | Export model reps to Excel |
-| `/api/model-representatives/bulk-delete` | POST | Admin | Soft-delete model reps by IDs |
-| `/api/alumni-agency` | GET, POST | Admin | List/create alumni-agency (Thailand + abroad) records |
-| `/api/alumni-agency/[id]` | PUT, DELETE | Admin | Update/soft-delete alumni-agency record |
-| `/api/alumni-agency/import` | POST | Admin | Import alumni-agency records from Excel |
-| `/api/alumni-agency/export` | GET | Admin | Export alumni-agency records to Excel |
-| `/api/alumni-agency/bulk-delete` | POST | Admin | Soft-delete alumni-agency records by IDs |
-| `/api/users` | GET, POST | Admin | List/create user accounts |
-| `/api/users/[id]` | GET, PUT, DELETE | Admin | Read/update/delete user account |
-| `/api/upload` | POST | Admin | Upload image (PNG/JPG, max 5 MB) |
-| `/api/logs` | GET | Admin | Activity logs (supports `?source=alumni` filter) |
+| `/api/alumni-accounts/[id]` | GET, PUT | Admin | View; change email |
+| `/api/alumni-accounts/[id]/approve` | POST | Admin | PENDING/REJECTED → ACTIVE |
+| `/api/alumni-accounts/[id]/reject` | POST | Admin | → REJECTED (requires `{ reason }`) |
+| `/api/alumni-accounts/[id]/suspend` | POST | Admin | Toggle suspension + kill sessions |
+| `/api/alumni-accounts/[id]/reverify` | POST | Admin | Refresh the verification snapshot |
+| `/api/alumni-accounts/[id]/delete` | POST | Superadmin | Delete account, keep data record |
+
+### 9.4 Alumni Self-Service
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/alumni-profile` | GET, PUT, DELETE | Alumni | Own profile (view/edit/self-delete) |
+| `/api/alumni-profile/educations` | GET, POST | Alumni | Own education records |
+
+### 9.5 Alumni (staff) + Education
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/alumni` | GET, POST | Admin | List/create alumni |
+| `/api/alumni/[id]` | GET, PUT, DELETE | Admin | Read/update/soft-delete (id = UUID or studentId) |
+| `/api/alumni/create-with-related` | POST | Admin | Full-form create (alumni + related) |
+| `/api/alumni/update-with-related/[id]` | PUT | Admin | Full-form update (alumni + related) |
+| `/api/alumni/import` · `/export` · `/bulk-delete` | POST/GET/POST | Admin | Import / merged-CMU+local export / soft-delete by IDs |
+| `/api/alumni/[id]/activity` | GET | Admin | Merged change timeline (§3.18) |
+| `/api/alumni/[id]/educations` | GET, POST | Admin | List/add an alumni's education |
+| `/api/educations/[id]` | GET, PUT, DELETE | Admin or owning alumni | One education record (re-derives primary) |
+
+### 9.6 Data Entities (staff) — Awards · Potentials · Associations · Graduate-Committee · Model-Representatives · Alumni-Agency
+
+Each follows the standard pattern: `/` (GET list / POST create), `/[id]` (GET/PUT/DELETE), `/import` (POST Excel), `/export` (GET Excel), `/bulk-delete` (POST by IDs). DELETE is a **soft delete**, recoverable superadmin-only via `/api/trash/restore` (+ `/api/trash/hard-delete`). `alumni-agency` GET/export accept `?region=thailand|abroad` and `?unlinked=true`.
+
+### 9.7 CMU Registrar
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/cmu-alumni` | GET | Admin | List/search the local cache |
+| `/api/cmu-alumni/lookup` | GET | Admin | Single-record auto-fill preview (same-person/already-claimed warnings) |
+| `/api/cmu-alumni/live` | GET | Staff | Live registrar list (for the sync compare table) |
+| `/api/cmu-alumni/sync` | GET, POST | Admin (or `CMU_SYNC_SECRET`) | GET = compare; POST = materialize the full remote set (§3.19) |
+
+### 9.8 News
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/news` | GET, POST | Admin | List/create (GET excludes pinned by default; `?pinned=true` for pinned only) |
+| `/api/news/[id]` | GET, PUT, DELETE | Admin | DELETE → DISCONTINUED |
+| `/api/news/[id]/pin` | POST | Admin | Pin/unpin toggle (published only) |
+| `/api/news/bulk-publish` · `/bulk-pin` · `/bulk-delete` | POST | Admin | Bulk status actions (§3.12) |
+
+### 9.9 Users, Upload, Logs, Aggregates
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/users` · `/api/users/[id]` | GET,POST / GET,PUT,DELETE | Admin/Superadmin | Staff account management |
+| `/api/upload` | POST | Admin (write) | Image upload (§3.23) |
+| `/api/logs` | GET | Admin | Activity logs (`?source=alumni`) |
+| `/api/logs/bulk-delete` | POST | Superadmin | Hard-delete log entries |
+| `/api/dashboard` | GET | Staff | Dashboard aggregate |
+| `/api/alumni-count` | GET | Staff | Degree-level counts (dashboard graph + cards) |
+| `/api/alumni-activity` | GET | Staff | Engagement analytics (§3.20) |
+| `/api/filter-facets` | GET | Staff | Facet values for filters (§3.10) |
+| `/api/field-changes` | GET | Staff | Per-field change history (orange indicators) |
+
+---
+
+## 10. Changes from the Original Spec
+
+This appendix records decisions that diverge from the original 2026-05-29 spec, for traceability. The body above describes only the current (as-built) behavior.
+
+- **Alumni sign-up** — was "auto-approve and log in if data matches a record"; now a **two-gate flow** (email-ownership verification, then staff approval), with no auto-login. *Why:* staff gatekeeping of who enters the system; the verification snapshot gives the reviewer the evidence to decide.
+- **Edit "Reason" field** (the แก้ไช/อัพเดท selector) — **removed**. *Why:* it added friction with little audit value; the per-field change history and activity log already capture every edit.
+- **"Management mode" toggle** — **removed**; tables are CRUD-always-on, gated by role. *Why:* with a genuine read-only role (executive), the toggle only hid affordances from users who were allowed to use them.
+- **News inline images (max 4)** — **removed**; only a cover/thumbnail remains. *Why:* the editor migrated to Tiptap and inline upload was dropped (legacy inline images still render).
+- **News body editor** — bespoke `execCommand` editor → **Tiptap v3** rich text.
+- **Alumni profile landing** — was "lands on profile"; now lands on **news** (`/graduates/news`).
+- **`/settings/alumni/[id]`** page — **deleted**; alumni profile editing is at **`/management/alumni/[id]`**.
+- **`AbroadAlumni` model** → **`AlumniAgency`**; Thailand and Abroad are now one model split by `country` (the in-country tab is not the `alumni` table).
+- **Alumni workplace fields** (`currentWorkplace`/`country`/`province`) — **removed from `Alumni`**; workplace/country/province live on `AlumniAgency`. `homeAddress` is unified as the single contact address (one home address per person, reflected across all surfaces).
+- **CMU Registrar data** — was fetched live on every load; now **materialized locally** (`cmu_graduates`) with an admin sync page.
+- **Unlinked related rows** (`pendingStudentId`) + **auto-link at canonicalization** — introduced so imports can reference alumni not yet in the system without creating stub records.
+- **Pinned news** ("ประชาสัมพันธ์สำคัญ") — introduced.
+- **Email notifications** and **alumni-activity analytics** — previously "post-MVP"; **now shipped** (§3.20, §3.21).
