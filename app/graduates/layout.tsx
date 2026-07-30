@@ -7,6 +7,12 @@
 // group, whose own layout enforces the alumni session and renders the
 // header + sidebar + footer shell.
 
+// Force dynamic rendering so proxy.ts's nonce-based CSP injects a nonce into
+// Next.js's inline scripts. Nonce auto-injection only happens on dynamically
+// rendered pages; without this the public /graduates pages would be statically
+// prerendered (no nonce) and the CSP would block their inline scripts.
+export const dynamic = "force-dynamic";
+
 export default async function GraduatesLayout({
   children,
 }: {
