@@ -33,6 +33,8 @@ interface AwardData {
   awardName: string;
   awardType: string;
   year: number;
+  link: string | null;
+  imageUrl: string | null;
   description: string | null;
 }
 interface AssociationData {
@@ -120,6 +122,8 @@ const AWARD_FIELDS: FieldDef[] = [
   { key: "awardType", label: "ประเภทรางวัล", type: "select", required: true, options: AWARD_TYPE_OPTIONS },
   { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
   { key: "description", label: "รายละเอียด", type: "textarea", required: true },
+  { key: "link", label: "ลิงค์", type: "text" },
+  { key: "imageUrl", label: "รูปภาพ (URL)", type: "text" },
 ];
 const ASSOCIATION_FIELDS: FieldDef[] = [
   { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
@@ -164,6 +168,8 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
       year: String(a.year),
+      link: a.link || "",
+      imageUrl: a.imageUrl || "",
       description: a.description || "",
     })),
     associations: (data.associations || []).map((a) => ({
@@ -316,6 +322,8 @@ export default function AlumniProfilePage() {
         awardName: a.awardName,
         awardType: a.awardType,
         year: Number(a.year),
+        link: a.link || null,
+        imageUrl: a.imageUrl || null,
         description: a.description,
       })),
       associations: (data.associations || []).map((a) => ({
@@ -608,7 +616,7 @@ export default function AlumniProfilePage() {
                   register={register}
                   errors={errors}
                   name="awards"
-                  emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }}
+                  emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", link: "", imageUrl: "", description: "" }}
                   fields={AWARD_FIELDS}
                 />
               </SectionToggle>

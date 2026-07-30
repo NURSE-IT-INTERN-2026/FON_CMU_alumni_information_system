@@ -109,6 +109,8 @@ export async function PUT(request: NextRequest) {
               awardName: a.awardName,
               awardType: a.awardType as AwardType,
               year: a.year,
+              link: a.link || null,
+              imageUrl: a.imageUrl || null,
               description: a.description || null,
             })),
           });

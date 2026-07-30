@@ -42,6 +42,8 @@ interface AwardData {
   awardName: string;
   awardType: string;
   year: number;
+  link: string | null;
+  imageUrl: string | null;
   description: string | null;
 }
 interface AssociationData {
@@ -111,6 +113,8 @@ const AWARD_FIELDS: FieldDef[] = [
   { key: "awardType", label: "ประเภทรางวัล", type: "select", required: true, options: AWARD_TYPE_OPTIONS },
   { key: "year", label: "ปี (พ.ศ.)", type: "number", required: true },
   { key: "description", label: "รายละเอียด", type: "textarea", required: true },
+  { key: "link", label: "ลิงค์", type: "text" },
+  { key: "imageUrl", label: "รูปภาพ (URL)", type: "text" },
 ];
 const ASSOCIATION_FIELDS: FieldDef[] = [
   { key: "associationName", label: "ชื่อสมาคม/ชมรม", required: true },
@@ -148,6 +152,8 @@ function buildFormValues(data: AlumniData): AlumniProfileWithRelatedFormData {
       awardName: a.awardName,
       awardType: a.awardType as "INTERNATIONAL" | "NATIONAL" | "LOCAL",
       year: String(a.year),
+      link: a.link || "",
+      imageUrl: a.imageUrl || "",
       description: a.description || "",
     })),
     associations: (data.associations || []).map((a) => ({
@@ -269,6 +275,8 @@ export default function AdminAlumniProfilePage() {
         awardName: a.awardName,
         awardType: a.awardType,
         year: Number(a.year),
+        link: a.link || null,
+        imageUrl: a.imageUrl || null,
         description: a.description,
       })),
       associations: (data.associations || []).map((a) => ({
@@ -479,7 +487,7 @@ export default function AdminAlumniProfilePage() {
               </div>
 
               <SectionToggle title="รางวัล" open={sections.awards} onToggle={() => toggleSection("awards")}>
-                <RepeatableFieldArray control={control} register={register} errors={errors} name="awards" emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", description: "" }} fields={AWARD_FIELDS} />
+                <RepeatableFieldArray control={control} register={register} errors={errors} name="awards" emptyRow={{ awardName: "", awardType: "INTERNATIONAL", year: "", link: "", imageUrl: "", description: "" }} fields={AWARD_FIELDS} />
               </SectionToggle>
               <SectionToggle title="สมาคม/ชมรม" open={sections.associations} onToggle={() => toggleSection("associations")}>
                 <RepeatableFieldArray control={control} register={register} errors={errors} name="associations" emptyRow={{ associationName: "", position: "", recordedYear: "" }} fields={ASSOCIATION_FIELDS} />

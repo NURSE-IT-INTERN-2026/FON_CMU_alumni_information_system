@@ -116,6 +116,8 @@ export const alumniWithRelatedUpdateSchema = z.object({
         awardName: z.string().min(1, "กรุณากรอกชื่อรางวัล"),
         awardType: z.string().min(1, "กรุณาเลือกประเภทรางวัล"),
         year: z.coerce.number().int("ปีต้องเป็นตัวเลข"),
+        link: z.string().trim().optional().nullable(),
+        imageUrl: z.string().trim().optional().nullable(),
         description: z.string().optional().default(""),
       }),
     )
