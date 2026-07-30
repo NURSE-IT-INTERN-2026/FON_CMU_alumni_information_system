@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createSession, setSessionCookie } from "@/lib/auth";
+import { createSession, setSessionCookie, constantTimeEqual } from "@/lib/auth";
 import {
   exchangeCodeForToken,
   fetchCmuProfile,
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Validate state for CSRF protection
     const cookieState = request.cookies.get("cmu-oauth-state")?.value;
-    if (!state || state !== cookieState) {
+    if (!state || !constantTimeEqual(state, cookieState)) {
       return loginRedirect("oauth_invalid_state");
     }
 

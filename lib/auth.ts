@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { Session, AdminUser, Alumni } from "@/app/generated/prisma/client";
 import { compare, hash } from "bcryptjs";
-import { createHash, randomUUID } from "crypto";
+import { createHash, randomUUID, timingSafeEqual } from "crypto";
 
 // Explicit types for narrowed session returns
 type AdminSession = Session & { user: AdminUser };
@@ -29,6 +29,25 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  */
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Constant-time equality for secrets/tokens (bearer secrets like
+ * `Bearer ${CLEANUP_SECRET}`, the OAuth `state` nonce, etc.). JS `===`/`!==`
+ * short-circuit on the first differing byte, leaking timing about the secret;
+ * `crypto.timingSafeEqual` compares every byte regardless. It THROWS on length
+ * mismatch, so guard with a length check first — that leaks only the length
+ * (fixed for `Bearer <secret>` and UUID state tokens), never the content.
+ * null/undefined is treated as the empty string (length 0 ⇒ always mismatches a
+ * non-empty secret, no throw).
+ */
+export function constantTimeEqual(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  const bufA = Buffer.from(a ?? "");
+  const bufB = Buffer.from(b ?? "");
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }
 
 export async function createSession(userId: string): Promise<string> {
