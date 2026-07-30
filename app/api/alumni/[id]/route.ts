@@ -10,6 +10,7 @@ import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/f
 import { mirrorAlumniHomeAddressToAgencies } from "@/lib/alumni-agency-home-sync";
 import { autoLinkPendingForAlumni } from "@/lib/alumni-link";
 import { isSamePersonByBirthday } from "@/lib/alumni-verify";
+import { findStudentIdClaimOwner, claimedByOtherMessage } from "@/lib/education-identity";
 
 export async function GET(
   request: NextRequest,
@@ -106,6 +107,28 @@ export async function PUT(
       if (localDuplicate) {
         return NextResponse.json(
           { error: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
+          { status: 409 }
+        );
+      }
+
+      // The new id must not already belong to ANOTHER alumni's Education record
+      // (Education.studentId is globally @unique). Same deterministic guard the
+      // education add/edit routes use — without it, re-pointing this alumni onto
+      // a stranger's degree would corrupt the dashboard person-count bridge
+      // (groupPersonsByDegree unions by studentId) when this alumni has no
+      // primary Education to trip the @unique backstop. Allowed when the claim
+      // is this alumni's OWN other degree.
+      const claimOwner = await findStudentIdClaimOwner(newStudentId);
+      if (claimOwner && claimOwner.alumniId !== id) {
+        const owner = await prisma.alumni.findUnique({
+          where: { id: claimOwner.alumniId },
+          select: { prefix: true, firstName: true, lastName: true },
+        });
+        const ownerName = owner
+          ? `${owner.prefix}${owner.firstName} ${owner.lastName}`.trim()
+          : undefined;
+        return NextResponse.json(
+          { error: claimedByOtherMessage({ forAdmin: true, ownerName }) },
           { status: 409 }
         );
       }

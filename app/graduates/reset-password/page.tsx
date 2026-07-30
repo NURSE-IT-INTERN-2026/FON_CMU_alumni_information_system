@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BASE_PATH } from "@/lib/constants";
 import { resetPasswordSchema, type ResetPasswordData } from "@/lib/validations";
 import FormField from "@/components/form/FormField";
-import FormInput from "@/components/form/FormInput";
 import PasswordInput from "@/components/form/PasswordInput";
 
 export default function ResetPasswordPage() {

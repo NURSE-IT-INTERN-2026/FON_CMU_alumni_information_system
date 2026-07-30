@@ -499,7 +499,7 @@ export default function AlumniCountPage() {
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
-          จำนวนนักศึกษาเก่าตามระดับการศึกษา
+          ข้อมูลนักศึกษาเก่า
         </h1>
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">

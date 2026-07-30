@@ -17,10 +17,10 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   alumni: { delegate: "alumni", label: "ข้อมูลนักศึกษาเก่า", nameFields: ["prefix", "firstName", "lastName"], resource: "alumni" },
   awards: { delegate: "award", label: "รางวัล", nameFields: ["awardName"], resource: "award" },
   associations: { delegate: "association", label: "สมาคม/ชมรม", nameFields: ["associationName"], resource: "association" },
-  "graduate-committee": { delegate: "graduateCommittee", label: "กรรมการบัณฑิต", nameFields: ["fullName"], resource: "graduate_committee" },
-  "model-representatives": { delegate: "modelRepresentative", label: "ผู้แทนรุ่น", nameFields: ["name"], resource: "model_representative" },
-  potentials: { delegate: "potential", label: "ศักยภาพ", nameFields: ["fullName"], resource: "potential" },
-  "alumni-agency": { delegate: "alumniAgency", label: "ข้อมูลการทำงานศิษย์เก่า", nameFields: ["thaiName", "englishName", "country"], resource: "alumni_agency" },
+  "graduate-committee": { delegate: "graduateCommittee", label: "กรรมการบัณฑิต", nameFields: ["prefix", "firstName", "lastName"], resource: "graduate_committee" },
+  "model-representatives": { delegate: "modelRepresentative", label: "ผู้แทนรุ่น", nameFields: ["prefix", "firstName", "lastName"], resource: "model_representative" },
+  potentials: { delegate: "potential", label: "ศักยภาพ", nameFields: ["prefix", "firstName", "lastName"], resource: "potential" },
+  "alumni-agency": { delegate: "alumniAgency", label: "ข้อมูลการทำงานศิษย์เก่า", nameFields: ["prefix", "firstName", "lastName", "englishName", "country"], resource: "alumni_agency" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PAGE_SIZE } from "@/lib/constants";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { assetUrl } from "@/lib/asset-url";
 import SearchInput from "@/components/ui/search-input";
+
+// 9 news cards per page (PRD §3.12/§3.13) — matches the admin news page.
+const NEWS_PAGE_SIZE = 9;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -42,7 +44,7 @@ export default function AlumniNewsPage() {
   const { data: newsData, isPending: loading, isError } = useQuery({
     queryKey: queryKeys.news.list({ page, search, statusFilter: "PUBLISHED" }),
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), status: "PUBLISHED" });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(NEWS_PAGE_SIZE), status: "PUBLISHED" });
       if (search) params.set("search", search);
       return apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(`/api/news?${params}`);
     },
@@ -51,11 +53,11 @@ export default function AlumniNewsPage() {
   const total = newsData?.total ?? 0;
   const totalPages = newsData?.totalPages ?? 1;
 
-  // Pinned "ประชาสัมพันธ์สำคัญ" section — only fetched on page 1 with no search
-  // (the section is hidden otherwise). The server already forces PUBLISHED-only.
+  // Pinned "ประชาสัมพันธ์สำคัญ" section — always fetched, render-gated on
+  // length below (a standby enabled:false observer doesn't reflect refetched
+  // data — CLAUDE.md pitfall). The server forces PUBLISHED-only.
   const { data: pinnedData } = useQuery({
     queryKey: queryKeys.news.pinned(),
-    enabled: page === 1 && !search,
     queryFn: () =>
       apiFetch<{ data: NewsItem[]; total: number; totalPages: number }>(
         `/api/news?${new URLSearchParams({ pinned: "true", pageSize: "100" })}`
@@ -63,8 +65,8 @@ export default function AlumniNewsPage() {
   });
   const pinnedItems = pinnedData?.data ?? [];
 
-  const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const pageEnd = Math.min(page * PAGE_SIZE, total);
+  const pageStart = total === 0 ? 0 : (page - 1) * NEWS_PAGE_SIZE + 1;
+  const pageEnd = Math.min(page * NEWS_PAGE_SIZE, total);
 
   const paginationNumbers = (() => {
     const pages: (number | "...")[] = [];

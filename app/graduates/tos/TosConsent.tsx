@@ -36,9 +36,15 @@ export default function TosConsent() {
     }
   }
 
-  function handleDecline() {
-    // GET logout deletes the session, clears the cookie, and redirects to /login.
-    window.location.href = `${BASE_PATH}/api/alumni-auth/logout`;
+  async function handleDecline() {
+    // POST logout (the GET handler was removed to avoid logout-CSRF): the route
+    // deletes the session + clears the cookie, then we hard-navigate to /login.
+    try {
+      await fetch(`${BASE_PATH}/api/alumni-auth/logout`, { method: "POST" });
+    } catch {
+      // ignore — navigate to /login regardless
+    }
+    window.location.href = `${BASE_PATH}/login`;
   }
 
   return (
