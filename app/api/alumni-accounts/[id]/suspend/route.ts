@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 
 // Suspend (or reactivate) an alumni account. Suspending is a full block
@@ -11,6 +12,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Suspending is a write op — admin/superadmin only (PRD §4.1). Mirrors
+    // approve/reject/reverify.
+    const denied = await checkWritePermission();
+    if (denied) return denied;
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });

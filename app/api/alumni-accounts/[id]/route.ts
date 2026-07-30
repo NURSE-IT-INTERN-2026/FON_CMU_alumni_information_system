@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkWritePermission, checkNonExecutivePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { TRACKED_FIELDS, computeFieldChanges, recordFieldChanges } from "@/lib/field-changes";
 
@@ -9,10 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-    }
+    // Account management is excluded from the read-only executive role
+    // (PRD §2.1/§4.1) — same guard the users/logs GETs use.
+    const denied = await checkNonExecutivePermission();
+    if (denied) return denied;
     const { id } = await params;
     const alumni = await prisma.alumni.findUnique({ where: { id } });
 
@@ -38,6 +39,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Write sub-routes require admin/superadmin (PRD §4.1) — the read-only
+    // executive role must not change an alumni's login email (account takeover)
+    // or any account field. Mirrors approve/reject/reverify.
+    const denied = await checkWritePermission();
+    if (denied) return denied;
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
@@ -50,10 +56,13 @@ export async function PUT(
     const reason = typeof body?.reason === "string" ? body.reason : undefined;
 
     // Admin can edit all alumni fields
+    // Admin can edit these alumni fields. (Removed columns that no longer
+    // exist on Alumni — `newLastName`/`currentWorkplace`/`country`/`province`
+    // — which would 500 if sent.)
     const allowedFields = [
-      "prefix", "firstName", "lastName", "newLastName",
-      "cohort", "degreeLevel", "province", "email", "contactEmail", "phones",
-      "currentWorkplace", "country", "citizenId", "birthDate",
+      "prefix", "firstName", "lastName",
+      "cohort", "degreeLevel", "email", "contactEmail", "phones",
+      "citizenId", "birthDate",
     ];
 
     const updateData: Record<string, unknown> = {};

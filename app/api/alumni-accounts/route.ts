@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { checkNonExecutivePermission } from "@/lib/permissions";
 
 // "unverified" is intentionally NOT a filter — UNVERIFIED accounts are a
 // transient pre-email-verification state that admins don't track, so they're
@@ -9,10 +9,10 @@ const STATUS_FILTERS = new Set(["pending", "active", "rejected"]);
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
-    }
+    // Account management is excluded from the read-only executive role
+    // (PRD §2.1/§4.1) — same guard the users/logs GETs use.
+    const denied = await checkNonExecutivePermission();
+    if (denied) return denied;
 
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1", 10);
