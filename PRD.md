@@ -60,7 +60,7 @@ The login page has **two sections — Staff and Alumni** — toggled by a pair o
 
 - Staff use **CMU OAuth** to log in (email–password in testing mode).
 - Access is granted only if the CMU account has been pre-registered by a superadmin/admin.
-- Session-based authentication with HTTP-only cookies (`fon-cmu-session`); sessions expire after **7 days**.
+- Session-based authentication with HTTP-only cookies (`fon-cmu-session`); sessions expire after **30 days**.
 - Write endpoints require a valid staff (admin/superadmin) session (`checkWritePermission`); the executive role is refused writes.
 
 #### 3.1.2 Alumni Sign-up (two-gate)
@@ -435,7 +435,7 @@ All endpoints are under `/api/` (served at `/alumni/api/...`). Every data endpoi
 | `/api/auth/cmu-login` | POST | Public | Initiate CMU OAuth login |
 | `/api/auth/callback` | GET | Public | OAuth callback |
 | `/api/auth/logout` | POST | Authenticated | Staff logout |
-| `/api/auth/cleanup` | GET | Secret (`CLEANUP_SECRET`) | Cron session cleanup |
+| `/api/auth/cleanup` | GET, DELETE | Secret (`CLEANUP_SECRET`) | Cron session cleanup (prune expired sessions) |
 
 ### 9.2 Alumni Auth
 
