@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkWritePermission } from "@/lib/permissions";
+import { getSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 import { fetchCmuGraduateById } from "@/lib/cmu-registrar";
 import {
   buildSignupVerification,
@@ -20,6 +22,10 @@ export async function POST(
   try {
     const denied = await checkWritePermission();
     if (denied) return denied;
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    }
     const { id } = await params;
 
     const alumni = await prisma.alumni.findUnique({ where: { id } });
@@ -68,6 +74,14 @@ export async function POST(
       where: { id },
       data: { signupVerification: verification as unknown as Prisma.InputJsonValue },
     });
+
+    await logActivity(
+      { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
+      "UPDATE",
+      "alumni_auth",
+      id,
+      { alumniName: `${alumni.prefix}${alumni.firstName} ${alumni.lastName}`, studentId: alumni.studentId, source: verification.source },
+    );
 
     return NextResponse.json({ success: true, verification });
   } catch (error) {

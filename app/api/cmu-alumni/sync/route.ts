@@ -129,24 +129,24 @@ export async function POST(request: Request) {
       });
     }
 
-    if (auth.session) {
-      await logImport({
-        ctx: {
-          actorType: "ADMIN",
-          userId: auth.session.user.id,
-          userEmail: auth.session.user.email,
-          userRole: auth.session.user.role,
-        },
-        resource: "cmu_alumni",
-        fileName: null,
-        attempted: remote.length,
-        created,
-        updated,
-        failed: 0,
-        records,
-        errors: [],
-      });
-    }
+    await logImport({
+      ctx: auth.session
+        ? {
+            actorType: "ADMIN",
+            userId: auth.session.user.id,
+            userEmail: auth.session.user.email,
+            userRole: auth.session.user.role,
+          }
+        : { actorType: "SYSTEM" },
+      resource: "cmu_alumni",
+      fileName: null,
+      attempted: remote.length,
+      created,
+      updated,
+      failed: 0,
+      records,
+      errors: [],
+    });
 
     // The dashboard + alumni-count payloads are 60s-TTL cached; bust so the new
     // counts land immediately after a sync.

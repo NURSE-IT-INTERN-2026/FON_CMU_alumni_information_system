@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { verifyPassword, createSession, setSessionCookie } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { logActivity } from "@/lib/activity-log";
 import { handleZodError } from "@/lib/validations/helpers";
 import { adminLoginSchema } from "@/lib/validations/auth";
 
@@ -57,6 +58,14 @@ export async function POST(request: Request) {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+
+    await logActivity(
+      { actorType: "ADMIN", userId: user.id, userEmail: user.email, userRole: user.role },
+      "LOGIN",
+      "user",
+      user.id,
+      { method: "password" },
+    );
 
     const cookieStore = await cookies();
     cookieStore.set(setSessionCookie(token));
