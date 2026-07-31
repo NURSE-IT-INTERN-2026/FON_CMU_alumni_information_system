@@ -1,5 +1,14 @@
 import ExcelJS from "exceljs";
 
+// OOXML (.xlsx) files are ZIP archives — they start with the ZIP local-file
+// header magic PK\x03\x04. The app is .xlsx-only (no .xls/OLE2). The import
+// routes use this to reject non-spreadsheet uploads before handing them to exceljs.
+const XLSX_MAGIC = [0x50, 0x4b, 0x03, 0x04];
+
+export function isXlsxFile(buffer: Uint8Array): boolean {
+  return buffer.length >= 4 && XLSX_MAGIC.every((byte, i) => buffer[i] === byte);
+}
+
 /**
  * Read an Excel buffer and return rows as an array of objects keyed by header names.
  * First row is treated as headers. Empty cells default to "".

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { readExcelRows } from "@/lib/excel-import";
+import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { splitFullName } from "@/lib/parse-name";
 import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
 import {
@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!isXlsxFile(buffer)) {
+      return NextResponse.json({ error: "ไฟล์ต้องเป็นนามสกุล .xlsx เท่านั้น" }, { status: 400 });
+    }
     const rows = await readExcelRows(buffer);
 
     const errors: ImportErrorRow[] = [];

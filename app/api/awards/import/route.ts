@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { AwardType } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
-import { readExcelRows } from "@/lib/excel-import";
+import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { parseAwardRow, type ParsedAwardRow } from "@/lib/award-import-parse";
 import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
 import {
@@ -78,6 +78,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!isXlsxFile(buffer)) {
+      return NextResponse.json({ error: "ไฟล์ต้องเป็นนามสกุล .xlsx เท่านั้น" }, { status: 400 });
+    }
     const rows = await readExcelRows(buffer);
 
     const errors: ImportErrorRow[] = [];

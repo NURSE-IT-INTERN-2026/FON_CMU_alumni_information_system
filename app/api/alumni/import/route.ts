@@ -4,7 +4,7 @@ import { DegreeLevel, Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
-import { readExcelRows } from "@/lib/excel-import";
+import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { parsePhones } from "@/lib/parse-phone";
 import { ensurePrimaryEducationBulk } from "@/lib/education-sync";
 import { autoLinkPendingForAlumniBatch } from "@/lib/alumni-link";
@@ -70,6 +70,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!isXlsxFile(buffer)) {
+      return NextResponse.json({ error: "ไฟล์ต้องเป็นนามสกุล .xlsx เท่านั้น" }, { status: 400 });
+    }
     const rows = await readExcelRows(buffer);
 
     // 1) Parse + validate every row up front (invalid rows never reach the batch).

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { readExcelRows, readExcelRawRows } from "@/lib/excel-import";
+import { readExcelRows, readExcelRawRows, isXlsxFile } from "@/lib/excel-import";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!isXlsxFile(buffer)) {
+      return NextResponse.json({ error: "ไฟล์ต้องเป็นนามสกุล .xlsx เท่านั้น" }, { status: 400 });
+    }
 
     const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
 
