@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { clampPaging } from "@/lib/pagination";
 import { getSession } from "@/lib/auth";
 import { checkNonExecutivePermission } from "@/lib/permissions";
 
@@ -14,8 +15,11 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = request.nextUrl;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const pageSize = parseInt(searchParams.get("pageSize") || "20", 10);
+    const { page, pageSize } = clampPaging(
+      parseInt(searchParams.get("page") || "1", 10),
+      parseInt(searchParams.get("pageSize") || "20", 10),
+      { defaultPageSize: 20 },
+    );
     const resource = searchParams.get("resource") || "";
     const action = searchParams.get("action") || "";
     const userId = searchParams.get("userId") || "";

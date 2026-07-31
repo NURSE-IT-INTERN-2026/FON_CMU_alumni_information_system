@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { clampPaging } from "@/lib/pagination";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
@@ -19,8 +20,13 @@ export async function GET(request: NextRequest) {
   }
   try {
     const { searchParams } = request.nextUrl;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    // The all-alumni management page fetches the full local list (pageSize=50000)
+    // for its client-side CMU+local merge, so this endpoint allows a large cap.
+    const { page, pageSize } = clampPaging(
+      parseInt(searchParams.get("page") || "1", 10),
+      parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10),
+      { maxPageSize: 50_000 },
+    );
     const search = searchParams.get("search") || "";
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";

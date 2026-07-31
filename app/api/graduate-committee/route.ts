@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { clampPaging } from "@/lib/pagination";
 import { PAGE_SIZE } from "@/lib/constants";
 import { checkWritePermission } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
@@ -17,9 +18,11 @@ export async function GET(request: NextRequest) {
   }
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
+    const { page, pageSize } = clampPaging(
+      parseInt(searchParams.get("page") || "1", 10),
+      parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10),
+    );
     const search = searchParams.get("search") || "";
-    const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
     const searchField = searchParams.get("searchField") || "";
     const sortBy = searchParams.get("sortBy") || "termYear";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
