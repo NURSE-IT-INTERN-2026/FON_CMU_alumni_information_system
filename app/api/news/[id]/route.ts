@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { sanitizeNewsBodyForStorage } from "@/lib/news-sanitize";
 import { getSession, getAlumniSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
@@ -81,7 +82,7 @@ export async function PUT(
 
     const updateData: Record<string, unknown> = {};
     if (validated.title !== undefined) updateData.title = validated.title;
-    if (validated.body !== undefined) updateData.body = validated.body;
+    if (validated.body !== undefined) updateData.body = sanitizeNewsBodyForStorage(validated.body);
     if (validated.coverImageUrl !== undefined) updateData.coverImageUrl = validated.coverImageUrl;
     if (validated.status !== undefined) {
       updateData.status = validated.status;
