@@ -40,6 +40,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
+    // Defense-in-depth: reject an oversized upload from its Content-Length
+    // BEFORE buffering the body. A client can omit/under-report it (or use
+    // chunked encoding), so the authoritative cap is the reverse proxy
+    // (nginx `client_max_body_size`) + the post-read `file.size` check below.
+    const contentLength = parseInt(request.headers.get("content-length") ?? "", 10);
+    if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE * 2) {
+      return NextResponse.json({ error: "ขนาดไฟล์ต้องไม่เกิน 5MB" }, { status: 400 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
