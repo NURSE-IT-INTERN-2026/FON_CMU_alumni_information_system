@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { verifyPassword, createSession, setSessionCookie } from "@/lib/auth";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/get-client-ip";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError } from "@/lib/validations/helpers";
 import { adminLoginSchema } from "@/lib/validations/auth";
@@ -11,10 +12,7 @@ import { adminLoginSchema } from "@/lib/validations/auth";
 export async function POST(request: Request) {
   try {
     const headerStore = await headers();
-    const ip =
-      headerStore.get("x-forwarded-for")?.split(",")[0].trim() ??
-      headerStore.get("x-real-ip") ??
-      "unknown";
+    const ip = getClientIp(headerStore);
 
     const rateLimit = checkRateLimit(`login:${ip}`);
     if (!rateLimit.allowed) {

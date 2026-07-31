@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/get-client-ip";
 import { logActivity } from "@/lib/activity-log";
 import { sendEmailVerificationEmail } from "@/lib/email";
 import { handleZodError } from "@/lib/validations/helpers";
@@ -16,10 +17,7 @@ import { resendVerificationSchema } from "@/lib/validations/auth";
 export async function POST(request: Request) {
   try {
     const headerStore = await headers();
-    const ip =
-      headerStore.get("x-forwarded-for")?.split(",")[0].trim() ??
-      headerStore.get("x-real-ip") ??
-      "unknown";
+    const ip = getClientIp(headerStore);
 
     const rateLimit = checkRateLimit(`resend-verify:${ip}`);
     if (!rateLimit.allowed) {
