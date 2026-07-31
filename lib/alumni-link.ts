@@ -349,7 +349,9 @@ export async function autoLinkPendingForAlumni(args: {
     const actor =
       ctx.actorType === "ADMIN"
         ? { actorType: "ADMIN" as const, userId: ctx.userId, actorName: ctx.userEmail }
-        : { actorType: "ALUMNI" as const, alumniId: ctx.alumniId, actorName: ctx.alumniName };
+        : ctx.actorType === "ALUMNI"
+          ? { actorType: "ALUMNI" as const, alumniId: ctx.alumniId, actorName: ctx.alumniName }
+          : { actorType: "ADMIN" as const, userId: "system", actorName: "ระบบ" };
     for (const c of collected) {
       await recordFieldChanges({
         resourceType: c.resourceType,
@@ -495,7 +497,9 @@ export async function autoLinkPendingForAlumniBatch(args: {
       const actor =
         ctx.actorType === "ADMIN"
           ? { actorType: "ADMIN" as const, userId: ctx.userId, actorName: ctx.userEmail }
-          : { actorType: "ALUMNI" as const, alumniId: ctx.alumniId, actorName: ctx.alumniName };
+          : ctx.actorType === "ALUMNI"
+            ? { actorType: "ALUMNI" as const, alumniId: ctx.alumniId, actorName: ctx.alumniName }
+            : { actorType: "ADMIN" as const, userId: "system", actorName: "ระบบ" };
       for (const c of collected) {
         await recordFieldChanges({
           resourceType: c.resourceType,

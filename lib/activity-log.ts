@@ -51,7 +51,11 @@ interface AlumniLogContext {
   alumniName: string;
 }
 
-export type LogContext = AdminLogContext | AlumniLogContext;
+interface SystemLogContext {
+  actorType: "SYSTEM";
+}
+
+export type LogContext = AdminLogContext | AlumniLogContext | SystemLogContext;
 
 export async function logActivity(
   ctx: LogContext,
@@ -79,12 +83,19 @@ export async function logActivity(
         userEmail: ctx.userEmail,
         userRole: ctx.userRole,
       };
-    } else {
+    } else if (ctx.actorType === "ALUMNI") {
       data = {
         ...common,
         actorType: "ALUMNI",
         alumniId: ctx.alumniId,
         alumniName: ctx.alumniName,
+      };
+    } else {
+      // SYSTEM: an automated actor (e.g. the CMU_SYNC_SECRET cron). The
+      // identity columns stay null (they're nullable); only actorType is set.
+      data = {
+        ...common,
+        actorType: "SYSTEM",
       };
     }
     const log = await tx.activityLog.create({ data });

@@ -120,7 +120,9 @@ async function applyAgencyHomeAddressToAlumni(
     actor:
       ctx.actorType === "ADMIN"
         ? { actorType: "ADMIN", userId: ctx.userId, actorName: ctx.userEmail }
-        : { actorType: "ALUMNI", alumniId: ctx.alumniId, actorName: ctx.alumniName },
+        : ctx.actorType === "ALUMNI"
+          ? { actorType: "ALUMNI", alumniId: ctx.alumniId, actorName: ctx.alumniName }
+          : { actorType: "ADMIN", userId: "system", actorName: "ระบบ" },
     reason,
     activityLogId: logId,
   });
