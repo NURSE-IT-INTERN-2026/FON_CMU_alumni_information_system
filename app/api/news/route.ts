@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { clampPaging } from "@/lib/pagination";
 import { sanitizeNewsBodyForStorage } from "@/lib/news-sanitize";
 import { getSession, getAlumniSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
@@ -12,8 +13,10 @@ import { handleZodError, newsCreateSchema } from "@/lib/validations";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const pageSize = parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10);
+    const { page, pageSize } = clampPaging(
+      parseInt(searchParams.get("page") || "1", 10),
+      parseInt(searchParams.get("pageSize") || String(PAGE_SIZE), 10),
+    );
     const search = searchParams.get("search") || "";
     const statusParam = searchParams.get("status") || "";
     const pinnedOnly = searchParams.get("pinned") === "true";

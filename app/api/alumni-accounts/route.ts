@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { clampPaging } from "@/lib/pagination";
 import { checkNonExecutivePermission } from "@/lib/permissions";
 
 // "unverified" is intentionally NOT a filter — UNVERIFIED accounts are a
@@ -15,8 +16,10 @@ export async function GET(request: NextRequest) {
     if (denied) return denied;
 
     const { searchParams } = request.nextUrl;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const pageSize = parseInt(searchParams.get("pageSize") || "10", 10);
+    const { page, pageSize } = clampPaging(
+      parseInt(searchParams.get("page") || "1", 10),
+      parseInt(searchParams.get("pageSize") || "10", 10),
+    );
     const search = searchParams.get("search") || "";
     const status = (searchParams.get("status") || "").toLowerCase();
 
