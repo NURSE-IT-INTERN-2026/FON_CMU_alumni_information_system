@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { educationCreateSchema } from "@/lib/validations/education";
 import { handleZodError } from "@/lib/validations";
@@ -51,6 +52,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permErr = await checkWritePermission();
+  if (permErr) return permErr;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });

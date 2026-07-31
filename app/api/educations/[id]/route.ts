@@ -14,11 +14,19 @@ type WriterCtx =
   | { kind: "admin"; userId: string; userEmail: string; userRole: string }
   | { kind: "alumni"; alumniId: string; alumniName: string };
 
-// A write is allowed for any admin, or for the alumni that owns the record.
-// Returns null with no session at all.
+// A write is allowed for any non-executive admin, or for the alumni that owns
+// the record. The read-only "executive" role is blocked here (mirrors
+// checkWritePermission, which every other mutating route funnels through).
+// Returns a 401 NextResponse with no session at all.
 async function resolveWriter(alumniOwnerId: string): Promise<WriterCtx | NextResponse> {
   const admin = await getSession();
   if (admin) {
+    if (admin.user.role === "executive") {
+      return NextResponse.json(
+        { error: "บัญชีผู้บริหารสามารถดูข้อมูลได้เท่านั้น ไม่สามารถแก้ไขหรือบันทึกข้อมูลได้" },
+        { status: 403 },
+      );
+    }
     return { kind: "admin", userId: admin.user.id, userEmail: admin.user.email, userRole: admin.user.role };
   }
   const alumniSession = await getAlumniSession();
