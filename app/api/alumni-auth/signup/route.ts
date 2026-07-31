@@ -76,19 +76,16 @@ export async function POST(request: Request) {
       where: { studentId },
     });
 
-    // Already-registered account (credentials exist). Tailor the message to the
-    // account's status so the applicant knows where they stand.
+    // Already-registered account (credentials exist). Return ONE generic message
+    // — do NOT reveal the account's review status (UNVERIFIED/PENDING/REJECTED),
+    // which would let an attacker enumerate account states by studentId
+    // (security #16). A legit applicant can learn their status by attempting to
+    // log in (the login flow surfaces it by email) or by contacting the admin.
     if (localAlumni?.passwordHash) {
-      const status = localAlumni.accountStatus;
-      const msg =
-        status === "UNVERIFIED"
-          ? "บัญชีของท่านรอยืนยันอีเมล กรุณาตรวจสอบอีเมลเพื่อยืนยันตัวตน"
-          : status === "PENDING"
-            ? "บัญชีของท่านอยู่ระหว่างตรวจสอบ กรุณารอการอนุมัติจากผู้ดูแลระบบ"
-            : status === "REJECTED"
-              ? "การลงทะเบียนของท่านถูกปฏิเสธ ท่านสามารถยื่นคำขอใหม่ได้ที่หน้าเข้าสู่ระบบ"
-              : "ท่านได้ลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ";
-      return NextResponse.json({ error: msg, code: status }, { status: 409 });
+      return NextResponse.json(
+        { error: "รหัสนักศึกษานี้ถูกใช้ลงทะเบียนแล้ว หากเป็นบัญชีของท่าน กรุณาเข้าสู่ระบบหรือติดต่อผู้ดูแลระบบ" },
+        { status: 409 },
+      );
     }
 
     // 3. Best-effort CMU lookup to capture the per-field comparison snapshot for
