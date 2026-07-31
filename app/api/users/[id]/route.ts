@@ -6,6 +6,29 @@ import { checkNonExecutivePermission, checkSuperAdminPermission } from "@/lib/pe
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, userUpdateSchema } from "@/lib/validations";
 
+// Reject an operation that would leave the system with zero active superadmins
+// (availability lockout — no account could then perform superadmin-only actions
+// like trash restore/hard-delete, user CRUD, or log bulk-delete). `removing`
+// must be true only when the operation actually drops the target from the
+// active-superadmin set (role change away, deactivate, or delete of a
+// currently-active superadmin). The count includes the target itself, so
+// `<= 1` means they are the only one.
+async function guardLastActiveSuperadmin(
+  removing: boolean,
+): Promise<NextResponse | null> {
+  if (!removing) return null;
+  const activeSuperadmins = await prisma.adminUser.count({
+    where: { role: "superadmin", isActive: true },
+  });
+  if (activeSuperadmins <= 1) {
+    return NextResponse.json(
+      { error: "ไม่สามารถดำเนินการที่ทำให้ไม่มีผู้ดูแลระบบขั้นสูงที่ใช้งานได้เหลืออยู่" },
+      { status: 400 },
+    );
+  }
+  return null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -76,6 +99,15 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    // Block demote/deactivate of the last active superadmin (availability lockout).
+    const removingActiveSuperadmin =
+      existing.role === "superadmin" &&
+      existing.isActive &&
+      ((validated.role !== undefined && validated.role !== "superadmin") ||
+        validated.isActive === false);
+    const lockErr = await guardLastActiveSuperadmin(removingActiveSuperadmin);
+    if (lockErr) return lockErr;
 
     const updateData: Record<string, unknown> = {};
     if (validated.firstName !== undefined) updateData.firstName = validated.firstName;
@@ -155,6 +187,12 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Block deletion of the last active superadmin (availability lockout).
+    const lockErr = await guardLastActiveSuperadmin(
+      existing.role === "superadmin" && existing.isActive,
+    );
+    if (lockErr) return lockErr;
 
     await prisma.adminUser.delete({ where: { id } });
 
