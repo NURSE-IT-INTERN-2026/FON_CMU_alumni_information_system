@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeNewsBody } from "@/lib/news-sanitize";
+import { sanitizeNewsBody, sanitizeNewsBodyForStorage } from "@/lib/news-sanitize";
 
 // Regression test for security #6: the news-body `style` attribute is
 // constrained to an editor-minimal allowlist (color / background-color /
@@ -66,5 +66,38 @@ describe("sanitizeNewsBody (security #6 — inline-style allowlist)", () => {
     expect(out).toContain("hl");
     expect(out.toLowerCase()).not.toContain("<script");
     expect(out).toContain("<p>ok</p>");
+  });
+});
+
+describe("sanitizeNewsBodyForStorage (security #7 — sanitize on write, basePath-relative)", () => {
+  it("strips dangerous styles (same policy as render)", () => {
+    const out = sanitizeNewsBodyForStorage(
+      `<div style="position:fixed;z-index:9;opacity:0">x</div>`,
+    );
+    expect(out).toContain("x");
+    expect(out).not.toContain("position");
+    expect(out).not.toContain("z-index");
+    expect(out).not.toContain("opacity");
+  });
+
+  it("keeps allowlisted editor styles", () => {
+    const out = sanitizeNewsBodyForStorage(`<p style="text-align:center">hi</p>`);
+    expect(out).toContain("text-align");
+  });
+
+  it("does NOT bake basePath into upload srcs (storage stays basePath-relative)", () => {
+    const out = sanitizeNewsBodyForStorage(`<img src="/uploads/abc.png">`);
+    expect(out).toContain('src="/uploads/abc.png"');
+    expect(out).not.toContain("/alumni/uploads/abc.png");
+  });
+
+  it("write-then-render is stable (idempotent second layer)", () => {
+    const stored = sanitizeNewsBodyForStorage(
+      `<p style="text-align:center">hi</p><script>x</script>`,
+    );
+    const rendered = sanitizeNewsBody(stored);
+    expect(rendered).toContain("text-align");
+    expect(rendered).toContain(">hi<");
+    expect(rendered.toLowerCase()).not.toContain("<script");
   });
 });

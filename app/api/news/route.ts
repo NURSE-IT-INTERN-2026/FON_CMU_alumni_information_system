@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { sanitizeNewsBodyForStorage } from "@/lib/news-sanitize";
 import { getSession, getAlumniSession } from "@/lib/auth";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
     const news = await prisma.news.create({
       data: {
         title: validated.title,
-        body: validated.body,
+        body: sanitizeNewsBodyForStorage(validated.body),
         coverImageUrl: validated.coverImageUrl || null,
         status: validated.status,
         publishedAt: validated.status === "PUBLISHED" ? new Date() : null,
