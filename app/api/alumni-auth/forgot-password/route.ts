@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { hashToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/get-client-ip";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity-log";
 import { randomBytes } from "crypto";
@@ -13,10 +14,7 @@ import { forgotPasswordSchema } from "@/lib/validations/auth";
 export async function POST(request: Request) {
   try {
     const headerStore = await headers();
-    const ip =
-      headerStore.get("x-forwarded-for")?.split(",")[0].trim() ??
-      headerStore.get("x-real-ip") ??
-      "unknown";
+    const ip = getClientIp(headerStore);
 
     const rateLimit = checkRateLimit(`forgot-password:${ip}`);
     if (!rateLimit.allowed) {

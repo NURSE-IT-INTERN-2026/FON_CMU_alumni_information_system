@@ -106,9 +106,3 @@ export async function logActivity(
     return null;
   }
 }
-
-export function getIp(request: Request): string | null {
-  const forwarded = (request as { headers: Headers }).headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return null;
-}

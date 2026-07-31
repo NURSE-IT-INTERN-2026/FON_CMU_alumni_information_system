@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getIp } from "@/lib/activity-log";
+import { getClientIp } from "@/lib/get-client-ip";
 import { getCmuGraduatesLocal, applyCmuGraduateFilters, type CmuGraduate } from "@/lib/cmu-registrar";
 import { normalizeCmuBirthday, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { PAGE_SIZE } from "@/lib/constants";
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Rate limit
-  const ip = getIp(request);
+  const ip = getClientIp(request.headers);
   const rateResult = checkRateLimit(
     `cmu-alumni:${ip}`,
     RATE_LIMIT_MAX,
