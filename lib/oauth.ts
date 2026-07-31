@@ -38,14 +38,25 @@ export async function exchangeCodeForToken(
 
   if (!res.ok) {
     const text = await res.text();
-    console.error(`Token exchange failed: ${res.status}`, text);
-    throw new Error(`Token exchange failed: ${res.status} ${text}`);
+    // In production log only the status — the token-endpoint body can echo
+    // sensitive request/internal detail. The raw body is dev-only (debugging)
+    // and is NEVER embedded in the thrown Error message (callers may log it).
+    console.error(`OAuth token exchange failed: HTTP ${res.status}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("OAuth token exchange response body:", text);
+    }
+    throw new Error(`OAuth token exchange failed: HTTP ${res.status}`);
   }
 
   const data = await res.json();
   if (!data.access_token) {
-    console.error("Token response missing access_token:", JSON.stringify(data).slice(0, 200));
-    throw new Error("No access_token in token response");
+    // A 200 token response can carry live tokens (refresh_token, id_token) —
+    // never log its body in production. Dev-only for debugging.
+    console.error("OAuth token response missing access_token");
+    if (process.env.NODE_ENV !== "production") {
+      console.error("OAuth token response body:", JSON.stringify(data));
+    }
+    throw new Error("OAuth token response missing access_token");
   }
 
   return data.access_token as string;
