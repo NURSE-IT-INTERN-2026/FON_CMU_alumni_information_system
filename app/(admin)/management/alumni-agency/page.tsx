@@ -766,7 +766,7 @@ export default function AlumniAgencyPage() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {sortedAlumni.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, sortedAlumni.length)} จาก {sortedAlumni.length} รายการ</span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
                 <button onClick={() => { setPage(Math.max(1, page - 1)); }} disabled={page === 1} className="rounded-md border border-[var(--border)] bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100">ก่อนหน้า</button>
                 {getPageNumbers(page, totalPages).map((p, i) => (
                   p === "dots" ? <span key={`dots-${i}`} className="px-1 text-gray-400">…</span> :

@@ -237,7 +237,7 @@ function AlumniReapplyForm() {
               )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <FormField label="รหัสนักศึกษา" error={errors.studentId?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                     <FormInput
                       registration={register("studentId")}
@@ -275,7 +275,7 @@ function AlumniReapplyForm() {
                   </FormSelect>
                 </FormField>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <FormField label="ชื่อ (ขณะศึกษา)" error={errors.firstName?.message} labelClassName="mb-1.5 block text-sm font-medium text-[var(--foreground)]">
                     <FormInput
                       registration={register("firstName")}

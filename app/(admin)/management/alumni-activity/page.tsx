@@ -270,7 +270,7 @@ function DegreeLineChart({
               margin={{ top: 10, right: 10, left: 10, bottom: 32 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" interval={0} tick={MonthTick} />
+              <XAxis dataKey="label" interval="preserveEnd" tick={MonthTick} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip
                 labelFormatter={(l) => String(l).replace("\n", " ")}

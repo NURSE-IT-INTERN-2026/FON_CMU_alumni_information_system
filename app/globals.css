@@ -113,3 +113,10 @@ table {
   max-width: 100%;
   height: auto;
 }
+/* Embedded videos (YouTube/Vimeo) must scale within the news body column —
+   a default 560px iframe overflows a ~343px phone otherwise. */
+.prose iframe {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}

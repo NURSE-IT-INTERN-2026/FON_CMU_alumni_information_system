@@ -930,7 +930,7 @@ export default function AlumniCountPage() {
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
                 <span className="text-sm text-gray-500">แสดง {activeTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, activeTotal)} จาก {activeTotal} รายการ</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
                   <button
                     onClick={() => { setPage(Math.max(1, page - 1)); }}
                     disabled={page === 1}

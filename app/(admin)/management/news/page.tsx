@@ -446,7 +446,7 @@ export default function NewsListPage() {
           ข่าวสารและกิจกรรม
         </h1>
         {canWrite && (selectMode ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               disabled={!(selectAllTarget.status !== null && selectAllTarget.ids.length > 0)}
               title={selectAllTarget.status === null ? "เลือกการ์ดใดการ์ดหนึ่งก่อนเพื่อเลือกตามสถานะ" : undefined}
