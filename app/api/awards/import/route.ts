@@ -39,9 +39,15 @@ const naturalKey = (r: ResolvedAward) => `${r.data.awardName}|${r.data.year}`;
 const compositeCandidates = (r: ResolvedAward) =>
   incomingIdentityKeys(identityOf(r)).map((k) => `${k}|${naturalKey(r)}`);
 
-/** The award payload written on both create and update (identical — same fields). */
+/**
+ * The award payload written on both create and update. `imageUrl` is included
+ * ONLY when the import provides a non-blank value: on create an omitted nullable
+ * column defaults to NULL (same as null), and on update omitting it preserves an
+ * existing image — so a round-tripped export (no รูปภาพ column, parses to null)
+ * doesn't blank an image that was set out-of-band.
+ */
 function awardPayload(r: ResolvedAward): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     studentId: r.studentId,
     pendingStudentId: r.pendingStudentId,
     prefix: r.data.prefix,
@@ -51,10 +57,13 @@ function awardPayload(r: ResolvedAward): Record<string, unknown> {
     awardType: r.data.awardType as AwardType,
     year: r.data.year,
     link: r.data.link,
-    imageUrl: r.data.imageUrl,
     description: r.data.description,
     major: r.major,
   };
+  if (r.data.imageUrl) {
+    payload.imageUrl = r.data.imageUrl;
+  }
+  return payload;
 }
 
 export async function POST(request: NextRequest) {
