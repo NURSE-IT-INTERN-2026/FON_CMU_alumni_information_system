@@ -97,7 +97,7 @@ describe("parseAwardRow", () => {
     const row = { ...validRow, "ปี (พ.ศ.)": "two-thousand" };
     const { data, error } = parseAwardRow(row, 7);
     expect(data).toBeNull();
-    expect(error).toMatchObject({ row: 7, message: "ปี (พ.ศ.) ไม่ถูกต้อง" });
+    expect(error).toMatchObject({ row: 7, message: "ปีไม่ถูกต้อง" });
   });
 
   it("parses all three award types", () => {

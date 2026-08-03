@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { AwardType } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { parseAwardRow, type ParsedAwardRow } from "@/lib/award-import-parse";
+import { awardWritePayload } from "@/lib/award-excel";
 import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import {
   fetchAlumniByStudentIds,
@@ -38,33 +38,6 @@ const identityOf = (r: ResolvedAward): Identity => ({
 const naturalKey = (r: ResolvedAward) => `${r.data.awardName}|${r.data.year}`;
 const compositeCandidates = (r: ResolvedAward) =>
   incomingIdentityKeys(identityOf(r)).map((k) => `${k}|${naturalKey(r)}`);
-
-/**
- * The award payload written on both create and update. `imageUrl` is included
- * ONLY when the import provides a non-blank value: on create an omitted nullable
- * column defaults to NULL (same as null), and on update omitting it preserves an
- * existing image — so a round-tripped export (no รูปภาพ column, parses to null)
- * doesn't blank an image that was set out-of-band.
- */
-function awardPayload(r: ResolvedAward): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    studentId: r.studentId,
-    pendingStudentId: r.pendingStudentId,
-    prefix: r.data.prefix,
-    firstName: r.data.firstName,
-    lastName: r.data.lastName,
-    awardName: r.data.awardName,
-    awardType: r.data.awardType as AwardType,
-    year: r.data.year,
-    link: r.data.link,
-    description: r.data.description,
-    major: r.major,
-  };
-  if (r.data.imageUrl) {
-    payload.imageUrl = r.data.imageUrl;
-  }
-  return payload;
-}
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -174,7 +147,7 @@ export async function POST(request: NextRequest) {
     let updated = 0;
 
     // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
-    await chunkedCreateMany(toCreate, awardPayload, {
+    await chunkedCreateMany(toCreate, awardWritePayload, {
       createMany: (payloads) => prisma.award.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.award.create({ data: payload as never }),
       onCreated: () => {
@@ -190,7 +163,7 @@ export async function POST(request: NextRequest) {
     //    the read-side bulk above already removed the per-row findFirst).
     for (const { row, existingId } of toUpdate) {
       try {
-        await prisma.award.update({ where: { id: existingId }, data: awardPayload(row) as never });
+        await prisma.award.update({ where: { id: existingId }, data: awardWritePayload(row) as never });
         updated++;
       } catch (e) {
         console.error("Import update row error:", e);

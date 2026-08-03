@@ -35,8 +35,12 @@ export function parseAwardRow(
   const lastName = row["นามสกุล"]?.toString().trim();
   const major = row["สาขาวิชา"]?.toString().trim() || null;
   const awardName = row["ชื่อรางวัล"]?.toString().trim();
-  const awardTypeThai = row["ประเภทรางวัล"]?.toString().trim();
-  const yearStr = row["ปี (พ.ศ.)"]?.toString().trim();
+  // Accept both the page-table header (ประเภท / ปีที่ได้รับ) and the legacy
+  // export header (ประเภทรางวัล / ปี (พ.ศ.)) so old exports still round-trip.
+  const awardTypeThai =
+    row["ประเภท"]?.toString().trim() || row["ประเภทรางวัล"]?.toString().trim() || "";
+  const yearStr =
+    row["ปีที่ได้รับ"]?.toString().trim() || row["ปี (พ.ศ.)"]?.toString().trim() || "";
   const link = row["ลิงค์"]?.toString().trim() || null;
   const imageUrl = row["รูปภาพ"]?.toString().trim() || null;
   const description = row["รายละเอียด"]?.toString().trim() || null;
@@ -55,7 +59,7 @@ export function parseAwardRow(
 
   const year = parseInt(yearStr, 10);
   if (isNaN(year)) {
-    return { data: null, error: { row: rowNumber, message: "ปี (พ.ศ.) ไม่ถูกต้อง" } };
+    return { data: null, error: { row: rowNumber, message: "ปีไม่ถูกต้อง" } };
   }
 
   return {
