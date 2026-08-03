@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { AWARD_TYPE_LABELS } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
+import { awardToExportRow } from "@/lib/award-excel";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -74,18 +74,7 @@ export async function GET(request: NextRequest) {
       orderBy: { [orderKey]: dir },
     });
     const { start, end } = resolveRowRange(startRow, endRow, items.length);
-    const rows = items.slice(start - 1, end).map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      "คำนำหน้า": a.prefix ?? "",
-      "ชื่อ": a.firstName ?? "",
-      "นามสกุล": a.lastName ?? "",
-      "สาขาวิชา": a.major || "",
-      "ชื่อรางวัล": a.awardName,
-      "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
-      "ปี (พ.ศ.)": a.year,
-      "ลิงค์": a.link || "",
-      "รายละเอียด": a.description || "",
-    }));
+    const rows = items.slice(start - 1, end).map(awardToExportRow);
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "EXPORT",
@@ -136,18 +125,7 @@ export async function POST(request: NextRequest) {
       { count: items.length, mode: "selected" },
     );
 
-    const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      "คำนำหน้า": a.prefix ?? "",
-      "ชื่อ": a.firstName ?? "",
-      "นามสกุล": a.lastName ?? "",
-      "สาขาวิชา": a.major || "",
-      "ชื่อรางวัล": a.awardName,
-      "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
-      "ปี (พ.ศ.)": a.year,
-      "ลิงค์": a.link || "",
-      "รายละเอียด": a.description || "",
-    }));
+    const rows = items.map(awardToExportRow);
 
     return buildExcelResponse(rows, "รางวัล", "awards_export");
   } catch (error) {
