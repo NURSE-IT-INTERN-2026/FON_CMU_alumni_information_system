@@ -12,7 +12,7 @@ import {
   parseExportFormat,
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
-import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import { syncAgencyHomeAddressToAlumniBulk } from "@/lib/alumni-agency-home-sync";
 import {
   fetchAlumniByStudentIds,
@@ -133,18 +133,14 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
     let updated = 0;
-    const importedRecords: ImportedRecord[] = [];
 
-    const displayName = (r: Row): string =>
-      [r.data.firstName, r.data.lastName].filter(Boolean).join(" ") || r.data.englishName || r.data.studentId || r.data.pendingStudentId || "—";
-    const effectiveId = (r: Row): string | null => r.data.studentId ?? r.data.pendingStudentId ?? null;
     const payloadOf = (r: Row): Record<string, unknown> => ({ ...r.data });
 
     // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
     await chunkedCreateMany(toCreate, payloadOf, {
       createMany: (payloads) => prisma.alumniAgency.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.alumniAgency.create({ data: payload as never }),
-      onCreated: (r) => { imported++; importedRecords.push({ id: effectiveId(r), name: displayName(r), op: "created" }); },
+      onCreated: () => { imported++; },
       onError: (r, e) => {
         console.error("Import create row error:", e);
         errors.push({ row: r.rowNumber, message: `ไม่สามารถนำเข้าข้อมูล: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
@@ -156,7 +152,6 @@ export async function POST(request: NextRequest) {
       try {
         await prisma.alumniAgency.update({ where: { id: existingId }, data: payloadOf(row) as never });
         updated++;
-        importedRecords.push({ id: effectiveId(row), name: displayName(row), op: "updated" });
       } catch (e) {
         console.error("Import update row error:", e);
         errors.push({ row: row.rowNumber, message: `ไม่สามารถนำเข้าข้อมูล: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
@@ -180,7 +175,6 @@ export async function POST(request: NextRequest) {
       created: imported,
       updated,
       failed: errors.length,
-      records: importedRecords,
       errors,
     });
 

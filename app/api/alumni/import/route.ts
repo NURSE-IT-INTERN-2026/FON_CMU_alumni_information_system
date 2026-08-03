@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { DegreeLevel, Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { parsePhones } from "@/lib/parse-phone";
 import { ensurePrimaryEducationBulk } from "@/lib/education-sync";
@@ -142,20 +142,13 @@ export async function POST(request: NextRequest) {
 
     let created = 0;
     let updated = 0;
-    const importedRecords: ImportedRecord[] = [];
-    const recordOf = (r: AlumniRecord, op: ImportedRecord["op"]): ImportedRecord => ({
-      id: r.studentId,
-      name: `${r.prefix} ${r.firstName} ${r.lastName}`.trim(),
-      op,
-    });
 
     // 4) Chunked createMany (per-row fallback isolates a bad row) for new alumni.
     await chunkedCreateMany(toCreate, (r) => ({ ...r }), {
       createMany: (payloads) => prisma.alumni.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.alumni.create({ data: payload as never }),
-      onCreated: (r) => {
+      onCreated: () => {
         created++;
-        importedRecords.push(recordOf(r, "created"));
       },
       onError: (r, e) => {
         console.error("Import create row error:", e);
@@ -200,7 +193,6 @@ export async function POST(request: NextRequest) {
           data: updateData,
         });
         updated++;
-        importedRecords.push(recordOf(row, "updated"));
       } catch (e) {
         console.error("Import update row error:", e);
         errors.push({ row: -1, message: `ไม่สามารถอัปเดต ${row.studentId}: ${e instanceof Error ? e.message : "ข้อผิดพลาด"}` });
@@ -258,7 +250,6 @@ export async function POST(request: NextRequest) {
       created,
       updated,
       failed: errors.length,
-      records: importedRecords,
       errors,
     });
 
