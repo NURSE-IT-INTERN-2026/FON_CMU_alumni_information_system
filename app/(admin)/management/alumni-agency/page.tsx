@@ -209,7 +209,7 @@ export default function AlumniAgencyPage() {
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string; homeAddress?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string; homeAddress?: string; cohort?: string; englishName?: string }) => {
     setValue("studentId", a.studentId);
     setValue("major", a.major ?? "");
     setValue("prefix", a.prefix ?? "");
@@ -219,6 +219,9 @@ export default function AlumniAgencyPage() {
     // homeAddress unification) — but only when they have one, so selecting an
     // alumni without an address never clobbers a value already typed.
     if (a.homeAddress) setValue("homeAddress", a.homeAddress);
+    // Auto-fill รุ่น + ชื่ออังกฤษ from the alumni when present (same don't-clobber rule).
+    if (a.cohort) setValue("cohort", a.cohort);
+    if (a.englishName) setValue("englishName", a.englishName);
     setNameSearch("");
     clearResults();
     setFormSearchField(null);
