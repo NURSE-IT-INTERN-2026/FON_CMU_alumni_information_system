@@ -3,14 +3,9 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
+import { committeeToExportRow } from "@/lib/graduate-committee-excel";
 
 const MAX_EXPORT_COUNT = 10000;
-
-const NAME_ROW = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) => ({
-  "คำนำหน้า": a.prefix ?? "",
-  "ชื่อ": a.firstName ?? "",
-  "นามสกุล": a.lastName ?? "",
-});
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,15 +69,7 @@ export async function GET(request: NextRequest) {
       orderBy: { [validSortField]: sortOrder },
     });
     const { start, end } = resolveRowRange(startRow, endRow, items.length);
-    const rows = items.slice(start - 1, end).map((a) => ({
-      "ปี พ.ศ.": a.termYear,
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      ...NAME_ROW(a),
-      "สาขาวิชา": a.major || "",
-      "รุ่นที่": a.cohort,
-      "ตำแหน่ง": a.position,
-      "หมายเหตุ": a.remarks || "",
-    }));
+    const rows = items.slice(start - 1, end).map(committeeToExportRow);
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "EXPORT",
@@ -133,15 +120,7 @@ export async function POST(request: NextRequest) {
       { count: items.length, mode: "selected" },
     );
 
-    const rows = items.map((a) => ({
-      "ปี พ.ศ.": a.termYear,
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      ...NAME_ROW(a),
-      "สาขาวิชา": a.major || "",
-      "รุ่นที่": a.cohort,
-      "ตำแหน่ง": a.position,
-      "หมายเหตุ": a.remarks || "",
-    }));
+    const rows = items.map(committeeToExportRow);
 
     return buildExcelResponse(rows, "กรรมการบัณฑิต", "graduate_committee_export");
   } catch (error) {
