@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
-import { splitFullName } from "@/lib/parse-name";
 import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import {
   fetchAlumniByStudentIds,
@@ -16,40 +15,19 @@ import {
   chunkedCreateMany,
   type Identity,
 } from "@/lib/import-batch";
+import { parseModelRepRow, type ModelRepImportRecord } from "@/lib/model-representative-excel";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-type NameRow = { prefix: string; firstName: string; lastName: string };
-
-/** Read คำนำหน้า/ชื่อ/นามสกุล columns; fall back to a legacy combined ชื่อ-สกุล column. */
-function readName(row: Record<string, unknown>): NameRow {
-  const prefixCol = row["คำนำหน้า"]?.toString().trim() || "";
-  const firstNameCol = row["ชื่อ"]?.toString().trim() || "";
-  const lastNameCol = row["นามสกุล"]?.toString().trim() || "";
-  const legacyFull = row["ชื่อ-สกุล"]?.toString().trim() || "";
-  if (!firstNameCol && !lastNameCol && legacyFull) {
-    const parsed = splitFullName(legacyFull);
-    return { prefix: parsed.prefix || "", firstName: parsed.firstName, lastName: parsed.lastName };
-  }
-  return { prefix: prefixCol, firstName: firstNameCol, lastName: lastNameCol };
-}
 
 /**
  * A parsed model-representative row with its resolved alumni link.
  * NOTE the inverted mapping vs sibling entities (per CLAUDE.md): เครือข่าย→`cohort`,
- * ลำดับรุ่น→`generation`, สาขาวิชา→`major`.
+ * รุ่นที่→`generation`, สาขาวิชา→`major`.
  */
-type Resolved = {
-  rowNumber: number;
-  attemptedStudentId: string; // raw id from the row (for the warning + link call)
+type Resolved = ModelRepImportRecord & {
   studentId: string | null; // resolved (linked) FK
   pendingStudentId: string | null;
   major: string | null;
-  prefix: string;
-  firstName: string;
-  lastName: string;
-  cohort: string; // เครือข่าย
-  generation: number; // ลำดับรุ่น
 };
 
 const identityOf = (r: Resolved): Identity => ({
@@ -114,28 +92,14 @@ export async function POST(request: NextRequest) {
     const warnings: ImportErrorRow[] = [];
 
     // 1) Parse + validate every row up front (invalid rows never reach the batch).
-    const raw: Omit<Resolved, "studentId" | "pendingStudentId" | "major">[] = [];
+    const raw: ModelRepImportRecord[] = [];
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNumber = i + 2;
-
-      const studentId = row["รหัสนักศึกษา"]?.toString().trim() || "";
-      const name = readName(row);
-      const cohort = row["เครือข่าย"]?.toString().trim();
-      const generationStr = row["ลำดับรุ่น"]?.toString().trim();
-
-      if (!studentId || !name.firstName || !name.lastName || !cohort || !generationStr) {
-        errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
+      const { data, error } = parseModelRepRow(rows[i], i + 2);
+      if (error) {
+        errors.push(error);
         continue;
       }
-
-      const generation = parseInt(generationStr, 10);
-      if (isNaN(generation)) {
-        errors.push({ row: rowNumber, message: "ลำดับรุ่นไม่ถูกต้อง" });
-        continue;
-      }
-
-      raw.push({ rowNumber, attemptedStudentId: studentId, prefix: name.prefix, firstName: name.firstName, lastName: name.lastName, cohort, generation });
+      raw.push(data!);
     }
 
     const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
