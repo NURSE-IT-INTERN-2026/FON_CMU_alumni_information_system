@@ -3,14 +3,9 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
+import { potentialToExportRow } from "@/lib/potential-excel";
 
 const MAX_EXPORT_COUNT = 10000;
-
-const NAME_ROW = (a: { prefix: string | null; firstName: string | null; lastName: string | null }) => ({
-  "คำนำหน้า": a.prefix ?? "",
-  "ชื่อ": a.firstName ?? "",
-  "นามสกุล": a.lastName ?? "",
-});
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,14 +56,7 @@ export async function GET(request: NextRequest) {
       orderBy: { [validSortField]: sortOrder },
     });
     const { start, end } = resolveRowRange(startRow, endRow, items.length);
-    const rows = items.slice(start - 1, end).map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      ...NAME_ROW(a),
-      "สาขาวิชา": a.major || "",
-      "อาชีพ": a.career,
-      "ตำแหน่ง": a.position,
-      "ปีที่บันทึก (พ.ศ.)": a.recordedYear,
-    }));
+    const rows = items.slice(start - 1, end).map(potentialToExportRow);
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "EXPORT",
@@ -119,14 +107,7 @@ export async function POST(request: NextRequest) {
       { count: items.length, mode: "selected" },
     );
 
-    const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      ...NAME_ROW(a),
-      "สาขาวิชา": a.major || "",
-      "อาชีพ": a.career,
-      "ตำแหน่ง": a.position,
-      "ปีที่บันทึก (พ.ศ.)": a.recordedYear,
-    }));
+    const rows = items.map(potentialToExportRow);
 
     return buildExcelResponse(rows, "ศักยภาพ", "potentials_export");
   } catch (error) {
