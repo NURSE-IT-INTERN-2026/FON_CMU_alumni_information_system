@@ -16,6 +16,9 @@ export interface AlumniSearchResult {
   // CMU `major_name_th` (or local alumni `major`) — surfaced so entity forms can
   // auto-fill the `major` (สาขาวิชา) field when a record is linked to this alumni.
   major?: string;
+  // Local alumni `homeAddress` (ที่อยู่ปัจจุบัน) — surfaced so the alumni-agency
+  // form can auto-fill ที่อยู่บ้าน when a record is linked. CMU has no address.
+  homeAddress?: string;
 }
 
 interface CmuAlumni {
@@ -63,6 +66,7 @@ export function useAlumniSearch() {
             firstName: a.firstName ?? "",
             lastName: a.lastName ?? "",
             major: a.major ?? "",
+            homeAddress: a.homeAddress ?? "",
           });
         }
       }

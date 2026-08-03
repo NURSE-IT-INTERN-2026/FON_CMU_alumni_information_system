@@ -209,12 +209,16 @@ export default function AlumniAgencyPage() {
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string; homeAddress?: string }) => {
     setValue("studentId", a.studentId);
     setValue("major", a.major ?? "");
     setValue("prefix", a.prefix ?? "");
     setValue("firstName", a.firstName ?? "");
     setValue("lastName", a.lastName ?? "");
+    // Load the alumni's home address (single source of truth under the
+    // homeAddress unification) — but only when they have one, so selecting an
+    // alumni without an address never clobbers a value already typed.
+    if (a.homeAddress) setValue("homeAddress", a.homeAddress);
     setNameSearch("");
     clearResults();
     setFormSearchField(null);
