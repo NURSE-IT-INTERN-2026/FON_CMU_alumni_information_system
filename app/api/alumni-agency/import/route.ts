@@ -10,6 +10,8 @@ import {
   isOriginalFormat,
   parseOriginalFormat,
   parseExportFormat,
+  agencyCreatePayload,
+  agencyUpdatePayload,
   type ParsedAlumniAgencyRow,
 } from "@/lib/alumni-agency-parse";
 import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
@@ -134,10 +136,8 @@ export async function POST(request: NextRequest) {
     let imported = 0;
     let updated = 0;
 
-    const payloadOf = (r: Row): Record<string, unknown> => ({ ...r.data });
-
     // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
-    await chunkedCreateMany(toCreate, payloadOf, {
+    await chunkedCreateMany(toCreate, agencyCreatePayload, {
       createMany: (payloads) => prisma.alumniAgency.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.alumniAgency.create({ data: payload as never }),
       onCreated: () => { imported++; },
@@ -147,10 +147,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 7) Per-row update for matched rows (the parsed `data` is the full payload).
+    // 7) Per-row update for matched rows (the parsed `data` is the full payload;
+    //    agencyUpdatePayload omits a null `order` so a tab-export re-import keeps
+    //    the existing order).
     for (const { row, existingId } of toUpdate) {
       try {
-        await prisma.alumniAgency.update({ where: { id: existingId }, data: payloadOf(row) as never });
+        await prisma.alumniAgency.update({ where: { id: existingId }, data: agencyUpdatePayload(row) as never });
         updated++;
       } catch (e) {
         console.error("Import update row error:", e);

@@ -1,3 +1,5 @@
+import { THAILAND_DEFAULT_COUNTRY } from "@/lib/alumni-agency-region";
+
 export interface ParsedAlumniAgencyRow {
   cohort: string | null;
   prefix: string | null;
@@ -10,7 +12,7 @@ export interface ParsedAlumniAgencyRow {
   homeAddress: string | null;
   country: string;
   notes: string | null;
-  order: number;
+  order: number | null;
   /** Optional studentId — when present, the import links the row to an alumni
    *  record (if one exists) and back-fills `major` from it. */
   studentId: string | null;
@@ -97,7 +99,11 @@ export function parseExportFormat(
 ): { data: ParsedAlumniAgencyRow; rowNumber: number }[] {  const result: { data: ParsedAlumniAgencyRow; rowNumber: number }[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const country = row["ประเทศ"]?.toString().trim();
+    const province = row["จังหวัด"]?.toString().trim() || null;
+    // A Thailand-tab export carries จังหวัด but no ประเทศ — infer ประเทศไทย so
+    // it round-trips (otherwise the import skips rows with no country).
+    const country =
+      row["ประเทศ"]?.toString().trim() || (province ? THAILAND_DEFAULT_COUNTRY : "");
 
     // Prefer the split ชื่อ/นามสกุล columns; fall back to a legacy ชื่อไทย column.
     const firstNameCol = row["ชื่อ"]?.toString().trim();
@@ -115,8 +121,12 @@ export function parseExportFormat(
     if (!country) continue;
     if (!firstName && !lastName && !englishName) continue;
 
-    const orderStr = row["ลำดับ"]?.toString().trim();
-    const order = orderStr ? parseInt(orderStr, 10) : 0;
+    const orderStr = row["ลำดับ"]?.toString().trim() || "";
+    const orderNum = parseInt(orderStr, 10);
+    // `order` is nullable: a Thailand/Abroad-tab export has no ลำดับ column, so
+    // absence → null (the import's update payload then omits it to preserve the
+    // existing order — see agencyUpdatePayload).
+    const order: number | null = orderStr && !isNaN(orderNum) ? orderNum : null;
 
     result.push({
       data: {
@@ -127,11 +137,11 @@ export function parseExportFormat(
         englishName,
         workplace: row["สถานที่ทำงาน"]?.toString().trim() || null,
         position: row["ตำแหน่ง"]?.toString().trim() || null,
-        province: row["จังหวัด"]?.toString().trim() || null,
+        province,
         homeAddress: row["ที่อยู่บ้าน"]?.toString().trim() || null,
         country,
         notes: row["หมายเหตุ"]?.toString().trim() || null,
-        order: isNaN(order) ? 0 : order,
+        order,
         studentId: row["รหัสนักศึกษา"]?.toString().trim() || null,
         major: row["สาขาวิชา"]?.toString().trim() || null,
         pendingStudentId: null,
@@ -179,4 +189,94 @@ export function alumniAgencyMatchWhere(data: {
       },
     ],
   };
+}
+
+// ─── Export column contract ────────────────────────────────────────────────
+// The alumni-agency page has two tabs (Thailand / Abroad) that differ in ONE
+// column: the location slot is จังหวัด (Thailand) or ประเทศ (Abroad). The export
+// is region-aware — `?region=thailand`/`?region=abroad` emit that tab's columns;
+// the POST bulk export + a region-less GET emit the full superset (both location
+// columns + the internal ลำดับ/order). `buildExcelResponse` derives column order
+// from `Object.keys(rows[0])`, so `agencyToExportRow` emitting only the chosen
+// columns in order IS the exported layout.
+
+/** An alumni-agency row's export-relevant fields (loose, client-safe + testable). */
+export interface AgencyExportShape {
+  studentId: string | null;
+  pendingStudentId: string | null;
+  cohort: string | null;
+  prefix: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  englishName: string | null;
+  major: string | null;
+  workplace: string | null;
+  position: string | null;
+  province: string | null;
+  homeAddress: string | null;
+  country: string;
+  notes: string | null;
+  order: number | null;
+}
+
+/** Thailand tab (12) — จังหวัด in the location slot, no ประเทศ, no ลำดับ. */
+export const AGENCY_THAILAND_COLUMNS = [
+  "รหัสนักศึกษา", "รุ่น", "สาขาวิชา", "คำนำหน้า", "ชื่อ", "นามสกุล", "ชื่ออังกฤษ",
+  "จังหวัด", "สถานที่ทำงาน", "ตำแหน่ง", "ที่อยู่บ้าน", "หมายเหตุ",
+] as const;
+
+/** Abroad tab (12) — ประเทศ in the location slot, no จังหวัด, no ลำดับ. */
+export const AGENCY_ABROAD_COLUMNS = [
+  "รหัสนักศึกษา", "รุ่น", "สาขาวิชา", "คำนำหน้า", "ชื่อ", "นามสกุล", "ชื่ออังกฤษ",
+  "ประเทศ", "สถานที่ทำงาน", "ตำแหน่ง", "ที่อยู่บ้าน", "หมายเหตุ",
+] as const;
+
+/** Full superset (14) — both location columns + ลำดับ(order); POST + region-less GET. */
+export const AGENCY_FULL_COLUMNS = [
+  "รหัสนักศึกษา", "รุ่น", "สาขาวิชา", "คำนำหน้า", "ชื่อ", "นามสกุล", "ชื่ออังกฤษ",
+  "จังหวัด", "ประเทศ", "สถานที่ทำงาน", "ตำแหน่ง", "ที่อยู่บ้าน", "หมายเหตุ", "ลำดับ",
+] as const;
+
+const AGENCY_CELL: Record<string, (a: AgencyExportShape) => string | number> = {
+  "รหัสนักศึกษา": (a) => a.studentId || a.pendingStudentId || "",
+  "รุ่น": (a) => a.cohort || "",
+  "สาขาวิชา": (a) => a.major || "",
+  "คำนำหน้า": (a) => a.prefix || "",
+  "ชื่อ": (a) => a.firstName || "",
+  "นามสกุล": (a) => a.lastName || "",
+  "ชื่ออังกฤษ": (a) => a.englishName || "",
+  "จังหวัด": (a) => a.province || "",
+  "ประเทศ": (a) => a.country,
+  "สถานที่ทำงาน": (a) => a.workplace || "",
+  "ตำแหน่ง": (a) => a.position || "",
+  "ที่อยู่บ้าน": (a) => a.homeAddress || "",
+  "หมายเหตุ": (a) => a.notes || "",
+  "ลำดับ": (a) => a.order ?? 0,
+};
+
+/** Map an alumni-agency row to an export row keyed by the chosen column list. */
+export function agencyToExportRow(
+  a: AgencyExportShape,
+  columns: readonly string[],
+): Record<string, string | number> {
+  const row: Record<string, string | number> = {};
+  for (const col of columns) row[col] = AGENCY_CELL[col](a);
+  return row;
+}
+
+// ─── Import write payloads ─────────────────────────────────────────────────
+// `order` is nullable (absent ลำดับ → null). On CREATE it must have a value
+// (Int required) so default to 0; on UPDATE, omit it when null so a tab-export
+// re-import preserves the existing order instead of resetting it to 0.
+
+/** CREATE payload — `order` defaults to 0 when the row had no ลำดับ column. */
+export function agencyCreatePayload(r: { data: ParsedAlumniAgencyRow }): Record<string, unknown> {
+  return { ...r.data, order: r.data.order ?? 0 };
+}
+
+/** UPDATE payload — omits `order` when null so an existing order is preserved. */
+export function agencyUpdatePayload(r: { data: ParsedAlumniAgencyRow }): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...r.data };
+  if (r.data.order == null) delete payload.order;
+  return payload;
 }
