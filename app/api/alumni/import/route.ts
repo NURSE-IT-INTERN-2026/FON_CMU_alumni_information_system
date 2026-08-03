@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { DegreeLevel, Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
-import { parsePhones } from "@/lib/parse-phone";
 import { ensurePrimaryEducationBulk } from "@/lib/education-sync";
 import { autoLinkPendingForAlumniBatch } from "@/lib/alumni-link";
 import { mirrorAlumniHomeAddressToAgenciesBulk } from "@/lib/alumni-agency-home-sync";
@@ -14,40 +12,13 @@ import {
   partitionImport,
   chunkedCreateMany,
 } from "@/lib/import-batch";
+import {
+  parseAlumniImportRow,
+  alumniUpdatePayload,
+  type AlumniImportRecord,
+} from "@/lib/alumni-excel";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-const DEGREE_LEVEL_MAP: Record<string, DegreeLevel> = {
-  "ปริญญาเอก": "DOCTORAL",
-  "ปริญญาโท": "MASTER",
-  "ปริญญาตรี": "BACHELOR",
-  "หลักสูตรประกาศนียบัตรผู้ช่วยพยาบาล": "NURSING_ASSISTANT",
-  "อนุปริญญา": "ASSOCIATE",
-  "DOCTORAL": "DOCTORAL",
-  "MASTER": "MASTER",
-  "BACHELOR": "BACHELOR",
-  "NURSING_ASSISTANT": "NURSING_ASSISTANT",
-  "ASSOCIATE": "ASSOCIATE",
-};
-
-type AlumniRecord = {
-  studentId: string;
-  prefix: string;
-  firstName: string;
-  lastName: string;
-  cohort: string | null;
-  degreeLevel: DegreeLevel;
-  // The four fields below exist in the EXPORT format but not the legacy dump.
-  // On UPDATE they are written only when the row provides them (see below) so a
-  // legacy import never blanks an alumni's existing major/year/birthDate/remarks.
-  major: string | null;
-  graduationYear: number | null;
-  birthDate: string | null;
-  remarks: string | null;
-  contactEmail: string | null;
-  phones: string[];
-  homeAddress: string | null;
-};
 
 export async function POST(request: NextRequest) {
   const permErr = await checkWritePermission();
@@ -77,51 +48,14 @@ export async function POST(request: NextRequest) {
 
     // 1) Parse + validate every row up front (invalid rows never reach the batch).
     const errors: ImportErrorRow[] = [];
-    const records: AlumniRecord[] = [];
+    const records: AlumniImportRecord[] = [];
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNumber = i + 2;
-
-      const studentId = row["รหัสนักศึกษา"]?.toString().trim();
-      const prefix = row["คำนำหน้า"]?.toString().trim();
-      const firstName = row["ชื่อ"]?.toString().trim();
-      const lastName = row["นามสกุล"]?.toString().trim();
-      // cohort: the export uses "รุ่น"; the legacy dump used the combined
-      // "รุ่น/สาขา". Accept either so export→edit→re-import is lossless while
-      // legacy imports keep working unchanged.
-      const cohort = (row["รุ่น"]?.toString().trim() || row["รุ่น/สาขา"]?.toString().trim() || null);
-      const degreeLevelRaw = row["ระดับการศึกษา"]?.toString().trim();
-      const degreeLevel: DegreeLevel = degreeLevelRaw ? DEGREE_LEVEL_MAP[degreeLevelRaw] || "BACHELOR" : "BACHELOR";
-      // major / graduationYear / birthDate / remarks are EXPORT-only columns
-      // (the legacy dump has none of them). Read when present; left null otherwise.
-      const major = row["สาขาวิชา"]?.toString().trim() || null;
-      const graduationRaw = row["ปีสำเร็จการศึกษา"]?.toString().replace(/\D/g, "") ?? "";
-      const graduationYear = graduationRaw ? parseInt(graduationRaw, 10) : null;
-      // The export emits วันเกิด as Thai "DD-MM-YYYY" Buddhist (formatBirthDateThai);
-      // stripping non-digits yields the 8-digit DDMMYYYY-Buddhist form Alumni.birthDate
-      // stores — so the round-trip is exact.
-      const birthDigits = row["วันเกิด"]?.toString().replace(/\D/g, "") ?? "";
-      const birthDate = birthDigits.length === 8 ? birthDigits : null;
-      // contactEmail: the export uses "อีเมลติดต่อ"; the legacy dump used "อีเมล"
-      // (NOT the auth/login `email`). Accept either.
-      const contactEmail = (row["อีเมลติดต่อ"]?.toString().trim() || row["อีเมล"]?.toString().trim() || null);
-      // เบอร์โทร may hold several numbers (comma-separated, possibly with a
-      // "มือถือ" label) — parse into a list, never a clumped string.
-      const phones = parsePhones(row["เบอร์โทร"]);
-      const homeAddress = row["ที่อยู่ปัจจุบัน"]?.toString().trim() || null;
-      const remarks = row["หมายเหตุ"]?.toString().trim() || null;
-
-      if (!studentId || !prefix || !firstName || !lastName) {
-        errors.push({ row: rowNumber, message: "ข้อมูลที่จำเป็นไม่ครบถ้วน" });
+      const { data, error } = parseAlumniImportRow(rows[i], i + 2);
+      if (error) {
+        errors.push(error);
         continue;
       }
-
-      if (!/^\d+$/.test(studentId)) {
-        errors.push({ row: rowNumber, message: "รหัสนักศึกษาต้องเป็นตัวเลขเท่านั้น" });
-        continue;
-      }
-
-      records.push({ studentId, prefix, firstName, lastName, cohort, degreeLevel, major, graduationYear, birthDate, contactEmail, phones, homeAddress, remarks });
+      records.push(data!);
     }
 
     const ctx = { actorType: "ADMIN" as const, userId: session.user.id, userEmail: session.user.email, userRole: session.user.role };
@@ -170,27 +104,13 @@ export async function POST(request: NextRequest) {
     //    bulk read in step 2 already removed the per-row existence probe).
     for (const { row, existingId } of toUpdate) {
       try {
-        // Core fields the legacy import owns — written unconditionally.
-        const updateData: Prisma.AlumniUpdateInput = {
-          prefix: row.prefix,
-          firstName: row.firstName,
-          lastName: row.lastName,
-          cohort: row.cohort,
-          degreeLevel: row.degreeLevel,
-          contactEmail: row.contactEmail,
-          phones: row.phones,
-          homeAddress: row.homeAddress,
-        };
-        // Export-only fields — write ONLY when the row provided them, so a legacy
-        // import (which omits these columns) never blanks an alumni's existing
+        // alumniUpdatePayload writes the 8 core fields unconditionally and the 4
+        // export-only fields only when the row provided them — so a legacy import
+        // (which omits those columns) never blanks an alumni's existing
         // major/graduationYear/birthDate/remarks.
-        if (row.major !== null) updateData.major = row.major;
-        if (row.graduationYear !== null) updateData.graduationYear = row.graduationYear;
-        if (row.birthDate !== null) updateData.birthDate = row.birthDate;
-        if (row.remarks !== null) updateData.remarks = row.remarks;
         await prisma.alumni.update({
           where: { id: existingId },
-          data: updateData,
+          data: alumniUpdatePayload(row) as never,
         });
         updated++;
       } catch (e) {
