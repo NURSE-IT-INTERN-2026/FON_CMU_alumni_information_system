@@ -181,7 +181,7 @@ export default function AlumniNewsPage() {
       {totalPages > 1 && (
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}

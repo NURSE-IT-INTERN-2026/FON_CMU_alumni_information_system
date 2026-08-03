@@ -441,7 +441,7 @@ export default function ModelRepresentativesPage() {
         <span className="text-sm text-gray-500">
           แสดง {pageStart}-{pageEnd} จาก {totalItems} รายการ
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-center gap-1">
           <button
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
@@ -772,7 +772,8 @@ export default function ModelRepresentativesPage() {
             <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
@@ -863,6 +864,7 @@ export default function ModelRepresentativesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {renderPagination(manageTotalPages, currentManagePage, (p) => { setManagePage(p); }, managePageStart, managePageEnd, mgmtSorted.length)}
           </div>
         )

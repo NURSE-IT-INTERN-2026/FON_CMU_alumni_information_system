@@ -414,7 +414,7 @@ function EducationForm({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="edu-year">ปีที่จบ (พ.ศ.)</Label>
           <Input
@@ -441,7 +441,7 @@ function EducationForm({
           onChange={(e) => set("major", e.target.value)}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="edu-firstName">ชื่อ(ขณะศึกษา)</Label>
           <Input

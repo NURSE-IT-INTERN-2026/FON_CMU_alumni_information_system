@@ -826,7 +826,7 @@ function VerificationFields({ v }: { v: SignupVerification }) {
         still sees exactly what the applicant entered. `v.fields[*].submitted`
         is populated by `buildSignupVerification` in every branch.
       */}
-      <div className="overflow-hidden rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">

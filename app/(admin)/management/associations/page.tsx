@@ -503,7 +503,8 @@ export default function AssociationsPage() {
           <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">
@@ -572,10 +573,11 @@ export default function AssociationsPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {(
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
               <span className="text-sm text-gray-500">แสดง {pageStart}-{pageEnd} จาก {total} รายการ</span>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-center gap-1">
                 <button onClick={() => { setPage(Math.max(1, page - 1)); }} disabled={page === 1} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-40">ก่อนหน้า</button>
                 {paginationNumbers.map((p, i) =>
                   p === "..." ? <span key={`dot-${i}`} className="px-2 text-gray-400">...</span> : (
