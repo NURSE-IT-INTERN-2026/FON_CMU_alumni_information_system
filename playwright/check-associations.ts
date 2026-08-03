@@ -23,10 +23,12 @@ async function main() {
     // 1) Need a real alumni studentId (FK). Grab one via the API.
     const alumniRes = await page.request.get(`${BASE}/alumni/api/alumni?pageSize=1`);
     const alumniJson = await alumniRes.json();
-    const studentId: string | undefined = alumniJson?.data?.[0]?.studentId;
-    const fullName: string = alumniJson?.data?.[0]
-      ? `${alumniJson.data[0].prefix ?? ""}${alumniJson.data[0].firstName ?? ""} ${alumniJson.data[0].maidenLastName ?? ""}`.trim()
-      : "ทดสอบ ระบบ";
+    const a0 = alumniJson?.data?.[0];
+    const studentId: string | undefined = a0?.studentId;
+    // Association stores split names (prefix/firstName/lastName), not a fullName.
+    const prefix: string = a0?.prefix ?? "";
+    const firstName: string = a0?.firstName ?? "ทดสอบ";
+    const lastName: string = a0?.lastName ?? "ระบบ";
 
     console.log("\n[1] Render (useEntityList fetch + render)");
     await page.goto(`${BASE}/alumni/management/associations`, { waitUntil: "domcontentloaded" });
@@ -38,7 +40,7 @@ async function main() {
     } else {
       console.log("\n[2] Seed throwaway association via API");
       const createRes = await page.request.post(`${BASE}/alumni/api/associations`, {
-        data: { studentId, fullName, associationName: MARKER, position: "ทดสอบ", recordedYear: 2569 },
+        data: { studentId, prefix, firstName, lastName, associationName: MARKER, position: "ทดสอบ", recordedYear: 2569 },
       });
       if (!createRes.ok()) { bad("seed create failed", String(createRes.status())); throw new Error("seed"); }
       ok(`created marker association (${studentId})`);
@@ -49,7 +51,7 @@ async function main() {
       ok("marker row appears after search (refetch on key change)");
 
       console.log("\n[4] UI delete -> invalidate -> refetch");
-      await page.getByRole("button", { name: "จัดการข้อมูล" }).click(); // enter manage mode
+      // CRUD is always-on now (no manage-mode toggle) — the inline row delete is directly available.
       const row = page.locator(`tr`, { hasText: MARKER });
       await row.locator('button[title="ลบ"]').click();
       await page.locator(".fixed button", { hasText: "ยืนยัน" }).click();
