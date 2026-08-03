@@ -46,6 +46,10 @@ export function ImageEditorDialog({
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<CropArea | null>(null);
   const [width, setWidth] = useState<number | "">("");
+  // When true, skip the crop and output the whole source image (original aspect
+  // ratio), only scaled by the width field. Defaults to off so the existing
+  // fixed-aspect crop flow is unchanged unless the user opts in.
+  const [keepOriginal, setKeepOriginal] = useState(false);
 
   // Load the source image on mount; setState only in async callbacks (never synchronously
   // in the effect body) to avoid cascading renders.
@@ -62,8 +66,14 @@ export function ImageEditorDialog({
     return () => { cancelled = true; };
   }, [src]);
 
-  const regionW = area?.width ?? img?.naturalWidth ?? 1;
-  const regionH = area?.height ?? img?.naturalHeight ?? 1;
+  // In "keep original" mode the output is the full image, so the height hint
+  // must reflect the natural aspect (not any prior crop region).
+  const regionW = keepOriginal
+    ? img?.naturalWidth ?? 1
+    : area?.width ?? img?.naturalWidth ?? 1;
+  const regionH = keepOriginal
+    ? img?.naturalHeight ?? 1
+    : area?.height ?? img?.naturalHeight ?? 1;
   const outW = typeof width === "number" && width > 0 ? width : regionW;
   const previewH = Math.round((outW * regionH) / regionW);
 
@@ -80,7 +90,7 @@ export function ImageEditorDialog({
     const targetW = typeof width === "number" && width > 0 ? width : null;
     setBusy(true);
     try {
-      const blob = await cropAndResize(img, area, targetW, mime);
+      const blob = await cropAndResize(img, keepOriginal ? null : area, targetW, mime);
       const ext = mime === "image/png" ? "png" : "jpg";
       const file = new File([blob], `edit.${ext}`, { type: mime });
       await onConfirm(file);
@@ -108,7 +118,14 @@ export function ImageEditorDialog({
               โหลดรูปภาพไม่สำเร็จ
             </div>
           ) : (
-            img && (
+            img &&
+            (keepOriginal ? (
+              <img
+                src={src}
+                alt="ตัวอย่างรูปภาพ"
+                className="h-full w-full object-contain"
+              />
+            ) : (
               <Cropper
                 image={src}
                 crop={crop}
@@ -118,24 +135,44 @@ export function ImageEditorDialog({
                 onZoomChange={setZoom}
                 onCropComplete={(_a, pixels) => setArea(pixels as CropArea)}
               />
-            )
+            ))
           )}
         </div>
 
-        {/* Zoom */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="w-16 shrink-0">ซูม</span>
-          <input
-            type="range"
-            min={1}
-            max={3}
-            step={0.01}
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            className="flex-1"
-            aria-label="ซูม"
-          />
-        </div>
+        {/* Let the user opt out of the fixed-aspect crop and keep the whole image. */}
+        {aspect != null && (
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={keepOriginal}
+              onChange={(e) => setKeepOriginal(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 accent-[var(--primary)]"
+            />
+            <span>
+              ใช้รูปภาพต้นฉบับทั้งรูป (ไม่ครอป)
+              <span className="ml-1 text-xs text-gray-400">
+                เก็บขนาด/สัดส่วนเดิม ไม่ตัดเป็น 16:9
+              </span>
+            </span>
+          </label>
+        )}
+
+        {!keepOriginal && (
+          /* Zoom (crop-only) */
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span className="w-16 shrink-0">ซูม</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="flex-1"
+              aria-label="ซูม"
+            />
+          </div>
+        )}
 
         {/* Resize (re-encode to chosen width, aspect-locked) */}
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
