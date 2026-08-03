@@ -76,7 +76,6 @@ const abroadFormSchema = z.object({
   country: z.string().min(1, "กรุณากรอกประเทศ"),
   major: z.string(),
   notes: z.string(),
-  order: z.string(),
 }).refine((data) => data.firstName.trim() || data.lastName.trim() || data.englishName.trim(), {
   message: "กรุณากรอกชื่อ-นามสกุล หรือชื่ออังกฤษ",
   path: ["firstName"],
@@ -202,7 +201,7 @@ export default function AlumniAgencyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors }, reset: formReset, control, setValue } = useForm<AbroadFormValues>({
     resolver: zodResolver(abroadFormSchema) as unknown as Resolver<AbroadFormValues>,
-    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "", order: "0" },
+    defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "" },
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [nameSearch, setNameSearch] = useState("");
@@ -303,13 +302,13 @@ export default function AlumniAgencyPage() {
   const defaultCountry = () => (isThailand ? THAILAND_DEFAULT_COUNTRY : "");
 
   const openCreate = () => {
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: defaultCountry(), major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: defaultCountry(), major: "", notes: "" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (a: AlumniAgency) => {
-    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", position: a.position || "", province: a.province || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "", order: String(a.order) });
+    formReset({ studentId: a.studentId || "", cohort: a.cohort || "", prefix: a.prefix || "", firstName: a.firstName || "", lastName: a.lastName || "", englishName: a.englishName || "", workplace: a.workplace || "", position: a.position || "", province: a.province || "", homeAddress: a.homeAddress || "", country: a.country, major: a.major || "", notes: a.notes || "" });
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -317,7 +316,7 @@ export default function AlumniAgencyPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "", order: "0" });
+    formReset({ studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "" });
   };
 
   const onSave = async (data: AbroadFormValues) => {
@@ -338,7 +337,6 @@ export default function AlumniAgencyPage() {
         country: data.country.trim(),
         major: data.major.trim() || null,
         notes: data.notes.trim() || null,
-        order: Number(data.order) || 0,
       };
       if (editingId) {
         await apiFetch(`/api/alumni-agency/${editingId}`, { method: "PUT", json: payload });
@@ -614,9 +612,6 @@ export default function AlumniAgencyPage() {
             )}
             <FormField label="หมายเหตุ">
               <FormInput registration={register("notes")} type="text" />
-            </FormField>
-            <FormField label="ลำดับ">
-              <FormInput registration={register("order")} type="number" />
             </FormField>
           </div>
           <div className="mt-4 flex justify-end gap-3">
