@@ -623,10 +623,11 @@ export default function NewsListPage() {
               <FormSelect registration={register("status")}>
                 <option value="DRAFT">ฉบับร่าง</option>
                 <option value="PUBLISHED">เผยแพร่</option>
-                {/* DISCONTINUED ("ยุติการเผยแพร่") is only reachable via the dedicated ยุติการเผยแพร่
-                    action on a published item — not a choice when creating/editing. Kept here only
-                    so an already-discontinued item's status still renders instead of going blank. */}
-                {watch("status") === "DISCONTINUED" && (
+                {/* DISCONTINUED ("ยุติการเผยแพร่") is offered when EDITING an existing item so an
+                    admin can discontinue it from the form (not only via the dedicated action); the
+                    PUT route clears pinnedAt on the DISCONTINUED transition. Hidden on create — a
+                    new article starts as DRAFT/PUBLISHED. */}
+                {editingId && (
                   <option value="DISCONTINUED">ยุติการเผยแพร่</option>
                 )}
               </FormSelect>
