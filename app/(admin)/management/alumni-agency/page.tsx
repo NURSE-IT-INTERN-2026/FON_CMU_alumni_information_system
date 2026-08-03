@@ -204,6 +204,7 @@ export default function AlumniAgencyPage() {
     defaultValues: { studentId: "", cohort: "", prefix: "คุณ", firstName: "", lastName: "", englishName: "", workplace: "", position: "", province: "", homeAddress: "", country: "", major: "", notes: "" },
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
+  const [countryOpen, setCountryOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
@@ -589,10 +590,33 @@ export default function AlumniAgencyPage() {
               <input type="hidden" {...register("country")} />
             ) : (
               <FormField label="ประเทศ" required error={errors.country?.message}>
-                <FormInput registration={register("country")} error={errors.country?.message} type="text" list="country-list" />
-                <datalist id="country-list">
-                  {countries.map((c) => <option key={c} value={c} />)}
-                </datalist>
+                <Controller name="country" control={control} render={({ field }) => {
+                  const suggestions = (countries ?? []).filter(
+                    (c) => !field.value || c.toLowerCase().includes(String(field.value).toLowerCase()),
+                  );
+                  return (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onFocus={() => setCountryOpen(true)}
+                        onBlur={() => setCountryOpen(false)}
+                        autoComplete="off"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${errors.country ? "border-red-400 focus:ring-red-400" : "border-gray-300"}`}
+                      />
+                      {countryOpen && suggestions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                          {suggestions.map((c) => (
+                            <button key={c} type="button" onMouseDown={(e) => { e.preventDefault(); field.onChange(c); setCountryOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }} />
               </FormField>
             )}
             {isThailand ? (
