@@ -30,6 +30,10 @@ export default async function AlumniNewsDetailPage({
     notFound();
   }
 
+  // Show the update date only when the article was actually edited after it was
+  // first created (Prisma sets updatedAt === createdAt on create).
+  const edited = news.updatedAt.getTime() > news.createdAt.getTime();
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
@@ -58,7 +62,14 @@ export default async function AlumniNewsDetailPage({
             {news.title}
           </h1>
           <p className="mb-6 text-sm text-[var(--muted)]">
-            {news.publishedAt ? formatThaiDate(new Date(news.publishedAt)) : ""}
+            {[
+              news.publishedAt ? formatThaiDate(new Date(news.publishedAt)) : null,
+              edited
+                ? `แก้ไขล่าสุด ${formatThaiDate(new Date(news.updatedAt))}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
 
