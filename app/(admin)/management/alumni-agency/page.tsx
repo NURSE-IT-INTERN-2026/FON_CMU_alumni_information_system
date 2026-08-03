@@ -18,7 +18,7 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormTextarea from "@/components/form/FormTextarea";
 import SearchInput from "@/components/ui/search-input";
-import { isThailandCountry } from "@/lib/alumni-agency-region";
+import { isThailandCountry, THAILAND_DEFAULT_COUNTRY } from "@/lib/alumni-agency-region";
 import { THAI_PROVINCES } from "@/lib/thai-provinces";
 import { useCanWrite } from "@/lib/role-context";
 
@@ -59,8 +59,7 @@ interface ApiResponse {
 // Canonical Thailand value written to `country` when an in-country record is
 // created (the form hides the country field in thailand mode). It is one of
 // THAILAND_COUNTRY_VALUES (lib/alumni-agency-region.ts) so the record lands in
-// the in-country tab.
-const THAILAND_DEFAULT_COUNTRY = "ประเทศไทย";
+// the in-country tab. THAILAND_DEFAULT_COUNTRY is imported from there too.
 
 const abroadFormSchema = z.object({
   studentId: z.string(),

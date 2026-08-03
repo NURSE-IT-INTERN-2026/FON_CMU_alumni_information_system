@@ -4,6 +4,12 @@ import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 import { THAILAND_COUNTRY_VALUES } from "@/lib/alumni-agency-region";
+import {
+  agencyToExportRow,
+  AGENCY_THAILAND_COLUMNS,
+  AGENCY_ABROAD_COLUMNS,
+  AGENCY_FULL_COLUMNS,
+} from "@/lib/alumni-agency-parse";
 
 const MAX_EXPORT_COUNT = 10000;
 
@@ -58,27 +64,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Region-aware columns: a Thailand/Abroad export mirrors that tab's columns;
+    // a region-less export emits the full superset (both location cols + ลำดับ).
+    const columns =
+      region === "thailand" ? AGENCY_THAILAND_COLUMNS
+        : region === "abroad" ? AGENCY_ABROAD_COLUMNS
+          : AGENCY_FULL_COLUMNS;
+
     const items = await prisma.alumniAgency.findMany({
       where,
       orderBy: [{ country: "asc" }, { order: "asc" }],
     });
     const { start, end } = resolveRowRange(startRow, endRow, items.length);
-    const rows = items.slice(start - 1, end).map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      "รุ่น": a.cohort || "",
-      "คำนำหน้า": a.prefix || "",
-      "ชื่อ": a.firstName || "",
-      "นามสกุล": a.lastName || "",
-      "ชื่ออังกฤษ": a.englishName || "",
-      "สาขาวิชา": a.major || "",
-      "สถานที่ทำงาน": a.workplace || "",
-      "ตำแหน่ง": a.position || "",
-      "ที่อยู่บ้าน": a.homeAddress || "",
-      "ประเทศ": a.country,
-      "จังหวัด": a.province || "",
-      "หมายเหตุ": a.notes || "",
-      "ลำดับ": a.order,
-    }));
+    const rows = items.slice(start - 1, end).map((a) => agencyToExportRow(a, columns));
     await logActivity(
       { actorType: "ADMIN", userId: session.user.id, userEmail: session.user.email, userRole: session.user.role },
       "EXPORT",
@@ -129,22 +127,7 @@ export async function POST(request: NextRequest) {
       { count: items.length, mode: "selected" },
     );
 
-    const rows = items.map((a) => ({
-      "รหัสนักศึกษา": a.studentId || a.pendingStudentId || "",
-      "รุ่น": a.cohort || "",
-      "คำนำหน้า": a.prefix || "",
-      "ชื่อ": a.firstName || "",
-      "นามสกุล": a.lastName || "",
-      "ชื่ออังกฤษ": a.englishName || "",
-      "สาขาวิชา": a.major || "",
-      "สถานที่ทำงาน": a.workplace || "",
-      "ตำแหน่ง": a.position || "",
-      "ที่อยู่บ้าน": a.homeAddress || "",
-      "ประเทศ": a.country,
-      "จังหวัด": a.province || "",
-      "หมายเหตุ": a.notes || "",
-      "ลำดับ": a.order,
-    }));
+    const rows = items.map((a) => agencyToExportRow(a, AGENCY_FULL_COLUMNS));
 
     return buildExcelResponse(rows, "ข้อมูลการทำงานศิษย์เก่า", "alumni_agency_export");
   } catch (error) {

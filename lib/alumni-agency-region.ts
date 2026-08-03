@@ -19,6 +19,11 @@ export const THAILAND_COUNTRY_VALUES = [
   "thai",
 ] as const;
 
+/** Canonical Thailand country value written on in-country create, and inferred
+ *  by the import when a row carries `จังหวัด` but no `ประเทศ` (a Thailand-tab
+ *  export). Single source of truth (was a local const in the page). */
+export const THAILAND_DEFAULT_COUNTRY = "ประเทศไทย";
+
 /** True when a country value (any case, any surrounding whitespace) is Thailand. */
 export function isThailandCountry(
   country: string | null | undefined

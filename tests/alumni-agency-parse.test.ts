@@ -187,16 +187,16 @@ describe("parseExportFormat", () => {
     expect(result[0].data.lastName).toBeNull();
   });
 
-  it("defaults order to 0 for non-numeric ลำดับ", () => {
+  it("order is null for a non-numeric ลำดับ (don't-blank on update, 0 on create)", () => {
     const rows = [{ ประเทศ: "ญี่ปุ่น", ชื่อไทย: "สมหญิง", ลำดับ: "abc" }];
     const result = parseExportFormat(rows);
-    expect(result[0].data.order).toBe(0);
+    expect(result[0].data.order).toBeNull();
   });
 
-  it("defaults order to 0 when ลำดับ is absent", () => {
+  it("order is null when ลำดับ is absent (a tab export has no ลำดับ column)", () => {
     const rows = [{ ประเทศ: "ญี่ปุ่น", ชื่อไทย: "สมหญิง" }];
     const result = parseExportFormat(rows);
-    expect(result[0].data.order).toBe(0);
+    expect(result[0].data.order).toBeNull();
   });
 
   it("sets null for optional fields when absent", () => {
