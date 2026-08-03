@@ -18,7 +18,6 @@ import {
   readSectionChanges,
   sectionCountSummary,
   type ImportDetailView,
-  type ImportRecordView,
 } from "@/lib/log-detail";
 
 interface ActivityLog {
@@ -660,7 +659,7 @@ function ImportRowSummary({ details, onOpen }: { details: Record<string, unknown
     <button
       onClick={(e) => { e.stopPropagation(); onOpen(); }}
       className="flex flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-purple-50 cursor-pointer"
-      title="ดูรายการที่นำเข้า"
+      title="ดูรายละเอียด"
     >
       {legacy ? (
         <CountBadge tone="purple">นำเข้า {d.imported}</CountBadge>
@@ -673,55 +672,18 @@ function ImportRowSummary({ details, onOpen }: { details: Record<string, unknown
       )}
       {d.failed > 0 && <CountBadge tone="red">ผิดพลาด {d.failed}</CountBadge>}
       <span className="ml-0.5 inline-flex items-center text-[11px] font-medium text-purple-600">
-        ดูรายการ
+        ดูรายละเอียด
         <svg className="ml-0.5 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
       </span>
     </button>
   );
 }
 
-/** A single imported record — links to the alumni profile when it has a studentId. */
-function ImportRecordRow({ record }: { record: ImportRecordView }) {
-  const opBadge =
-    record.op === "created" ? <CountBadge tone="green">สร้าง</CountBadge> : <CountBadge tone="blue">อัปเดต</CountBadge>;
-  const content = (
-    <span className="flex min-w-0 items-center gap-2">
-      {opBadge}
-      <span className="truncate font-medium text-gray-800">{record.name || "—"}</span>
-      {record.id && <span className="shrink-0 text-xs text-gray-400">{record.id}</span>}
-    </span>
-  );
-  if (record.id) {
-    return (
-      <li className="hover:bg-purple-50/60">
-        <a
-          href={`${BASE_PATH}/management/alumni/${record.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between gap-2 px-3 py-2"
-        >
-          {content}
-          <svg className="h-4 w-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5h5v5M19 5l-9 9M19 13v5a1 1 0 01-1 1H6a1 1 0 01-1-1V6a1 1 0 011-1h5" /></svg>
-        </a>
-      </li>
-    );
-  }
-  return <li className="px-3 py-2">{content}</li>;
-}
-
-/** Full import detail view: summary header + searchable record list + failed rows. */
+/** Full import detail view: summary header + failed rows. */
 function ImportDetail({ details }: { details: ImportDetailView }) {
-  const [query, setQuery] = useState("");
   const [showErrors, setShowErrors] = useState(false);
 
   const legacy = details.created === 0 && details.updated === 0 && details.imported > 0;
-  const q = query.trim().toLowerCase();
-  const filtered =
-    q && details.records.length > 0
-      ? details.records.filter(
-          (r) => r.name.toLowerCase().includes(q) || (r.id ?? "").toLowerCase().includes(q)
-        )
-      : details.records;
 
   return (
     <div className="space-y-4">
@@ -744,42 +706,6 @@ function ImportDetail({ details }: { details: ImportDetailView }) {
           {details.failed > 0 && <CountBadge tone="red">ผิดพลาด {details.failed}</CountBadge>}
           <span className="text-xs text-gray-400">นำเข้าทั้งหมด {details.attempted} แถว</span>
         </div>
-      </div>
-
-      {/* Record list */}
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-gray-700">รายการที่นำเข้า</p>
-          {details.records.length > 0 && (
-            <div className="relative">
-              <svg className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="ค้นหา ชื่อ / รหัสนักศึกษา"
-                className="w-60 rounded-lg border border-gray-300 py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
-            </div>
-          )}
-        </div>
-
-        {details.truncated && (
-          <p className="mb-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
-            แสดง {details.records.length.toLocaleString()} จาก {details.totalRecords.toLocaleString()} รายการ (ข้อมูลมากเกินกว่าจะบันทึกไว้ทั้งหมดในบันทึกกิจกรรม)
-          </p>
-        )}
-
-        {details.records.length === 0 ? (
-          <p className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-sm text-gray-400">ไม่มีรายการที่บันทึกไว้</p>
-        ) : filtered.length === 0 ? (
-          <p className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-sm text-gray-400">ไม่พบรายการที่ตรงกับ &ldquo;{query}&rdquo;</p>
-        ) : (
-          <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200">
-            {filtered.map((r, i) => (
-              <ImportRecordRow key={`${r.id ?? "noid"}-${i}`} record={r} />
-            ))}
-          </ul>
-        )}
       </div>
 
       {/* Failed rows */}

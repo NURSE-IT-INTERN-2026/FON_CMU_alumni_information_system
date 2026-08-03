@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession, constantTimeEqual } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { logImport, type ImportedRecord } from "@/lib/import-log";
+import { logImport } from "@/lib/import-log";
 import { bustCache, bustCachePrefix } from "@/lib/cache";
 import {
   fetchCmuGraduatesLive,
@@ -99,7 +99,6 @@ export async function POST(request: Request) {
     const remote = await fetchCmuGraduatesLive();
     let created = 0;
     let updated = 0;
-    const records: ImportedRecord[] = [];
 
     for (let i = 0; i < remote.length; i += CHUNK_SIZE) {
       const slice = remote.slice(i, i + CHUNK_SIZE);
@@ -118,13 +117,6 @@ export async function POST(request: Request) {
               : "updated";
           if (op === "created") created++;
           else updated++;
-          if (records.length < 500) {
-            records.push({
-              id: sid,
-              name: `${g.name_th ?? ""} ${g.surname_th ?? ""}`.trim(),
-              op,
-            });
-          }
         }
       });
     }
@@ -144,7 +136,6 @@ export async function POST(request: Request) {
       created,
       updated,
       failed: 0,
-      records,
       errors: [],
     });
 

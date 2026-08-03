@@ -5,7 +5,7 @@ import { AwardType } from "@/app/generated/prisma/client";
 import { checkWritePermission } from "@/lib/permissions";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { parseAwardRow, type ParsedAwardRow } from "@/lib/award-import-parse";
-import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import {
   fetchAlumniByStudentIds,
   fetchExistingEntityRows,
@@ -163,21 +163,13 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
     let updated = 0;
-    const importedRecords: ImportedRecord[] = [];
-
-    const recordOf = (r: ResolvedAward, op: ImportedRecord["op"]): ImportedRecord => ({
-      id: r.studentId ?? r.pendingStudentId ?? null,
-      name: [r.data.prefix, r.data.firstName, r.data.lastName].filter(Boolean).join(" ") || r.data.awardName,
-      op,
-    });
 
     // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
     await chunkedCreateMany(toCreate, awardPayload, {
       createMany: (payloads) => prisma.award.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.award.create({ data: payload as never }),
-      onCreated: (r) => {
+      onCreated: () => {
         imported++;
-        importedRecords.push(recordOf(r, "created"));
       },
       onError: (r, e) => {
         console.error("Import create row error:", e);
@@ -191,7 +183,6 @@ export async function POST(request: NextRequest) {
       try {
         await prisma.award.update({ where: { id: existingId }, data: awardPayload(row) as never });
         updated++;
-        importedRecords.push(recordOf(row, "updated"));
       } catch (e) {
         console.error("Import update row error:", e);
         errors.push({ row: row.rowNumber, message: "ไม่สามารถนำเข้าข้อมูลแถวนี้ได้" });
@@ -206,7 +197,6 @@ export async function POST(request: NextRequest) {
       created: imported,
       updated,
       failed: errors.length,
-      records: importedRecords,
       errors,
     });
 

@@ -85,13 +85,10 @@ const META_KEYS = new Set([
   "changes",
   "action",
   "method",
-  // IMPORT details: the record/error arrays + their cap flags are rendered by
-  // the dedicated ImportDetail component (via `extractImportDetails`), not as
+  // IMPORT details: the error array + its cap flags are rendered by the
+  // dedicated ImportDetail component (via `extractImportDetails`), not as
   // generic rows. (The scalar counts created/updated/failed/attempted/fileName
   // are left in so a fallback still shows something useful.)
-  "records",
-  "truncated",
-  "totalRecords",
   "errorsTruncated",
   "totalErrors",
   "op",
@@ -159,13 +156,6 @@ export function extractChanges(details: Record<string, unknown> | null): FieldCh
   return raw as FieldChange[];
 }
 
-export interface ImportRecordView {
-  /** studentId when present (null for unlinked rows). */
-  id: string | null;
-  name: string;
-  op: "created" | "updated";
-}
-
 export interface ImportErrorView {
   row: number;
   message: string;
@@ -179,9 +169,6 @@ export interface ImportDetailView {
   failed: number;
   /** Legacy pre-redesign alumni imports stored only a combined `imported` count. */
   imported: number;
-  records: ImportRecordView[];
-  truncated: boolean;
-  totalRecords: number;
   errors: ImportErrorView[];
   errorsTruncated: boolean;
   totalErrors: number;
@@ -200,9 +187,9 @@ function asString(v: unknown): string | null {
 }
 
 /**
- * Read an IMPORT log's `details` into a typed view. Tolerates both the new
- * shape (records[] + created/updated) and the legacy alumni shape
- * (`{ imported, attempted, errors: <number> }`). Returns null when `details`
+ * Read an IMPORT log's `details` into a typed view (counts + failed rows).
+ * Tolerates the legacy alumni shape (`{ imported, attempted, errors: <number> }`)
+ * and any pre-cleanup `records` key (ignored). Returns null when `details`
  * isn't import-shaped, so the caller can fall back to a generic card.
  */
 export function extractImportDetails(details: Record<string, unknown> | null): ImportDetailView | null {
@@ -215,15 +202,6 @@ export function extractImportDetails(details: Record<string, unknown> | null): I
     "imported" in details;
   if (!isImport) return null;
 
-  const recordsRaw = Array.isArray(details.records) ? details.records : [];
-  const records: ImportRecordView[] = recordsRaw
-    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
-    .map((r) => ({
-      id: typeof r.id === "string" ? r.id : null,
-      name: typeof r.name === "string" ? r.name : String(r.name ?? ""),
-      op: r.op === "updated" ? "updated" : "created",
-    }));
-
   const errorsRaw = Array.isArray(details.errors) ? details.errors : [];
   const errors: ImportErrorView[] = errorsRaw
     .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
@@ -232,7 +210,6 @@ export function extractImportDetails(details: Record<string, unknown> | null): I
       message: typeof e.message === "string" ? e.message : String(e.message ?? ""),
     }));
 
-  const totalRecords = asNumber(details.totalRecords);
   const totalErrors = asNumber(details.totalErrors);
 
   return {
@@ -242,9 +219,6 @@ export function extractImportDetails(details: Record<string, unknown> | null): I
     updated: asNumber(details.updated),
     failed: asNumber(details.failed),
     imported: asNumber(details.imported),
-    records,
-    truncated: details.truncated === true,
-    totalRecords: totalRecords || records.length,
     errors,
     errorsTruncated: details.errorsTruncated === true,
     totalErrors: totalErrors || errors.length,

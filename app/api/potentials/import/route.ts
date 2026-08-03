@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { isXlsxFile, readExcelRows } from "@/lib/excel-import";
 import { splitFullName } from "@/lib/parse-name";
-import { logImport, captureFileName, type ImportedRecord, type ImportErrorRow } from "@/lib/import-log";
+import { logImport, captureFileName, type ImportErrorRow } from "@/lib/import-log";
 import {
   fetchAlumniByStudentIds,
   fetchExistingEntityRows,
@@ -183,19 +183,12 @@ export async function POST(request: NextRequest) {
 
     let imported = 0;
     let updated = 0;
-    const importedRecords: ImportedRecord[] = [];
-
-    const recordOf = (r: Resolved, op: ImportedRecord["op"]): ImportedRecord => ({
-      id: r.studentId ?? r.pendingStudentId ?? null,
-      name: [r.prefix, r.firstName, r.lastName].filter(Boolean).join(" "),
-      op,
-    });
 
     // 6) Chunked createMany (per-row fallback isolates a bad row) for new rows.
     await chunkedCreateMany(toCreate, buildCreate, {
       createMany: (payloads) => prisma.potential.createMany({ data: payloads as never }),
       createOne: (payload) => prisma.potential.create({ data: payload as never }),
-      onCreated: (r) => { imported++; importedRecords.push(recordOf(r, "created")); },
+      onCreated: () => { imported++; },
       onError: (r, e) => {
         console.error("Import create row error:", e);
         const who = [r.firstName, r.lastName].filter(Boolean).join(" ") || (r.pendingStudentId ?? "");
@@ -208,7 +201,6 @@ export async function POST(request: NextRequest) {
       try {
         await prisma.potential.update({ where: { id: existingId }, data: buildUpdate(row) as never });
         updated++;
-        importedRecords.push(recordOf(row, "updated"));
       } catch (e) {
         console.error("Import update row error:", e);
         const who = [row.firstName, row.lastName].filter(Boolean).join(" ") || (row.pendingStudentId ?? "");
@@ -224,7 +216,6 @@ export async function POST(request: NextRequest) {
       created: imported,
       updated,
       failed: errors.length,
-      records: importedRecords,
       errors,
     });
 
