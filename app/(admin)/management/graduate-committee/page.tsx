@@ -95,12 +95,14 @@ export default function GraduateCommitteePage() {
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
   const hot = useHotFields("graduate_committee", committees.map((c) => c.id));
 
-  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string }) => {
+  const selectAlumni = (a: { id: string; studentId: string; prefix: string; firstName: string; lastName: string; major?: string; cohort?: string }) => {
     setValue("studentId", a.studentId);
     setValue("prefix", a.prefix ?? "");
     setValue("firstName", a.firstName ?? "");
     setValue("lastName", a.lastName ?? "");
     setValue("major", a.major ?? "");
+    // Auto-fill รุ่น from the alumni when they have one (don't clobber an empty).
+    if (a.cohort) setValue("cohort", a.cohort);
     setNameSearch(displayName(a));
     setAlumniSearchField(null);
     clearResults();

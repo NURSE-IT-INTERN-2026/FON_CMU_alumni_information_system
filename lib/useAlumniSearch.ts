@@ -19,6 +19,11 @@ export interface AlumniSearchResult {
   // Local alumni `homeAddress` (ที่อยู่ปัจจุบัน) — surfaced so the alumni-agency
   // form can auto-fill ที่อยู่บ้าน when a record is linked. CMU has no address.
   homeAddress?: string;
+  // Local alumni `cohort` (รุ่น) and `englishName` (ชื่ออังกฤษ) — surfaced so forms
+  // that carry those fields (alumni-agency, graduate-committee) can auto-fill
+  // them. CMU has neither.
+  cohort?: string;
+  englishName?: string;
 }
 
 interface CmuAlumni {
@@ -67,6 +72,8 @@ export function useAlumniSearch() {
             lastName: a.lastName ?? "",
             major: a.major ?? "",
             homeAddress: a.homeAddress ?? "",
+            cohort: a.cohort ?? "",
+            englishName: a.englishName ?? "",
           });
         }
       }
