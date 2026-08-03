@@ -205,6 +205,7 @@ export default function AlumniAgencyPage() {
   });
   const [formSearchField, setFormSearchField] = useState<"studentId" | "name" | null>(null);
   const [countryOpen, setCountryOpen] = useState(false);
+  const [provinceOpen, setProvinceOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const { alumniResults, showAlumniDropdown, searchAlumni, clearResults, displayName } = useAlumniSearch();
 
@@ -621,12 +622,35 @@ export default function AlumniAgencyPage() {
             )}
             {isThailand ? (
               // จังหวัด is required for in-country rows (enforced by the schema
-              // refine). Backed by a datalist of the 77 official Thai provinces.
+              // refine). Backed by a combobox of the 77 official Thai provinces.
               <FormField label="จังหวัด" required error={errors.province?.message}>
-                <FormInput registration={register("province")} error={errors.province?.message} type="text" list="province-list" />
-                <datalist id="province-list">
-                  {THAI_PROVINCES.map((p) => <option key={p} value={p} />)}
-                </datalist>
+                <Controller name="province" control={control} render={({ field }) => {
+                  const suggestions = THAI_PROVINCES.filter(
+                    (p) => !field.value || p.toLowerCase().includes(String(field.value).toLowerCase()),
+                  );
+                  return (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onFocus={() => setProvinceOpen(true)}
+                        onBlur={() => setProvinceOpen(false)}
+                        autoComplete="off"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${errors.province ? "border-red-400 focus:ring-red-400" : "border-gray-300"}`}
+                      />
+                      {provinceOpen && suggestions.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                          {suggestions.map((p) => (
+                            <button key={p} type="button" onMouseDown={(e) => { e.preventDefault(); field.onChange(p); setProvinceOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-purple-50 transition-colors">
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }} />
               </FormField>
             ) : (
               // Abroad records have no province — keep the field registered so
