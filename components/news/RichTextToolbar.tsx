@@ -114,7 +114,6 @@ export function RichTextToolbar({ editor }: { editor: Editor }) {
       alignCenter: editor.isActive({ textAlign: "center" }),
       alignRight: editor.isActive({ textAlign: "right" }),
       alignJustify: editor.isActive({ textAlign: "justify" }),
-      highlight: editor.isActive("highlight"),
     }),
   });
 
@@ -189,10 +188,19 @@ export function RichTextToolbar({ editor }: { editor: Editor }) {
           onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
         />
       </label>
-      {/* Highlight (single default color toggle) */}
-      <ToolbarButton title="สีพื้นหลังข้อความ" active={s.highlight} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+      {/* Text background color / highlight (native color picker → setHighlight({color})).
+          The Highlight extension is multicolor, so passing a color emits
+          <mark style="background-color:…">, which the sanitizer keeps and the
+          reader renders. Mirrors the text-color control above. */}
+      <label title="สีพื้นหลังข้อความ" className="relative flex cursor-pointer items-center rounded p-1.5 text-gray-600 hover:bg-gray-200">
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /></svg>
-      </ToolbarButton>
+        <input
+          type="color"
+          defaultValue="#fef08a"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()}
+        />
+      </label>
 
       <Divider />
 
