@@ -85,6 +85,22 @@ describe("sanitizeNewsBodyForStorage (security #7 — sanitize on write, basePat
     expect(out).toContain("text-align");
   });
 
+  it("keeps a colored highlight's background-color (drops data-color / color:inherit)", () => {
+    // Editor emits this for setHighlight({color}) with the multicolor Highlight
+    // extension. The inline background-color is what renders AND what the editor
+    // reads back on re-edit (parseHTML falls back to the background-color style),
+    // so stripping data-color / color:inherit is harmless.
+    const out = sanitizeNewsBodyForStorage(
+      `<mark data-color="#fef08a" style="background-color:#fef08a; color:inherit">hi</mark>`,
+    );
+    const low = out.toLowerCase();
+    expect(low).toContain("<mark");
+    expect(low).toContain("background-color");
+    expect(low).toContain("#fef08a");
+    expect(low).not.toContain("data-color");
+    expect(low).toContain(">hi<");
+  });
+
   it("does NOT bake basePath into upload srcs (storage stays basePath-relative)", () => {
     const out = sanitizeNewsBodyForStorage(`<img src="/uploads/abc.png">`);
     expect(out).toContain('src="/uploads/abc.png"');
