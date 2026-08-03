@@ -84,7 +84,6 @@ export async function GET(request: NextRequest) {
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,
       "ลิงค์": a.link || "",
-      "รูปภาพ": a.imageUrl || "",
       "รายละเอียด": a.description || "",
     }));
     await logActivity(
@@ -147,7 +146,6 @@ export async function POST(request: NextRequest) {
       "ประเภทรางวัล": AWARD_TYPE_LABELS[a.awardType] || a.awardType,
       "ปี (พ.ศ.)": a.year,
       "ลิงค์": a.link || "",
-      "รูปภาพ": a.imageUrl || "",
       "รายละเอียด": a.description || "",
     }));
 
