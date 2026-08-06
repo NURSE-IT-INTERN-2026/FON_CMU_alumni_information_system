@@ -17,4 +17,11 @@ export function register() {
   if (!check.ok) {
     console.error("⚠️ PUBLIC BASE URL FAIL-SAFE: " + check.reason);
   }
+
+  // Start the in-process monthly CMU-sync scheduler (lib/cmu-scheduler.ts).
+  // Best-effort: a failure here must never block boot. The scheduler is
+  // production-only by design (dev/HMR would double-arm), and fire-and-forget.
+  void import("@/lib/cmu-scheduler")
+    .then((m) => m.startCmuScheduler())
+    .catch((e) => console.error("[cmu-scheduler] failed to start:", e));
 }

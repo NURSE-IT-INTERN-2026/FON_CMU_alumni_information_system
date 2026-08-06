@@ -2,13 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession, constantTimeEqual } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
-import { logImport } from "@/lib/import-log";
-import { bustCache, bustCachePrefix } from "@/lib/cache";
-import {
-  fetchCmuGraduatesLive,
-  diffCmuGraduates,
-  type CmuGraduate,
-} from "@/lib/cmu-registrar";
+import { fetchCmuGraduatesLive, diffCmuGraduates } from "@/lib/cmu-registrar";
+import { materializeCmuGraduates } from "@/lib/cmu-sync-job";
 
 /**
  * CMU Registrar materialization endpoint — the ONLY place the app still calls
@@ -20,6 +15,10 @@ import {
  *
  * Auth: a valid admin/superadmin session (`checkWritePermission`), OR the
  * `CMU_SYNC_SECRET` bearer token so an external cron can refresh the table.
+ *
+ * POST delegates to `materializeCmuGraduates` (`lib/cmu-sync-job.ts`), shared
+ * with the in-process monthly scheduler (`lib/cmu-scheduler.ts`, armed at boot
+ * from `instrumentation.ts`) — one code path for manual + scheduled sync.
  */
 async function authorize(request: Request): Promise<
   | { ok: true; session: Awaited<ReturnType<typeof getSession>> }
@@ -33,25 +32,6 @@ async function authorize(request: Request): Promise<
   if (permErr) return { ok: false, response: permErr };
   return { ok: true, session: await getSession() };
 }
-
-/** The 11 CMU fields persisted per record (no studentId / bookkeeping here). */
-function rowFields(g: CmuGraduate) {
-  return {
-    nameTh: (g.name_th ?? "").trim(),
-    surnameTh: (g.surname_th ?? "").trim(),
-    birthday: g.birthday ?? "",
-    levelId: g.level_id ?? "",
-    majorNameTh: (g.major_name_th ?? "").trim(),
-    gradYear: g.grad_year ?? "",
-    sexId: g.sex_id || null,
-    cmuitAccount: g.cmuitaccount || null,
-    nameEn: g.name_en || null,
-    surnameEn: g.surname_en || null,
-    gradDate: g.grad_date || null,
-  };
-}
-
-const CHUNK_SIZE = 500;
 
 // GET — compare local vs remote (studentId-set + count; excludes local-not-CMU
 // data by design: local-only alumni are not in `cmu_graduates`).
@@ -90,39 +70,15 @@ export async function GET(request: Request) {
 // POST — materialize the full remote registrar set into cmu_graduates (chunked
 // upserts so existing rows refresh stale fields; createMany would skip them).
 // Does NOT auto-soft-delete registrar-removed rows — reported via GET's
-// removedCount only (keeps the table a faithful superset).
+// removedCount only (keeps the table a faithful superset). Delegates to the
+// shared `materializeCmuGraduates` (also used by the monthly scheduler).
 export async function POST(request: Request) {
   const auth = await authorize(request);
   if (!auth.ok) return auth.response;
 
   try {
-    const remote = await fetchCmuGraduatesLive();
-    let created = 0;
-    let updated = 0;
-
-    for (let i = 0; i < remote.length; i += CHUNK_SIZE) {
-      const slice = remote.slice(i, i + CHUNK_SIZE);
-      await prisma.$transaction(async (tx) => {
-        for (const g of slice) {
-          const sid = String(g.student_id ?? "").trim();
-          if (!sid) continue;
-          const result = await tx.cmuGraduate.upsert({
-            where: { studentId: sid },
-            create: { studentId: sid, ...rowFields(g) },
-            update: { ...rowFields(g), deletedAt: null },
-          });
-          const op =
-            result.createdAt.getTime() === result.updatedAt.getTime()
-              ? "created"
-              : "updated";
-          if (op === "created") created++;
-          else updated++;
-        }
-      });
-    }
-
-    await logImport({
-      ctx: auth.session
+    const result = await materializeCmuGraduates(
+      auth.session
         ? {
             actorType: "ADMIN",
             userId: auth.session.user.id,
@@ -130,26 +86,8 @@ export async function POST(request: Request) {
             userRole: auth.session.user.role,
           }
         : { actorType: "SYSTEM" },
-      resource: "cmu_alumni",
-      fileName: null,
-      attempted: remote.length,
-      created,
-      updated,
-      failed: 0,
-      errors: [],
-    });
-
-    // The dashboard + alumni-count payloads are 60s-TTL cached; bust so the new
-    // counts land immediately after a sync.
-    bustCache("dashboard");
-    bustCachePrefix("alumni");
-
-    return NextResponse.json({
-      upserted: created + updated,
-      created,
-      updated,
-      remoteCount: remote.length,
-    });
+    );
+    return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/cmu-alumni/sync error:", error);
     return NextResponse.json(
