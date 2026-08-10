@@ -7,6 +7,7 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { requireForumAlumni, alumniLogCtx } from "@/lib/forum-guard";
+import { communityRateLimit, COMMUNITY_REPORT_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { handleZodError, forumReportCreateSchema } from "@/lib/validations";
 
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
     const a = await requireForumAlumni();
     if ("error" in a) return a.error;
     const alumni = a.alumni;
+
+    const rl = communityRateLimit(request, "report", COMMUNITY_REPORT_LIMIT);
+    if (rl) return rl;
 
     const validated = forumReportCreateSchema.parse(await request.json());
 

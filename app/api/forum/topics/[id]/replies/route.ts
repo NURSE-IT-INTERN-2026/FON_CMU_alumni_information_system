@@ -5,6 +5,7 @@ import { clampPaging } from "@/lib/pagination";
 import { PAGE_SIZE } from "@/lib/constants";
 import { logActivity } from "@/lib/activity-log";
 import { resolveForumReader, requireForumAlumni, alumniLogCtx } from "@/lib/forum-guard";
+import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { handleZodError, forumReplyCreateSchema } from "@/lib/validations";
 
@@ -68,6 +69,9 @@ export async function POST(
     if ("error" in a) return a.error;
     const alumni = a.alumni;
     const { id: topicId } = await params;
+
+    const rl = communityRateLimit(request, "post", COMMUNITY_POST_LIMIT);
+    if (rl) return rl;
 
     const topic = await prisma.forumTopic.findFirst({
       where: { id: topicId, deletedAt: null },

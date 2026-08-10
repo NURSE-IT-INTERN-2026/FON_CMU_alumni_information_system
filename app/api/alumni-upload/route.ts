@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_FILE_SIZE, saveImageUpload } from "@/lib/upload";
 import { requireForumAlumni } from "@/lib/forum-guard";
+import { communityRateLimit, COMMUNITY_UPLOAD_LIMIT } from "@/lib/community-rate-limit";
 
 // Alumni image upload for community content (the activity feed). Gated on an
 // OPTED-IN alumni (same gate as posting) — `POST /api/upload` is admin-only, so
@@ -9,6 +10,8 @@ import { requireForumAlumni } from "@/lib/forum-guard";
 export async function POST(request: NextRequest) {
   const a = await requireForumAlumni();
   if ("error" in a) return a.error;
+  const rl = communityRateLimit(request, "upload", COMMUNITY_UPLOAD_LIMIT);
+  if (rl) return rl;
   try {
     const contentLength = parseInt(request.headers.get("content-length") ?? "", 10);
     if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE * 2) {

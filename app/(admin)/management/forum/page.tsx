@@ -31,15 +31,18 @@ function publicName(a: AlumniPublicIdentity | null | undefined): string {
 interface ReportedTarget {
   id: string;
   title?: string;
-  body: string;
+  body?: string;
+  description?: string;
+  imageUrl?: string | null;
   deletedAt: string | null;
   createdAt: string;
-  author: AlumniPublicIdentity;
-  topicId?: string;
+  author?: AlumniPublicIdentity;
+  organizerAlumni?: AlumniPublicIdentity | null;
+  organizerUser?: { id: string; firstName: string; lastName: string } | null;
 }
 interface ForumReport {
   id: string;
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY";
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT";
   resourceId: string;
   reason: keyof typeof FORUM_REPORT_REASON_LABELS;
   reasonDetail: string | null;
@@ -50,6 +53,45 @@ interface ForumReport {
   resolver: { id: string; firstName: string; lastName: string } | null;
   topic: ReportedTarget | null;
   reply: ReportedTarget | null;
+  event: ReportedTarget | null;
+  feedPost: ReportedTarget | null;
+  feedComment: ReportedTarget | null;
+}
+
+const RESOURCE_LABELS: Record<ForumReport["resourceType"], string> = {
+  FORUM_TOPIC: "กระทู้",
+  FORUM_REPLY: "ความคิดเห็น (กระดานสนทนา)",
+  EVENT: "กิจกรรม",
+  FEED_POST: "โพสต์ (ฟีด)",
+  FEED_COMMENT: "ความคิดเห็น (ฟีด)",
+};
+
+/** Uniform descriptor for a reported item, regardless of resource type, so the
+ * card can render + delete it generically. Returns null if the target is gone. */
+function describeReport(r: ForumReport) {
+  const t =
+    r.resourceType === "FORUM_TOPIC" ? r.topic
+    : r.resourceType === "FORUM_REPLY" ? r.reply
+    : r.resourceType === "EVENT" ? r.event
+    : r.resourceType === "FEED_POST" ? r.feedPost
+    : r.feedComment;
+  if (!t) return null;
+  const deleteUrl =
+    r.resourceType === "FORUM_TOPIC" ? `/api/forum/topics/${r.resourceId}`
+    : r.resourceType === "FORUM_REPLY" ? `/api/forum/replies/${r.resourceId}`
+    : r.resourceType === "EVENT" ? `/api/events/${r.resourceId}`
+    : r.resourceType === "FEED_POST" ? `/api/feed/${r.resourceId}`
+    : `/api/feed/comments/${r.resourceId}`;
+  const staffName = t.organizerUser ? `${t.organizerUser.firstName} ${t.organizerUser.lastName}`.trim() : null;
+  return {
+    label: RESOURCE_LABELS[r.resourceType],
+    title: t.title ?? null,
+    body: t.body ?? t.description ?? "",
+    deleted: !!t.deletedAt,
+    deleteUrl,
+    author: t.author ?? t.organizerAlumni ?? null,
+    staffName,
+  };
 }
 
 type StatusFilter = "OPEN" | "RESOLVED" | "DISMISSED";
@@ -84,10 +126,7 @@ export default function ForumModerationPage() {
   });
 
   const hide = useMutation({
-    mutationFn: (r: ForumReport) =>
-      r.resourceType === "FORUM_TOPIC"
-        ? apiFetch(`/api/forum/topics/${r.resourceId}`, { method: "DELETE" })
-        : apiFetch(`/api/forum/replies/${r.resourceId}`, { method: "DELETE" }),
+    mutationFn: (desc: { deleteUrl: string }) => apiFetch(desc.deleteUrl, { method: "DELETE" }),
     onSuccess: bust,
     onError: (e) => setError(e instanceof ApiError ? e.message : "เกิดข้อผิดพลาด"),
   });
@@ -130,34 +169,35 @@ export default function ForumModerationPage() {
       ) : (
         <div className="space-y-4">
           {reports.map((r) => {
-            const target = r.topic ?? r.reply;
-            const isTopic = r.resourceType === "FORUM_TOPIC";
+            const desc = describeReport(r);
             return (
               <div key={r.id} className="rounded-lg bg-white p-5 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
                   <span className="rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
                     {FORUM_REPORT_REASON_LABELS[r.reason]}
                   </span>
-                  <span className="text-[var(--muted)]">
-                    {isTopic ? "กระทู้" : "ความคิดเห็น"}
-                  </span>
+                  <span className="text-[var(--muted)]">{desc?.label ?? RESOURCE_LABELS[r.resourceType]}</span>
                   <span className="text-[var(--muted)]">·</span>
                   <span className="text-[var(--muted)]">รายงานเมื่อ {formatThaiDate(r.createdAt)}</span>
-                  {target?.deletedAt && (
+                  {desc?.deleted && (
                     <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-500">ถูกลบแล้ว</span>
                   )}
                 </div>
 
                 {/* Reported content */}
-                {target ? (
+                {desc ? (
                   <div className="mb-3 rounded-md bg-gray-50 p-3">
-                    {isTopic && <p className="mb-1 font-semibold text-[var(--foreground)]">{target.title}</p>}
-                    <p className="line-clamp-3 text-sm text-[var(--foreground)]">{target.body}</p>
+                    {desc.title && <p className="mb-1 font-semibold text-[var(--foreground)]">{desc.title}</p>}
+                    {desc.body && <p className="line-clamp-3 text-sm text-[var(--foreground)]">{desc.body}</p>}
                     <p className="mt-2 text-xs text-[var(--muted)]">
-                      โดย {publicName(target.author)} ·{" "}
-                      <Link href={`/management/alumni/${target.author.id}`} className="text-[var(--primary)] hover:underline">
-                        ดูโพรไฟล์เต็ม
-                      </Link>
+                      โดย {desc.author ? (
+                        <>
+                          {publicName(desc.author)} ·{" "}
+                          <Link href={`/management/alumni/${desc.author.id}`} className="text-[var(--primary)] hover:underline">ดูโพรไฟล์เต็ม</Link>
+                        </>
+                      ) : desc.staffName ? (
+                        `เจ้าหน้าที่: ${desc.staffName}`
+                      ) : "—"}
                     </p>
                   </div>
                 ) : (
@@ -171,12 +211,12 @@ export default function ForumModerationPage() {
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-[var(--muted)]">รายงานโดย {publicName(r.reporter)}</p>
                   <div className="flex flex-wrap gap-2">
-                    {r.status === "OPEN" && canWrite && target && !target.deletedAt && (
+                    {r.status === "OPEN" && canWrite && desc && !desc.deleted && (
                       <Button
                         size="sm"
                         variant="destructive"
                         disabled={hide.isPending}
-                        onClick={() => hide.mutate(r)}
+                        onClick={() => hide.mutate(desc)}
                       >
                         ซ่อน/ลบเนื้อหา
                       </Button>

@@ -46,6 +46,10 @@ export default function FeedPostPage() {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [report, setReport] = useState<{ type: "FEED_POST" | "FEED_COMMENT"; resourceId: string } | null>(null);
   const [delComment, setDelComment] = useState<string | null>(null);
+  const [editPost, setEditPost] = useState(false);
+  const [editPostText, setEditPostText] = useState("");
+  const [editCommentId, setEditCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState("");
 
   const bust = () => qc.invalidateQueries({ queryKey: queryKeys.feed.all });
 
@@ -65,6 +69,15 @@ export default function FeedPostPage() {
   const removePost = useMutation({
     mutationFn: () => apiFetch(`/api/feed/${postId}`, { method: "DELETE" }),
     onSuccess: () => { bust(); router.push("/graduates/feed"); },
+  });
+  const savePost = useMutation({
+    mutationFn: (body: string) => apiFetch(`/api/feed/${postId}`, { method: "PUT", json: { body } }),
+    onSuccess: () => { setEditPost(false); qc.invalidateQueries({ queryKey: queryKeys.feed.post(postId) }); },
+  });
+  const saveComment = useMutation({
+    mutationFn: ({ cid, body }: { cid: string; body: string }) =>
+      apiFetch(`/api/feed/comments/${cid}`, { method: "PUT", json: { body } }),
+    onSuccess: () => { setEditCommentId(null); qc.invalidateQueries({ queryKey: queryKeys.feed.post(postId) }); },
   });
 
   if (isPending) {
@@ -95,7 +108,25 @@ export default function FeedPostPage() {
           <PhotoAvatar identity={post.author} size="sm" />
           <span className="text-xs text-[var(--muted)]">{formatThaiDate(post.createdAt)}</span>
         </div>
-        {post.body && <ForumBody text={post.body} />}
+        {editPost ? (
+          <div className="space-y-2">
+            <textarea
+              className="w-full resize-none rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm"
+              rows={4}
+              maxLength={10000}
+              value={editPostText}
+              onChange={(e) => setEditPostText(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditPost(false)} disabled={savePost.isPending}>ยกเลิก</Button>
+              <Button size="sm" onClick={() => savePost.mutate(editPostText.trim())} disabled={savePost.isPending || !editPostText.trim()}>
+                {savePost.isPending ? "กำลังบันทึก…" : "บันทึก"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          post.body && <ForumBody text={post.body} />
+        )}
         {post.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={assetUrl(post.imageUrl)} alt="" className="mt-3 max-h-96 w-full rounded-md object-cover" />
@@ -106,6 +137,7 @@ export default function FeedPostPage() {
           </button>
           <span className="text-[var(--muted)]">💬 {post.commentCount}</span>
           <button onClick={() => setReport({ type: "FEED_POST", resourceId: post.id })} className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--primary)]">รายงาน</button>
+          {isOwn && <button onClick={() => { setEditPostText(post.body); setEditPost(true); }} className="text-xs text-[var(--muted)] hover:text-[var(--primary)]">แก้ไข</button>}
           {isOwn && <button onClick={() => removePost.mutate()} className="text-xs text-red-600 hover:underline" disabled={removePost.isPending}>ลบ</button>}
         </div>
       </article>
@@ -124,9 +156,28 @@ export default function FeedPostPage() {
                   <PhotoAvatar identity={c.author} size="sm" />
                   <span className="text-xs text-[var(--muted)]">{formatThaiDate(c.createdAt)}</span>
                 </div>
-                <ForumBody text={c.body} />
+                {editCommentId === c.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      className="w-full resize-none rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm"
+                      rows={3}
+                      maxLength={10000}
+                      value={editCommentText}
+                      onChange={(e) => setEditCommentText(e.target.value)}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setEditCommentId(null)} disabled={saveComment.isPending}>ยกเลิก</Button>
+                      <Button size="sm" onClick={() => saveComment.mutate({ cid: c.id, body: editCommentText.trim() })} disabled={saveComment.isPending || !editCommentText.trim()}>
+                        {saveComment.isPending ? "กำลังบันทึก…" : "บันทึก"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ForumBody text={c.body} />
+                )}
                 <div className="mt-2 flex items-center gap-3 text-xs">
                   <button onClick={() => setReport({ type: "FEED_COMMENT", resourceId: c.id })} className="text-[var(--muted)] hover:text-[var(--primary)]">รายงาน</button>
+                  {cOwn && editCommentId !== c.id && <button onClick={() => { setEditCommentText(c.body); setEditCommentId(c.id); }} className="text-[var(--muted)] hover:text-[var(--primary)]">แก้ไข</button>}
                   {cOwn && <button onClick={() => setDelComment(c.id)} className="text-red-600 hover:underline">ลบ</button>}
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { Prisma } from "@/app/generated/prisma/client";
 import { logActivity } from "@/lib/activity-log";
 import { resolveEventReader, resolveEventCreator, adminLogCtx, alumniLogCtx } from "@/lib/event-guard";
+import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { bangkokDatetimeLocalToIso } from "@/lib/event-format";
 import { handleZodError, eventCreateSchema } from "@/lib/validations";
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
   try {
     const creator = await resolveEventCreator();
     if ("error" in creator) return creator.error;
+
+    const rl = communityRateLimit(request, "post", COMMUNITY_POST_LIMIT);
+    if (rl) return rl;
 
     const v = eventCreateSchema.parse(await request.json());
     const startAt = new Date(bangkokDatetimeLocalToIso(v.startAt));
