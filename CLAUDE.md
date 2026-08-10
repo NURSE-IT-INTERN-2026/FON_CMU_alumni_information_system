@@ -44,7 +44,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 
 ### Database Schema
 
-19 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
+21 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
 
 | Model | Table | Purpose |
 |---|---|---|
@@ -66,7 +66,9 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | `CmuGraduate` | `cmu_graduates` | **Materialized** CMU Registrar graduate list (one row per FON degree record, `studentId @unique`) — local cache of the registrar universe. Refreshed on demand by an admin from `/management/settings/cmu-sync`; the ONLY live-CMU call lives in that sync route. See the materialization lesson |
 | `ForumTopic` | `forum_topics` | Alumni community forum topic (opening post + title). **Plain-text** body (escaped+linkified on render via `renderForumBody`, NOT Tiptap). FK to `Alumni.id`. `replyCount`/`lastReplyAt` denormalized + maintained in a `$transaction` on reply create/delete. Soft-delete (`deletedAt` = owner delete OR admin hide; trash-recoverable). Opt-in gate in `lib/forum-guard.ts`; the public-identity select in `lib/forum-identity.ts` is the single leak surface. See the forum lesson |
 | `ForumReply` | `forum_replies` | A reply on a `ForumTopic`. Plain-text body, FK to `ForumTopic.id` (Cascade) + `Alumni.id`. Soft-delete recomputes the topic's denormalized counters |
-| `ContentReport` | `content_reports` | User-generated content report (report+admin-review moderation). `@@unique([reporterId, resourceType, resourceId])` = one report per (reporter, target); re-report re-opens. Lifecycle is a status (`OPEN`/`RESOLVED`/`DISMISSED`) — NOT soft-delete/trash-recoverable |
+| `ContentReport` | `content_reports` | User-generated content report (report+admin-review moderation). `@@unique([reporterId, resourceType, resourceId])` = one report per (reporter, target); re-report re-opens. Lifecycle is a status (`OPEN`/`RESOLVED`/`DISMISSED`) — NOT soft-delete/trash-recoverable. `resourceType` also covers events (`EVENT`) |
+| `CommunityEvent` | `community_events` | Alumni community event/reunion. Organizer is an alum (opted-in) OR a staff member — exactly one of `organizerAlumniId`/`organizerUserId` set. **Broadcast visibility** (all ACTIVE alumni; NOT opt-in-gated like the forum — see `lib/event-guard.ts`). Plain-text description (`renderForumBody`). `capacity` = max total headcount (attendees+guests); enforced in the RSVP route (`lib/event-capacity.ts`). Soft-delete (RSVPs cascade) |
+| `EventRsvp` | `event_rsvps` | An alum's RSVP on a `CommunityEvent` — `ATTENDING` (with `guestCount`, counts toward capacity) or `DECLINED`. `@@unique([eventId, alumniId])` |
 
 **Enums:**
 - `DegreeLevel`: DOCTORAL, MASTER, BACHELOR, ASSOCIATE, NURSING_ASSISTANT
@@ -75,7 +77,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 - `SessionType`: ADMIN, ALUMNI
 - `ActorType`: ADMIN, ALUMNI, SYSTEM
 - `AccountStatus`: UNVERIFIED, PENDING, ACTIVE, REJECTED (alumni signup lifecycle — new signups are UNVERIFIED until email-confirmed, then PENDING until admin-approved; only ACTIVE may log in)
-- `ContentReportStatus`: OPEN, RESOLVED, DISMISSED · `ContentReportReason`: SPAM, HARASSMENT, INAPPROPRIATE, OTHER · `ForumReportResource`: FORUM_TOPIC, FORUM_REPLY (alumni community forum)
+- `ContentReportStatus`: OPEN, RESOLVED, DISMISSED · `ContentReportReason`: SPAM, HARASSMENT, INAPPROPRIATE, OTHER · `ForumReportResource`: FORUM_TOPIC, FORUM_REPLY, EVENT (forum + community events share the report system) · `RsvpStatus`: ATTENDING, DECLINED (community events)
 
 ### Auth & Roles
 
@@ -113,6 +115,7 @@ app/
 │       ├── potentials/
 │       ├── news/                 # News management (cards, not a table)
 │       ├── forum/                # Alumni community forum — moderation/reports queue (admin+superadmin; exec read-only)
+│       ├── events/               # Alumni community events — staff create/edit/delete + attendee counts
 │       └── settings/{profile,users,logs,cmu-sync,trash}/  # cmu-sync = "การดึงข้อมูล" (admin+superadmin)
 ├── admin/{alumni,news,users}/    # Admin-side views (verify purpose before editing)
 ├── graduates/                    # Alumni ("graduates") portal
@@ -122,6 +125,7 @@ app/
 │       ├── layout.tsx            # Alumni auth guard
 │       ├── profile/              # Alumni self-profile (view/edit)
 │       ├── forum/ + forum/[id]/ + forum/new/   # Alumni community forum (opt-in gated)
+│       ├── events/ + events/[id]/ + events/new/   # Alumni community events (broadcast; RSVP w/ guests+capacity)
 │       └── news/ + news/[id]/    # Alumni news (read-only)
 ├── api/                          # REST API routes
 │   ├── alumni/                   # CRUD + import/export/bulk-delete + create-with-related + update-with-related/[id] + [id]/activity (merged change timeline; [id] GET resolves UUID or studentId)
@@ -133,6 +137,7 @@ app/
 │   ├── associations/ · awards/ · graduate-committee/ · model-representatives/ · potentials/  # CRUD + import/export/bulk-delete
 │   ├── news/                     # CRUD + bulk-delete (→ DISCONTINUED) + bulk-publish + bulk-pin + [id]/pin
 │   ├── forum/                    # Alumni community forum — topics + topics/[id] + topics/[id]/replies + replies/[id] + reports + reports/[id]. Opt-in gate (`lib/forum-guard.ts`); public-identity select (`lib/forum-identity.ts`)
+│   ├── events/                   # Alumni community events — events/[id] + events/[id]/rsvp. Broadcast gate (`lib/event-guard.ts`); capacity-aware RSVP (`lib/event-capacity.ts`). Event reports go through /api/forum/reports (resourceType EVENT)
 │   ├── auth/{login,cmu-login,logout,callback,cleanup}/   # callback = CMU OAuth callback (Microsoft Entra ID PKCE)
 │   ├── educations/[id]/          # Education record GET/PUT/DELETE (admin OR owning alumni; PUT of the primary re-syncs the Alumni snapshot)
 │   ├── alumni/[id]/educations/   # Admin: list + add an alumni's education records
@@ -167,6 +172,7 @@ Each data entity follows a consistent route structure:
   - `educations` — degree records (1:N per alumni). `GET/POST /api/alumni/[id]/educations` (admin) and `GET/POST /api/alumni-profile/educations` (alumni-self) for list/add; `GET/PUT/DELETE /api/educations/[id]` for one record (admin OR owning alumni via `resolveWriter`). Every add, and a PUT that changes `studentId`, must pass `assertEducationSamePerson`. No import/export/bulk-delete.
   - `logs` — read-only (GET list only) + a **superadmin-only** `POST /api/logs/bulk-delete` `{ ids }` that **hard-deletes** (and deliberately does NOT log the deletion). UI gate is `useRole() === "superadmin"` (NOT `useIsAdmin()`).
   - `forum` — alumni community forum (v1). **Opt-in gated** (`lib/forum-guard.ts`): reads = staff OR opted-in alumni (401 anon, 403 `{code:"NOT_OPTED_IN"}`); writes = opted-in alumni; admin moderation writes via `checkWritePermission` (exec read-only, opt-in-exempt). Routes: `GET/POST /api/forum/topics`, `GET/PUT/DELETE /api/forum/topics/[id]`, `GET/POST /api/forum/topics/[id]/replies`, `PUT/DELETE /api/forum/replies/[id]`, `POST /api/forum/reports` (alumni; no self-report; upsert re-opens) + `GET /api/forum/reports` (staff queue), `POST /api/forum/reports/[id] {action:"resolve"|"dismiss"}`. `POST /api/alumni-profile/community-membership {action:"opt-in"|"opt-out"}` flips `Alumni.communityOptedInAt`. **Bodies are plain text** (escape+linkify on render via `renderForumBody` — NO Tiptap/sanitize-html). DELETE is a soft-delete (owner OR admin); `forum_topic`/`forum_reply` are in `TRASH_ENTITIES`. Denormalized `replyCount`/`lastReplyAt` maintained in a `$transaction`. No import/export/bulk-delete. See the forum lesson.
+  - `events` — alumni community events/reunions. **Broadcast gated** (`lib/event-guard.ts`, NOT opt-in): reads/RSVP = staff OR any ACTIVE alumni; creation = staff (`checkWritePermission`) OR opted-in alumni (sets `organizerUserId`/`organizerAlumniId`). Routes: `GET/POST /api/events`, `GET/PUT/DELETE /api/events/[id]` (PUT = organizer-or-staff; DELETE = organizer-or-staff soft-delete), `POST/DELETE /api/events/[id]/rsvp`. RSVP `{status:ATTENDING|DECLINED, guestCount}`; `guestCount ≤ event.guestLimit`; **capacity** (total headcount = attendees+guests) enforced via `lib/event-capacity.ts` → 400 `{code:"EVENT_FULL"}` when full (an update subtracts the alum's current seats to avoid double-counting). Datetimes: the route appends `+07:00` to the naive datetime-local input (`bangkokDatetimeLocalToIso`) and stores a UTC instant; `lib/event-format.ts` shifts +7h back for Bangkok display. Event reports reuse `POST /api/forum/reports {resourceType:"EVENT"}` and surface in the `/management/forum` queue. `community-event` is in `TRASH_ENTITIES` (RSVPs cascade). No import/export/bulk-delete. Alumni cover-image upload is intentionally omitted (the admin-gated `/api/upload` can't be reached by alumni; staff set covers via the admin page).
 
 ### Route Correlations, Redirects & Entry Points
 
@@ -575,3 +581,11 @@ Template for a ledger entry:
 - **Opt-out semantics:** clearing `communityOptedInAt` loses read/post access, but existing posts STAY attributed (standard forum behavior; anonymizing-on-opt-out is a deferred option). Self-edit/delete of own past content stays allowed after opt-out (the PUT/DELETE owner paths check `getAlumniSession` directly, NOT `requireForumAlumni`).
 - **Denormalized topic counters:** `ForumTopic.replyCount`/`lastReplyAt` are maintained on reply create/delete inside a `$transaction` (delete recomputes `lastReplyAt` = max remaining reply createdAt, null if none) so the list view stays cheap.
 - **Prevention:** New peer-to-peer alumni features MUST (1) go through the opt-in gate, (2) select author identity ONLY via `SELECT_ALUMNI_PUBLIC_IDENTITY`, (3) store plain text (or, if rich text ever needed, reuse the news sanitize pipeline). Add the `proxy.ts` matcher caveat: forum API GETs are NOT in the exclusion list, so a cookieless anonymous request 307→/login (like `news`); the route-handler 401/403 is the real enforcement for in-app calls (cookie present). The `no-public-browsing` test's `GATE_RE` recognizes `resolveForumReader`/`requireForumAlumni`/`resolveForumStaffOrOwner` as gates.
+
+### Alumni community events — BROADCAST visibility (not opt-in) + Bangkok datetime + capacity
+- **Rule:** Events use a DIFFERENT visibility model from the forum. The forum is opt-in (`Alumni.communityOptedInAt` required to read/post); **events are a broadcast** — `resolveEventReader` (`lib/event-guard.ts`) = staff OR any ACTIVE alumni, NO opt-in gate (a non-opted-in alum still sees events + can RSVP, because a reunion is for your whole class). Only CREATION is consent-gated: `resolveEventCreator` = staff (`checkWritePermission`) OR opted-in alumni. Two visibility models coexist on purpose — don't collapse them.
+- **Datetimes are Bangkok wall-clock:** `startAt`/`endAt` are stored as UTC instants, but the datetime-local picker is naive. The route appends `+07:00` via `bangkokDatetimeLocalToIso` (`lib/event-format.ts`) so the stored instant IS that Bangkok wall-clock; `formatEventDateTimeThai`/`isoToDatetimeLocal` shift +7h back for display/edit-prefill. **Do NOT** interpret datetime-local as UTC or server-local TZ — always pin ±07:00 explicitly (deterministic regardless of the container's TZ env).
+- **Capacity = total headcount (attendees + guests),** pure math in `lib/event-capacity.ts` (`rsvpSeats` = 1+guests, `fitsCapacity`). The RSVP route subtracts the alum's CURRENT attending seats before checking (`otherHeadcount = total − currentSeats`) so an update isn't double-counted; `ATTENDING` over capacity → 400 `{code:"EVENT_FULL"}`; `DECLINED` always fits. `guestCount ≤ event.guestLimit`.
+- **Organizer is dual:** `organizerAlumniId` (alum, opted-in creator) XOR `organizerUserId` (staff) — exactly one set (app-enforced), both `onDelete:SetNull` so the event survives the organizer's removal. Display: alumni→PhotoAvatar; staff→badge (`EventOrganizerView`).
+- **Reports are shared:** events reuse `ContentReport` via `resourceType:"EVENT"` (added to `ForumReportResource`); `POST /api/forum/reports` + the `/management/forum` queue handle event targets. An alum cannot report their OWN event (the self-report guard compares `organizerAlumniId`).
+- **Prevention:** New broadcast alumni features use `resolveEventReader` (not the opt-in gate); reuse `SELECT_ALUMNI_PUBLIC_IDENTITY` for organizers/attendees; keep capacity math pure + tested. Alumni can't reach the admin-gated `/api/upload`, so alumni-created events have no cover (staff set covers via the admin page).

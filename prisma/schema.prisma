@@ -70,6 +70,14 @@ enum ContentReportReason {
 enum ForumReportResource {
   FORUM_TOPIC
   FORUM_REPLY
+  EVENT // community events share the report+moderation system (name is historical)
+}
+
+// Event RSVP states (alumni community events). ATTENDING counts toward the
+// event's capacity (with guestCount); DECLINED = explicit "not coming".
+enum RsvpStatus {
+  ATTENDING
+  DECLINED
 }
 
 model Alumni {
@@ -143,6 +151,8 @@ model Alumni {
   forumTopics          ForumTopic[]
   forumReplies         ForumReply[]
   contentReports       ContentReport[]
+  organizedEvents      CommunityEvent[] @relation("EventOrganizerAlumni")
+  eventRsvps           EventRsvp[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -374,6 +384,7 @@ model AdminUser {
   sessions     Session[]
   activityLogs ActivityLog[]
   resolvedReports ContentReport[]
+  organizedEvents CommunityEvent[] @relation("EventOrganizerUser")
 
   @@map("admin_users")
 }
@@ -586,4 +597,55 @@ model ContentReport {
   @@index([resourceType, resourceId])
   @@index([reporterId])
   @@map("content_reports")
+}
+
+// Alumni community event / reunion. Organizer is EITHER an alum (opted-in) OR
+// a staff member — exactly one of organizerAlumniId / organizerUserId is set
+// (app-enforced; SetNull keeps the event if the organizer's account is removed).
+// Plain-text description (rendered via renderForumBody). Visible to ALL ACTIVE
+// alumni (broadcast — NOT opt-in-gated like the forum; see lib/event-guard.ts).
+// `capacity` = max total headcount (attending alumni + their guests); enforced
+// in the RSVP route. `guestLimit` = per-RSVP guest cap. Soft-delete (RSVPs
+// cascade on the event).
+model CommunityEvent {
+  id                 String    @id @default(uuid())
+  organizerAlumniId  String?
+  organizerUserId    String?
+  title              String
+  description        String
+  startAt            DateTime
+  endAt              DateTime?
+  location           String?
+  onlineLink         String?
+  coverImageUrl      String?
+  capacity           Int?
+  guestLimit         Int       @default(0)
+  deletedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organizerAlumni Alumni?        @relation("EventOrganizerAlumni", fields: [organizerAlumniId], references: [id], onDelete: SetNull)
+  organizerUser   AdminUser?     @relation("EventOrganizerUser", fields: [organizerUserId], references: [id], onDelete: SetNull)
+  rsvps           EventRsvp[]
+
+  @@index([startAt])
+  @@index([deletedAt, startAt])
+  @@map("community_events")
+}
+
+model EventRsvp {
+  id         String     @id @default(uuid())
+  eventId    String
+  alumniId   String
+  status     RsvpStatus
+  guestCount Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  event  CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  alumni Alumni         @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, alumniId])
+  @@index([eventId, status])
+  @@map("event_rsvps")
 }

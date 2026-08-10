@@ -181,6 +181,22 @@ export type {
   CommunityMembershipInput,
 } from "./forum";
 
+// Events (alumni community)
+export {
+  eventFormSchema,
+  eventCreateSchema,
+  eventUpdateSchema,
+  rsvpSchema,
+  RSVP_STATUS_VALUES,
+  RSVP_STATUS_LABELS,
+} from "./event";
+export type {
+  EventFormData,
+  EventCreateInput,
+  EventUpdateInput,
+  RsvpInput,
+} from "./event";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

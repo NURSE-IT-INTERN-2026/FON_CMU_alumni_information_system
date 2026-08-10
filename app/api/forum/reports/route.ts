@@ -61,7 +61,11 @@ export async function POST(request: NextRequest) {
     await logActivity(
       alumniLogCtx(alumni),
       "REPORT",
-      validated.resourceType === "FORUM_TOPIC" ? "forum_topic" : "forum_reply",
+      validated.resourceType === "FORUM_TOPIC"
+        ? "forum_topic"
+        : validated.resourceType === "FORUM_REPLY"
+          ? "forum_reply"
+          : "community_event",
       validated.resourceId,
       { reason: validated.reason, reportId: report.id },
     );
@@ -75,9 +79,9 @@ export async function POST(request: NextRequest) {
 }
 
 async function resolveReportTarget(
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY",
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT",
   resourceId: string,
-): Promise<{ authorId: string } | null> {
+): Promise<{ authorId: string | null } | null> {
   if (resourceType === "FORUM_TOPIC") {
     const t = await prisma.forumTopic.findFirst({
       where: { id: resourceId, deletedAt: null },
@@ -85,11 +89,20 @@ async function resolveReportTarget(
     });
     return t;
   }
-  const r = await prisma.forumReply.findFirst({
+  if (resourceType === "FORUM_REPLY") {
+    const r = await prisma.forumReply.findFirst({
+      where: { id: resourceId, deletedAt: null },
+      select: { authorId: true },
+    });
+    return r;
+  }
+  // EVENT — "author" is the alumni organizer (null for staff-organized events,
+  // which any alum may report).
+  const ev = await prisma.communityEvent.findFirst({
     where: { id: resourceId, deletedAt: null },
-    select: { authorId: true },
+    select: { organizerAlumniId: true },
   });
-  return r;
+  return ev ? { authorId: ev.organizerAlumniId } : null;
 }
 
 // GET — staff moderation queue. Executive allowed (read-only — the per-action
@@ -113,8 +126,8 @@ export async function GET(request: NextRequest) {
     if (["OPEN", "RESOLVED", "DISMISSED"].includes(statusParam)) {
       where.status = statusParam as "OPEN" | "RESOLVED" | "DISMISSED";
     }
-    if (resourceTypeParam === "FORUM_TOPIC" || resourceTypeParam === "FORUM_REPLY") {
-      where.resourceType = resourceTypeParam;
+    if (["FORUM_TOPIC", "FORUM_REPLY", "EVENT"].includes(resourceTypeParam)) {
+      where.resourceType = resourceTypeParam as "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT";
     }
 
     const [reports, total] = await Promise.all([
@@ -131,17 +144,14 @@ export async function GET(request: NextRequest) {
       prisma.contentReport.count({ where }),
     ]);
 
-    // Batch-fetch the reported targets (topics + replies) so the queue can show
-    // the content + its author inline. Deleted targets are included (shown as
-    // "ถูกลบแล้ว") so a moderator sees the resolution state.
-    const topicIds = reports
-      .filter((r) => r.resourceType === "FORUM_TOPIC")
-      .map((r) => r.resourceId);
-    const replyIds = reports
-      .filter((r) => r.resourceType === "FORUM_REPLY")
-      .map((r) => r.resourceId);
+    // Batch-fetch the reported targets (topics + replies + events) so the queue
+    // can show the content + its author inline. Deleted targets are included
+    // (shown as "ถูกลบแล้ว") so a moderator sees the resolution state.
+    const topicIds = reports.filter((r) => r.resourceType === "FORUM_TOPIC").map((r) => r.resourceId);
+    const replyIds = reports.filter((r) => r.resourceType === "FORUM_REPLY").map((r) => r.resourceId);
+    const eventIds = reports.filter((r) => r.resourceType === "EVENT").map((r) => r.resourceId);
 
-    const [topics, replies] = await Promise.all([
+    const [topics, replies, events] = await Promise.all([
       topicIds.length
         ? prisma.forumTopic.findMany({
             where: { id: { in: topicIds } },
@@ -154,15 +164,26 @@ export async function GET(request: NextRequest) {
             include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } },
           })
         : [],
+      eventIds.length
+        ? prisma.communityEvent.findMany({
+            where: { id: { in: eventIds } },
+            include: {
+              organizerAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
+              organizerUser: { select: { id: true, firstName: true, lastName: true } },
+            },
+          })
+        : [],
     ]);
 
     const topicById = new Map(topics.map((t) => [t.id, t]));
     const replyById = new Map(replies.map((r) => [r.id, r]));
+    const eventById = new Map(events.map((e) => [e.id, e]));
 
     const data = reports.map((report) => ({
       ...report,
       topic: report.resourceType === "FORUM_TOPIC" ? topicById.get(report.resourceId) ?? null : null,
       reply: report.resourceType === "FORUM_REPLY" ? replyById.get(report.resourceId) ?? null : null,
+      event: report.resourceType === "EVENT" ? eventById.get(report.resourceId) ?? null : null,
     }));
 
     return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });

@@ -25,6 +25,8 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   // (superadmin). ContentReport is NOT here (its lifecycle is a status, not soft-delete).
   "forum-topic": { delegate: "forumTopic", label: "กระทู้", nameFields: ["title"], resource: "forum_topic" },
   "forum-reply": { delegate: "forumReply", label: "ความคิดเห็น", nameFields: ["body"], resource: "forum_reply" },
+  // Alumni community events — RSVPs cascade on event delete (not separately listed).
+  "community-event": { delegate: "communityEvent", label: "กิจกรรม", nameFields: ["title"], resource: "community_event" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

@@ -109,6 +109,15 @@ export const queryKeys = {
       ["forum", "reports", o] as const,
   },
 
+  // Alumni community events — list (upcoming/past) + detail. `.all` wipes
+  // everything event-related on a mutation.
+  events: {
+    all: ["events"] as const,
+    list: (o: { page: number; search: string; scope: string }) =>
+      ["events", "list", o] as const,
+    detail: (id: string) => ["events", "detail", id] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

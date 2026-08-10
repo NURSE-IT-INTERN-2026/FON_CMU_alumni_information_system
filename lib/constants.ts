@@ -51,6 +51,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/management/alumni-agency", label: "ข้อมูลการทำงานศิษย์เก่า" },
   { href: "/management/news", label: "ข่าวสาร" },
   { href: "/management/forum", label: "กระดานสนทนา" },
+  { href: "/management/events", label: "กิจกรรม" },
 ];
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [

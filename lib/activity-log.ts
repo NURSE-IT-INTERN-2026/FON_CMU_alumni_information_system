@@ -47,7 +47,10 @@ export type LogResource =
   | "forum_topic"
   | "forum_reply"
   | "community"
-  | "content_report";
+  | "content_report"
+  // Alumni community events
+  | "community_event"
+  | "event_rsvp";
 
 interface AdminLogContext {
   actorType: "ADMIN";
