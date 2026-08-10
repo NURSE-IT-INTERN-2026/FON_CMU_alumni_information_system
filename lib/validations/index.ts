@@ -149,6 +149,38 @@ export type {
   NewsUpdateInput,
 } from "./news";
 
+// Forum (alumni community)
+export {
+  forumTopicFormSchema,
+  forumTopicCreateSchema,
+  forumTopicUpdateSchema,
+  forumReplyFormSchema,
+  forumReplyCreateSchema,
+  forumReplyUpdateSchema,
+  forumReportCreateSchema,
+  forumReportActionSchema,
+  communityMembershipSchema,
+  FORUM_REPORT_RESOURCE_VALUES,
+  CONTENT_REPORT_REASON_VALUES,
+  CONTENT_REPORT_STATUS_VALUES,
+  COMMUNITY_ACTION_VALUES,
+  FORUM_REPORT_REASON_LABELS,
+  CONTENT_REPORT_STATUS_LABELS,
+  FORUM_SORT_VALUES,
+  FORUM_SORT_LABELS,
+} from "./forum";
+export type {
+  ForumTopicFormData,
+  ForumTopicCreateInput,
+  ForumTopicUpdateInput,
+  ForumReplyFormData,
+  ForumReplyCreateInput,
+  ForumReplyUpdateInput,
+  ForumReportCreateInput,
+  ForumReportActionInput,
+  CommunityMembershipInput,
+} from "./forum";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

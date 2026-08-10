@@ -44,11 +44,11 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 
 ### Database Schema
 
-16 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
+19 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
 
 | Model | Table | Purpose |
 |---|---|---|
-| `Alumni` | `alumni` | Core alumni records (`studentId` unique, `prefix`/`firstName`/`lastName`, `degreeLevel`, `cohort`, `email` (auth/login, `@unique`)/`contactEmail` (contact, distinct from auth)/`phones` (`String[]`)/`homeAddress`). **Single `lastName`** (merged from old `maidenLastName`+`newLastName`). Carries a denormalized **primary** degree snapshot + `primaryEducationId` (see `Education`). `currentWorkplace`/`country`/`province` and the old `maidenLastName`/`newLastName` were REMOVED |
+| `Alumni` | `alumni` | Core alumni records (`studentId` unique, `prefix`/`firstName`/`lastName`, `degreeLevel`, `cohort`, `email` (auth/login, `@unique`)/`contactEmail` (contact, distinct from auth)/`phones` (`String[]`)/`homeAddress`). **Single `lastName`** (merged from old `maidenLastName`+`newLastName`). Carries a denormalized **primary** degree snapshot + `primaryEducationId` (see `Education`). `communityOptedInAt` gates the alumni community forum (see `ForumTopic`). `currentWorkplace`/`country`/`province` and the old `maidenLastName`/`newLastName` were REMOVED |
 | `Education` | `education` | One row per degree an alumni earned (`studentId` unique, `degreeLevel`, `graduationYear`, `major`, `cohort`, `firstName`/`lastName` = ชื่อ/นามสกุล ขณะศึกษา); `@@unique([alumniId, degreeLevel])`. 1:N with `Alumni`; `Alumni.primaryEducationId` points at the primary row whose fields are mirrored onto the `Alumni` snapshot |
 | `Award` | `awards` | Awards linked to alumni — split name (`prefix`/`firstName`/`lastName`), `awardType` enum, Buddhist `year`, `link`/`imageUrl` (no legacy `recipientName`) |
 | `Association` | `associations` | Professional associations/positions |
@@ -64,6 +64,9 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | `EmailVerification` | `email_verifications` | Email-ownership verification tokens (signup). Mirrors `PasswordReset` (`token @unique`, `used`, `expiresAt` 24h, `alumniId`) |
 | `Session` | `sessions` | Browser sessions (token-based, `ADMIN` or `ALUMNI`) |
 | `CmuGraduate` | `cmu_graduates` | **Materialized** CMU Registrar graduate list (one row per FON degree record, `studentId @unique`) — local cache of the registrar universe. Refreshed on demand by an admin from `/management/settings/cmu-sync`; the ONLY live-CMU call lives in that sync route. See the materialization lesson |
+| `ForumTopic` | `forum_topics` | Alumni community forum topic (opening post + title). **Plain-text** body (escaped+linkified on render via `renderForumBody`, NOT Tiptap). FK to `Alumni.id`. `replyCount`/`lastReplyAt` denormalized + maintained in a `$transaction` on reply create/delete. Soft-delete (`deletedAt` = owner delete OR admin hide; trash-recoverable). Opt-in gate in `lib/forum-guard.ts`; the public-identity select in `lib/forum-identity.ts` is the single leak surface. See the forum lesson |
+| `ForumReply` | `forum_replies` | A reply on a `ForumTopic`. Plain-text body, FK to `ForumTopic.id` (Cascade) + `Alumni.id`. Soft-delete recomputes the topic's denormalized counters |
+| `ContentReport` | `content_reports` | User-generated content report (report+admin-review moderation). `@@unique([reporterId, resourceType, resourceId])` = one report per (reporter, target); re-report re-opens. Lifecycle is a status (`OPEN`/`RESOLVED`/`DISMISSED`) — NOT soft-delete/trash-recoverable |
 
 **Enums:**
 - `DegreeLevel`: DOCTORAL, MASTER, BACHELOR, ASSOCIATE, NURSING_ASSISTANT
@@ -72,6 +75,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 - `SessionType`: ADMIN, ALUMNI
 - `ActorType`: ADMIN, ALUMNI, SYSTEM
 - `AccountStatus`: UNVERIFIED, PENDING, ACTIVE, REJECTED (alumni signup lifecycle — new signups are UNVERIFIED until email-confirmed, then PENDING until admin-approved; only ACTIVE may log in)
+- `ContentReportStatus`: OPEN, RESOLVED, DISMISSED · `ContentReportReason`: SPAM, HARASSMENT, INAPPROPRIATE, OTHER · `ForumReportResource`: FORUM_TOPIC, FORUM_REPLY (alumni community forum)
 
 ### Auth & Roles
 
@@ -108,6 +112,7 @@ app/
 │       ├── awards/
 │       ├── potentials/
 │       ├── news/                 # News management (cards, not a table)
+│       ├── forum/                # Alumni community forum — moderation/reports queue (admin+superadmin; exec read-only)
 │       └── settings/{profile,users,logs,cmu-sync,trash}/  # cmu-sync = "การดึงข้อมูล" (admin+superadmin)
 ├── admin/{alumni,news,users}/    # Admin-side views (verify purpose before editing)
 ├── graduates/                    # Alumni ("graduates") portal
@@ -116,16 +121,18 @@ app/
 │   └── (authed)/                 # Auth-guarded alumni pages
 │       ├── layout.tsx            # Alumni auth guard
 │       ├── profile/              # Alumni self-profile (view/edit)
+│       ├── forum/ + forum/[id]/ + forum/new/   # Alumni community forum (opt-in gated)
 │       └── news/ + news/[id]/    # Alumni news (read-only)
 ├── api/                          # REST API routes
 │   ├── alumni/                   # CRUD + import/export/bulk-delete + create-with-related + update-with-related/[id] + [id]/activity (merged change timeline; [id] GET resolves UUID or studentId)
 │   ├── alumni-agency/            # CRUD + import/export/bulk-delete; GET + export accept `?region=thailand|abroad`; GET accepts `?unlinked=true`
 │   ├── alumni-accounts/[id]/     # Admin alumni-account mgmt (+ /suspend, /approve, /reject, /reverify, /delete)
 │   ├── alumni-auth/              # signup, login-email, forgot/reset-password, accept-tos, logout, verify-email (+ /resend), reapply (+ /prepare)
-│   ├── alumni-profile/           # Logged-in alumni's own profile (GET/PUT/DELETE) + /educations (GET/POST)
+│   ├── alumni-profile/           # Logged-in alumni's own profile (GET/PUT/DELETE) + /educations (GET/POST) + /community-membership (forum opt-in/out)
 │   ├── alumni-count/ · alumni-activity/ · dashboard/   # read-only, session-guarded, TTL-cached aggregations
 │   ├── associations/ · awards/ · graduate-committee/ · model-representatives/ · potentials/  # CRUD + import/export/bulk-delete
 │   ├── news/                     # CRUD + bulk-delete (→ DISCONTINUED) + bulk-publish + bulk-pin + [id]/pin
+│   ├── forum/                    # Alumni community forum — topics + topics/[id] + topics/[id]/replies + replies/[id] + reports + reports/[id]. Opt-in gate (`lib/forum-guard.ts`); public-identity select (`lib/forum-identity.ts`)
 │   ├── auth/{login,cmu-login,logout,callback,cleanup}/   # callback = CMU OAuth callback (Microsoft Entra ID PKCE)
 │   ├── educations/[id]/          # Education record GET/PUT/DELETE (admin OR owning alumni; PUT of the primary re-syncs the Alumni snapshot)
 │   ├── alumni/[id]/educations/   # Admin: list + add an alumni's education records
@@ -159,6 +166,7 @@ Each data entity follows a consistent route structure:
   - `cmu-alumni` — read-only (GET list/search) + `lookup?studentId=&alumniId=` (single-record preview; `samePersonWarning` + `alreadyClaimed`) + `/live` (session-gated LIVE CMU list, `withTtlCache("cmu-live-graduates", 120s)`-wrapped; each row carries `isNew` = its trimmed `student_id` is NOT in the local cache) + `/sync` (the ONLY write/live-CMU call: `GET` compares local vs remote, `POST` materializes the full remote set). The live table MUST go through this cached route (`fetchCmuGraduatesLive` has no cache of its own). The cmu-sync "ข้อมูลในระบบ" table hits local `GET /api/cmu-alumni?dedupe=false`.
   - `educations` — degree records (1:N per alumni). `GET/POST /api/alumni/[id]/educations` (admin) and `GET/POST /api/alumni-profile/educations` (alumni-self) for list/add; `GET/PUT/DELETE /api/educations/[id]` for one record (admin OR owning alumni via `resolveWriter`). Every add, and a PUT that changes `studentId`, must pass `assertEducationSamePerson`. No import/export/bulk-delete.
   - `logs` — read-only (GET list only) + a **superadmin-only** `POST /api/logs/bulk-delete` `{ ids }` that **hard-deletes** (and deliberately does NOT log the deletion). UI gate is `useRole() === "superadmin"` (NOT `useIsAdmin()`).
+  - `forum` — alumni community forum (v1). **Opt-in gated** (`lib/forum-guard.ts`): reads = staff OR opted-in alumni (401 anon, 403 `{code:"NOT_OPTED_IN"}`); writes = opted-in alumni; admin moderation writes via `checkWritePermission` (exec read-only, opt-in-exempt). Routes: `GET/POST /api/forum/topics`, `GET/PUT/DELETE /api/forum/topics/[id]`, `GET/POST /api/forum/topics/[id]/replies`, `PUT/DELETE /api/forum/replies/[id]`, `POST /api/forum/reports` (alumni; no self-report; upsert re-opens) + `GET /api/forum/reports` (staff queue), `POST /api/forum/reports/[id] {action:"resolve"|"dismiss"}`. `POST /api/alumni-profile/community-membership {action:"opt-in"|"opt-out"}` flips `Alumni.communityOptedInAt`. **Bodies are plain text** (escape+linkify on render via `renderForumBody` — NO Tiptap/sanitize-html). DELETE is a soft-delete (owner OR admin); `forum_topic`/`forum_reply` are in `TRASH_ENTITIES`. Denormalized `replyCount`/`lastReplyAt` maintained in a `$transaction`. No import/export/bulk-delete. See the forum lesson.
 
 ### Route Correlations, Redirects & Entry Points
 
@@ -558,3 +566,12 @@ Template for a ledger entry:
 ### Root-level pages (no layout) shrink-to-fit inside `<body class="flex flex-col">`
 - **Rule:** `app/news/[id]` has **no layout of its own**, so its top-level `<div className="mx-auto max-w-4xl …">` is a **direct flex item** of the root `<body className="min-h-full flex flex-col">`. In a column flexbox, auto cross-axis margins (`mx-auto`) **defeat `align-items: stretch`**; with stretch off, the wrapper shrink-to-fits to content width. (Pages under `(admin)`/`(authed)` are shielded — their `mx-auto` wrappers sit inside `<main className="min-w-0 flex-1">`, block flow.)
 - **Prevention:** Any page rendered as a direct child of the root flex-col `<body>` (a route with NO matching layout — currently `app/news/[id]`) must add **`w-full`** to its outermost `mx-auto max-w-*` wrapper, or be nested in a layout. Don't rely on `mx-auto` alone to center+fill a root-level page.
+
+### Alumni community forum — opt-in gate + the public-identity select is the single leak surface
+- **Rule:** The forum breaks the PRD's "alumni can't see other alumni's data" rule, so it's **opt-in**: `Alumni.communityOptedInAt` must be set. The gate lives in `lib/forum-guard.ts` (`resolveForumReader` = staff OR opted-in alumni; `requireForumAlumni` = opted-in alumni only) and is THE architectural crux — every forum read/write route funnels through it (401 anon, 403 `{code:"NOT_OPTED_IN"}` for a logged-in-but-not-opted-in alum). Staff are opt-in-exempt (they moderate).
+- **The public-identity select is the single leak surface:** `SELECT_ALUMNI_PUBLIC_IDENTITY` (`lib/forum-identity.ts`, client-safe — type-only `Prisma.AlumniSelect`) selects ONLY `{id, prefix, firstName, lastName, cohort, degreeLevel, photoUrl}`. EVERY forum query uses `include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } }` (the same fragment for staff AND alumni — one code path, one leak surface). Contact fields (email/contactEmail/phones/homeAddress/citizenId/birthDate) are never selected, so they can never leak. Staff who need the full record follow a link to `/management/alumni/[authorId]`, NOT via the forum API. Locked by `tests/forum-identity.test.ts`.
+- **New FKs use `Alumni.id` (uuid),** NOT the legacy `studentId` (that pattern exists only for the 6 import entities). `ForumTopic`/`ForumReply`/`ContentReport` FK to `Alumni.id`.
+- **Plain-text bodies, NOT Tiptap:** `ForumTopic.body`/`ForumReply.body` store raw text; render via `renderForumBody` (`lib/forum-render.ts`) which **escapes FIRST**, then linkifies `http(s)` only, then `\n`→`<br>` — so user text can't inject markup (`<ForumBody>` uses `dangerouslySetInnerHTML` but the helper pre-escapes). A bare `javascript:` URL is never matched. No `sanitize-html`, no rich-text editor for the forum. Locked by `tests/forum-render.test.ts`.
+- **Opt-out semantics:** clearing `communityOptedInAt` loses read/post access, but existing posts STAY attributed (standard forum behavior; anonymizing-on-opt-out is a deferred option). Self-edit/delete of own past content stays allowed after opt-out (the PUT/DELETE owner paths check `getAlumniSession` directly, NOT `requireForumAlumni`).
+- **Denormalized topic counters:** `ForumTopic.replyCount`/`lastReplyAt` are maintained on reply create/delete inside a `$transaction` (delete recomputes `lastReplyAt` = max remaining reply createdAt, null if none) so the list view stays cheap.
+- **Prevention:** New peer-to-peer alumni features MUST (1) go through the opt-in gate, (2) select author identity ONLY via `SELECT_ALUMNI_PUBLIC_IDENTITY`, (3) store plain text (or, if rich text ever needed, reuse the news sanitize pipeline). Add the `proxy.ts` matcher caveat: forum API GETs are NOT in the exclusion list, so a cookieless anonymous request 307→/login (like `news`); the route-handler 401/403 is the real enforcement for in-app calls (cookie present). The `no-public-browsing` test's `GATE_RE` recognizes `resolveForumReader`/`requireForumAlumni`/`resolveForumStaffOrOwner` as gates.

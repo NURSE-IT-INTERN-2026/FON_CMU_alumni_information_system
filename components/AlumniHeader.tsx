@@ -15,6 +15,7 @@ interface AlumniHeaderProps {
 
 const NAV_ITEMS = [
   { href: "/graduates/news", label: "ข่าวสาร" },
+  { href: "/graduates/forum", label: "กระดานสนทนา" },
   { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
 ];
 

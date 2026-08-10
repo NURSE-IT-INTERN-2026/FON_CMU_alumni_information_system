@@ -51,6 +51,27 @@ enum AccountStatus {
   REJECTED
 }
 
+// Alumni community forum (v1). Opt-in membership + user-generated content
+// moderation. See lib/forum-guard.ts (opt-in gate) and lib/forum-identity.ts
+// (the public-identity select that keeps contact fields out of forum reads).
+enum ContentReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum ContentReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  OTHER
+}
+
+enum ForumReportResource {
+  FORUM_TOPIC
+  FORUM_REPLY
+}
+
 model Alumni {
   id                    String      @id @default(uuid())
   studentId             String      @unique
@@ -85,6 +106,10 @@ model Alumni {
   passwordHash          String?
   lastLoginAt           DateTime?
   tosAcceptedAt         DateTime?
+  // Alumni opted into the community forum. null = not a member (sees only news
+  // + profile, as before). Set when they opt in; cleared on opt-out. Gate is in
+  // lib/forum-guard.ts. Opt-out does NOT anonymize past posts (standard forum).
+  communityOptedInAt    DateTime?
   cmuEmail              String?
   // Admin-approval signup flow: PENDING until reviewed. Snapshot of the
   // CMU Registrar comparison captured at signup — drives the admin's
@@ -115,6 +140,9 @@ model Alumni {
   activityLogs         ActivityLog[]
   educations           Education[]
   primaryEducation     Education?  @relation("PrimaryEducation", fields: [primaryEducationId], references: [id], onDelete: SetNull)
+  forumTopics          ForumTopic[]
+  forumReplies         ForumReply[]
+  contentReports       ContentReport[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -345,6 +373,7 @@ model AdminUser {
 
   sessions     Session[]
   activityLogs ActivityLog[]
+  resolvedReports ContentReport[]
 
   @@map("admin_users")
 }
@@ -485,4 +514,76 @@ model CmuGraduate {
   @@index([majorNameTh])
   @@index([deletedAt])
   @@map("cmu_graduates")
+}
+
+// Alumni community forum — a topic (opening post) + its replies. Two-level
+// (no nested threading). Bodies are PLAIN TEXT (escaped + linkified on render
+// via lib/forum-render.ts; no rich text / sanitize-html). Soft-deleted on owner
+// delete OR admin hide (recoverable via superadmin trash). `replyCount` /
+// `lastReplyAt` are denormalized for the list view, maintained on reply
+// create/delete inside a $transaction. FKs target Alumni.id (uuid), NOT studentId.
+model ForumTopic {
+  id          String    @id @default(uuid())
+  authorId    String
+  title       String
+  body        String
+  replyCount  Int       @default(0)
+  lastReplyAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  author  Alumni       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  replies ForumReply[]
+
+  @@index([authorId])
+  @@index([deletedAt, createdAt])
+  @@index([lastReplyAt])
+  @@map("forum_topics")
+}
+
+model ForumReply {
+  id        String    @id @default(uuid())
+  topicId   String
+  authorId  String
+  body      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  topic  ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  author Alumni     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, createdAt])
+  @@index([authorId])
+  @@index([deletedAt])
+  @@map("forum_replies")
+}
+
+// User-generated content reports for the report+admin-review moderation flow.
+// One OPEN report per (reporter, target) via @@unique; re-reporting the same
+// target re-opens/updates. Lifecycle is a status (OPEN → RESOLVED/DISMISSED),
+// so this is NOT soft-delete/trash-recoverable. `resolver` is the admin who
+// acted (SetNull if the admin is deleted).
+model ContentReport {
+  id             String               @id @default(uuid())
+  reporterId     String
+  resourceType   ForumReportResource
+  resourceId     String
+  reason         ContentReportReason
+  reasonDetail   String?
+  status         ContentReportStatus  @default(OPEN)
+  resolvedBy     String?
+  resolutionNote String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  reporter Alumni     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver AdminUser? @relation(fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@unique([reporterId, resourceType, resourceId])
+  @@index([status, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([reporterId])
+  @@map("content_reports")
 }

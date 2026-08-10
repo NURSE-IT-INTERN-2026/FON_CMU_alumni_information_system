@@ -21,6 +21,10 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   "model-representatives": { delegate: "modelRepresentative", label: "ผู้แทนรุ่น", nameFields: ["prefix", "firstName", "lastName"], resource: "model_representative" },
   potentials: { delegate: "potential", label: "ศักยภาพ", nameFields: ["prefix", "firstName", "lastName"], resource: "potential" },
   "alumni-agency": { delegate: "alumniAgency", label: "ข้อมูลการทำงานศิษย์เก่า", nameFields: ["prefix", "firstName", "lastName", "englishName", "country"], resource: "alumni_agency" },
+  // Alumni community forum — admin moderation soft-deletes are recoverable here
+  // (superadmin). ContentReport is NOT here (its lifecycle is a status, not soft-delete).
+  "forum-topic": { delegate: "forumTopic", label: "กระทู้", nameFields: ["title"], resource: "forum_topic" },
+  "forum-reply": { delegate: "forumReply", label: "ความคิดเห็น", nameFields: ["body"], resource: "forum_reply" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

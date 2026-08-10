@@ -94,6 +94,21 @@ export const queryKeys = {
     activity: (id: string) => ["alumniProfile", "activity", id] as const,
   },
 
+  // Alumni community forum — graduates portal (membership + topics + replies)
+  // and the admin moderation reports queue. `.all` wipes everything forum-
+  // related on a mutation.
+  forum: {
+    all: ["forum"] as const,
+    membership: () => ["forum", "membership"] as const,
+    topics: (o: { page: number; search: string; sort: string }) =>
+      ["forum", "topics", o] as const,
+    topic: (id: string) => ["forum", "topic", id] as const,
+    replies: (topicId: string, page: number) =>
+      ["forum", "replies", topicId, page] as const,
+    reports: (o: { page: number; status: string; resourceType: string }) =>
+      ["forum", "reports", o] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,
