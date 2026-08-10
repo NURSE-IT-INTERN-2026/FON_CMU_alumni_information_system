@@ -35,7 +35,7 @@ Heed all deprecation notices.
 
 ## Project-Specific Patterns
 
-- **Auth via `proxy.ts` (Next.js 16 middleware):** `proxy.ts` at project root handles CSP headers and auth redirects. Next.js 16 renamed `middleware.ts` to `proxy.ts` — do NOT create a `middleware.ts` file. Auth is also enforced at layout level via `app/(public)/layout.tsx`.
+- **Auth via `proxy.ts` (Next.js 16 middleware):** `proxy.ts` at project root handles CSP headers and auth redirects. Next.js 16 renamed `middleware.ts` to `proxy.ts` — do NOT create a `middleware.ts` file. Auth is also enforced at the layout level via `app/(admin)/layout.tsx` (admin area) and `app/graduates/(authed)/layout.tsx` (alumni portal).
 - **API routes follow a strict pattern:** Each entity has `/`, `/[id]`, `/import`, `/export`, `/bulk-delete` sub-routes. `Alumni` additionally has `create-with-related` + `update-with-related/[id]` (full-form). DELETE is a **soft delete**; restore/hard-delete are superadmin-only under `/api/trash/`.
 - **Keep the route map current:** Every page/API route must list its purpose, correlations with other routes, and redirects. When you create, update, rename, or delete a route, update CLAUDE.md's **Route Structure** + **API Route Pattern** in the same task, and delete any route nothing references (grep the path incl. `/[id]` and `BASE_PATH` forms first). See the Working Protocol "On touching routes" rule for full detail.
 - **Write permission guard:** Import `checkWritePermission` from `@/lib/permissions` for any mutating API route.
