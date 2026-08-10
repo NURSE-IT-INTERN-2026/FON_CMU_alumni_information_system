@@ -102,6 +102,7 @@ const { GET: getNews } = await import("@/app/api/news/route"); // dual-audience
 const { GET: getCmuLookup } = await import("@/app/api/cmu-alumni/lookup/route"); // dual-audience
 const { GET: getForumTopics } = await import("@/app/api/forum/topics/route"); // forum dual-audience (resolveForumReader)
 const { GET: getEvents } = await import("@/app/api/events/route"); // events broadcast (resolveEventReader)
+const { GET: getFeed } = await import("@/app/api/feed/route"); // feed opt-in (resolveForumReader)
 
 const req = (p: string) => new NextRequest(`http://localhost/alumni${p}`);
 
@@ -126,5 +127,7 @@ describe("no-public-browsing (runtime): anonymous request ⇒ 401", () => {
     expect((await getForumTopics(req("/api/forum/topics"))).status).toBe(401);
     // events GET gates via resolveEventReader (broadcast, but anon is still blocked).
     expect((await getEvents(req("/api/events"))).status).toBe(401);
+    // feed GET gates via resolveForumReader (opt-in, like the forum).
+    expect((await getFeed(req("/api/feed"))).status).toBe(401);
   });
 });

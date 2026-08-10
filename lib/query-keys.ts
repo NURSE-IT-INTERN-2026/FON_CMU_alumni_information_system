@@ -118,6 +118,16 @@ export const queryKeys = {
     detail: (id: string) => ["events", "detail", id] as const,
   },
 
+  // Alumni activity feed — stream + a post's comments. `.all` wipes on a
+  // post/like/comment mutation.
+  feed: {
+    all: ["feed"] as const,
+    list: (o: { page: number }) => ["feed", "list", o] as const,
+    post: (id: string) => ["feed", "post", id] as const,
+    comments: (postId: string, page: number) =>
+      ["feed", "comments", postId, page] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

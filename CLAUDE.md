@@ -44,7 +44,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 
 ### Database Schema
 
-21 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
+24 models in `prisma/schema.prisma` (table names from `@@map`). Long descriptions live in the **Known Pitfalls** entries they point to — the cells here are terse pointers.
 
 | Model | Table | Purpose |
 |---|---|---|
@@ -69,6 +69,9 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 | `ContentReport` | `content_reports` | User-generated content report (report+admin-review moderation). `@@unique([reporterId, resourceType, resourceId])` = one report per (reporter, target); re-report re-opens. Lifecycle is a status (`OPEN`/`RESOLVED`/`DISMISSED`) — NOT soft-delete/trash-recoverable. `resourceType` also covers events (`EVENT`) |
 | `CommunityEvent` | `community_events` | Alumni community event/reunion. Organizer is an alum (opted-in) OR a staff member — exactly one of `organizerAlumniId`/`organizerUserId` set. **Broadcast visibility** (all ACTIVE alumni; NOT opt-in-gated like the forum — see `lib/event-guard.ts`). Plain-text description (`renderForumBody`). `capacity` = max total headcount (attendees+guests); enforced in the RSVP route (`lib/event-capacity.ts`). Soft-delete (RSVPs cascade) |
 | `EventRsvp` | `event_rsvps` | An alum's RSVP on a `CommunityEvent` — `ATTENDING` (with `guestCount`, counts toward capacity) or `DECLINED`. `@@unique([eventId, alumniId])` |
+| `FeedPost` | `feed_posts` | Alumni activity feed post (plain-text body + optional `imageUrl`, one photo). **Opt-in gated** (reuses `lib/forum-guard.ts`). Denormalized `likeCount`/`commentCount` maintained in `$transaction`s. Soft-delete (likes/comments cascade) |
+| `FeedLike` | `feed_likes` | A like on a `FeedPost`. `@@unique([postId, alumniId])` (one per alum — the toggle deletes the row) |
+| `FeedComment` | `feed_comments` | A comment on a `FeedPost` (≈ a forum reply). Plain-text body, soft-delete |
 
 **Enums:**
 - `DegreeLevel`: DOCTORAL, MASTER, BACHELOR, ASSOCIATE, NURSING_ASSISTANT
@@ -77,7 +80,7 @@ The singleton pattern in `lib/prisma.ts` prevents multiple client instances duri
 - `SessionType`: ADMIN, ALUMNI
 - `ActorType`: ADMIN, ALUMNI, SYSTEM
 - `AccountStatus`: UNVERIFIED, PENDING, ACTIVE, REJECTED (alumni signup lifecycle — new signups are UNVERIFIED until email-confirmed, then PENDING until admin-approved; only ACTIVE may log in)
-- `ContentReportStatus`: OPEN, RESOLVED, DISMISSED · `ContentReportReason`: SPAM, HARASSMENT, INAPPROPRIATE, OTHER · `ForumReportResource`: FORUM_TOPIC, FORUM_REPLY, EVENT (forum + community events share the report system) · `RsvpStatus`: ATTENDING, DECLINED (community events)
+- `ContentReportStatus`: OPEN, RESOLVED, DISMISSED · `ContentReportReason`: SPAM, HARASSMENT, INAPPROPRIATE, OTHER · `ForumReportResource`: FORUM_TOPIC, FORUM_REPLY, EVENT, FEED_POST, FEED_COMMENT (one report system across forum + events + feed) · `RsvpStatus`: ATTENDING, DECLINED (community events)
 
 ### Auth & Roles
 
@@ -125,6 +128,7 @@ app/
 │       ├── layout.tsx            # Alumni auth guard
 │       ├── profile/              # Alumni self-profile (view/edit)
 │       ├── forum/ + forum/[id]/ + forum/new/   # Alumni community forum (opt-in gated)
+│       ├── feed/ + feed/[id]/                  # Alumni activity feed (opt-in; posts + likes + comments + photo)
 │       ├── events/ + events/[id]/ + events/new/   # Alumni community events (broadcast; RSVP w/ guests+capacity)
 │       └── news/ + news/[id]/    # Alumni news (read-only)
 ├── api/                          # REST API routes
@@ -138,6 +142,8 @@ app/
 │   ├── news/                     # CRUD + bulk-delete (→ DISCONTINUED) + bulk-publish + bulk-pin + [id]/pin
 │   ├── forum/                    # Alumni community forum — topics + topics/[id] + topics/[id]/replies + replies/[id] + reports + reports/[id]. Opt-in gate (`lib/forum-guard.ts`); public-identity select (`lib/forum-identity.ts`)
 │   ├── events/                   # Alumni community events — events/[id] + events/[id]/rsvp. Broadcast gate (`lib/event-guard.ts`); capacity-aware RSVP (`lib/event-capacity.ts`). Event reports go through /api/forum/reports (resourceType EVENT)
+│   ├── feed/                     # Alumni activity feed — feed/[id] + feed/[id]/like + feed/[id]/comments + feed/comments/[id]. Reuses the forum opt-in gate (`lib/forum-guard.ts`). Feed reports → /api/forum/reports (resourceType FEED_POST/FEED_COMMENT)
+│   ├── alumni-upload/            # Opt-in-alumni image upload (shares `saveImageUpload` with /api/upload) — feeds the activity-feed photo attach
 │   ├── auth/{login,cmu-login,logout,callback,cleanup}/   # callback = CMU OAuth callback (Microsoft Entra ID PKCE)
 │   ├── educations/[id]/          # Education record GET/PUT/DELETE (admin OR owning alumni; PUT of the primary re-syncs the Alumni snapshot)
 │   ├── alumni/[id]/educations/   # Admin: list + add an alumni's education records
@@ -173,6 +179,8 @@ Each data entity follows a consistent route structure:
   - `logs` — read-only (GET list only) + a **superadmin-only** `POST /api/logs/bulk-delete` `{ ids }` that **hard-deletes** (and deliberately does NOT log the deletion). UI gate is `useRole() === "superadmin"` (NOT `useIsAdmin()`).
   - `forum` — alumni community forum (v1). **Opt-in gated** (`lib/forum-guard.ts`): reads = staff OR opted-in alumni (401 anon, 403 `{code:"NOT_OPTED_IN"}`); writes = opted-in alumni; admin moderation writes via `checkWritePermission` (exec read-only, opt-in-exempt). Routes: `GET/POST /api/forum/topics`, `GET/PUT/DELETE /api/forum/topics/[id]`, `GET/POST /api/forum/topics/[id]/replies`, `PUT/DELETE /api/forum/replies/[id]`, `POST /api/forum/reports` (alumni; no self-report; upsert re-opens) + `GET /api/forum/reports` (staff queue), `POST /api/forum/reports/[id] {action:"resolve"|"dismiss"}`. `POST /api/alumni-profile/community-membership {action:"opt-in"|"opt-out"}` flips `Alumni.communityOptedInAt`. **Bodies are plain text** (escape+linkify on render via `renderForumBody` — NO Tiptap/sanitize-html). DELETE is a soft-delete (owner OR admin); `forum_topic`/`forum_reply` are in `TRASH_ENTITIES`. Denormalized `replyCount`/`lastReplyAt` maintained in a `$transaction`. No import/export/bulk-delete. See the forum lesson.
   - `events` — alumni community events/reunions. **Broadcast gated** (`lib/event-guard.ts`, NOT opt-in): reads/RSVP = staff OR any ACTIVE alumni; creation = staff (`checkWritePermission`) OR opted-in alumni (sets `organizerUserId`/`organizerAlumniId`). Routes: `GET/POST /api/events`, `GET/PUT/DELETE /api/events/[id]` (PUT = organizer-or-staff; DELETE = organizer-or-staff soft-delete), `POST/DELETE /api/events/[id]/rsvp`. RSVP `{status:ATTENDING|DECLINED, guestCount}`; `guestCount ≤ event.guestLimit`; **capacity** (total headcount = attendees+guests) enforced via `lib/event-capacity.ts` → 400 `{code:"EVENT_FULL"}` when full (an update subtracts the alum's current seats to avoid double-counting). Datetimes: the route appends `+07:00` to the naive datetime-local input (`bangkokDatetimeLocalToIso`) and stores a UTC instant; `lib/event-format.ts` shifts +7h back for Bangkok display. Event reports reuse `POST /api/forum/reports {resourceType:"EVENT"}` and surface in the `/management/forum` queue. `community-event` is in `TRASH_ENTITIES` (RSVPs cascade). No import/export/bulk-delete. Alumni cover-image upload is intentionally omitted (the admin-gated `/api/upload` can't be reached by alumni; staff set covers via the admin page).
+  - `feed` — alumni activity feed (flat posts + likes + comments + one photo). **Opt-in gated** (reuses `lib/forum-guard.ts` — NOT a new gate). Routes: `GET/POST /api/feed`, `GET/PUT/DELETE /api/feed/[id]` (PUT = author-only; DELETE = owner-or-staff soft-delete), `POST /api/feed/[id]/like` (toggle — deletes the `FeedLike` row + decrements `likeCount`, or creates + increments, in a `$transaction`), `GET/POST /api/feed/[id]/comments`, `PUT/DELETE /api/feed/comments/[id]`. Each list/detail post carries `likedByMe` (one batched `feed_likes` query for the requesting alum). Denormalized `likeCount`/`commentCount` maintained in `$transaction`s. Feed reports reuse `POST /api/forum/reports {resourceType:"FEED_POST"|"FEED_COMMENT"}` → `/management/forum` queue. `feed-post`/`feed-comment` in `TRASH_ENTITIES` (likes/comments cascade on post delete). No admin page (reports-driven; staff DELETE via the API/report queue). Bodies plain text (`renderForumBody`).
+  - `alumni-upload` — opt-in-alumni image upload (`requireForumAlumni`). Shares `saveImageUpload` (`lib/upload.ts`) with the admin `/api/upload` so the 5 MB / PNG+JPG / magic-byte rules are identical; writes to the same `public/uploads`. Exists because `/api/upload` is admin-gated and alumni need to attach photos to feed posts.
 
 ### Route Correlations, Redirects & Entry Points
 
@@ -589,3 +597,9 @@ Template for a ledger entry:
 - **Organizer is dual:** `organizerAlumniId` (alum, opted-in creator) XOR `organizerUserId` (staff) — exactly one set (app-enforced), both `onDelete:SetNull` so the event survives the organizer's removal. Display: alumni→PhotoAvatar; staff→badge (`EventOrganizerView`).
 - **Reports are shared:** events reuse `ContentReport` via `resourceType:"EVENT"` (added to `ForumReportResource`); `POST /api/forum/reports` + the `/management/forum` queue handle event targets. An alum cannot report their OWN event (the self-report guard compares `organizerAlumniId`).
 - **Prevention:** New broadcast alumni features use `resolveEventReader` (not the opt-in gate); reuse `SELECT_ALUMNI_PUBLIC_IDENTITY` for organizers/attendees; keep capacity math pure + tested. Alumni can't reach the admin-gated `/api/upload`, so alumni-created events have no cover (staff set covers via the admin page).
+
+### Alumni activity feed — reuses the forum gate; alumni upload via a shared helper
+- **Rule:** The feed reuses the forum's opt-in gate (`lib/forum-guard.ts`) verbatim — `resolveForumReader` (reads), `requireForumAlumni` (writes), `resolveForumStaffOrOwner` (delete). Do NOT add a feed-specific guard. The forum + feed are both opt-in alumni text content; the forum is threaded, the feed is flat-with-likes — same gate, different shape.
+- **Likes are a toggle on a `@@unique` row:** `FeedLike(postId, alumniId)` is unique, so "unlike" = DELETE the row (+ `likeCount--`), "like" = CREATE (+ `likeCount++`), both in one `$transaction`. The list/detail endpoints add `likedByMe` via ONE batched `feed_likes` query (`postId IN [...] AND alumniId = me`) — not N queries. `commentCount` is maintained the same way on comment create/delete (mirror the forum's `replyCount`).
+- **Alumni photos need their own upload route:** `/api/upload` is admin-gated, so alumni attach feed photos via `/api/alumni-upload` (gated on `requireForumAlumni`). Both routes call the shared `saveImageUpload` (`lib/upload.ts`) — identical 5 MB / PNG+JPG / magic-byte validation + same `public/uploads` write + basePath-relative return (render via `assetUrl`). When adding any future alumni-image feature, reuse `saveImageUpload` + an opt-in-gated route — don't duplicate the validation or widen `/api/upload`.
+- **Prevention:** New opt-in alumni content features reuse `lib/forum-guard.ts` (no new guard); denormalized counts (likes/comments) maintained in `$transaction`s with the row create/delete; alumni uploads go through a gated route sharing `saveImageUpload`.

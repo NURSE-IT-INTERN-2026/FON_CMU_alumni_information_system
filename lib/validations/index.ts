@@ -197,6 +197,24 @@ export type {
   RsvpInput,
 } from "./event";
 
+// Activity feed (alumni community)
+export {
+  feedPostFormSchema,
+  feedPostCreateSchema,
+  feedPostUpdateSchema,
+  feedCommentFormSchema,
+  feedCommentCreateSchema,
+  feedCommentUpdateSchema,
+} from "./feed";
+export type {
+  FeedPostFormData,
+  FeedPostCreateInput,
+  FeedPostUpdateInput,
+  FeedCommentFormData,
+  FeedCommentCreateInput,
+  FeedCommentUpdateInput,
+} from "./feed";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

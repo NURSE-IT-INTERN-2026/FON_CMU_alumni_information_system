@@ -27,6 +27,9 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   "forum-reply": { delegate: "forumReply", label: "ความคิดเห็น", nameFields: ["body"], resource: "forum_reply" },
   // Alumni community events — RSVPs cascade on event delete (not separately listed).
   "community-event": { delegate: "communityEvent", label: "กิจกรรม", nameFields: ["title"], resource: "community_event" },
+  // Alumni activity feed — likes/comments cascade on post delete.
+  "feed-post": { delegate: "feedPost", label: "โพสต์", nameFields: ["body"], resource: "feed_post" },
+  "feed-comment": { delegate: "feedComment", label: "ความคิดเห็น", nameFields: ["body"], resource: "feed_comment" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

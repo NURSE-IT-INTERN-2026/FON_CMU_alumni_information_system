@@ -28,7 +28,7 @@ export default function ReportDialog({
   open,
   onOpenChange,
 }: {
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT";
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT";
   resourceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;

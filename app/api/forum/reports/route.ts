@@ -65,7 +65,11 @@ export async function POST(request: NextRequest) {
         ? "forum_topic"
         : validated.resourceType === "FORUM_REPLY"
           ? "forum_reply"
-          : "community_event",
+          : validated.resourceType === "EVENT"
+            ? "community_event"
+            : validated.resourceType === "FEED_POST"
+              ? "feed_post"
+              : "feed_comment",
       validated.resourceId,
       { reason: validated.reason, reportId: report.id },
     );
@@ -79,30 +83,28 @@ export async function POST(request: NextRequest) {
 }
 
 async function resolveReportTarget(
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT",
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT",
   resourceId: string,
 ): Promise<{ authorId: string | null } | null> {
   if (resourceType === "FORUM_TOPIC") {
-    const t = await prisma.forumTopic.findFirst({
-      where: { id: resourceId, deletedAt: null },
-      select: { authorId: true },
-    });
+    const t = await prisma.forumTopic.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
     return t;
   }
   if (resourceType === "FORUM_REPLY") {
-    const r = await prisma.forumReply.findFirst({
-      where: { id: resourceId, deletedAt: null },
-      select: { authorId: true },
-    });
+    const r = await prisma.forumReply.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
     return r;
   }
-  // EVENT — "author" is the alumni organizer (null for staff-organized events,
-  // which any alum may report).
-  const ev = await prisma.communityEvent.findFirst({
-    where: { id: resourceId, deletedAt: null },
-    select: { organizerAlumniId: true },
-  });
-  return ev ? { authorId: ev.organizerAlumniId } : null;
+  if (resourceType === "EVENT") {
+    const ev = await prisma.communityEvent.findFirst({ where: { id: resourceId, deletedAt: null }, select: { organizerAlumniId: true } });
+    return ev ? { authorId: ev.organizerAlumniId } : null;
+  }
+  if (resourceType === "FEED_POST") {
+    const p = await prisma.feedPost.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
+    return p;
+  }
+  // FEED_COMMENT
+  const c = await prisma.feedComment.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
+  return c;
 }
 
 // GET — staff moderation queue. Executive allowed (read-only — the per-action
@@ -126,8 +128,8 @@ export async function GET(request: NextRequest) {
     if (["OPEN", "RESOLVED", "DISMISSED"].includes(statusParam)) {
       where.status = statusParam as "OPEN" | "RESOLVED" | "DISMISSED";
     }
-    if (["FORUM_TOPIC", "FORUM_REPLY", "EVENT"].includes(resourceTypeParam)) {
-      where.resourceType = resourceTypeParam as "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT";
+    if (["FORUM_TOPIC", "FORUM_REPLY", "EVENT", "FEED_POST", "FEED_COMMENT"].includes(resourceTypeParam)) {
+      where.resourceType = resourceTypeParam as "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT";
     }
 
     const [reports, total] = await Promise.all([
@@ -144,46 +146,42 @@ export async function GET(request: NextRequest) {
       prisma.contentReport.count({ where }),
     ]);
 
-    // Batch-fetch the reported targets (topics + replies + events) so the queue
-    // can show the content + its author inline. Deleted targets are included
-    // (shown as "ถูกลบแล้ว") so a moderator sees the resolution state.
+    // Batch-fetch the reported targets (topics + replies + events + feed posts +
+    // feed comments) so the queue can show the content + its author inline.
+    // Deleted targets are included (shown as "ถูกลบแล้ว") so a moderator sees
+    // the resolution state.
     const topicIds = reports.filter((r) => r.resourceType === "FORUM_TOPIC").map((r) => r.resourceId);
     const replyIds = reports.filter((r) => r.resourceType === "FORUM_REPLY").map((r) => r.resourceId);
     const eventIds = reports.filter((r) => r.resourceType === "EVENT").map((r) => r.resourceId);
+    const feedPostIds = reports.filter((r) => r.resourceType === "FEED_POST").map((r) => r.resourceId);
+    const feedCommentIds = reports.filter((r) => r.resourceType === "FEED_COMMENT").map((r) => r.resourceId);
 
-    const [topics, replies, events] = await Promise.all([
-      topicIds.length
-        ? prisma.forumTopic.findMany({
-            where: { id: { in: topicIds } },
-            include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } },
-          })
-        : [],
-      replyIds.length
-        ? prisma.forumReply.findMany({
-            where: { id: { in: replyIds } },
-            include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } },
-          })
-        : [],
+    const [topics, replies, events, feedPosts, feedComments] = await Promise.all([
+      topicIds.length ? prisma.forumTopic.findMany({ where: { id: { in: topicIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
+      replyIds.length ? prisma.forumReply.findMany({ where: { id: { in: replyIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
       eventIds.length
         ? prisma.communityEvent.findMany({
             where: { id: { in: eventIds } },
-            include: {
-              organizerAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
-              organizerUser: { select: { id: true, firstName: true, lastName: true } },
-            },
+            include: { organizerAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY }, organizerUser: { select: { id: true, firstName: true, lastName: true } } },
           })
         : [],
+      feedPostIds.length ? prisma.feedPost.findMany({ where: { id: { in: feedPostIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
+      feedCommentIds.length ? prisma.feedComment.findMany({ where: { id: { in: feedCommentIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
     ]);
 
     const topicById = new Map(topics.map((t) => [t.id, t]));
     const replyById = new Map(replies.map((r) => [r.id, r]));
     const eventById = new Map(events.map((e) => [e.id, e]));
+    const feedPostById = new Map(feedPosts.map((p) => [p.id, p]));
+    const feedCommentById = new Map(feedComments.map((c) => [c.id, c]));
 
     const data = reports.map((report) => ({
       ...report,
       topic: report.resourceType === "FORUM_TOPIC" ? topicById.get(report.resourceId) ?? null : null,
       reply: report.resourceType === "FORUM_REPLY" ? replyById.get(report.resourceId) ?? null : null,
       event: report.resourceType === "EVENT" ? eventById.get(report.resourceId) ?? null : null,
+      feedPost: report.resourceType === "FEED_POST" ? feedPostById.get(report.resourceId) ?? null : null,
+      feedComment: report.resourceType === "FEED_COMMENT" ? feedCommentById.get(report.resourceId) ?? null : null,
     }));
 
     return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });

@@ -71,6 +71,8 @@ enum ForumReportResource {
   FORUM_TOPIC
   FORUM_REPLY
   EVENT // community events share the report+moderation system (name is historical)
+  FEED_POST
+  FEED_COMMENT
 }
 
 // Event RSVP states (alumni community events). ATTENDING counts toward the
@@ -153,6 +155,9 @@ model Alumni {
   contentReports       ContentReport[]
   organizedEvents      CommunityEvent[] @relation("EventOrganizerAlumni")
   eventRsvps           EventRsvp[]
+  feedPosts            FeedPost[]
+  feedLikes            FeedLike[]
+  feedComments         FeedComment[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -648,4 +653,58 @@ model EventRsvp {
   @@unique([eventId, alumniId])
   @@index([eventId, status])
   @@map("event_rsvps")
+}
+
+// Alumni activity feed — a flat, opt-in social post (text + optional image).
+// Reuses the forum opt-in gate (lib/forum-guard.ts) + public-identity select +
+// plain-text render. `likeCount`/`commentCount` are denormalized, maintained in
+// $transactions on like-toggle/comment-create-delete. One image per post (v1).
+model FeedPost {
+  id           String   @id @default(uuid())
+  authorId     String
+  body         String
+  imageUrl     String?
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  author   Alumni        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    FeedLike[]
+  comments FeedComment[]
+
+  @@index([authorId])
+  @@index([deletedAt, createdAt])
+  @@map("feed_posts")
+}
+
+model FeedLike {
+  id        String   @id @default(uuid())
+  postId    String
+  alumniId  String
+  createdAt DateTime @default(now())
+
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  alumni Alumni   @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, alumniId])
+  @@index([postId])
+  @@map("feed_likes")
+}
+
+model FeedComment {
+  id        String    @id @default(uuid())
+  postId    String
+  authorId  String
+  body      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Alumni   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("feed_comments")
 }
