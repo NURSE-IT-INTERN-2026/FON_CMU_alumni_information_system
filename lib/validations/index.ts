@@ -219,6 +219,15 @@ export type {
 export { communityProfileSchema } from "./community-profile";
 export type { CommunityProfileInput } from "./community-profile";
 
+// Groups (alumni community V2)
+export {
+  groupCreateSchema,
+  groupUpdateSchema,
+  GROUP_KIND_VALUES,
+  GROUP_KIND_LABELS,
+} from "./group";
+export type { GroupCreateInput, GroupUpdateInput } from "./group";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

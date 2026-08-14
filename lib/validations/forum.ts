@@ -59,6 +59,9 @@ export const forumTopicFormSchema = z.object({
 export const forumTopicCreateSchema = z.object({
   title: titleField,
   body: bodyField,
+  // Optional group scope (community V2): the group's slug or id. Membership
+  // is checked by the route.
+  groupId: z.string().trim().max(100).optional(),
 });
 
 export const forumTopicUpdateSchema = z.object({

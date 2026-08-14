@@ -18,6 +18,8 @@ export async function GET() {
       alumniId: session.alumni.id,
       optedIn: session.alumni.communityOptedInAt !== null,
       optedInAt: session.alumni.communityOptedInAt,
+      // The alum's cohort label — drives the groups page's cohort quick-join.
+      cohort: session.alumni.cohort,
     });
   } catch {
     return NextResponse.json({ error: "เกิดข้อผิดพลาดในการดึงข้อมูล" }, { status: 500 });

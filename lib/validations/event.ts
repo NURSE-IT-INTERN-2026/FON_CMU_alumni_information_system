@@ -49,6 +49,9 @@ const eventShape = {
   capacity: capacityField,
   guestLimit: guestLimitField,
   coverImageUrl: coverField,
+  // Optional group scope (community V2): the group's slug or id. Membership
+  // (alumni organizers) is checked by the route.
+  groupId: z.string().trim().max(100).optional(),
 };
 
 const endAfterStart = z

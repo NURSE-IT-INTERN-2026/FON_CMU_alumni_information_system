@@ -8,9 +8,13 @@ import { logActivity } from "@/lib/activity-log";
 import { resolveForumReader, requireForumAlumni, alumniLogCtx } from "@/lib/forum-guard";
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
+import { loadGroup, requireGroupMember } from "@/lib/group-guard";
 import { handleZodError, forumTopicCreateSchema } from "@/lib/validations";
 
-const INCLUDE = { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } as const;
+const INCLUDE = {
+  author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
+  group: { select: { id: true, slug: true, title: true } },
+} as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,8 +28,13 @@ export async function GET(request: NextRequest) {
     );
     const search = (searchParams.get("search") || "").trim();
     const sort = searchParams.get("sort") || "newest";
+    // `groupId` scopes the list to one group's space; `groupId=none` (default
+    // forum view) shows ONLY forum-wide topics; omitted = everything.
+    const groupId = searchParams.get("groupId");
 
     const where: Prisma.ForumTopicWhereInput = { deletedAt: null };
+    if (groupId === "none") where.groupId = null;
+    else if (groupId) where.groupId = groupId;
     if (search) {
       where.OR = [
         { title: { contains: search, mode: "insensitive" } },
@@ -75,14 +84,34 @@ export async function POST(request: NextRequest) {
 
     const validated = forumTopicCreateSchema.parse(await request.json());
 
-    const topic = await prisma.forumTopic.create({
-      data: {
-        authorId: alumni.id,
-        title: validated.title,
-        body: validated.body,
-        replyCount: 0,
-      },
-      include: INCLUDE,
+    // Group-scoped topics require membership of that group.
+    let groupId: string | null = null;
+    if (validated.groupId) {
+      const found = await loadGroup(validated.groupId);
+      if ("error" in found) return found.error;
+      const member = await requireGroupMember(found.group.id);
+      if ("error" in member) return member.error;
+      groupId = found.group.id;
+    }
+
+    const topic = await prisma.$transaction(async (tx) => {
+      const created = await tx.forumTopic.create({
+        data: {
+          authorId: alumni.id,
+          groupId,
+          title: validated.title,
+          body: validated.body,
+          replyCount: 0,
+        },
+        include: INCLUDE,
+      });
+      if (groupId) {
+        await tx.communityGroup.update({
+          where: { id: groupId },
+          data: { topicCount: { increment: 1 } },
+        });
+      }
+      return created;
     });
 
     await logActivity(

@@ -16,6 +16,7 @@ import { handleZodError, eventUpdateSchema } from "@/lib/validations";
 const ORGANIZER_INCLUDE = {
   organizerAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
   organizerUser: { select: { id: true, firstName: true, lastName: true } },
+  group: { select: { id: true, slug: true, title: true } },
 } as const;
 
 function shapeOrganizer(ev: {

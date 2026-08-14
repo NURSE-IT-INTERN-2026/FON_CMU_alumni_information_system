@@ -9,6 +9,7 @@ import { resolveEventReader, resolveEventCreator, adminLogCtx, alumniLogCtx } fr
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { bangkokDatetimeLocalToIso } from "@/lib/event-format";
+import { loadGroup, requireGroupMember } from "@/lib/group-guard";
 import { handleZodError, eventCreateSchema } from "@/lib/validations";
 
 // Uniform organizer object for the response: alumni organizers carry their
@@ -25,6 +26,7 @@ function shapeOrganizer(ev: {
 const ORGANIZER_INCLUDE = {
   organizerAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
   organizerUser: { select: { id: true, firstName: true, lastName: true } },
+  group: { select: { id: true, slug: true, title: true } },
 } as const;
 
 export async function GET(request: NextRequest) {
@@ -42,6 +44,10 @@ export async function GET(request: NextRequest) {
     const now = new Date();
 
     const where: Prisma.CommunityEventWhereInput = { deletedAt: null };
+    // Group scoping (community V2): `groupId=none` = community-wide only.
+    const groupId = searchParams.get("groupId");
+    if (groupId === "none") where.groupId = null;
+    else if (groupId) where.groupId = groupId;
     if (scope === "upcoming") {
       where.startAt = { gte: now };
     } else {
@@ -103,10 +109,23 @@ export async function POST(request: NextRequest) {
     const startAt = new Date(bangkokDatetimeLocalToIso(v.startAt));
     const endAt = v.endAt ? new Date(bangkokDatetimeLocalToIso(v.endAt)) : null;
 
+    // Group-scoped events: an alum organizer must be a member of the group.
+    let groupId: string | null = null;
+    if (v.groupId) {
+      const found = await loadGroup(v.groupId);
+      if ("error" in found) return found.error;
+      if ("alumni" in creator) {
+        const member = await requireGroupMember(found.group.id);
+        if ("error" in member) return member.error;
+      }
+      groupId = found.group.id;
+    }
+
     const event = await prisma.communityEvent.create({
       data: {
         organizerAlumniId: "alumni" in creator ? creator.alumni.id : null,
         organizerUserId: "staff" in creator ? creator.staff.user.id : null,
+        groupId,
         title: v.title,
         description: v.description,
         startAt,

@@ -30,6 +30,9 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   // Alumni activity feed — likes/comments cascade on post delete.
   "feed-post": { delegate: "feedPost", label: "โพสต์", nameFields: ["body"], resource: "feed_post" },
   "feed-comment": { delegate: "feedComment", label: "ความคิดเห็น", nameFields: ["body"], resource: "feed_comment" },
+  // Community V2 groups — memberships cascade on group delete (topics/events
+  // survive: their groupId is SetNull and they fall back to the forum-wide list).
+  "community-group": { delegate: "communityGroup", label: "กลุ่มศิษย์เก่า", nameFields: ["title"], resource: "community_group" },
 };
 
 export const TRASH_PAGE_SIZE = 10;
