@@ -158,6 +158,7 @@ model Alumni {
   feedPosts            FeedPost[]
   feedLikes            FeedLike[]
   feedComments         FeedComment[]
+  communityProfile     CommunityProfile?
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -707,4 +708,40 @@ model FeedComment {
 
   @@index([postId, createdAt])
   @@map("feed_comments")
+}
+
+// Opted-in alumni's self-published COMMUNITY profile (V2). Kept in a separate
+// 1:1 table (NOT columns on `Alumni`) so the extended fields (workplace, bio,
+// social links) can never leak through the forum/feed identity selects — they
+// require an explicit join (see SELECT_ALUMNI_DIRECTORY_IDENTITY in
+// lib/forum-identity.ts). The row exists only while opted in semantically:
+// directory reads additionally filter `communityOptedInAt != null`, so opt-out
+// hides the profile without deleting data (same semantics as forum opt-out).
+// `photoUrl` here is the SELF-SERVICE upload; display falls back to the
+// admin-set `Alumni.photoUrl` (profile.photoUrl ?? alumni.photoUrl).
+model CommunityProfile {
+  id               String   @id @default(uuid())
+  alumniId         String   @unique
+  photoUrl         String?
+  currentWorkplace String?
+  currentPosition  String?
+  province         String?
+  country          String?
+  // Plain text (max 2,000) — rendered via renderForumBody like all UGC.
+  bio              String?
+  // Self-published contact — shown in the directory ONLY because the owner
+  // filled it in. NOT the private Alumni.contactEmail.
+  contactEmail     String?
+  facebookUrl      String?
+  lineId           String?
+  linkedinUrl      String?
+  otherLink        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@index([province])
+  @@index([country])
+  @@map("community_profiles")
 }

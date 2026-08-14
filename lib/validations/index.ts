@@ -215,6 +215,10 @@ export type {
   FeedCommentUpdateInput,
 } from "./feed";
 
+// Community profile (alumni community V2)
+export { communityProfileSchema } from "./community-profile";
+export type { CommunityProfileInput } from "./community-profile";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

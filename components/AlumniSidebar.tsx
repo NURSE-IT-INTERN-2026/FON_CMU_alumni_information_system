@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const NAV_ITEMS = [
-  { href: "/graduates/news", label: "ข่าวสาร" },
-  { href: "/graduates/feed", label: "ฟีด" },
-  { href: "/graduates/forum", label: "กระดานสนทนา" },
-  { href: "/graduates/events", label: "กิจกรรม" },
-  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
-];
+import { ALUMNI_NAV_ITEMS as NAV_ITEMS } from "@/lib/alumni-nav";
 
 // Desktop left navigation for the authenticated alumni portal.
 // Mobile navigation is handled by the hamburger drawer in AlumniHeader.
