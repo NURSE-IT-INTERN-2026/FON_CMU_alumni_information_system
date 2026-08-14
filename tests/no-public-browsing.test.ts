@@ -103,6 +103,8 @@ const { GET: getCmuLookup } = await import("@/app/api/cmu-alumni/lookup/route");
 const { GET: getForumTopics } = await import("@/app/api/forum/topics/route"); // forum dual-audience (resolveForumReader)
 const { GET: getEvents } = await import("@/app/api/events/route"); // events broadcast (resolveEventReader)
 const { GET: getFeed } = await import("@/app/api/feed/route"); // feed opt-in (resolveForumReader)
+const { GET: getCommunityProfile } = await import("@/app/api/community-profile/route"); // own profile (requireForumAlumni)
+const { GET: getDirectory } = await import("@/app/api/directory/route"); // directory (resolveForumReader)
 
 const req = (p: string) => new NextRequest(`http://localhost/alumni${p}`);
 
@@ -129,5 +131,8 @@ describe("no-public-browsing (runtime): anonymous request ⇒ 401", () => {
     expect((await getEvents(req("/api/events"))).status).toBe(401);
     // feed GET gates via resolveForumReader (opt-in, like the forum).
     expect((await getFeed(req("/api/feed"))).status).toBe(401);
+    // community V2: own community profile + directory both gate via forum-guard.
+    expect((await getCommunityProfile(req("/api/community-profile"))).status).toBe(401);
+    expect((await getDirectory(req("/api/directory"))).status).toBe(401);
   });
 });

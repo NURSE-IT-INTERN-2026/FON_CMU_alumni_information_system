@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { BASE_PATH } from "@/lib/constants";
+import { ALUMNI_NAV_ITEMS } from "@/lib/alumni-nav";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -13,13 +14,7 @@ interface AlumniHeaderProps {
   };
 }
 
-const NAV_ITEMS = [
-  { href: "/graduates/news", label: "ข่าวสาร" },
-  { href: "/graduates/feed", label: "ฟีด" },
-  { href: "/graduates/forum", label: "กระดานสนทนา" },
-  { href: "/graduates/events", label: "กิจกรรม" },
-  { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
-];
+const NAV_ITEMS = ALUMNI_NAV_ITEMS;
 
 export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
   const router = useRouter();

@@ -25,6 +25,7 @@ import RepeatableFieldArray, { type FieldDef } from "@/components/form/Repeatabl
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
 import { SectionHeading } from "@/components/SectionHeading";
+import CommunityProfileSection from "@/components/community/CommunityProfileSection";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 
@@ -824,6 +825,9 @@ export default function AlumniProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Community profile (V2) — self-contained card, view mode only */}
+        {!editMode && <CommunityProfileSection />}
 
         {/* Danger zone — shown only while editing */}
         {editMode && (

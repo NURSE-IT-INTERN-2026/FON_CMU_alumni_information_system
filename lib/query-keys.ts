@@ -128,6 +128,22 @@ export const queryKeys = {
       ["feed", "comments", postId, page] as const,
   },
 
+  // Community profile + directory (alumni community V2). `.all` wipes both on
+  // a profile mutation (the directory reads the profile).
+  community: {
+    all: ["community"] as const,
+    profile: () => ["community", "profile"] as const,
+    directory: (o: {
+      page: number;
+      search: string;
+      cohort: string;
+      degreeLevel: string;
+      province: string;
+      country: string;
+    }) => ["community", "directory", o] as const,
+    directoryDetail: (id: string) => ["community", "directoryDetail", id] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

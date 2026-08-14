@@ -53,7 +53,9 @@ export type LogResource =
   | "event_rsvp"
   // Alumni activity feed
   | "feed_post"
-  | "feed_comment";
+  | "feed_comment"
+  // Alumni community V2
+  | "community_profile";
 
 interface AdminLogContext {
   actorType: "ADMIN";
