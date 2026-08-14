@@ -35,6 +35,9 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   "community-group": { delegate: "communityGroup", label: "กลุ่มศิษย์เก่า", nameFields: ["title"], resource: "community_group" },
   // Community V2 job board.
   "job-posting": { delegate: "jobPosting", label: "ประกาศงาน", nameFields: ["title", "workplace"], resource: "job_posting" },
+  // Community V2 event albums + staff announcements.
+  "event-photo": { delegate: "eventPhoto", label: "รูปภาพกิจกรรม", nameFields: ["caption", "imageUrl"], resource: "event_photo" },
+  announcement: { delegate: "announcement", label: "ประกาศชุมชน", nameFields: ["title"], resource: "announcement" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

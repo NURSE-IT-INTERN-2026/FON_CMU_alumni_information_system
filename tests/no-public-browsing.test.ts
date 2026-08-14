@@ -108,6 +108,7 @@ const { GET: getDirectory } = await import("@/app/api/directory/route"); // dire
 const { GET: getGroups } = await import("@/app/api/groups/route"); // groups (resolveGroupReader)
 const { GET: getJobs } = await import("@/app/api/jobs/route"); // jobs (resolveEventReader broadcast)
 const { GET: getMentors } = await import("@/app/api/mentors/route"); // mentors (resolveForumReader)
+const { GET: getAnnouncements } = await import("@/app/api/announcements/route"); // announcements (resolveEventReader)
 
 const req = (p: string) => new NextRequest(`http://localhost/alumni${p}`);
 
@@ -142,5 +143,7 @@ describe("no-public-browsing (runtime): anonymous request ⇒ 401", () => {
     // jobs GET gates via resolveEventReader; mentors GET via resolveForumReader.
     expect((await getJobs(req("/api/jobs"))).status).toBe(401);
     expect((await getMentors(req("/api/mentors"))).status).toBe(401);
+    // announcements GET gates via resolveEventReader (broadcast, like events).
+    expect((await getAnnouncements(req("/api/announcements"))).status).toBe(401);
   });
 });

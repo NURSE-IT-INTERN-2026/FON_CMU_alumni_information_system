@@ -74,6 +74,7 @@ enum ForumReportResource {
   FEED_POST
   FEED_COMMENT
   JOB_POSTING // community V2 job board
+  EVENT_PHOTO // community V2 event photo albums
 }
 
 // Event RSVP states (alumni community events). ATTENDING counts toward the
@@ -187,6 +188,10 @@ model Alumni {
   mentorProfile        MentorProfile?
   mentorshipRequestsMentor MentorshipRequest[] @relation("MentorshipMentor")
   mentorshipRequestsMentee MentorshipRequest[] @relation("MentorshipMentee")
+  eventPhotos          EventPhoto[]
+  // Watermark for the announcements "ใหม่" indicator (community V2) — the
+  // timestamp of the last announcements list view. null = never viewed.
+  announcementsLastReadAt DateTime?
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -420,6 +425,7 @@ model AdminUser {
   resolvedReports ContentReport[]
   organizedEvents CommunityEvent[] @relation("EventOrganizerUser")
   jobPostings  JobPosting[] @relation("JobAuthorUser")
+  announcements Announcement[]
 
   @@map("admin_users")
 }
@@ -672,6 +678,7 @@ model CommunityEvent {
   organizerUser   AdminUser?     @relation("EventOrganizerUser", fields: [organizerUserId], references: [id], onDelete: SetNull)
   group           CommunityGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   rsvps           EventRsvp[]
+  photos          EventPhoto[]
 
   @@index([startAt])
   @@index([groupId])
@@ -903,4 +910,49 @@ model MentorshipRequest {
   @@index([mentorId, status])
   @@index([menteeId, status])
   @@map("mentorship_requests")
+}
+
+// Community V2 event photo album — one row per uploaded photo. Upload gate:
+// ATTENDING (an RSVP row) or the organizer or staff (checked in the route).
+// `imageUrl` is basePath-relative (/uploads/...) — render via assetUrl.
+// Soft-delete; reportable via ForumReportResource.EVENT_PHOTO.
+model EventPhoto {
+  id               String    @id @default(uuid())
+  eventId          String
+  uploaderAlumniId String?
+  imageUrl         String
+  caption          String?
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  event    CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  uploader Alumni?        @relation(fields: [uploaderAlumniId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@map("event_photos")
+}
+
+// Community V2 staff announcements — short, plain-text notices for the alumni
+// community (distinct from News: no Tiptap, no PUBLISHED workflow). Audience =
+// staff + every ACTIVE alum (broadcast, like events). "New" indicator is a
+// per-alumni watermark (Alumni.announcementsLastReadAt) — NO notification
+// fan-out. `pinnedAt` floats an announcement to the top; `expiresAt` hides it.
+// Soft-delete (`announcement` in TRASH_ENTITIES).
+model Announcement {
+  id           String    @id @default(uuid())
+  authorUserId String?
+  title        String
+  body         String
+  pinnedAt     DateTime?
+  expiresAt    DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  authorUser AdminUser? @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([deletedAt, createdAt])
+  @@index([expiresAt])
+  @@map("announcements")
 }

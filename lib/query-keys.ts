@@ -166,6 +166,19 @@ export const queryKeys = {
     requests: () => ["mentorship", "requests"] as const,
   },
 
+  // Announcements + event photo albums (alumni community V2).
+  announcements: {
+    all: ["announcements"] as const,
+    list: () => ["announcements", "list"] as const,
+    // Admin management list — distinct from `list()` (alumni adds ?since=true,
+    // a different response shape).
+    adminList: () => ["announcements", "adminList"] as const,
+  },
+  eventPhotos: {
+    all: ["eventPhotos"] as const,
+    list: (eventId: string) => ["eventPhotos", "list", eventId] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,
