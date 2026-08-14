@@ -85,6 +85,9 @@ export default function AlumniForumPage() {
         page: String(page),
         pageSize: String(FORUM_PAGE_SIZE),
         sort,
+        // Forum-wide topics only — group-scoped topics live in their group's
+        // space (/graduates/groups/[slug]).
+        groupId: "none",
       });
       if (search) params.set("search", search);
       return apiFetch<Paged<ForumTopicItem>>(`/api/forum/topics?${params}`);

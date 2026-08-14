@@ -33,7 +33,7 @@ const PUBLIC_ALLOWLIST = new Set([
 
 /** A session/permission gate call inside a handler body. */
 const GATE_RE =
-  /getSession|getAlumniSession|checkWritePermission|checkSuperAdminPermission|checkNonExecutivePermission|checkAlumniSession|resolveForumReader|requireForumAlumni|resolveForumStaffOrOwner|resolveEventReader|resolveEventCreator|resolveEventStaffOrAlumni|authorize\s*\(/;
+  /getSession|getAlumniSession|checkWritePermission|checkSuperAdminPermission|checkNonExecutivePermission|checkAlumniSession|resolveForumReader|requireForumAlumni|resolveForumStaffOrOwner|resolveEventReader|resolveEventCreator|resolveEventStaffOrAlumni|resolveGroupReader|requireGroupMember|authorize\s*\(/;
 
 /** Extract one named async handler's body (from its `export` to the next `export` / EOF). */
 function handlerBody(content: string, name: "GET"): string | null {
@@ -105,6 +105,7 @@ const { GET: getEvents } = await import("@/app/api/events/route"); // events bro
 const { GET: getFeed } = await import("@/app/api/feed/route"); // feed opt-in (resolveForumReader)
 const { GET: getCommunityProfile } = await import("@/app/api/community-profile/route"); // own profile (requireForumAlumni)
 const { GET: getDirectory } = await import("@/app/api/directory/route"); // directory (resolveForumReader)
+const { GET: getGroups } = await import("@/app/api/groups/route"); // groups (resolveGroupReader)
 
 const req = (p: string) => new NextRequest(`http://localhost/alumni${p}`);
 
@@ -134,5 +135,7 @@ describe("no-public-browsing (runtime): anonymous request ⇒ 401", () => {
     // community V2: own community profile + directory both gate via forum-guard.
     expect((await getCommunityProfile(req("/api/community-profile"))).status).toBe(401);
     expect((await getDirectory(req("/api/directory"))).status).toBe(401);
+    // groups GET gates via resolveGroupReader (same opt-in entry as the forum).
+    expect((await getGroups(req("/api/groups"))).status).toBe(401);
   });
 });

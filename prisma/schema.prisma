@@ -82,6 +82,20 @@ enum RsvpStatus {
   DECLINED
 }
 
+// Community V2 groups. COHORT groups are auto-generated per cohort value;
+// INTEREST groups are user/staff-created.
+enum GroupKind {
+  COHORT
+  INTEREST
+}
+
+// Membership role within a group. MODERATOR = the creator (or a staff-promoted
+// member) — may edit/delete the group; staff outrank moderators everywhere.
+enum GroupRole {
+  MEMBER
+  MODERATOR
+}
+
 model Alumni {
   id                    String      @id @default(uuid())
   studentId             String      @unique
@@ -159,6 +173,7 @@ model Alumni {
   feedLikes            FeedLike[]
   feedComments         FeedComment[]
   communityProfile     CommunityProfile?
+  groupMemberships     GroupMembership[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -542,6 +557,10 @@ model CmuGraduate {
 model ForumTopic {
   id          String    @id @default(uuid())
   authorId    String
+  // Group-scoped topic (community V2). null = a normal forum-wide topic.
+  // SetNull keeps the topic if the group is deleted (it falls back to the
+  // forum-wide list).
+  groupId     String?
   title       String
   body        String
   replyCount  Int       @default(0)
@@ -550,10 +569,12 @@ model ForumTopic {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  author  Alumni       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author  Alumni          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  group   CommunityGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   replies ForumReply[]
 
   @@index([authorId])
+  @@index([groupId])
   @@index([deletedAt, createdAt])
   @@index([lastReplyAt])
   @@map("forum_topics")
@@ -617,6 +638,9 @@ model CommunityEvent {
   id                 String    @id @default(uuid())
   organizerAlumniId  String?
   organizerUserId    String?
+  // Group-scoped event (community V2). null = a community-wide event. SetNull
+  // keeps the event if the group is deleted.
+  groupId            String?
   title              String
   description        String
   startAt            DateTime
@@ -632,9 +656,11 @@ model CommunityEvent {
 
   organizerAlumni Alumni?        @relation("EventOrganizerAlumni", fields: [organizerAlumniId], references: [id], onDelete: SetNull)
   organizerUser   AdminUser?     @relation("EventOrganizerUser", fields: [organizerUserId], references: [id], onDelete: SetNull)
+  group           CommunityGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   rsvps           EventRsvp[]
 
   @@index([startAt])
+  @@index([groupId])
   @@index([deletedAt, startAt])
   @@map("community_events")
 }
@@ -744,4 +770,51 @@ model CommunityProfile {
   @@index([province])
   @@index([country])
   @@map("community_profiles")
+}
+
+// Community V2 groups / sub-communities. A group's "space" is NOT a separate
+// feed — it is the existing ForumTopic/CommunityEvent lists scoped by the
+// nullable `groupId` FK on those models (cheapest reuse of the forum).
+// COHORT groups are auto-generated (one per distinct cohort value; see
+// ensureCohortGroup in lib/group-cohort.ts); INTEREST groups are created via
+// the API by staff or opted-in alumni. `memberCount`/`topicCount` are
+// denormalized and maintained in $transactions on join/leave/topic-create
+// (same discipline as ForumTopic.replyCount).
+model CommunityGroup {
+  id            String     @id @default(uuid())
+  slug          String     @unique
+  kind          GroupKind
+  // Set iff kind = COHORT — matches Alumni.cohort (whitespace-normalized).
+  cohortKey     String?
+  title         String
+  description   String     @default("")
+  coverImageUrl String?
+  memberCount   Int        @default(0)
+  topicCount    Int        @default(0)
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  memberships GroupMembership[]
+  topics      ForumTopic[]
+  events      CommunityEvent[]
+
+  @@index([kind])
+  @@map("community_groups")
+}
+
+model GroupMembership {
+  id        String    @id @default(uuid())
+  groupId   String
+  alumniId  String
+  role      GroupRole @default(MEMBER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  group  CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  alumni Alumni         @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, alumniId])
+  @@index([alumniId])
+  @@map("group_memberships")
 }

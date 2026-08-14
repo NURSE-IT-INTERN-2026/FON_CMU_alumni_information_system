@@ -144,6 +144,14 @@ export const queryKeys = {
     directoryDetail: (id: string) => ["community", "directoryDetail", id] as const,
   },
 
+  // Groups (alumni community V2) — list + detail (+ myMembership flag).
+  groups: {
+    all: ["groups"] as const,
+    list: (o: { page: number; search: string; kind: string }) =>
+      ["groups", "list", o] as const,
+    detail: (slug: string) => ["groups", "detail", slug] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

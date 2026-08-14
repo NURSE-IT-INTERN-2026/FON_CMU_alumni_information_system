@@ -10,6 +10,7 @@ export const ALUMNI_NAV_ITEMS = [
   { href: "/graduates/news", label: "ข่าวสาร" },
   { href: "/graduates/feed", label: "ฟีด" },
   { href: "/graduates/forum", label: "กระดานสนทนา" },
+  { href: "/graduates/groups", label: "กลุ่มศิษย์เก่า" },
   { href: "/graduates/directory", label: "ไดเรกทอรีศิษย์เก่า" },
   { href: "/graduates/events", label: "กิจกรรม" },
   { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },

@@ -8,7 +8,10 @@ import { resolveForumReader, resolveForumStaffOrOwner, alumniLogCtx } from "@/li
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { handleZodError, forumTopicUpdateSchema } from "@/lib/validations";
 
-const INCLUDE = { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } as const;
+const INCLUDE = {
+  author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
+  group: { select: { id: true, slug: true, title: true } },
+} as const;
 
 export async function GET(
   _request: NextRequest,
@@ -100,7 +103,15 @@ export async function DELETE(
       // Staff moderation: executive is read-only.
       const permErr = await checkWritePermission();
       if (permErr) return permErr;
-      await prisma.forumTopic.update({ where: { id }, data: { deletedAt: new Date() } });
+      await prisma.$transaction(async (tx) => {
+        await tx.forumTopic.update({ where: { id }, data: { deletedAt: new Date() } });
+        if (existing.groupId) {
+          await tx.communityGroup.update({
+            where: { id: existing.groupId },
+            data: { topicCount: { decrement: 1 } },
+          });
+        }
+      });
       await logActivity(
         {
           actorType: "ADMIN",
@@ -123,7 +134,15 @@ export async function DELETE(
         { status: 403 },
       );
     }
-    await prisma.forumTopic.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.$transaction(async (tx) => {
+      await tx.forumTopic.update({ where: { id }, data: { deletedAt: new Date() } });
+      if (existing.groupId) {
+        await tx.communityGroup.update({
+          where: { id: existing.groupId },
+          data: { topicCount: { decrement: 1 } },
+        });
+      }
+    });
     await logActivity(alumniLogCtx(who.alumni!), "DELETE", "forum_topic", id, {
       title: existing.title,
     });
