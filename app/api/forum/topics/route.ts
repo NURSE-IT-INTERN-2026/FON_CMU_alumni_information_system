@@ -10,6 +10,7 @@ import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-l
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { loadGroup, requireGroupMember } from "@/lib/group-guard";
 import { handleZodError, forumTopicCreateSchema } from "@/lib/validations";
+import { emitToGroupMembers } from "@/lib/notification-emitter";
 
 const INCLUDE = {
   author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY },
@@ -113,6 +114,28 @@ export async function POST(request: NextRequest) {
       }
       return created;
     });
+
+    // Best-effort: a new GROUP topic notifies the group's members (capped —
+    // groups above GROUP_NOTIFY_CAP are skipped by the emitter itself).
+    if (groupId) {
+      const [group, memberIds] = await Promise.all([
+        prisma.communityGroup.findUnique({ where: { id: groupId }, select: { title: true } }),
+        prisma.groupMembership.findMany({
+          where: { groupId },
+          select: { alumniId: true },
+        }),
+      ]);
+      await emitToGroupMembers({
+        groupId,
+        memberIds: memberIds.map((m) => m.alumniId),
+        type: "NEW_GROUP_TOPIC",
+        entityId: topic.id,
+        actor: topic.author,
+        topicTitle: topic.title,
+        groupTitle: group?.title ?? null,
+        skipAlumniId: alumni.id,
+      });
+    }
 
     await logActivity(
       alumniLogCtx(alumni),

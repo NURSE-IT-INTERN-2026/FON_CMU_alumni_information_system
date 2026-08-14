@@ -179,6 +179,14 @@ export const queryKeys = {
     list: (eventId: string) => ["eventPhotos", "list", eventId] as const,
   },
 
+  // Notifications (community V2) — badge key separate from `.all` so it isn't
+  // wiped by list invalidations (mirrors alumniAccounts.pendingCount).
+  notifications: {
+    all: ["notifications"] as const,
+    list: (o: { page: number }) => ["notifications", "list", o] as const,
+    unreadCount: () => ["notifications", "unreadCount"] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

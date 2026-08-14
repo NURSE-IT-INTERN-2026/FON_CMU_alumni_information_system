@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { checkWritePermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity-log";
 import { handleZodError, forumReportActionSchema } from "@/lib/validations";
+import { emitNotification } from "@/lib/notification-emitter";
 
 // Staff moderation action on a report: resolve or dismiss. Executive is blocked
 // by checkWritePermission (read-only). Uses POST (not PUT/PATCH) for a discrete
@@ -51,6 +52,13 @@ export async function POST(
       id,
       { action: validated.action, resourceId: existing.resourceId, resourceType: existing.resourceType },
     );
+
+    // Best-effort: tell the reporter the outcome.
+    await emitNotification({
+      alumniId: existing.reporterId,
+      type: "REPORT_OUTCOME",
+      outcome: validated.action === "resolve" ? "RESOLVED" : "DISMISSED",
+    });
 
     return NextResponse.json(report);
   } catch (error) {

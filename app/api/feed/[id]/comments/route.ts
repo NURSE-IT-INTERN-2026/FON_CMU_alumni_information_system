@@ -8,6 +8,7 @@ import { resolveForumReader, requireForumAlumni, alumniLogCtx } from "@/lib/foru
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { handleZodError, feedCommentCreateSchema } from "@/lib/validations";
+import { emitNotification } from "@/lib/notification-emitter";
 
 const INCLUDE = { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } as const;
 
@@ -53,7 +54,7 @@ export async function POST(
     const rl = communityRateLimit(request, "post", COMMUNITY_POST_LIMIT);
     if (rl) return rl;
 
-    const post = await prisma.feedPost.findFirst({ where: { id: postId, deletedAt: null }, select: { id: true } });
+    const post = await prisma.feedPost.findFirst({ where: { id: postId, deletedAt: null }, select: { id: true, authorId: true } });
     if (!post) return NextResponse.json({ error: "ไม่พบโพสต์" }, { status: 404 });
 
     const v = feedCommentCreateSchema.parse(await request.json());
@@ -61,6 +62,16 @@ export async function POST(
       const created = await tx.feedComment.create({ data: { postId, authorId: alumni.id, body: v.body }, include: INCLUDE });
       await tx.feedPost.update({ where: { id: postId }, data: { commentCount: { increment: 1 } } });
       return created;
+    });
+
+    // Best-effort: tell the post author (never themselves).
+    await emitNotification({
+      alumniId: post.authorId,
+      type: "COMMENT_ON_MY_POST",
+      entityId: postId,
+      actor: comment.author,
+      postSnippet: v.body.slice(0, 120),
+      skipAlumniId: alumni.id,
     });
 
     await logActivity(alumniLogCtx(alumni), "CREATE", "feed_comment", comment.id, { postId });

@@ -106,6 +106,19 @@ enum MentorshipStatus {
   CANCELLED
 }
 
+// Community V2 notification kinds (see lib/notification-text.ts for the
+// Thai title/body/link builders per type).
+enum NotificationType {
+  REPLY_TO_MY_TOPIC
+  LIKE_ON_MY_POST
+  COMMENT_ON_MY_POST
+  RSVP_ON_MY_EVENT
+  NEW_GROUP_TOPIC
+  MENTORSHIP_REQUEST
+  MENTORSHIP_RESPONSE
+  REPORT_OUTCOME
+}
+
 model Alumni {
   id                    String      @id @default(uuid())
   studentId             String      @unique
@@ -189,6 +202,7 @@ model Alumni {
   mentorshipRequestsMentor MentorshipRequest[] @relation("MentorshipMentor")
   mentorshipRequestsMentee MentorshipRequest[] @relation("MentorshipMentee")
   eventPhotos          EventPhoto[]
+  notifications        Notification[]
   // Watermark for the announcements "ใหม่" indicator (community V2) — the
   // timestamp of the last announcements list view. null = never viewed.
   announcementsLastReadAt DateTime?
@@ -955,4 +969,31 @@ model Announcement {
   @@index([deletedAt, createdAt])
   @@index([expiresAt])
   @@map("announcements")
+}
+
+// Community V2 in-app notifications. DB rows, O(1) per actor-directed event
+// (NO fan-out — group-new-topic is capped at GROUP_NOTIFY_CAP members via a
+// batched createMany; staff announcements use the watermark instead).
+// title/body/link are PRE-RENDERED Thai snapshots so later edits/deletes of
+// the source don't break the center. Emitters are best-effort — a failed
+// insert must never fail the parent action (lib/notification-emitter.ts).
+// Read notifications older than 90 days are purged by /api/auth/cleanup.
+model Notification {
+  id        String           @id @default(uuid())
+  alumniId  String
+  type      NotificationType
+  // Id of the related entity (topic/post/event/request/report) — display only.
+  entityId  String?
+  title     String
+  body      String?
+  // Route-internal path (no basePath — added at render like assetUrl).
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@index([alumniId, readAt, createdAt])
+  @@index([alumniId, createdAt])
+  @@map("notifications")
 }

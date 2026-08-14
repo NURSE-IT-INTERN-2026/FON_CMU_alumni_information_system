@@ -5,6 +5,7 @@ import { logActivity } from "@/lib/activity-log";
 import { resolveEventReader, alumniLogCtx } from "@/lib/event-guard";
 import { rsvpSeats, fitsCapacity } from "@/lib/event-capacity";
 import { handleZodError, rsvpSchema } from "@/lib/validations";
+import { emitNotification } from "@/lib/notification-emitter";
 
 // RSVP is an alumni action. Any ACTIVE alum may RSVP (events are a broadcast);
 // staff (no alumni identity) get a 403.
@@ -68,6 +69,17 @@ export async function POST(
       rsvp.id,
       { eventId, status: v.status, guestCount: v.status === "ATTENDING" ? guestCount : 0 },
     );
+
+    // Best-effort: tell the alumni organizer about a NEW attending RSVP.
+    if (!existed && v.status === "ATTENDING" && event.organizerAlumniId) {
+      await emitNotification({
+        alumniId: event.organizerAlumniId,
+        type: "RSVP_ON_MY_EVENT",
+        entityId: eventId,
+        eventTitle: event.title,
+        skipAlumniId: alumni.id,
+      });
+    }
 
     return NextResponse.json({ status: rsvp.status, guestCount: rsvp.guestCount });
   } catch (error) {
