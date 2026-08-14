@@ -15,7 +15,7 @@ const DETAIL_MAX = 1000;
 
 // --- Enums (mirror the Prisma enums; safe to redeclare as zod enums) ---
 
-export const FORUM_REPORT_RESOURCE_VALUES = ["FORUM_TOPIC", "FORUM_REPLY", "EVENT", "FEED_POST", "FEED_COMMENT"] as const;
+export const FORUM_REPORT_RESOURCE_VALUES = ["FORUM_TOPIC", "FORUM_REPLY", "EVENT", "FEED_POST", "FEED_COMMENT", "JOB_POSTING"] as const;
 export const CONTENT_REPORT_REASON_VALUES = [
   "SPAM",
   "HARASSMENT",

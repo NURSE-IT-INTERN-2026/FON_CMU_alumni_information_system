@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
             ? "community_event"
             : validated.resourceType === "FEED_POST"
               ? "feed_post"
-              : "feed_comment",
+              : validated.resourceType === "JOB_POSTING"
+                ? "job_posting"
+                : "feed_comment",
       validated.resourceId,
       { reason: validated.reason, reportId: report.id },
     );
@@ -87,7 +89,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function resolveReportTarget(
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT",
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT" | "JOB_POSTING",
   resourceId: string,
 ): Promise<{ authorId: string | null } | null> {
   if (resourceType === "FORUM_TOPIC") {
@@ -105,6 +107,10 @@ async function resolveReportTarget(
   if (resourceType === "FEED_POST") {
     const p = await prisma.feedPost.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
     return p;
+  }
+  if (resourceType === "JOB_POSTING") {
+    const j = await prisma.jobPosting.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorAlumniId: true } });
+    return j ? { authorId: j.authorAlumniId } : null;
   }
   // FEED_COMMENT
   const c = await prisma.feedComment.findFirst({ where: { id: resourceId, deletedAt: null }, select: { authorId: true } });
@@ -132,8 +138,8 @@ export async function GET(request: NextRequest) {
     if (["OPEN", "RESOLVED", "DISMISSED"].includes(statusParam)) {
       where.status = statusParam as "OPEN" | "RESOLVED" | "DISMISSED";
     }
-    if (["FORUM_TOPIC", "FORUM_REPLY", "EVENT", "FEED_POST", "FEED_COMMENT"].includes(resourceTypeParam)) {
-      where.resourceType = resourceTypeParam as "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT";
+    if (["FORUM_TOPIC", "FORUM_REPLY", "EVENT", "FEED_POST", "FEED_COMMENT", "JOB_POSTING"].includes(resourceTypeParam)) {
+      where.resourceType = resourceTypeParam as "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT" | "JOB_POSTING";
     }
 
     const [reports, total] = await Promise.all([
@@ -159,8 +165,9 @@ export async function GET(request: NextRequest) {
     const eventIds = reports.filter((r) => r.resourceType === "EVENT").map((r) => r.resourceId);
     const feedPostIds = reports.filter((r) => r.resourceType === "FEED_POST").map((r) => r.resourceId);
     const feedCommentIds = reports.filter((r) => r.resourceType === "FEED_COMMENT").map((r) => r.resourceId);
+    const jobIds = reports.filter((r) => r.resourceType === "JOB_POSTING").map((r) => r.resourceId);
 
-    const [topics, replies, events, feedPosts, feedComments] = await Promise.all([
+    const [topics, replies, events, feedPosts, feedComments, jobs] = await Promise.all([
       topicIds.length ? prisma.forumTopic.findMany({ where: { id: { in: topicIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
       replyIds.length ? prisma.forumReply.findMany({ where: { id: { in: replyIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
       eventIds.length
@@ -171,6 +178,12 @@ export async function GET(request: NextRequest) {
         : [],
       feedPostIds.length ? prisma.feedPost.findMany({ where: { id: { in: feedPostIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
       feedCommentIds.length ? prisma.feedComment.findMany({ where: { id: { in: feedCommentIds } }, include: { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } }) : [],
+      jobIds.length
+        ? prisma.jobPosting.findMany({
+            where: { id: { in: jobIds } },
+            include: { authorAlumni: { select: SELECT_ALUMNI_PUBLIC_IDENTITY }, authorUser: { select: { id: true, firstName: true, lastName: true } } },
+          })
+        : [],
     ]);
 
     const topicById = new Map(topics.map((t) => [t.id, t]));
@@ -178,6 +191,7 @@ export async function GET(request: NextRequest) {
     const eventById = new Map(events.map((e) => [e.id, e]));
     const feedPostById = new Map(feedPosts.map((p) => [p.id, p]));
     const feedCommentById = new Map(feedComments.map((c) => [c.id, c]));
+    const jobById = new Map(jobs.map((j) => [j.id, j]));
 
     const data = reports.map((report) => ({
       ...report,
@@ -186,6 +200,7 @@ export async function GET(request: NextRequest) {
       event: report.resourceType === "EVENT" ? eventById.get(report.resourceId) ?? null : null,
       feedPost: report.resourceType === "FEED_POST" ? feedPostById.get(report.resourceId) ?? null : null,
       feedComment: report.resourceType === "FEED_COMMENT" ? feedCommentById.get(report.resourceId) ?? null : null,
+      jobPosting: report.resourceType === "JOB_POSTING" ? jobById.get(report.resourceId) ?? null : null,
     }));
 
     return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });

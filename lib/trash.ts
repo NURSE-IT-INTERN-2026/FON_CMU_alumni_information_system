@@ -33,6 +33,8 @@ export const TRASH_ENTITIES: Record<string, TrashEntityConfig> = {
   // Community V2 groups — memberships cascade on group delete (topics/events
   // survive: their groupId is SetNull and they fall back to the forum-wide list).
   "community-group": { delegate: "communityGroup", label: "กลุ่มศิษย์เก่า", nameFields: ["title"], resource: "community_group" },
+  // Community V2 job board.
+  "job-posting": { delegate: "jobPosting", label: "ประกาศงาน", nameFields: ["title", "workplace"], resource: "job_posting" },
 };
 
 export const TRASH_PAGE_SIZE = 10;

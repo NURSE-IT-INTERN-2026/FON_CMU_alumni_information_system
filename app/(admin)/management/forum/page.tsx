@@ -39,10 +39,13 @@ interface ReportedTarget {
   author?: AlumniPublicIdentity;
   organizerAlumni?: AlumniPublicIdentity | null;
   organizerUser?: { id: string; firstName: string; lastName: string } | null;
+  authorAlumni?: AlumniPublicIdentity | null;
+  authorUser?: { id: string; firstName: string; lastName: string } | null;
+  workplace?: string;
 }
 interface ForumReport {
   id: string;
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT";
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT" | "JOB_POSTING";
   resourceId: string;
   reason: keyof typeof FORUM_REPORT_REASON_LABELS;
   reasonDetail: string | null;
@@ -56,6 +59,7 @@ interface ForumReport {
   event: ReportedTarget | null;
   feedPost: ReportedTarget | null;
   feedComment: ReportedTarget | null;
+  jobPosting: ReportedTarget | null;
 }
 
 const RESOURCE_LABELS: Record<ForumReport["resourceType"], string> = {
@@ -64,6 +68,7 @@ const RESOURCE_LABELS: Record<ForumReport["resourceType"], string> = {
   EVENT: "กิจกรรม",
   FEED_POST: "โพสต์ (ฟีด)",
   FEED_COMMENT: "ความคิดเห็น (ฟีด)",
+  JOB_POSTING: "ประกาศงาน",
 };
 
 /** Uniform descriptor for a reported item, regardless of resource type, so the
@@ -74,6 +79,7 @@ function describeReport(r: ForumReport) {
     : r.resourceType === "FORUM_REPLY" ? r.reply
     : r.resourceType === "EVENT" ? r.event
     : r.resourceType === "FEED_POST" ? r.feedPost
+    : r.resourceType === "JOB_POSTING" ? r.jobPosting
     : r.feedComment;
   if (!t) return null;
   const deleteUrl =
@@ -81,15 +87,21 @@ function describeReport(r: ForumReport) {
     : r.resourceType === "FORUM_REPLY" ? `/api/forum/replies/${r.resourceId}`
     : r.resourceType === "EVENT" ? `/api/events/${r.resourceId}`
     : r.resourceType === "FEED_POST" ? `/api/feed/${r.resourceId}`
+    : r.resourceType === "JOB_POSTING" ? `/api/jobs/${r.resourceId}`
     : `/api/feed/comments/${r.resourceId}`;
-  const staffName = t.organizerUser ? `${t.organizerUser.firstName} ${t.organizerUser.lastName}`.trim() : null;
+  const staffName = t.organizerUser
+    ? `${t.organizerUser.firstName} ${t.organizerUser.lastName}`.trim()
+    : t.authorUser
+      ? `${t.authorUser.firstName} ${t.authorUser.lastName}`.trim()
+      : null;
   return {
     label: RESOURCE_LABELS[r.resourceType],
     title: t.title ?? null,
+    subtitle: "workplace" in t && t.workplace ? t.workplace : null,
     body: t.body ?? t.description ?? "",
     deleted: !!t.deletedAt,
     deleteUrl,
-    author: t.author ?? t.organizerAlumni ?? null,
+    author: t.author ?? t.organizerAlumni ?? t.authorAlumni ?? null,
     staffName,
   };
 }
@@ -188,6 +200,7 @@ export default function ForumModerationPage() {
                 {desc ? (
                   <div className="mb-3 rounded-md bg-gray-50 p-3">
                     {desc.title && <p className="mb-1 font-semibold text-[var(--foreground)]">{desc.title}</p>}
+                    {desc.subtitle && <p className="mb-1 text-xs text-[var(--muted)]">{desc.subtitle}</p>}
                     {desc.body && <p className="line-clamp-3 text-sm text-[var(--foreground)]">{desc.body}</p>}
                     <p className="mt-2 text-xs text-[var(--muted)]">
                       โดย {desc.author ? (

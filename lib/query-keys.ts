@@ -152,6 +152,20 @@ export const queryKeys = {
     detail: (slug: string) => ["groups", "detail", slug] as const,
   },
 
+  // Job board + mentorship (alumni community V2).
+  jobs: {
+    all: ["jobs"] as const,
+    list: (o: { page: number; search: string; province: string; scope: string }) =>
+      ["jobs", "list", o] as const,
+    detail: (id: string) => ["jobs", "detail", id] as const,
+  },
+  mentorship: {
+    all: ["mentorship"] as const,
+    mentors: (o: { search: string }) => ["mentorship", "mentors", o] as const,
+    myProfile: () => ["mentorship", "myProfile"] as const,
+    requests: () => ["mentorship", "requests"] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,
