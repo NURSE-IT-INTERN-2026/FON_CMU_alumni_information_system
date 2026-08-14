@@ -6,6 +6,7 @@ import { requireForumAlumni, alumniLogCtx } from "@/lib/forum-guard";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { handleZodError, mentorshipRequestSchema } from "@/lib/validations";
+import { emitNotification } from "@/lib/notification-emitter";
 
 /**
  * Community V2 mentorship requests (opt-in gated). GET = the logged-in alum's
@@ -97,6 +98,14 @@ export async function POST(request: NextRequest) {
       created.id,
       { mentorId: mentor.alumniId },
     );
+
+    // Best-effort: tell the mentor.
+    await emitNotification({
+      alumniId: mentor.alumniId,
+      type: "MENTORSHIP_REQUEST",
+      entityId: created.id,
+      skipAlumniId: alumni.id,
+    });
 
     return NextResponse.json(created, { status: 201 });
   } catch (error) {

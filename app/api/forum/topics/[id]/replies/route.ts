@@ -8,6 +8,7 @@ import { resolveForumReader, requireForumAlumni, alumniLogCtx } from "@/lib/foru
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { handleZodError, forumReplyCreateSchema } from "@/lib/validations";
+import { emitNotification } from "@/lib/notification-emitter";
 
 const INCLUDE = { author: { select: SELECT_ALUMNI_PUBLIC_IDENTITY } } as const;
 
@@ -75,7 +76,7 @@ export async function POST(
 
     const topic = await prisma.forumTopic.findFirst({
       where: { id: topicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, authorId: true, title: true },
     });
     if (!topic) {
       return NextResponse.json({ error: "ไม่พบกระทู้" }, { status: 404 });
@@ -94,6 +95,16 @@ export async function POST(
         data: { replyCount: { increment: 1 }, lastReplyAt: created.createdAt },
       });
       return created;
+    });
+
+    // Best-effort: tell the topic author (never themselves).
+    await emitNotification({
+      alumniId: topic.authorId,
+      type: "REPLY_TO_MY_TOPIC",
+      entityId: topicId,
+      actor: reply.author,
+      topicTitle: topic.title,
+      skipAlumniId: alumni.id,
     });
 
     await logActivity(alumniLogCtx(alumni), "CREATE", "forum_reply", reply.id, {

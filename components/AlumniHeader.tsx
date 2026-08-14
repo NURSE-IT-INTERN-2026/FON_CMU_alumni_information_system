@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { BASE_PATH } from "@/lib/constants";
 import { ALUMNI_NAV_ITEMS } from "@/lib/alumni-nav";
+import NotificationBell from "@/components/alumni/NotificationBell";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -69,6 +70,7 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
 
           {/* User info and logout */}
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium text-white/90">{displayName}</p>
               <p className="text-xs text-white/60">ศิษย์เก่า</p>

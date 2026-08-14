@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireForumAlumni } from "@/lib/forum-guard";
+import { emitNotification } from "@/lib/notification-emitter";
 
 // Toggle the requesting alum's like on a post. Idempotent: returns the new
 // state. The denormalized FeedPost.likeCount is maintained in the same
@@ -28,6 +29,22 @@ export async function POST(
         await tx.feedPost.update({ where: { id: postId }, data: { likeCount: { increment: 1 } } });
       }
     });
+
+    // Best-effort: tell the post author about a NEW like (never un-like, never self).
+    if (!existing) {
+      const post = await prisma.feedPost.findUnique({
+        where: { id: postId },
+        select: { authorId: true },
+      });
+      if (post) {
+        await emitNotification({
+          alumniId: post.authorId,
+          type: "LIKE_ON_MY_POST",
+          entityId: postId,
+          skipAlumniId: alumni.id,
+        });
+      }
+    }
 
     const post = await prisma.feedPost.findUnique({ where: { id: postId }, select: { likeCount: true } });
     return NextResponse.json({ liked: !existing, likeCount: post?.likeCount ?? 0 });

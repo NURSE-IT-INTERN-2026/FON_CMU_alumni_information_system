@@ -5,6 +5,7 @@ import { logActivity } from "@/lib/activity-log";
 import { requireForumAlumni, alumniLogCtx } from "@/lib/forum-guard";
 import { handleZodError, mentorshipActionSchema } from "@/lib/validations";
 import { checkTransition, transitionResult } from "@/lib/mentorship-flow";
+import { emitNotification } from "@/lib/notification-emitter";
 
 /**
  * Act on a mentorship request: accept/decline (mentor only) or cancel
@@ -56,6 +57,15 @@ export async function POST(
       id,
       { action },
     );
+
+    // Best-effort: tell the other party (mentee hears accept/decline; the
+    // mentor hears a cancel).
+    await emitNotification({
+      alumniId: action === "cancel" ? req.mentorId : req.menteeId,
+      type: "MENTORSHIP_RESPONSE",
+      entityId: id,
+      skipAlumniId: alumni.id,
+    });
 
     // The accept payload is the ONLY contact disclosure point.
     let mentorContact: { contactEmail: string | null; phones: string[] } | undefined;
