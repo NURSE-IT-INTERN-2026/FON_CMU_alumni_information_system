@@ -13,6 +13,7 @@ import {
   FORUM_REPORT_REASON_LABELS,
 } from "@/lib/validations";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
+import { assetUrl } from "@/lib/asset-url";
 
 const MONTHS_TH = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -42,10 +43,12 @@ interface ReportedTarget {
   authorAlumni?: AlumniPublicIdentity | null;
   authorUser?: { id: string; firstName: string; lastName: string } | null;
   workplace?: string;
+  eventId?: string;
+  uploader?: AlumniPublicIdentity | null;
 }
 interface ForumReport {
   id: string;
-  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT" | "JOB_POSTING";
+  resourceType: "FORUM_TOPIC" | "FORUM_REPLY" | "EVENT" | "FEED_POST" | "FEED_COMMENT" | "JOB_POSTING" | "EVENT_PHOTO";
   resourceId: string;
   reason: keyof typeof FORUM_REPORT_REASON_LABELS;
   reasonDetail: string | null;
@@ -60,6 +63,7 @@ interface ForumReport {
   feedPost: ReportedTarget | null;
   feedComment: ReportedTarget | null;
   jobPosting: ReportedTarget | null;
+  eventPhoto: ReportedTarget | null;
 }
 
 const RESOURCE_LABELS: Record<ForumReport["resourceType"], string> = {
@@ -69,6 +73,7 @@ const RESOURCE_LABELS: Record<ForumReport["resourceType"], string> = {
   FEED_POST: "โพสต์ (ฟีด)",
   FEED_COMMENT: "ความคิดเห็น (ฟีด)",
   JOB_POSTING: "ประกาศงาน",
+  EVENT_PHOTO: "รูปภาพกิจกรรม",
 };
 
 /** Uniform descriptor for a reported item, regardless of resource type, so the
@@ -80,6 +85,7 @@ function describeReport(r: ForumReport) {
     : r.resourceType === "EVENT" ? r.event
     : r.resourceType === "FEED_POST" ? r.feedPost
     : r.resourceType === "JOB_POSTING" ? r.jobPosting
+    : r.resourceType === "EVENT_PHOTO" ? r.eventPhoto
     : r.feedComment;
   if (!t) return null;
   const deleteUrl =
@@ -88,6 +94,7 @@ function describeReport(r: ForumReport) {
     : r.resourceType === "EVENT" ? `/api/events/${r.resourceId}`
     : r.resourceType === "FEED_POST" ? `/api/feed/${r.resourceId}`
     : r.resourceType === "JOB_POSTING" ? `/api/jobs/${r.resourceId}`
+    : r.resourceType === "EVENT_PHOTO" ? `/api/events/${t.eventId ?? ""}/photos/${r.resourceId}`
     : `/api/feed/comments/${r.resourceId}`;
   const staffName = t.organizerUser
     ? `${t.organizerUser.firstName} ${t.organizerUser.lastName}`.trim()
@@ -99,9 +106,10 @@ function describeReport(r: ForumReport) {
     title: t.title ?? null,
     subtitle: "workplace" in t && t.workplace ? t.workplace : null,
     body: t.body ?? t.description ?? "",
+    imageUrl: "imageUrl" in t ? t.imageUrl ?? null : null,
     deleted: !!t.deletedAt,
     deleteUrl,
-    author: t.author ?? t.organizerAlumni ?? t.authorAlumni ?? null,
+    author: t.author ?? t.organizerAlumni ?? t.authorAlumni ?? t.uploader ?? null,
     staffName,
   };
 }
@@ -201,6 +209,10 @@ export default function ForumModerationPage() {
                   <div className="mb-3 rounded-md bg-gray-50 p-3">
                     {desc.title && <p className="mb-1 font-semibold text-[var(--foreground)]">{desc.title}</p>}
                     {desc.subtitle && <p className="mb-1 text-xs text-[var(--muted)]">{desc.subtitle}</p>}
+                    {desc.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={assetUrl(desc.imageUrl)} alt="รูปที่ถูกรายงาน" className="mb-2 max-h-48 rounded-md object-cover" />
+                    )}
                     {desc.body && <p className="line-clamp-3 text-sm text-[var(--foreground)]">{desc.body}</p>}
                     <p className="mt-2 text-xs text-[var(--muted)]">
                       โดย {desc.author ? (

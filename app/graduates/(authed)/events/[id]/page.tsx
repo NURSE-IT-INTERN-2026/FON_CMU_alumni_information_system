@@ -12,6 +12,7 @@ import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
 import EventOrganizerView, { type EventOrganizer } from "@/components/events/EventOrganizer";
+import EventPhotoAlbum from "@/components/events/EventPhotoAlbum";
 import { formatEventDateTimeThai } from "@/lib/event-format";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
 
@@ -203,6 +204,11 @@ export default function EventDetailPage() {
           </ul>
         </section>
       )}
+
+      {/* Photo album (community V2) */}
+      <div className="mt-6">
+        <EventPhotoAlbum eventId={ev.id} />
+      </div>
 
       {reportOpen && (
         <ReportDialog resourceType="EVENT" resourceId={ev.id} open={reportOpen} onOpenChange={setReportOpen} />

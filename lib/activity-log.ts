@@ -60,7 +60,9 @@ export type LogResource =
   | "group_membership"
   | "job_posting"
   | "mentor_profile"
-  | "mentorship_request";
+  | "mentorship_request"
+  | "event_photo"
+  | "announcement";
 
 interface AdminLogContext {
   actorType: "ADMIN";

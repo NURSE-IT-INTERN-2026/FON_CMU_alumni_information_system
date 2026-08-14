@@ -252,6 +252,15 @@ export type {
   MentorshipActionInput,
 } from "./mentorship";
 
+// Announcements + event photo albums (alumni community V2)
+export {
+  announcementCreateSchema,
+  announcementUpdateSchema,
+} from "./announcement";
+export type { AnnouncementCreateInput, AnnouncementUpdateInput } from "./announcement";
+export { eventPhotoCreateSchema } from "./event-photo";
+export type { EventPhotoCreateInput } from "./event-photo";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,
