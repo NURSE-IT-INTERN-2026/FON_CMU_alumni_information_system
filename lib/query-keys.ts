@@ -94,6 +94,40 @@ export const queryKeys = {
     activity: (id: string) => ["alumniProfile", "activity", id] as const,
   },
 
+  // Alumni community forum — graduates portal (membership + topics + replies)
+  // and the admin moderation reports queue. `.all` wipes everything forum-
+  // related on a mutation.
+  forum: {
+    all: ["forum"] as const,
+    membership: () => ["forum", "membership"] as const,
+    topics: (o: { page: number; search: string; sort: string }) =>
+      ["forum", "topics", o] as const,
+    topic: (id: string) => ["forum", "topic", id] as const,
+    replies: (topicId: string, page: number) =>
+      ["forum", "replies", topicId, page] as const,
+    reports: (o: { page: number; status: string; resourceType: string }) =>
+      ["forum", "reports", o] as const,
+  },
+
+  // Alumni community events — list (upcoming/past) + detail. `.all` wipes
+  // everything event-related on a mutation.
+  events: {
+    all: ["events"] as const,
+    list: (o: { page: number; search: string; scope: string }) =>
+      ["events", "list", o] as const,
+    detail: (id: string) => ["events", "detail", id] as const,
+  },
+
+  // Alumni activity feed — stream + a post's comments. `.all` wipes on a
+  // post/like/comment mutation.
+  feed: {
+    all: ["feed"] as const,
+    list: (o: { page: number }) => ["feed", "list", o] as const,
+    post: (id: string) => ["feed", "post", id] as const,
+    comments: (postId: string, page: number) =>
+      ["feed", "comments", postId, page] as const,
+  },
+
   // field-changes — powers useHotFields.
   fieldChanges: {
     all: ["fieldChanges"] as const,

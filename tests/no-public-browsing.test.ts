@@ -33,7 +33,7 @@ const PUBLIC_ALLOWLIST = new Set([
 
 /** A session/permission gate call inside a handler body. */
 const GATE_RE =
-  /getSession|getAlumniSession|checkWritePermission|checkSuperAdminPermission|checkNonExecutivePermission|checkAlumniSession|authorize\s*\(/;
+  /getSession|getAlumniSession|checkWritePermission|checkSuperAdminPermission|checkNonExecutivePermission|checkAlumniSession|resolveForumReader|requireForumAlumni|resolveForumStaffOrOwner|resolveEventReader|resolveEventCreator|resolveEventStaffOrAlumni|authorize\s*\(/;
 
 /** Extract one named async handler's body (from its `export` to the next `export` / EOF). */
 function handlerBody(content: string, name: "GET"): string | null {
@@ -100,6 +100,9 @@ const { GET: getFilterFacets } = await import("@/app/api/filter-facets/route");
 const { GET: getAlumniAgency } = await import("@/app/api/alumni-agency/route");
 const { GET: getNews } = await import("@/app/api/news/route"); // dual-audience
 const { GET: getCmuLookup } = await import("@/app/api/cmu-alumni/lookup/route"); // dual-audience
+const { GET: getForumTopics } = await import("@/app/api/forum/topics/route"); // forum dual-audience (resolveForumReader)
+const { GET: getEvents } = await import("@/app/api/events/route"); // events broadcast (resolveEventReader)
+const { GET: getFeed } = await import("@/app/api/feed/route"); // feed opt-in (resolveForumReader)
 
 const req = (p: string) => new NextRequest(`http://localhost/alumni${p}`);
 
@@ -120,5 +123,11 @@ describe("no-public-browsing (runtime): anonymous request ⇒ 401", () => {
     expect((await getNews(req("/api/news"))).status).toBe(401);
     // cmu-alumni/lookup takes studentId/alumniId query params, but the gate fires first.
     expect((await getCmuLookup(req("/api/cmu-alumni/lookup?studentId=1"))).status).toBe(401);
+    // forum topics GET gates via resolveForumReader (wraps the dual session check).
+    expect((await getForumTopics(req("/api/forum/topics"))).status).toBe(401);
+    // events GET gates via resolveEventReader (broadcast, but anon is still blocked).
+    expect((await getEvents(req("/api/events"))).status).toBe(401);
+    // feed GET gates via resolveForumReader (opt-in, like the forum).
+    expect((await getFeed(req("/api/feed"))).status).toBe(401);
   });
 });

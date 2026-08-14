@@ -23,7 +23,12 @@ services:
     build:
       context: .
       target: deps
-    command: sh -c "npx prisma generate && npm run dev -- -H 0.0.0.0"
+    # dev-watch.mjs: generates the Prisma client on boot AND regenerates +
+    # reloads `next dev` whenever prisma/schema.prisma changes (polled —
+    # Docker/WSL2 bind-mounts don't reliably deliver inotify). So a host-side
+    # `npx prisma migrate dev` is picked up automatically — no manual
+    # `exec prisma generate` / restart needed.
+    command: node scripts/dev-watch.mjs
     environment:
       NODE_ENV: development
     volumes:

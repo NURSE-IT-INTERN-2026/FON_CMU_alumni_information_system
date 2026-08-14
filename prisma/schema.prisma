@@ -51,6 +51,37 @@ enum AccountStatus {
   REJECTED
 }
 
+// Alumni community forum (v1). Opt-in membership + user-generated content
+// moderation. See lib/forum-guard.ts (opt-in gate) and lib/forum-identity.ts
+// (the public-identity select that keeps contact fields out of forum reads).
+enum ContentReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum ContentReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  OTHER
+}
+
+enum ForumReportResource {
+  FORUM_TOPIC
+  FORUM_REPLY
+  EVENT // community events share the report+moderation system (name is historical)
+  FEED_POST
+  FEED_COMMENT
+}
+
+// Event RSVP states (alumni community events). ATTENDING counts toward the
+// event's capacity (with guestCount); DECLINED = explicit "not coming".
+enum RsvpStatus {
+  ATTENDING
+  DECLINED
+}
+
 model Alumni {
   id                    String      @id @default(uuid())
   studentId             String      @unique
@@ -85,6 +116,10 @@ model Alumni {
   passwordHash          String?
   lastLoginAt           DateTime?
   tosAcceptedAt         DateTime?
+  // Alumni opted into the community forum. null = not a member (sees only news
+  // + profile, as before). Set when they opt in; cleared on opt-out. Gate is in
+  // lib/forum-guard.ts. Opt-out does NOT anonymize past posts (standard forum).
+  communityOptedInAt    DateTime?
   cmuEmail              String?
   // Admin-approval signup flow: PENDING until reviewed. Snapshot of the
   // CMU Registrar comparison captured at signup — drives the admin's
@@ -115,6 +150,14 @@ model Alumni {
   activityLogs         ActivityLog[]
   educations           Education[]
   primaryEducation     Education?  @relation("PrimaryEducation", fields: [primaryEducationId], references: [id], onDelete: SetNull)
+  forumTopics          ForumTopic[]
+  forumReplies         ForumReply[]
+  contentReports       ContentReport[]
+  organizedEvents      CommunityEvent[] @relation("EventOrganizerAlumni")
+  eventRsvps           EventRsvp[]
+  feedPosts            FeedPost[]
+  feedLikes            FeedLike[]
+  feedComments         FeedComment[]
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -345,6 +388,8 @@ model AdminUser {
 
   sessions     Session[]
   activityLogs ActivityLog[]
+  resolvedReports ContentReport[]
+  organizedEvents CommunityEvent[] @relation("EventOrganizerUser")
 
   @@map("admin_users")
 }
@@ -485,4 +530,181 @@ model CmuGraduate {
   @@index([majorNameTh])
   @@index([deletedAt])
   @@map("cmu_graduates")
+}
+
+// Alumni community forum — a topic (opening post) + its replies. Two-level
+// (no nested threading). Bodies are PLAIN TEXT (escaped + linkified on render
+// via lib/forum-render.ts; no rich text / sanitize-html). Soft-deleted on owner
+// delete OR admin hide (recoverable via superadmin trash). `replyCount` /
+// `lastReplyAt` are denormalized for the list view, maintained on reply
+// create/delete inside a $transaction. FKs target Alumni.id (uuid), NOT studentId.
+model ForumTopic {
+  id          String    @id @default(uuid())
+  authorId    String
+  title       String
+  body        String
+  replyCount  Int       @default(0)
+  lastReplyAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  author  Alumni       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  replies ForumReply[]
+
+  @@index([authorId])
+  @@index([deletedAt, createdAt])
+  @@index([lastReplyAt])
+  @@map("forum_topics")
+}
+
+model ForumReply {
+  id        String    @id @default(uuid())
+  topicId   String
+  authorId  String
+  body      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  topic  ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  author Alumni     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, createdAt])
+  @@index([authorId])
+  @@index([deletedAt])
+  @@map("forum_replies")
+}
+
+// User-generated content reports for the report+admin-review moderation flow.
+// One OPEN report per (reporter, target) via @@unique; re-reporting the same
+// target re-opens/updates. Lifecycle is a status (OPEN → RESOLVED/DISMISSED),
+// so this is NOT soft-delete/trash-recoverable. `resolver` is the admin who
+// acted (SetNull if the admin is deleted).
+model ContentReport {
+  id             String               @id @default(uuid())
+  reporterId     String
+  resourceType   ForumReportResource
+  resourceId     String
+  reason         ContentReportReason
+  reasonDetail   String?
+  status         ContentReportStatus  @default(OPEN)
+  resolvedBy     String?
+  resolutionNote String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  reporter Alumni     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver AdminUser? @relation(fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@unique([reporterId, resourceType, resourceId])
+  @@index([status, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([reporterId])
+  @@map("content_reports")
+}
+
+// Alumni community event / reunion. Organizer is EITHER an alum (opted-in) OR
+// a staff member — exactly one of organizerAlumniId / organizerUserId is set
+// (app-enforced; SetNull keeps the event if the organizer's account is removed).
+// Plain-text description (rendered via renderForumBody). Visible to ALL ACTIVE
+// alumni (broadcast — NOT opt-in-gated like the forum; see lib/event-guard.ts).
+// `capacity` = max total headcount (attending alumni + their guests); enforced
+// in the RSVP route. `guestLimit` = per-RSVP guest cap. Soft-delete (RSVPs
+// cascade on the event).
+model CommunityEvent {
+  id                 String    @id @default(uuid())
+  organizerAlumniId  String?
+  organizerUserId    String?
+  title              String
+  description        String
+  startAt            DateTime
+  endAt              DateTime?
+  location           String?
+  onlineLink         String?
+  coverImageUrl      String?
+  capacity           Int?
+  guestLimit         Int       @default(0)
+  deletedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organizerAlumni Alumni?        @relation("EventOrganizerAlumni", fields: [organizerAlumniId], references: [id], onDelete: SetNull)
+  organizerUser   AdminUser?     @relation("EventOrganizerUser", fields: [organizerUserId], references: [id], onDelete: SetNull)
+  rsvps           EventRsvp[]
+
+  @@index([startAt])
+  @@index([deletedAt, startAt])
+  @@map("community_events")
+}
+
+model EventRsvp {
+  id         String     @id @default(uuid())
+  eventId    String
+  alumniId   String
+  status     RsvpStatus
+  guestCount Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  event  CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  alumni Alumni         @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, alumniId])
+  @@index([eventId, status])
+  @@map("event_rsvps")
+}
+
+// Alumni activity feed — a flat, opt-in social post (text + optional image).
+// Reuses the forum opt-in gate (lib/forum-guard.ts) + public-identity select +
+// plain-text render. `likeCount`/`commentCount` are denormalized, maintained in
+// $transactions on like-toggle/comment-create-delete. One image per post (v1).
+model FeedPost {
+  id           String   @id @default(uuid())
+  authorId     String
+  body         String
+  imageUrl     String?
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  author   Alumni        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    FeedLike[]
+  comments FeedComment[]
+
+  @@index([authorId])
+  @@index([deletedAt, createdAt])
+  @@map("feed_posts")
+}
+
+model FeedLike {
+  id        String   @id @default(uuid())
+  postId    String
+  alumniId  String
+  createdAt DateTime @default(now())
+
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  alumni Alumni   @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, alumniId])
+  @@index([postId])
+  @@map("feed_likes")
+}
+
+model FeedComment {
+  id        String    @id @default(uuid())
+  postId    String
+  authorId  String
+  body      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Alumni   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("feed_comments")
 }

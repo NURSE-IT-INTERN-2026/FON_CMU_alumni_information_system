@@ -149,6 +149,72 @@ export type {
   NewsUpdateInput,
 } from "./news";
 
+// Forum (alumni community)
+export {
+  forumTopicFormSchema,
+  forumTopicCreateSchema,
+  forumTopicUpdateSchema,
+  forumReplyFormSchema,
+  forumReplyCreateSchema,
+  forumReplyUpdateSchema,
+  forumReportCreateSchema,
+  forumReportActionSchema,
+  communityMembershipSchema,
+  FORUM_REPORT_RESOURCE_VALUES,
+  CONTENT_REPORT_REASON_VALUES,
+  CONTENT_REPORT_STATUS_VALUES,
+  COMMUNITY_ACTION_VALUES,
+  FORUM_REPORT_REASON_LABELS,
+  CONTENT_REPORT_STATUS_LABELS,
+  FORUM_SORT_VALUES,
+  FORUM_SORT_LABELS,
+} from "./forum";
+export type {
+  ForumTopicFormData,
+  ForumTopicCreateInput,
+  ForumTopicUpdateInput,
+  ForumReplyFormData,
+  ForumReplyCreateInput,
+  ForumReplyUpdateInput,
+  ForumReportCreateInput,
+  ForumReportActionInput,
+  CommunityMembershipInput,
+} from "./forum";
+
+// Events (alumni community)
+export {
+  eventFormSchema,
+  eventCreateSchema,
+  eventUpdateSchema,
+  rsvpSchema,
+  RSVP_STATUS_VALUES,
+  RSVP_STATUS_LABELS,
+} from "./event";
+export type {
+  EventFormData,
+  EventCreateInput,
+  EventUpdateInput,
+  RsvpInput,
+} from "./event";
+
+// Activity feed (alumni community)
+export {
+  feedPostFormSchema,
+  feedPostCreateSchema,
+  feedPostUpdateSchema,
+  feedCommentFormSchema,
+  feedCommentCreateSchema,
+  feedCommentUpdateSchema,
+} from "./feed";
+export type {
+  FeedPostFormData,
+  FeedPostCreateInput,
+  FeedPostUpdateInput,
+  FeedCommentFormData,
+  FeedCommentCreateInput,
+  FeedCommentUpdateInput,
+} from "./feed";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,

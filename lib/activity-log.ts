@@ -21,7 +21,13 @@ export type LogAction =
   | "RESTORE"
   | "SUSPEND"
   | "HARD_DELETE"
-  | "LINK";
+  | "LINK"
+  // Alumni community forum
+  | "OPT_IN"
+  | "OPT_OUT"
+  | "REPORT"
+  | "RESOLVE"
+  | "DISMISS";
 
 export type LogResource =
   | "alumni"
@@ -36,7 +42,18 @@ export type LogResource =
   | "alumni_profile"
   | "alumni_auth"
   | "cmu_alumni"
-  | "education";
+  | "education"
+  // Alumni community forum
+  | "forum_topic"
+  | "forum_reply"
+  | "community"
+  | "content_report"
+  // Alumni community events
+  | "community_event"
+  | "event_rsvp"
+  // Alumni activity feed
+  | "feed_post"
+  | "feed_comment";
 
 interface AdminLogContext {
   actorType: "ADMIN";
