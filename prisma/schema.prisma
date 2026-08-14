@@ -73,6 +73,7 @@ enum ForumReportResource {
   EVENT // community events share the report+moderation system (name is historical)
   FEED_POST
   FEED_COMMENT
+  JOB_POSTING // community V2 job board
 }
 
 // Event RSVP states (alumni community events). ATTENDING counts toward the
@@ -94,6 +95,14 @@ enum GroupKind {
 enum GroupRole {
   MEMBER
   MODERATOR
+}
+
+// Community V2 mentorship request lifecycle.
+enum MentorshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
 }
 
 model Alumni {
@@ -174,6 +183,10 @@ model Alumni {
   feedComments         FeedComment[]
   communityProfile     CommunityProfile?
   groupMemberships     GroupMembership[]
+  jobPostings          JobPosting[] @relation("JobAuthorAlumni")
+  mentorProfile        MentorProfile?
+  mentorshipRequestsMentor MentorshipRequest[] @relation("MentorshipMentor")
+  mentorshipRequestsMentee MentorshipRequest[] @relation("MentorshipMentee")
 
   @@unique([citizenId])
   @@index([degreeLevel])
@@ -406,6 +419,7 @@ model AdminUser {
   activityLogs ActivityLog[]
   resolvedReports ContentReport[]
   organizedEvents CommunityEvent[] @relation("EventOrganizerUser")
+  jobPostings  JobPosting[] @relation("JobAuthorUser")
 
   @@map("admin_users")
 }
@@ -817,4 +831,76 @@ model GroupMembership {
   @@unique([groupId, alumniId])
   @@index([alumniId])
   @@map("group_memberships")
+}
+
+// Community V2 job board — a career-opportunity posting. Broadcast read
+// (any ACTIVE alum, like events); creation = staff or opted-in alum (dual
+// author FKs mirror CommunityEvent's organizer pattern). Plain-text
+// description. `applyUrl`/`contactInfo` are INTENTIONALLY public on the
+// posting (the poster wants to be contacted). `expiresAt` is required
+// (capped ≤ 90 days in zod); lists hide expired by default — no cron needed.
+// Soft-delete; reportable via ForumReportResource.JOB_POSTING.
+model JobPosting {
+  id             String    @id @default(uuid())
+  authorAlumniId String?
+  authorUserId   String?
+  title          String
+  workplace      String
+  position       String?
+  province       String?
+  country        String?
+  description    String
+  applyUrl       String?
+  contactInfo    String?
+  expiresAt      DateTime
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  authorAlumni Alumni?    @relation("JobAuthorAlumni", fields: [authorAlumniId], references: [id], onDelete: SetNull)
+  authorUser   AdminUser? @relation("JobAuthorUser", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@index([deletedAt, createdAt])
+  @@index([province])
+  @@map("job_postings")
+}
+
+// Community V2 mentorship — an opted-in alum volunteering as a mentor.
+// 1:1 with Alumni; `accepting:false` pauses NEW requests without deleting
+// history. Contact info leaves the DB ONLY in the accept-response payload of
+// a MentorshipRequest (see the mentorship lesson).
+model MentorProfile {
+  id        String   @id @default(uuid())
+  alumniId  String   @unique
+  expertise String
+  capacity  Int      @default(1)
+  accepting Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  alumni Alumni @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@map("mentor_profiles")
+}
+
+// A mentee's request to a mentor. Status lifecycle PENDING → ACCEPTED /
+// DECLINED (mentor) or CANCELLED (mentee). One open (PENDING) request per
+// (mentee, mentor) — the route rejects duplicates.
+model MentorshipRequest {
+  id          String           @id @default(uuid())
+  mentorId    String
+  menteeId    String
+  message     String
+  status      MentorshipStatus @default(PENDING)
+  respondedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  mentor Alumni @relation("MentorshipMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee Alumni @relation("MentorshipMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId, status])
+  @@index([menteeId, status])
+  @@map("mentorship_requests")
 }

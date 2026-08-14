@@ -228,6 +228,30 @@ export {
 } from "./group";
 export type { GroupCreateInput, GroupUpdateInput } from "./group";
 
+// Job board (alumni community V2)
+export {
+  jobFormSchema,
+  jobCreateSchema,
+  jobUpdateSchema,
+  JOB_SCOPE_VALUES,
+  JOB_SCOPE_LABELS,
+} from "./job";
+export type { JobFormData, JobCreateInput, JobUpdateInput } from "./job";
+
+// Mentorship (alumni community V2)
+export {
+  mentorProfileSchema,
+  mentorshipRequestSchema,
+  mentorshipActionSchema,
+  MENTORSHIP_STATUS_VALUES,
+  MENTORSHIP_STATUS_LABELS,
+} from "./mentorship";
+export type {
+  MentorProfileInput,
+  MentorshipRequestInput,
+  MentorshipActionInput,
+} from "./mentorship";
+
 // Alumni with Related (composite)
 export {
   alumniWithRelatedFormSchema,
