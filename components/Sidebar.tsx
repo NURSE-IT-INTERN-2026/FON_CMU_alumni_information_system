@@ -39,7 +39,7 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--card-bg)] lg:block">
-      <nav className="sticky top-[4.5rem] flex h-[calc(100vh-4.5rem)] flex-col justify-between p-4">
+      <nav className="sticky top-22 flex h-[calc(100vh-5.5rem)] flex-col justify-between p-4">
         <ul className="flex-1 space-y-1">
           {items.map((item) => {
             const isActive =

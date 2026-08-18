@@ -205,7 +205,8 @@ function LoginForm() {
           {/* Mobile logo */}
           <div className="mb-8 text-center lg:hidden">
             <img src={`${BASE_PATH}/fon-cmu-logo.png`} alt="FON CMU" className="mx-auto mb-3 h-16 w-auto" />
-            <h1 className="text-lg font-bold text-[var(--foreground)]">ระบบสารสนเทศศิษย์เก่า</h1>
+            {/* Branding only — the desktop panel's heading is the page's h1. */}
+            <p className="text-lg font-bold text-[var(--foreground)]">ระบบสารสนเทศศิษย์เก่า</p>
             <p className="text-sm text-[var(--muted)]">คณะพยาบาลศาสตร์ มหาวิทยาลัยเชียงใหม่</p>
           </div>
 

@@ -128,7 +128,7 @@ export default function EventPhotoAlbum({ eventId }: { eventId: string }) {
                 <button
                   onClick={() => remove.mutate(p.id)}
                   disabled={remove.isPending}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   ลบ
                 </button>

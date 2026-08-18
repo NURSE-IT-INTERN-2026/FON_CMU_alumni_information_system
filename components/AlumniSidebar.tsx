@@ -11,7 +11,7 @@ export default function AlumniSidebar() {
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--card-bg)] lg:block">
-      <nav className="sticky top-[4.5rem] flex h-[calc(100vh-4.5rem)] flex-col p-4">
+      <nav className="sticky top-22 flex h-[calc(100vh-5.5rem)] flex-col p-4">
         <ul className="space-y-1">
           {NAV_ITEMS.map((item) => {
             const isActive =
