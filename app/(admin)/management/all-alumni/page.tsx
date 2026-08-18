@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -15,8 +15,10 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { formatBirthDateThai } from "@/lib/alumni-verify";
+import { formatBirthDateThai, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { mergeAlumniTableRows } from "@/lib/alumni-merge";
+import { applyCmuGraduateFilters } from "@/lib/cmu-graduate-filters";
+import { filterLocalAlumniRows } from "@/lib/alumni-local-filter";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import FacetFilter from "@/components/ui/facet-filter";
 import SearchInput from "@/components/ui/search-input";
@@ -142,53 +144,78 @@ export default function AlumniCountPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const qc = useQueryClient();
   // Manage mode: merge CMU Registrar + local DB (with soft-delete overlay).
-  // The merge logic now lives in the queryFn and returns { merged, total }.
-  // NOTE: the query is keyed WITHOUT `page` — we fetch the full merged set once
-  // (per search/filter/sort) and paginate it on the client by slicing
-  // `allMerged`. This is required because the merged CMU+local result can only
-  // be sorted/paginated correctly once the full set is assembled.
-  const manageQuery = useQuery({
-    queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir, dedupeView }],
+  //
+  // FETCH-ONCE ARCHITECTURE: the query is keyed WITHOUT search/filters/sort/
+  // dedupe (and without `page`) — one request pair loads the FULL raw CMU list
+  // + the FULL local list, and every interaction (search submit, sort click,
+  // facet change, dedupe toggle, pagination) is instant client-side work in
+  // the useMemo pipeline below. The merged CMU+local result can only be
+  // filtered/sorted/paginated correctly once the full set is assembled, so the
+  // data must be whole anyway — refetching it per interaction was pure waste.
+  const manageBaseQuery = useQuery({
+    queryKey: queryKeys.alumni.manageBase(),
+    staleTime: 5 * 60_000,
     queryFn: async () => {
-      // Fetch the FULL CMU list (not a single page) so the client can merge,
-      // sort, and paginate the complete set. `/api/cmu-alumni` reads the local
-      // `cmu_graduates` table (refreshed from /management/settings/cmu-sync), so this is
-      // one request per search/filter/sort.
-      const cmuParams = new URLSearchParams({
-        page: "1", pageSize: "50000", search,
-        sortField: sortField as string, sortDir,
-        dedupe: dedupeView ? "true" : "false",
-      });
-      facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
-      let cmuData: CmuAlumni[] = [];
+      // RAW CMU list (dedupe=false → one row per degree record): the client
+      // runs dedupeCmuGraduatesByPerson itself, so the dedupe toggle needs no
+      // refetch. `/api/cmu-alumni` reads the local `cmu_graduates` table
+      // (refreshed from /management/settings/cmu-sync).
+      let cmuRaw: CmuAlumni[] = [];
       try {
-        const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${cmuParams}`);
-        cmuData = cmuJson.data || [];
+        const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(
+          `/api/cmu-alumni?page=1&pageSize=50000&dedupe=false`,
+        );
+        cmuRaw = cmuJson.data || [];
       } catch {}
 
-      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true", search });
-      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      let localData: Alumni[] = [];
+      // Full local list INCLUDING soft-deleted rows — the merge builds its
+      // deleted-studentId hide-set from them (net behavior: a soft-deleted
+      // person is hidden even if a CMU twin exists).
+      let localAll: Alumni[] = [];
       try {
-        const localJson = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
-        localData = localJson.data || [];
+        const localJson = await apiFetch<AlumniApiResponse>(
+          `/api/alumni?pageSize=50000&includeDeleted=true`,
+        );
+        localAll = localJson.data || [];
       } catch {}
 
-      // Merge CMU + local into the table's row set. Shared with the Excel export
-      // (`lib/alumni-merge`) so the table and the export can never drift apart.
-      // Soft-deleted alumni are fetched (includeDeleted) and skipped inside the
-      // merge, matching the prior inline behavior. Returned unsorted — sorted below.
-      const merged = mergeAlumniTableRows(cmuData, localData, { dedupeView, search });
-      return { merged: sortAlumni(merged, sortField, sortDir), total: merged.length };
+      return { cmuRaw, localAll };
     },
   });
+
+  // The client-side manage pipeline — the SAME composition the Excel export
+  // runs server-side (shared filter/merge/sort libs; see tests/
+  // alumni-manage-pipeline.test.ts). ORDER MATTERS: dedupe BEFORE filter
+  // (mirrors the /api/cmu-alumni route), or a person whose kept degree fails a
+  // facet would wrongly reappear via a lower degree.
+  const { cmuRaw = [], localAll = [] } = manageBaseQuery.data ?? {};
+  const allMerged = useMemo(() => {
+    const cmuBase = dedupeView ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
+    const cmuRows = applyCmuGraduateFilters(cmuBase, {
+      search,
+      degreeLevels: filters.degreeLevel,
+      majors: filters.major,
+      graduationYears: filters.graduationYear,
+    });
+    const localRows = filterLocalAlumniRows(localAll, {
+      search,
+      degreeLevels: filters.degreeLevel,
+      majors: filters.major,
+      graduationYears: filters.graduationYear,
+    });
+    const merged = mergeAlumniTableRows(cmuRows, localRows, { dedupeView, search });
+    return sortAlumni(merged, sortField, sortDir);
+    // `filtersKey` (the serialized facet selection) is the stable dep for
+    // `filters`; reading filters.degreeLevel etc. directly is covered by it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cmuRaw, localAll, dedupeView, search, filtersKey, sortField, sortDir]);
+  const tableLoading = manageBaseQuery.isPending;
   // Manage mode paginates the full merged set on the client. `allMerged` holds
   // every row (for cross-page delete/bulk-delete lookups); `alumni` is the
-  // current page's slice that the table renders. Since the query is keyed
-  // without `page`, navigating pages is instant (no refetch).
-  const allMerged = manageQuery.data?.merged ?? [];
+  // current page's slice that the table renders. Navigating pages, sorting,
+  // searching, and toggling dedupe are all instant — no refetch.
   const alumni = allMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalAlumni = manageQuery.data?.total ?? 0;
+  const totalAlumni = allMerged.length;
   const [editingId, setEditingId] = useState<string | null>(null);
   const hot = useHotFields("alumni", alumni.map((a) => a.id));
   const [saving, setSaving] = useState(false);
@@ -226,9 +253,6 @@ export default function AlumniCountPage() {
   const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  // CMU Registrar data (view mode only) — merge CMU + local overlay.
-  const tableLoading = manageQuery.isPending;
 
   const activeTotal = totalAlumni;
   const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE));

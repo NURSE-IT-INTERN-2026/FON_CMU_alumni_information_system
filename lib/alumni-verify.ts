@@ -322,9 +322,22 @@ export const DEGREE_RANK: Record<DegreeLevelValue, number> = {
  * (stable; `Map` preserves insertion order). The returned order is not
  * meaningful — every caller sorts or aggregates afterward.
  */
-export function dedupeCmuGraduatesByPerson(
-  graduates: CmuGraduate[],
-): CmuGraduate[] {
+/** Structural input for `dedupeCmuGraduatesByPerson` — the fields the person
+ *  key + degree ranking read. The full `CmuGraduate` satisfies this, and so
+ *  does the all-alumni page's looser client-side `CmuAlumni` view. */
+export interface CmuPersonKeyInput {
+  student_id: string;
+  name_th: string;
+  surname_th: string;
+  /** Raw CMU "MM-DD-YYYY"; null/undefined never collapses (kept verbatim). */
+  birthday?: string | null;
+  level_id: string;
+  major_name_th: string;
+}
+
+export function dedupeCmuGraduatesByPerson<T extends CmuPersonKeyInput>(
+  graduates: readonly T[],
+): (T & { student_ids?: string[] })[] {
   // Keep the highest-degree record per person (normalized first+last name +
   // birthday). Also collect ALL of the person's student_ids and attach them to
   // the kept record as `student_ids`, so consumers bridging on student_id (e.g.
@@ -332,9 +345,9 @@ export function dedupeCmuGraduatesByPerson(
   // any of the person's degrees — not just the kept (highest) one. Without this,
   // a multi-degree person whose kept record kept a different student_id than the
   // degree a local alumni holds can't be linked → duplicate row.
-  const bestByKey = new Map<string, CmuGraduate>();
+  const bestByKey = new Map<string, T>();
   const sidsByKey = new Map<string, Set<string>>();
-  const unkeyed: CmuGraduate[] = []; // incomplete identity — kept verbatim
+  const unkeyed: T[] = []; // incomplete identity — kept verbatim
 
   for (const g of graduates) {
     const firstName = normalizeName(g.name_th);
@@ -363,7 +376,7 @@ export function dedupeCmuGraduatesByPerson(
     if (curRank > prevRank) bestByKey.set(key, g);
   }
 
-  const keyed: CmuGraduate[] = [];
+  const keyed: (T & { student_ids?: string[] })[] = [];
   for (const [key, g] of bestByKey) {
     keyed.push({ ...g, student_ids: [...(sidsByKey.get(key) ?? [])] });
   }

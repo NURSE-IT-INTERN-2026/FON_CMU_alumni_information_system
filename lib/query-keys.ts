@@ -25,7 +25,14 @@ export const queryKeys = {
   graduateCommittee: { all: ["graduateCommittee"] as const },
   modelRepresentatives: { all: ["modelRepresentatives"] as const },
   alumniAgency: { all: ["alumniAgency"] as const },
-  alumni: { all: ["alumni"] as const },
+  alumni: {
+    all: ["alumni"] as const,
+    // The all-alumni manage page's FETCH-ONCE base: the full raw CMU list +
+    // full local list, param-free (search/facets/sort/dedupe are applied
+    // client-side in a useMemo, so interactions never refetch). Prefixed by
+    // `.all` so existing alumni invalidations still wipe it.
+    manageBase: () => ["alumni", "manageBase"] as const,
+  },
   education: {
     all: ["education"] as const,
     list: (alumniId: string) => ["education", "list", alumniId] as const,
