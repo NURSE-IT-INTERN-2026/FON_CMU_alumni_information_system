@@ -10,7 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 // onMouseDown={e => e.preventDefault()} focus-juggling: every command chains
 // `.focus()`, which restores ProseMirror's own selection.
 function btnClass(active: boolean): string {
-  return `rounded p-1.5 ${active ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`;
+  // p-2 + min size keeps every toolbar button ≥36px — a comfortable touch
+  // target (the old p-1.5 ≈ 28px was below any touch minimum).
+  return `rounded p-2 min-h-9 min-w-9 inline-flex items-center justify-center ${active ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "text-gray-600"} hover:bg-gray-200`;
 }
 
 const Divider = () => <span className="mx-1 h-5 w-px bg-gray-300" />;

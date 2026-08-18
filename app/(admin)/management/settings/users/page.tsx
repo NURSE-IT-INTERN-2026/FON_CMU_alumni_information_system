@@ -16,6 +16,9 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import SearchInput from "@/components/ui/search-input";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 /* ───── Admin User types & tab ───── */
 interface AdminUser {
@@ -283,15 +286,15 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
                     {canWrite && (
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEdit(m)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="แก้ไข">
+                          <button onClick={() => openEdit(m)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" aria-label="แก้ไข" title="แก้ไข">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                           </button>
                           {role === "superadmin" && (
-                            <button onClick={() => toggleSuspend(m)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${m.isActive ? "text-amber-600" : "text-green-600"}`} title={m.isActive ? "ระงับบัญชี" : "ยกเลิกการระงับ"}>
+                            <button onClick={() => toggleSuspend(m)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${m.isActive ? "text-amber-600" : "text-green-600"}`} aria-label={m.isActive ? "ระงับบัญชี" : "ยกเลิกการระงับ"} title={m.isActive ? "ระงับบัญชี" : "ยกเลิกการระงับ"}>
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                             </button>
                           )}
-                          <button onClick={() => setDeleteId(m.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" title="ลบ">
+                          <button onClick={() => setDeleteId(m.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" aria-label="ลบ" title="ลบ">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
                         </div>
@@ -305,18 +308,13 @@ function AdminAccountsTab({ canWrite }: { canWrite: boolean }) {
         </div>
       </div>
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข้อมูลสมาชิกนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">ยกเลิก</button>
-              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 cursor-pointer">ยืนยัน</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ยืนยันการลบข้อมูล"
+        description="คุณต้องการลบข้อมูลสมาชิกนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        onConfirm={confirmDelete}
+      />
     </>
   );
 }
@@ -579,19 +577,19 @@ function AlumniAccountsTab({
                     {canWrite && (
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openReview(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" title="ตรวจสอบการลงทะเบียน">
+                          <button onClick={() => openReview(a)} className="rounded p-1.5 text-blue-600 hover:bg-blue-100 cursor-pointer" aria-label="ตรวจสอบการลงทะเบียน" title="ตรวจสอบการลงทะเบียน">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                           </button>
-                          <button onClick={() => openEmailEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" title="เปลี่ยนอีเมล">
+                          <button onClick={() => openEmailEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100 cursor-pointer" aria-label="เปลี่ยนอีเมล" title="เปลี่ยนอีเมล">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
                           </button>
                           {a.accountStatus === "ACTIVE" && (
-                            <button onClick={() => toggleSuspend(a)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${a.suspendedAt ? "text-green-600" : "text-amber-600"}`} title={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"}>
+                            <button onClick={() => toggleSuspend(a)} className={`rounded p-1.5 hover:bg-gray-100 cursor-pointer ${a.suspendedAt ? "text-green-600" : "text-amber-600"}`} aria-label={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"} title={a.suspendedAt ? "ยกเลิกการระงับ" : "ระงับบัญชี"}>
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                             </button>
                           )}
                           {role === "superadmin" && (
-                            <button onClick={() => setDeleteAccId(a.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" title="ลบบัญชี">
+                            <button onClick={() => setDeleteAccId(a.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100 cursor-pointer" aria-label="ลบบัญชี" title="ลบบัญชี">
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                             </button>
                           )}
@@ -617,141 +615,138 @@ function AlumniAccountsTab({
 
       {/* Change email modal */}
       {emailEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">
-              เปลี่ยนอีเมล — {emailEdit.firstName} {emailEdit.lastName}
-            </h3>
-            <label className="mb-1 block text-sm font-medium text-gray-700">อีเมลใหม่</label>
-            <input
-              type="email"
-              value={emailValue}
-              onChange={(e) => setEmailValue(e.target.value)}
-              className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
-            />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setEmailEdit(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={saveEmail} disabled={emailSaving} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setEmailEdit(null); }}
+          title={`เปลี่ยนอีเมล — ${emailEdit.firstName} ${emailEdit.lastName}`}
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setEmailEdit(null)}>ยกเลิก</Button>
+              <Button onClick={saveEmail} disabled={emailSaving}>
                 {emailSaving ? "กำลังบันทึก..." : "บันทึก"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <label className="mb-1 block text-sm font-medium text-gray-700">อีเมลใหม่</label>
+          <input
+            type="email"
+            value={emailValue}
+            onChange={(e) => setEmailValue(e.target.value)}
+            className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+          />
+        </Modal>
       )}
 
       {/* Signup review / approval modal */}
       {reviewAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">ตรวจสอบการลงทะเบียน</h3>
-              <p className="text-sm text-gray-600">
-                {reviewAccount.prefix}{reviewAccount.firstName} {reviewAccount.lastName} · รหัสนักศึกษา {reviewAccount.studentId}
-              </p>
-              <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[reviewAccount.accountStatus]}`}>
-                {STATUS_LABELS[reviewAccount.accountStatus]}
-              </span>
-            </div>
-
-            {errorMsg && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{errorMsg}</div>
-            )}
-
-            {reviewAccount.signupVerification ? (
-              <VerificationFields v={reviewAccount.signupVerification} />
-            ) : (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                ไม่มีข้อมูลการตรวจสอบสำหรับบัญชีนี้
-              </div>
-            )}
-
-            {/* Prior rejection(s) — shown when this is a re-application, so the
-                admin sees why it was rejected before. Latest from the row +
-                the full history from the activity timeline. */}
-            {reviewAccount.rejectionReason && (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-                <p className="font-semibold text-amber-800">เหตุผลที่ถูกปฏิเสธครั้งล่าสุด</p>
-                <p className="mt-1 whitespace-pre-wrap text-amber-900">{reviewAccount.rejectionReason}</p>
-                {reviewAccount.rejectedAt && (
-                  <p className="mt-1 text-xs text-amber-700">{formatDate(reviewAccount.rejectedAt)}</p>
-                )}
-              </div>
-            )}
-            {(rejectionHistory?.length ?? 0) > 1 && (
-              <details className="mt-2 text-sm text-gray-600">
-                <summary className="cursor-pointer font-medium text-gray-700">
-                  ประวัติการปฏิเสธทั้งหมด ({rejectionHistory!.length} ครั้ง)
-                </summary>
-                <ul className="mt-2 space-y-1">
-                  {rejectionHistory!.map((r, i) => (
-                    <li key={i} className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
-                      <span className="whitespace-pre-wrap text-gray-900">{r.reason ?? "—"}</span>
-                      <span className="ml-2 text-xs text-gray-500">
-                        {formatDate(r.createdAt)}{r.actorName ? ` · ${r.actorName}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-
-            {/* Required reject reason — only for rejectable accounts. The API
-                rejects (400) a blank reason; disabling here gives instant feedback. */}
-            {reviewAccount.accountStatus !== "REJECTED" && (
-              <div className="mt-4">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  เหตุผลที่ปฏิเสธ <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                  placeholder="ระบุเหตุผลที่ปฏิเสธ (จะถูกส่งไปยังอีเมลของผู้สมัคร)"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
-                />
-              </div>
-            )}
-
-            <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <button onClick={handleReverify} disabled={reviewActioning} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setReviewAccount(null); }}
+          title="ตรวจสอบการลงทะเบียน"
+          description={`${reviewAccount.prefix}${reviewAccount.firstName} ${reviewAccount.lastName} · รหัสนักศึกษา ${reviewAccount.studentId}`}
+          size="lg"
+          scrollBody
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={handleReverify} disabled={reviewActioning}>
                 ตรวจสอบใหม่
-              </button>
+              </Button>
               {reviewAccount.accountStatus !== "REJECTED" && (
-                <button onClick={handleReject} disabled={reviewActioning || !rejectReason.trim()} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer">
+                <Button variant="destructive" onClick={handleReject} disabled={reviewActioning || !rejectReason.trim()}>
                   ปฏิเสธ
-                </button>
+                </Button>
               )}
               {reviewAccount.accountStatus !== "ACTIVE" && (
-                <button onClick={handleApprove} disabled={reviewActioning} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 cursor-pointer">
+                <Button onClick={handleApprove} disabled={reviewActioning}>
                   อนุมัติ
-                </button>
+                </Button>
               )}
-              <button onClick={() => setReviewAccount(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">
+              <Button variant="outline" onClick={() => setReviewAccount(null)}>
                 ปิด
-              </button>
+              </Button>
+            </>
+          }
+        >
+          <span className={`mb-4 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[reviewAccount.accountStatus]}`}>
+            {STATUS_LABELS[reviewAccount.accountStatus]}
+          </span>
+
+          {errorMsg && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{errorMsg}</div>
+          )}
+
+          {reviewAccount.signupVerification ? (
+            <VerificationFields v={reviewAccount.signupVerification} />
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+              ไม่มีข้อมูลการตรวจสอบสำหรับบัญชีนี้
             </div>
-          </div>
-        </div>
+          )}
+
+          {/* Prior rejection(s) — shown when this is a re-application, so the
+              admin sees why it was rejected before. Latest from the row +
+              the full history from the activity timeline. */}
+          {reviewAccount.rejectionReason && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+              <p className="font-semibold text-amber-800">เหตุผลที่ถูกปฏิเสธครั้งล่าสุด</p>
+              <p className="mt-1 whitespace-pre-wrap text-amber-900">{reviewAccount.rejectionReason}</p>
+              {reviewAccount.rejectedAt && (
+                <p className="mt-1 text-xs text-amber-700">{formatDate(reviewAccount.rejectedAt)}</p>
+              )}
+            </div>
+          )}
+          {(rejectionHistory?.length ?? 0) > 1 && (
+            <details className="mt-2 text-sm text-gray-600">
+              <summary className="cursor-pointer font-medium text-gray-700">
+                ประวัติการปฏิเสธทั้งหมด ({rejectionHistory!.length} ครั้ง)
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {rejectionHistory!.map((r, i) => (
+                  <li key={i} className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="whitespace-pre-wrap text-gray-900">{r.reason ?? "—"}</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      {formatDate(r.createdAt)}{r.actorName ? ` · ${r.actorName}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {/* Required reject reason — only for rejectable accounts. The API
+              rejects (400) a blank reason; disabling here gives instant feedback. */}
+          {reviewAccount.accountStatus !== "REJECTED" && (
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                เหตุผลที่ปฏิเสธ <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+                placeholder="ระบุเหตุผลที่ปฏิเสธ (จะถูกส่งไปยังอีเมลของผู้สมัคร)"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              />
+            </div>
+          )}
+        </Modal>
       )}
 
       {/* Delete account confirmation — superadmin only. Removes the login
           credentials but keeps the alumni data record (re-sign-up enabled). */}
-      {deleteAccId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบบัญชี</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              การลบบัญชีจะลบข้อมูลการเข้าสู่ระบบ (อีเมลและรหัสผ่าน) ของศิษย์เก่ารายนี้ ส่วนข้อมูลประวัติศิษย์เก่าจะยังคงอยู่ และศิษย์เก่าสามารถลงทะเบียนใหม่ได้อีกครั้งด้วยอีเมลเดิม
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteAccId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer">ยกเลิก</button>
-              <button onClick={confirmDeleteAccount} disabled={deletingAcc} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer">
-                {deletingAcc ? "กำลังลบ..." : "ลบบัญชี"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteAccId}
+        onOpenChange={(o) => { if (!o) setDeleteAccId(null); }}
+        title="ยืนยันการลบบัญชี"
+        description="การลบบัญชีจะลบข้อมูลการเข้าสู่ระบบ (อีเมลและรหัสผ่าน) ของศิษย์เก่ารายนี้ ส่วนข้อมูลประวัติศิษย์เก่าจะยังคงอยู่ และศิษย์เก่าสามารถลงทะเบียนใหม่ได้อีกครั้งด้วยอีเมลเดิม"
+        confirmLabel="ลบบัญชี"
+        onConfirm={confirmDeleteAccount}
+        loading={deletingAcc}
+      />
     </>
   );
 }

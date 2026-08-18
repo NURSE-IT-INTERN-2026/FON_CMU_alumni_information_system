@@ -280,7 +280,8 @@ export default function NewAlumniPage() {
   if (!canWrite) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)]">เพิ่มข้อมูลศิษย์เก่า</h1>
+        {/* Error branch — demoted so the main render keeps the page's single h1. */}
+        <h2 className="mb-4 text-2xl font-bold text-[var(--primary)]">เพิ่มข้อมูลศิษย์เก่า</h2>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้
         </div>

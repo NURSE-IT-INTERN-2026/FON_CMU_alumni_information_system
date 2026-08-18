@@ -43,6 +43,7 @@ function CalendarDropdown({
   value,
   onChange,
   name,
+  id,
 }: { options?: DropdownOption[] } & SelectHTMLAttributes<HTMLSelectElement>) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,11 +51,19 @@ function CalendarDropdown({
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
+    // pointerdown (not mousedown) so a touch tap outside also closes.
+    const onDown = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   // Cap height only when there are many options (the year list); let the short
@@ -65,7 +74,10 @@ function CalendarDropdown({
     <div ref={ref} className="relative">
       <button
         type="button"
+        id={id}
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2 text-sm font-medium hover:bg-accent"
       >
         {selected?.label}
@@ -103,6 +115,11 @@ interface BirthDateSelectProps<T extends FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
   error?: string;
+  /** Injected by FormField — forwarded to the trigger button so the label
+   *  associates and the error wires through aria-describedby. */
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "false" | "true";
 }
 
 /**
@@ -117,6 +134,9 @@ export default function BirthDateSelect<T extends FieldValues>({
   control,
   name,
   error,
+  id,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: BirthDateSelectProps<T>) {
   const { field } = useController({ control, name });
   const value = (field.value as string) ?? "";
@@ -137,6 +157,9 @@ export default function BirthDateSelect<T extends FieldValues>({
         <Button
           type="button"
           variant="outline"
+          id={id}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
           className={`w-full justify-start text-left font-normal ${
             error ? "border-red-400 focus-visible:ring-red-400" : ""
           } ${selected ? "" : "text-[var(--muted)]"}`}

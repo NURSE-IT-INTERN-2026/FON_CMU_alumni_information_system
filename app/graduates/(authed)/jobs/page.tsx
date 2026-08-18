@@ -6,6 +6,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import SearchInput from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
@@ -226,27 +228,35 @@ export default function AlumniJobsPage() {
       />
 
       {/* Delete confirm */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold">ลบประกาศงาน</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">ท่านแน่ใจหรือไม่ว่าต้องการลบประกาศงานนี้</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={remove.isPending}>ยกเลิก</Button>
-              <Button variant="destructive" onClick={() => remove.mutate(deleteId)} disabled={remove.isPending}>
-                {remove.isPending ? "กำลังลบ..." : "ลบประกาศ"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ลบประกาศงาน"
+        description="ท่านแน่ใจหรือไม่ว่าต้องการลบประกาศงานนี้"
+        confirmLabel="ลบประกาศ"
+        onConfirm={() => { if (deleteId) remove.mutate(deleteId); }}
+        loading={remove.isPending}
+      />
 
       {/* Create dialog */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-semibold">ลงประกาศงาน</h3>
-            <div className="space-y-3">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowCreate(false); }}
+          title="ลงประกาศงาน"
+          size="md"
+          scrollBody
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowCreate(false)} disabled={create.isPending}>ยกเลิก</Button>
+              <Button onClick={() => create.mutate()} disabled={create.isPending || !form.title.trim() || !form.workplace.trim() || !form.description.trim()}>
+                {create.isPending ? "กำลังลงประกาศ..." : "ลงประกาศ"}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">ตำแหน่งงาน *</label>
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} className={inputClass} />
@@ -289,15 +299,8 @@ export default function AlumniJobsPage() {
                 <input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className={inputClass} />
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={() => setShowCreate(false)} disabled={create.isPending}>ยกเลิก</Button>
-                <Button onClick={() => create.mutate()} disabled={create.isPending || !form.title.trim() || !form.workplace.trim() || !form.description.trim()}>
-                  {create.isPending ? "กำลังลงประกาศ..." : "ลงประกาศ"}
-                </Button>
-              </div>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

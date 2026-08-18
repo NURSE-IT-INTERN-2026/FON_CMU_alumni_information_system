@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { buildExcelResponse, resolveRowRange } from "@/lib/excel-export";
 import { dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { getCmuGraduatesLocal, applyCmuGraduateFilters } from "@/lib/cmu-registrar";
+import { filterLocalAlumniRows } from "@/lib/alumni-local-filter";
 import { mergeAlumniTableRows, type MergedAlumni } from "@/lib/alumni-merge";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { parseFacetFilters, FACET_FIELDS } from "@/lib/filter-facets";
 import { alumniToExportRow } from "@/lib/alumni-excel";
 
 const MAX_EXPORT_COUNT = 50000;
@@ -40,31 +39,31 @@ async function buildMergedRows(
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+  const degreeLevels = facetList("degreeLevel");
+  const majors = facetList("major");
+  const graduationYears = facetList("graduationYear");
   const cmuRows = applyCmuGraduateFilters(cmuDeduped, {
     search,
-    degreeLevels: facetList("degreeLevel"),
-    majors: facetList("major"),
-    graduationYears: facetList("graduationYear"),
+    degreeLevels,
+    majors,
+    graduationYears,
   });
 
-  // Local side: mirror /api/alumni GET — search OR (incl. an education's
-  // studentId so a lower-degree id is findable) + the same facet filters. NO
-  // deletedAt filter: the merge needs soft-deleted rows to build the
-  // deleted-studentId set and skip them, matching the table's net behavior.
-  const where: Prisma.AlumniWhereInput = {};
-  if (search) {
-    where.OR = [
-      { firstName: { contains: search, mode: "insensitive" } },
-      { lastName: { contains: search, mode: "insensitive" } },
-      { studentId: { contains: search, mode: "insensitive" } },
-      { educations: { some: { studentId: { contains: search, mode: "insensitive" } } } },
-    ];
-  }
-  Object.assign(where, parseFacetFilters(searchParams, FACET_FIELDS.alumni));
-
-  const localRows = await prisma.alumni.findMany({
-    where,
+  // Local side: the shared client-safe filterLocalAlumniRows (the exact
+  // /api/alumni GET where-clause semantics, incl. an education's studentId so a
+  // lower-degree id is findable). NO deletedAt filter: the merge needs
+  // soft-deleted rows to build the deleted-studentId set and skip them,
+  // matching the table's net behavior. Fetch unfiltered then filter in-process
+  // — same single Prisma query either way, and the client pipeline + export now
+  // run literally one implementation.
+  const allLocal = await prisma.alumni.findMany({
     include: { educations: EDUCATION_SELECT },
+  });
+  const localRows = filterLocalAlumniRows(allLocal, {
+    search,
+    degreeLevels,
+    majors,
+    graduationYears,
   });
 
   return mergeAlumniTableRows(cmuRows, localRows, { dedupeView: dedupe, search });

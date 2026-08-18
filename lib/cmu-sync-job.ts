@@ -89,9 +89,11 @@ export async function materializeCmuGraduates(ctx: LogContext): Promise<Material
   });
 
   // The dashboard + alumni-count payloads are 60s-TTL cached; bust so the new
-  // counts land immediately after a sync.
+  // counts land immediately after a sync. Same for the local CMU-graduate
+  // list cache (getCmuGraduatesLocal) so post-sync reads see the new rows.
   bustCache("dashboard");
   bustCachePrefix("alumni");
+  bustCache("cmu-graduates-local");
 
   return { upserted: created + updated, created, updated, remoteCount: remote.length };
 }

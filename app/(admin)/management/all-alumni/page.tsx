@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -8,6 +8,7 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { ExportRangeButton } from "@/components/ExportRangeButton";
@@ -15,8 +16,10 @@ import { useHotFields } from "@/lib/use-hot-fields";
 import { alumniEditFormSchema, type AlumniEditFormData } from "@/lib/validations";
 import { facetQueryParams } from "@/lib/filter-facets";
 import { sortAlumni } from "@/lib/alumni-sort";
-import { formatBirthDateThai } from "@/lib/alumni-verify";
+import { formatBirthDateThai, dedupeCmuGraduatesByPerson } from "@/lib/alumni-verify";
 import { mergeAlumniTableRows } from "@/lib/alumni-merge";
+import { applyCmuGraduateFilters } from "@/lib/cmu-graduate-filters";
+import { filterLocalAlumniRows } from "@/lib/alumni-local-filter";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import FacetFilter from "@/components/ui/facet-filter";
 import SearchInput from "@/components/ui/search-input";
@@ -24,6 +27,9 @@ import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import { useCanWrite } from "@/lib/role-context";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 /** Thai display labels for degree-level enum values. */
 const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
@@ -142,53 +148,78 @@ export default function AlumniCountPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const qc = useQueryClient();
   // Manage mode: merge CMU Registrar + local DB (with soft-delete overlay).
-  // The merge logic now lives in the queryFn and returns { merged, total }.
-  // NOTE: the query is keyed WITHOUT `page` — we fetch the full merged set once
-  // (per search/filter/sort) and paginate it on the client by slicing
-  // `allMerged`. This is required because the merged CMU+local result can only
-  // be sorted/paginated correctly once the full set is assembled.
-  const manageQuery = useQuery({
-    queryKey: ["alumni", "manage", { search, filtersKey, sortField, sortDir, dedupeView }],
+  //
+  // FETCH-ONCE ARCHITECTURE: the query is keyed WITHOUT search/filters/sort/
+  // dedupe (and without `page`) — one request pair loads the FULL raw CMU list
+  // + the FULL local list, and every interaction (search submit, sort click,
+  // facet change, dedupe toggle, pagination) is instant client-side work in
+  // the useMemo pipeline below. The merged CMU+local result can only be
+  // filtered/sorted/paginated correctly once the full set is assembled, so the
+  // data must be whole anyway — refetching it per interaction was pure waste.
+  const manageBaseQuery = useQuery({
+    queryKey: queryKeys.alumni.manageBase(),
+    staleTime: 5 * 60_000,
     queryFn: async () => {
-      // Fetch the FULL CMU list (not a single page) so the client can merge,
-      // sort, and paginate the complete set. `/api/cmu-alumni` reads the local
-      // `cmu_graduates` table (refreshed from /management/settings/cmu-sync), so this is
-      // one request per search/filter/sort.
-      const cmuParams = new URLSearchParams({
-        page: "1", pageSize: "50000", search,
-        sortField: sortField as string, sortDir,
-        dedupe: dedupeView ? "true" : "false",
-      });
-      facetQueryParams(filters).forEach((v, k) => cmuParams.set(k, v));
-      let cmuData: CmuAlumni[] = [];
+      // RAW CMU list (dedupe=false → one row per degree record): the client
+      // runs dedupeCmuGraduatesByPerson itself, so the dedupe toggle needs no
+      // refetch. `/api/cmu-alumni` reads the local `cmu_graduates` table
+      // (refreshed from /management/settings/cmu-sync).
+      let cmuRaw: CmuAlumni[] = [];
       try {
-        const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(`/api/cmu-alumni?${cmuParams}`);
-        cmuData = cmuJson.data || [];
+        const cmuJson = await apiFetch<{ data: CmuAlumni[]; total: number }>(
+          `/api/cmu-alumni?page=1&pageSize=50000&dedupe=false`,
+        );
+        cmuRaw = cmuJson.data || [];
       } catch {}
 
-      const localParams = new URLSearchParams({ pageSize: "50000", includeDeleted: "true", search });
-      facetQueryParams(filters).forEach((v, k) => localParams.set(k, v));
-      let localData: Alumni[] = [];
+      // Full local list INCLUDING soft-deleted rows — the merge builds its
+      // deleted-studentId hide-set from them (net behavior: a soft-deleted
+      // person is hidden even if a CMU twin exists).
+      let localAll: Alumni[] = [];
       try {
-        const localJson = await apiFetch<AlumniApiResponse>(`/api/alumni?${localParams}`);
-        localData = localJson.data || [];
+        const localJson = await apiFetch<AlumniApiResponse>(
+          `/api/alumni?pageSize=50000&includeDeleted=true`,
+        );
+        localAll = localJson.data || [];
       } catch {}
 
-      // Merge CMU + local into the table's row set. Shared with the Excel export
-      // (`lib/alumni-merge`) so the table and the export can never drift apart.
-      // Soft-deleted alumni are fetched (includeDeleted) and skipped inside the
-      // merge, matching the prior inline behavior. Returned unsorted — sorted below.
-      const merged = mergeAlumniTableRows(cmuData, localData, { dedupeView, search });
-      return { merged: sortAlumni(merged, sortField, sortDir), total: merged.length };
+      return { cmuRaw, localAll };
     },
   });
+
+  // The client-side manage pipeline — the SAME composition the Excel export
+  // runs server-side (shared filter/merge/sort libs; see tests/
+  // alumni-manage-pipeline.test.ts). ORDER MATTERS: dedupe BEFORE filter
+  // (mirrors the /api/cmu-alumni route), or a person whose kept degree fails a
+  // facet would wrongly reappear via a lower degree.
+  const { cmuRaw = [], localAll = [] } = manageBaseQuery.data ?? {};
+  const allMerged = useMemo(() => {
+    const cmuBase = dedupeView ? dedupeCmuGraduatesByPerson(cmuRaw) : cmuRaw;
+    const cmuRows = applyCmuGraduateFilters(cmuBase, {
+      search,
+      degreeLevels: filters.degreeLevel,
+      majors: filters.major,
+      graduationYears: filters.graduationYear,
+    });
+    const localRows = filterLocalAlumniRows(localAll, {
+      search,
+      degreeLevels: filters.degreeLevel,
+      majors: filters.major,
+      graduationYears: filters.graduationYear,
+    });
+    const merged = mergeAlumniTableRows(cmuRows, localRows, { dedupeView, search });
+    return sortAlumni(merged, sortField, sortDir);
+    // `filtersKey` (the serialized facet selection) is the stable dep for
+    // `filters`; reading filters.degreeLevel etc. directly is covered by it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cmuRaw, localAll, dedupeView, search, filtersKey, sortField, sortDir]);
+  const tableLoading = manageBaseQuery.isPending;
   // Manage mode paginates the full merged set on the client. `allMerged` holds
   // every row (for cross-page delete/bulk-delete lookups); `alumni` is the
-  // current page's slice that the table renders. Since the query is keyed
-  // without `page`, navigating pages is instant (no refetch).
-  const allMerged = manageQuery.data?.merged ?? [];
+  // current page's slice that the table renders. Navigating pages, sorting,
+  // searching, and toggling dedupe are all instant — no refetch.
   const alumni = allMerged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalAlumni = manageQuery.data?.total ?? 0;
+  const totalAlumni = allMerged.length;
   const [editingId, setEditingId] = useState<string | null>(null);
   const hot = useHotFields("alumni", alumni.map((a) => a.id));
   const [saving, setSaving] = useState(false);
@@ -226,9 +257,6 @@ export default function AlumniCountPage() {
   const exitSelect = () => { setSelectMode(false); deselectAll(); };
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  // CMU Registrar data (view mode only) — merge CMU + local overlay.
-  const tableLoading = manageQuery.isPending;
 
   const activeTotal = totalAlumni;
   const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE));
@@ -524,6 +552,7 @@ export default function AlumniCountPage() {
           <button
             onClick={() => setErrorMsg("")}
             className="ml-4 font-bold text-red-500 hover:text-red-700"
+            aria-label="ปิด"
           >
             &times;
           </button>
@@ -542,6 +571,7 @@ export default function AlumniCountPage() {
             <button
               onClick={() => setImportResult(null)}
               className="ml-4 font-bold text-green-500 hover:text-green-700"
+              aria-label="ปิด"
             >
               &times;
             </button>
@@ -765,50 +795,76 @@ export default function AlumniCountPage() {
                     className="text-white text-left"
                     style={{ backgroundColor: "#5b21b6" }}
                   >
-                    <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    <th scope="col" className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                      รหัสนักศึกษา {renderSortIcon("studentId")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "studentId" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("studentId")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        รหัสนักศึกษา {renderSortIcon("studentId")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น {renderSortIcon("cohort")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "cohort" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("cohort")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        รุ่น {renderSortIcon("cohort")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
-                      คำนำหน้า {renderSortIcon("prefix")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "prefix" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("prefix")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        คำนำหน้า {renderSortIcon("prefix")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                      ชื่อ {renderSortIcon("firstName")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "firstName" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("firstName")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ชื่อ {renderSortIcon("firstName")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
-                      นามสกุล {renderSortIcon("lastName")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "lastName" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("lastName")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        นามสกุล {renderSortIcon("lastName")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
-                      ระดับการศึกษา {renderSortIcon("degreeLevel")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "degreeLevel" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("degreeLevel")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ระดับการศึกษา {renderSortIcon("degreeLevel")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                      สาขาวิชา {renderSortIcon("major")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "major" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("major")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        สาขาวิชา {renderSortIcon("major")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("graduationYear")}>
-                      ปีสำเร็จการศึกษา {renderSortIcon("graduationYear")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "graduationYear" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("graduationYear")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ปีสำเร็จการศึกษา {renderSortIcon("graduationYear")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
-                      วันเกิด {renderSortIcon("birthDate")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "birthDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("birthDate")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        วันเกิด {renderSortIcon("birthDate")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("contactEmail")}>
-                      อีเมลติดต่อ {renderSortIcon("contactEmail")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "contactEmail" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("contactEmail")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        อีเมลติดต่อ {renderSortIcon("contactEmail")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("phones")}>
-                      เบอร์โทร {renderSortIcon("phones")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "phones" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("phones")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        เบอร์โทร {renderSortIcon("phones")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("homeAddress")}>
-                      ที่อยู่ปัจจุบัน {renderSortIcon("homeAddress")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "homeAddress" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("homeAddress")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ที่อยู่ปัจจุบัน {renderSortIcon("homeAddress")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
-                      หมายเหตุ {renderSortIcon("remarks")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "remarks" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("remarks")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        หมายเหตุ {renderSortIcon("remarks")}
+                      </button>
                     </th>
                     {canWrite && (
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                      <th scope="col" className="sticky-col-head px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                         จัดการ
                       </th>
                     )}
@@ -817,10 +873,11 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={15} className="px-4 py-12 text-center">
+                      <td colSpan={15} className="px-4 py-12 text-center" role="status" aria-live="polite">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
+                        <span className="sr-only">กำลังโหลดข้อมูล</span>
                       </td>
                     </tr>
                   ) : alumni.length === 0 ? (
@@ -828,6 +885,8 @@ export default function AlumniCountPage() {
                       <td
                         colSpan={15}
                         className="px-4 py-12 text-center text-[var(--muted)]"
+                        role="status"
+                        aria-live="polite"
                       >
                         ไม่พบข้อมูล
                       </td>
@@ -842,7 +901,11 @@ export default function AlumniCountPage() {
                         <td className="px-4 py-3 text-center">
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
-                        <td className="px-4 py-3">{a.studentId}</td>
+                        <td className="px-4 py-3">
+                          <Link href={`/management/alumni/${a.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                            {a.studentId}
+                          </Link>
+                        </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} />
                         </td>
@@ -877,12 +940,13 @@ export default function AlumniCountPage() {
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />
                         </td>
                         {canWrite && (
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <td className="sticky-col px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               <button
                                 onClick={() => openEdit(a)}
                                 className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                                 title="แก้ไข"
+                                aria-label="แก้ไข"
                               >
                                 <svg
                                   className="h-4 w-4"
@@ -902,6 +966,7 @@ export default function AlumniCountPage() {
                                 onClick={() => setDeleteId(a.id)}
                                 className="rounded p-1.5 text-red-500 hover:bg-red-100"
                                 title="ลบ"
+                                aria-label="ลบ"
                               >
                                 <svg
                                   className="h-4 w-4"
@@ -968,48 +1033,34 @@ export default function AlumniCountPage() {
           </div>
 
       {/* Delete confirmation dialog */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              ยืนยันการลบข้อมูล
-            </h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูลนี้หรือไม่?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                ยืนยัน
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ยืนยันการลบข้อมูล"
+        description="คุณต้องการลบข้อมูลนี้หรือไม่?"
+        onConfirm={confirmDelete}
+      />
 
       {showBulkDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowBulkDeleteDialog(false); }}
+          title="ยืนยันการลบข้อมูล"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>ยกเลิก</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
+          </p>
+        </Modal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BASE_PATH } from "@/lib/constants";
+import { Modal } from "@/components/ui/modal";
 
 interface HistoryEntry {
   oldValue: string | null;
@@ -14,6 +15,8 @@ interface HistoryEntry {
 /**
  * Lists the update history (old → new, date, actor, reason) for a single
  * record field. Opened by clicking an orange updated value (PRD §3.16).
+ * Conditionally mounted by the caller (OrangeCell) — internally always `open`,
+ * any close path (Escape / overlay / ×) calls `onClose` which unmounts it.
  */
 export default function FieldHistoryModal({
   resourceType,
@@ -54,53 +57,41 @@ export default function FieldHistoryModal({
     new Date(s).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={`ประวัติการแก้ไข: ${field}`}
+      size="md"
     >
-      <div
-        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            ประวัติการแก้ไข: {field}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-2xl leading-none text-gray-400 hover:text-gray-600"
-          >
-            &times;
-          </button>
-        </div>
-        {history === null ? (
-          <p className="text-sm text-gray-400">กำลังโหลด...</p>
-        ) : history.length === 0 ? (
-          <p className="text-sm text-gray-400">ไม่มีประวัติ</p>
-        ) : (
-          <ul className="max-h-96 space-y-3 overflow-y-auto">
-            {history.map((h, i) => (
-              <li
-                key={i}
-                className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm"
-              >
-                <div>
-                  <span className="text-gray-400 line-through">
-                    {h.oldValue || "—"}
-                  </span>
-                  <span className="mx-1.5 font-semibold text-orange-500">→</span>
-                  <span className="text-gray-800">{h.newValue || "—"}</span>
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {fmt(h.createdAt)}
-                  {h.actorName ? ` • ${h.actorName}` : ""}
-                  {h.reason ? ` • ${h.reason}` : ""}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+      {history === null ? (
+        <p className="text-sm text-gray-400">กำลังโหลด...</p>
+      ) : history.length === 0 ? (
+        <p className="text-sm text-gray-400">ไม่มีประวัติ</p>
+      ) : (
+        <ul className="max-h-96 space-y-3 overflow-y-auto">
+          {history.map((h, i) => (
+            <li
+              key={i}
+              className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm"
+            >
+              <div>
+                <span className="text-gray-400 line-through">
+                  {h.oldValue || "—"}
+                </span>
+                <span className="mx-1.5 font-semibold text-orange-500">→</span>
+                <span className="text-gray-800">{h.newValue || "—"}</span>
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                {fmt(h.createdAt)}
+                {h.actorName ? ` • ${h.actorName}` : ""}
+                {h.reason ? ` • ${h.reason}` : ""}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
   );
 }

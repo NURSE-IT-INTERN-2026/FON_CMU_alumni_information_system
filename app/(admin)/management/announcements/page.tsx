@@ -6,6 +6,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { useCanWrite } from "@/lib/role-context";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Staff announcements for the alumni community (V2) — plain textarea CRUD
@@ -157,55 +159,55 @@ export default function AnnouncementsManagementPage() {
 
       {/* Create/edit form dialog */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-semibold">{editId ? "แก้ไขประกาศ" : "เพิ่มประกาศ"}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">หัวข้อ *</label>
-                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} className={inputClass} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">เนื้อหา * (ข้อความธรรมดา)</label>
-                <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={6} maxLength={5000} className={inputClass} />
-              </div>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} />
-                  ปักหมุดไว้ด้านบน
-                </label>
-                <div className="flex flex-1 items-center gap-2">
-                  <label className="text-xs font-medium text-[var(--primary-dark)]">หมดอายุ (ไม่บังคับ)</label>
-                  <input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="flex-1 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm" />
-                </div>
-              </div>
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={() => setShowForm(false)} disabled={save.isPending}>ยกเลิก</Button>
-                <Button onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim() || !form.body.trim()}>
-                  {save.isPending ? "กำลังบันทึก..." : "บันทึก"}
-                </Button>
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowForm(false); }}
+          title={editId ? "แก้ไขประกาศ" : "เพิ่มประกาศ"}
+          scrollBody
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowForm(false)} disabled={save.isPending}>ยกเลิก</Button>
+              <Button onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim() || !form.body.trim()}>
+                {save.isPending ? "กำลังบันทึก..." : "บันทึก"}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">หัวข้อ *</label>
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} className={inputClass} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">เนื้อหา * (ข้อความธรรมดา)</label>
+              <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={6} maxLength={5000} className={inputClass} />
+            </div>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} />
+                ปักหมุดไว้ด้านบน
+              </label>
+              <div className="flex flex-1 items-center gap-2">
+                <label className="text-xs font-medium text-[var(--primary-dark)]">หมดอายุ (ไม่บังคับ)</label>
+                <input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="flex-1 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm" />
               </div>
             </div>
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete confirm */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold">ลบประกาศ</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">ท่านแน่ใจหรือไม่ว่าต้องการลบประกาศนี้ (ผู้ดูแลระบบสามารถกู้คืนจากถังขยะได้)</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteId(null)} disabled={remove.isPending}>ยกเลิก</Button>
-              <Button variant="destructive" onClick={() => remove.mutate(deleteId)} disabled={remove.isPending}>
-                {remove.isPending ? "กำลังลบ..." : "ลบประกาศ"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ลบประกาศ"
+        description="ท่านแน่ใจหรือไม่ว่าต้องการลบประกาศนี้ (ผู้ดูแลระบบสามารถกู้คืนจากถังขยะได้)"
+        confirmLabel="ลบประกาศ"
+        onConfirm={() => remove.mutate(deleteId!)}
+        loading={remove.isPending}
+      />
     </div>
   );
 }

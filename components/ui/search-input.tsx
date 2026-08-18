@@ -63,6 +63,7 @@ export default function SearchInput({
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder || "ค้นหา"}
         className={`flex-1 min-w-0 rounded-lg border border-[var(--border)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${inputClassName ?? ""}`}
       />
       <button

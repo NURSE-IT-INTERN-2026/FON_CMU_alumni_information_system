@@ -428,7 +428,12 @@ export default function DashboardPage() {
 
         {/* Alumni count line chart */}
         {chartReady && (
-          <div className="mt-5" onClick={(e) => e.preventDefault()}>
+          <div
+            className="mt-5"
+            onClick={(e) => e.preventDefault()}
+            role="img"
+            aria-label={`กราฟแสดงจำนวนศิษย์เก่าตามปีที่จบ แยกตามระดับการศึกษา (${chartData!.series.map((s) => s.label).join(", ")}) — ตัวเลขสรุปอยู่ในการ์ดด้านบน`}
+          >
             <div className="h-[280px] sm:h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart

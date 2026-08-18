@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import SearchInput from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import { MENTORSHIP_STATUS_LABELS } from "@/lib/validations";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
@@ -315,23 +316,26 @@ export default function MentorshipPage() {
 
       {/* Request dialog */}
       {requestTo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-lg font-semibold">ขอคำปรึกษา</h3>
-            <p className="mb-3 text-sm text-[var(--muted)]">
-              ถึง {requestTo.alumni.prefix}{requestTo.alumni.firstName} {requestTo.alumni.lastName} ({requestTo.expertise})
-            </p>
-            <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} maxLength={2000}
-              placeholder="แนะนำตัวและบอกสิ่งที่อยากปรึกษา..." className={inputClass} />
-            {requestError && <p className="mt-2 text-sm text-red-600">{requestError}</p>}
-            <div className="mt-4 flex justify-end gap-2">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setRequestTo(null); }}
+          title="ขอคำปรึกษา"
+          description={`ถึง ${requestTo.alumni.prefix}${requestTo.alumni.firstName} ${requestTo.alumni.lastName} (${requestTo.expertise})`}
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
               <Button variant="outline" onClick={() => setRequestTo(null)} disabled={sendRequest.isPending}>ยกเลิก</Button>
               <Button onClick={() => sendRequest.mutate()} disabled={sendRequest.isPending || message.trim().length < 1}>
                 {sendRequest.isPending ? "กำลังส่ง..." : "ส่งคำขอ"}
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} maxLength={2000}
+            placeholder="แนะนำตัวและบอกสิ่งที่อยากปรึกษา..." className={inputClass} />
+          {requestError && <p className="text-sm text-red-600">{requestError}</p>}
+        </Modal>
       )}
     </div>
   );

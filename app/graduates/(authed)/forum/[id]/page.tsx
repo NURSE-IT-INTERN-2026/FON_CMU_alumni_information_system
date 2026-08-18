@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
@@ -315,26 +316,19 @@ export default function TopicDetailPage() {
       )}
 
       {/* Delete confirm */}
-      {del && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">ยืนยันการลบ</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">
-              {del.kind === "topic" ? "การลบกระทู้จะลบความคิดเห็นทั้งหมดในกระทู้นี้ด้วย" : "ต้องการลบความคิดเห็นนี้ใช่หรือไม่"}
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDel(null)}>ยกเลิก</Button>
-              <Button
-                variant="destructive"
-                disabled={removeTopic.isPending || removeReply.isPending}
-                onClick={() => (del.kind === "topic" ? removeTopic.mutate() : removeReply.mutate(del.id))}
-              >
-                ลบ
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!del}
+        onOpenChange={(o) => { if (!o) setDel(null); }}
+        title="ยืนยันการลบ"
+        description={del?.kind === "topic" ? "การลบกระทู้จะลบความคิดเห็นทั้งหมดในกระทู้นี้ด้วย" : "ต้องการลบความคิดเห็นนี้ใช่หรือไม่"}
+        confirmLabel="ลบ"
+        loading={removeTopic.isPending || removeReply.isPending}
+        onConfirm={() => {
+          if (!del) return;
+          if (del.kind === "topic") removeTopic.mutate();
+          else removeReply.mutate(del.id);
+        }}
+      />
     </div>
   );
 }

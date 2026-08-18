@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useRole } from "@/lib/role-context";
 import SearchInput from "@/components/ui/search-input";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface TrashRecord {
   id: string;
@@ -241,22 +242,15 @@ export default function TrashPage() {
       )}
 
       {/* Final hard-delete confirmation (second confirmation step) */}
-      {hardDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-red-700">ยืนยันการลบถาวร</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              การลบถาวรจะไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้ออกจากระบบอย่างถาวร?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => { setHardDeleteConfirm(null); setHardDeleteId(null); }} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={() => hardDelete(hardDeleteConfirm)} disabled={busyId === hardDeleteConfirm} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-                {busyId === hardDeleteConfirm ? "กำลังลบ..." : "ลบถาวร"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!hardDeleteConfirm}
+        onOpenChange={(o) => { if (!o) { setHardDeleteConfirm(null); setHardDeleteId(null); } }}
+        title="ยืนยันการลบถาวร"
+        description="การลบถาวรจะไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้ออกจากระบบอย่างถาวร?"
+        confirmLabel="ลบถาวร"
+        onConfirm={() => hardDelete(hardDeleteConfirm!)}
+        loading={busyId === hardDeleteConfirm}
+      />
     </div>
   );
 }

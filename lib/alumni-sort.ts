@@ -20,6 +20,14 @@ export interface SortableAlumni {
 }
 
 /**
+ * Shared Thai collator — identical ordering to `localeCompare(x, "th")` but far
+ * faster: a single ICU collator instance reused across comparisons instead of
+ * re-resolving the locale on every call (~280k comparisons when the ~20k-row
+ * merged table re-sorts). Module-level, client-safe.
+ */
+const thCollator = new Intl.Collator("th");
+
+/**
  * Compare two rows by a sort field, mirroring the CMU proxy's th-locale
  * ordering. Nulls / empty values sort first in ascending order (consistent with
  * how the CMU proxy treats missing strings). `graduationYear` is compared
@@ -44,13 +52,13 @@ export function compareAlumni<T>(a: T, b: T, field: string): number {
       const r = x as unknown as Record<string, unknown>;
       return String(r.contactEmail || r.email || "");
     };
-    return eff(a).localeCompare(eff(b), "th");
+    return thCollator.compare(eff(a), eff(b));
   }
   const val = (x: T): string => {
     const v = (x as unknown as Record<string, unknown>)[field];
     return v == null ? "" : String(v);
   };
-  return val(a).localeCompare(val(b), "th");
+  return thCollator.compare(val(a), val(b));
 }
 
 /**

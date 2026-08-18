@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { useCanWrite } from "@/lib/role-context";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import EventFormDialog, { type EventFormValues } from "@/components/events/EventFormDialog";
 import EventOrganizerView, { type EventOrganizer } from "@/components/events/EventOrganizer";
 import { formatEventDateTimeThai, isoToDatetimeLocal } from "@/lib/event-format";
@@ -142,16 +143,21 @@ export default function AdminEventsPage() {
       )}
 
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold">ลบกิจกรรม</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">ต้องการลบ &ldquo;{deleting.title}&rdquo; ใช่หรือไม่ (กู้คืนได้จากถังขยะ)</p>
-            <div className="flex justify-end gap-2">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setDeleting(null); }}
+          title="ลบกิจกรรม"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
               <Button variant="outline" onClick={() => setDeleting(null)}>ยกเลิก</Button>
               <Button variant="destructive" disabled={del.isPending} onClick={() => del.mutate(deleting.id)}>ลบ</Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-sm text-[var(--muted)]">ต้องการลบ &ldquo;{deleting.title}&rdquo; ใช่หรือไม่ (กู้คืนได้จากถังขยะ)</p>
+        </Modal>
       )}
     </div>
   );

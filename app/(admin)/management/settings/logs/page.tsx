@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api-client";
 import { useRole } from "@/lib/role-context";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { BASE_PATH } from "@/lib/constants";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import {
   FIELD_LABELS,
   formatValue,
@@ -302,7 +304,7 @@ export default function LogsPage() {
                 <th className="px-4 py-3">ผู้ใช้งาน</th>
                 <th className="px-4 py-3">กิจกรรม</th>
                 <th className="px-4 py-3">ประเภทข้อมูล</th>
-                <th className="px-4 py-3">รายละเอียด</th>
+                <th className="sticky-col-head px-4 py-3">รายละเอียด</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -358,7 +360,7 @@ export default function LogsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
-                    <td className="px-4 py-3">
+                    <td className="sticky-col px-4 py-3">
                       {log.action === "IMPORT" ? (
                         <ImportRowSummary
                           details={log.details}
@@ -415,21 +417,26 @@ export default function LogsPage() {
 
       {/* Bulk-delete confirmation */}
       {showBulkDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setShowBulkDeleteDialog(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบบันทึกกิจกรรม</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบบันทึกกิจกรรม <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
-              การดำเนินการนี้ไม่สามารถย้อนกลับได้
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowBulkDeleteDialog(false)} disabled={deleting} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">ยกเลิก</button>
-              <button onClick={handleBulkDelete} disabled={deleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40 cursor-pointer">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o && !deleting) setShowBulkDeleteDialog(false); }}
+          title="ยืนยันการลบบันทึกกิจกรรม"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)} disabled={deleting}>ยกเลิก</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={deleting}>
                 {deleting ? "กำลังลบ..." : "ยืนยัน"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            คุณต้องการลบบันทึกกิจกรรม <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่?
+            การดำเนินการนี้ไม่สามารถย้อนกลับได้
+          </p>
+        </Modal>
       )}
     </div>
   );
@@ -462,75 +469,58 @@ function DetailModal({
   const resourceLabel = RESOURCE_LABELS[log.resource] ?? log.resource;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-600"}`}>
-                {ACTION_LABELS[log.action] || log.action}
-              </span>
-              {resourceLabel}
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">{formatDate(log.createdAt)}</p>
-          </div>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600">&times;</button>
-        </div>
-
-        {/* Body — tailored to the action */}
-        <div className="mb-3">
-          {log.action === "IMPORT" && importDetails ? (
-            <ImportDetail details={importDetails} />
-          ) : authLead ? (
-            <div>
-              <p className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-800">
-                {authLead}
-              </p>
-              {rows.length > 0 && (
-                <DataCard title="รายละเอียดเพิ่มเติม" rows={rows} emptyText="ไม่มีรายละเอียด" />
-              )}
-            </div>
-          ) : log.action === "UPDATE" && changes && changes.length > 0 ? (
-            <EditDiff changes={changes} />
-          ) : log.action === "UPDATE" && sectionRows.length > 0 ? (
-            <SectionChanges rows={sectionRows} />
-          ) : log.action === "UPDATE" && countSummary ? (
-            <DataCard title="รายการที่บันทึก" rows={[{ label: "ส่วนที่แก้ไข", value: countSummary }]} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
-          ) : log.action === "UPDATE" ? (
-            <DataCard title="ข้อมูลหลังแก้ไข" rows={rows} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
-          ) : log.action === "CREATE" ? (
-            <DataCard title="ข้อมูลที่เพิ่ม" rows={rows} emptyText="ไม่มีข้อมูลที่บันทึกไว้" />
-          ) : log.action === "DELETE" || log.action === "HARD_DELETE" ? (
-            <DataCard title="ข้อมูลที่ลบ" rows={rows} emptyText={`ไม่มีข้อมูลที่บันทึกไว้ (รหัส ${log.resourceId ?? "—"})`} />
-          ) : (
-            <DataCard title="รายละเอียด" rows={rows} emptyText="ไม่มีรายละเอียด" />
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
-          {log.reason ? (
-            <p className="text-xs text-gray-500">หมายเหตุ: {log.reason}</p>
-          ) : <span />}
+    <Modal
+      open
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title={resourceLabel}
+      description={formatDate(log.createdAt)}
+      size="xl"
+      scrollBody
+      footer={
+        <>
+          {log.reason && <p className="mr-auto text-xs text-gray-500">หมายเหตุ: {log.reason}</p>}
           {canDelete && (
-            <button
-              onClick={() => onDelete(log.id)}
-              disabled={deleting}
-              className="shrink-0 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40 cursor-pointer"
-            >
+            <Button variant="destructive" onClick={() => onDelete(log.id)} disabled={deleting}>
               {deleting ? "กำลังลบ..." : "ลบรายการนี้"}
-            </button>
+            </Button>
           )}
-        </div>
+        </>
+      }
+    >
+      <span className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-600"}`}>
+        {ACTION_LABELS[log.action] || log.action}
+      </span>
+
+      {/* Body — tailored to the action */}
+      <div className="mb-3">
+        {log.action === "IMPORT" && importDetails ? (
+          <ImportDetail details={importDetails} />
+        ) : authLead ? (
+          <div>
+            <p className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-800">
+              {authLead}
+            </p>
+            {rows.length > 0 && (
+              <DataCard title="รายละเอียดเพิ่มเติม" rows={rows} emptyText="ไม่มีรายละเอียด" />
+            )}
+          </div>
+        ) : log.action === "UPDATE" && changes && changes.length > 0 ? (
+          <EditDiff changes={changes} />
+        ) : log.action === "UPDATE" && sectionRows.length > 0 ? (
+          <SectionChanges rows={sectionRows} />
+        ) : log.action === "UPDATE" && countSummary ? (
+          <DataCard title="รายการที่บันทึก" rows={[{ label: "ส่วนที่แก้ไข", value: countSummary }]} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
+        ) : log.action === "UPDATE" ? (
+          <DataCard title="ข้อมูลหลังแก้ไข" rows={rows} emptyText="ไม่มีการเปลี่ยนแปลงค่า" />
+        ) : log.action === "CREATE" ? (
+          <DataCard title="ข้อมูลที่เพิ่ม" rows={rows} emptyText="ไม่มีข้อมูลที่บันทึกไว้" />
+        ) : log.action === "DELETE" || log.action === "HARD_DELETE" ? (
+          <DataCard title="ข้อมูลที่ลบ" rows={rows} emptyText={`ไม่มีข้อมูลที่บันทึกไว้ (รหัส ${log.resourceId ?? "—"})`} />
+        ) : (
+          <DataCard title="รายละเอียด" rows={rows} emptyText="ไม่มีรายละเอียด" />
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 

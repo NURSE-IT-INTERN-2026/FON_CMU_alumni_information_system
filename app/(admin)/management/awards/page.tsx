@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
@@ -23,6 +24,9 @@ import SearchInput from "@/components/ui/search-input";
 import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 import { assetUrl } from "@/lib/asset-url";
 import { useCanWrite } from "@/lib/role-context";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 interface Award {
   id: string;
@@ -509,6 +513,7 @@ export default function AwardsPage() {
                     type="button"
                     onClick={() => setValue("imageUrl", "")}
                     title="ลบรูปภาพ"
+                    aria-label="ลบรูปภาพ"
                     className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -678,40 +683,58 @@ export default function AwardsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-white text-left" style={{ backgroundColor: "#5b21b6" }}>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                   ลำดับ
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                  รหัสนักศึกษา {renderSortIcon("studentId")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "studentId" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("studentId")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    รหัสนักศึกษา {renderSortIcon("studentId")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                  สาขาวิชา {renderSortIcon("major")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "major" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("major")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    สาขาวิชา {renderSortIcon("major")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
-                  คำนำหน้า {renderSortIcon("prefix")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "prefix" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("prefix")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    คำนำหน้า {renderSortIcon("prefix")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("name")}>
-                  ชื่อ {renderSortIcon("name")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "name" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("name")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    ชื่อ {renderSortIcon("name")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
-                  นามสกุล {renderSortIcon("lastName")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "lastName" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("lastName")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    นามสกุล {renderSortIcon("lastName")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("award")}>
-                  ชื่อรางวัล {renderSortIcon("award")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "award" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("award")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    ชื่อรางวัล {renderSortIcon("award")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("type")}>
-                  ประเภท {renderSortIcon("type")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "type" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("type")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    ประเภท {renderSortIcon("type")}
+                  </button>
                 </th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("year")}>
-                  ปีที่ได้รับ {renderSortIcon("year")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "year" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("year")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    ปีที่ได้รับ {renderSortIcon("year")}
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลิงค์</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รูปภาพ</th>
-                <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("description")}>
-                  รายละเอียด {renderSortIcon("description")}
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">ลิงค์</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">รูปภาพ</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "description" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => handleSort("description")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                    รายละเอียด {renderSortIcon("description")}
+                  </button>
                 </th>
                 {canWrite && (
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
+                  <th scope="col" className="sticky-col-head px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                 )}
               </tr>
             </thead>
@@ -737,7 +760,19 @@ export default function AwardsPage() {
                   <tr key={award.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(award.id); else if (award.studentId) router.push(`/management/alumni/${award.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(award.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center text-gray-500">{rowNumber(i)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                      <OrangeCell resourceType="award" recordId={award.id} field="studentId" value={(award.studentId || award.pendingStudentId) || "-"} hotFields={hot[award.id]} />
+                      <OrangeCell resourceType="award" recordId={award.id} field="studentId" value={award.studentId ? (
+                        // Hot cell: OrangeCell wraps the value in its own history
+                        // <button> — a Link inside would nest interactive elements
+                        // (invalid HTML), so the profile link becomes a sibling.
+                        hot[award.id]?.includes("studentId") ? award.studentId : (
+                          <Link href={`/management/alumni/${award.studentId}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                            {award.studentId}
+                          </Link>
+                        )
+                      ) : (award.pendingStudentId || "-")} hotFields={hot[award.id]} />
+                      {award.studentId && hot[award.id]?.includes("studentId") ? (
+                        <Link href={`/management/alumni/${award.studentId}`} onClick={(e) => e.stopPropagation()} aria-label={`ดูโปรไฟล์ ${award.studentId}`} className="ml-1 text-[var(--primary)] hover:underline">↗</Link>
+                      ) : null}
                       {award.pendingStudentId && !award.studentId ? (
                         <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
                       ) : null}
@@ -755,7 +790,7 @@ export default function AwardsPage() {
                     <td className="px-4 py-3"><OrangeCell resourceType="award" recordId={award.id} field="year" value={award.year} hotFields={hot[award.id]} /></td>
                     <td className="px-4 py-3">
                       {award.link ? (
-                        <a href={award.link} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                        <a href={award.link} target="_blank" rel="noopener noreferrer" aria-label="เปิดลิงค์" title="เปิดลิงค์" className="text-[var(--primary)] hover:underline">
                           <svg className="inline h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                         </a>
                       ) : "-"}
@@ -766,6 +801,7 @@ export default function AwardsPage() {
                           type="button"
                           onClick={() => setPhotoPreviewUrl(award.imageUrl)}
                           title="ดูรูปภาพ"
+                          aria-label="ดูรูปภาพ"
                           className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -777,12 +813,12 @@ export default function AwardsPage() {
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="award" recordId={award.id} field="description" value={award.description || "-"} hotFields={hot[award.id]} /></td>
                     {canWrite && (
-                      <td className="px-4 py-3 text-center">
+                      <td className="sticky-col px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEdit(award)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
+                          <button onClick={() => openEdit(award)} aria-label="แก้ไข" className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                           </button>
-                          <button onClick={() => setDeleteId(award.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
+                          <button onClick={() => setDeleteId(award.id)} aria-label="ลบ" className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
                         </div>
@@ -810,50 +846,46 @@ export default function AwardsPage() {
         )}
       </div>
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข้อมูลรางวัลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ยืนยันการลบข้อมูล"
+        description="คุณต้องการลบข้อมูลรางวัลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        onConfirm={confirmDelete}
+      />
 
       {photoPreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhotoPreviewUrl(null)}>
-          <div className="relative max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setPhotoPreviewUrl(null)}
-              title="ปิด"
-              className="absolute -right-3 -top-3 z-10 rounded-full bg-white p-1.5 text-gray-700 shadow-lg hover:bg-gray-100"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <img src={assetUrl(photoPreviewUrl)} alt="รูปภาพรางวัล" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
-          </div>
-        </div>
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setPhotoPreviewUrl(null); }}
+          title="รูปภาพรางวัล"
+          size="lg"
+          scrollBody
+        >
+          <img src={assetUrl(photoPreviewUrl)} alt="รูปภาพรางวัล" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+        </Modal>
       )}
 
       {showBulkDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowBulkDeleteDialog(false); }}
+          title="ยืนยันการลบข้อมูล"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>ยกเลิก</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+          </p>
+        </Modal>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import SearchInput from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
 import { FORUM_SORT_VALUES, FORUM_SORT_LABELS } from "@/lib/validations";
@@ -262,30 +263,30 @@ export default function AlumniForumPage() {
       )}
 
       {/* Leave-community confirm dialog */}
-      {showLeaveConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">ออกจากชุมชน</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">
-              ท่านจะไม่สามารถอ่านหรือโพสต์ในกระดานสนทนาได้อีก โพสต์ที่ท่านเคยสร้างไว้จะยังคงแสดงชื่อของท่านอยู่
-              ท่านสามารถเข้าร่วมใหม่ได้ในภายหลัง
-            </p>
-            {leaveError && <p className="mb-3 text-sm text-red-600">{leaveError}</p>}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowLeaveConfirm(false)} disabled={joinMutation.isPending}>
-                ยกเลิก
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => joinMutation.mutate("opt-out")}
-                disabled={joinMutation.isPending}
-              >
-                {joinMutation.isPending ? "กำลังดำเนินการ..." : "ออกจากชุมชน"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showLeaveConfirm}
+        onOpenChange={(o) => { if (!o) setShowLeaveConfirm(false); }}
+        title="ออกจากชุมชน"
+        description="ท่านจะไม่สามารถอ่านหรือโพสต์ในกระดานสนทนาได้อีก โพสต์ที่ท่านเคยสร้างไว้จะยังคงแสดงชื่อของท่านอยู่ ท่านสามารถเข้าร่วมใหม่ได้ในภายหลัง"
+        size="sm"
+        showCloseButton={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowLeaveConfirm(false)} disabled={joinMutation.isPending}>
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => joinMutation.mutate("opt-out")}
+              disabled={joinMutation.isPending}
+            >
+              {joinMutation.isPending ? "กำลังดำเนินการ..." : "ออกจากชุมชน"}
+            </Button>
+          </>
+        }
+      >
+        {leaveError && <p className="text-sm text-red-600">{leaveError}</p>}
+      </Modal>
 
       <p className="mt-6 text-center text-xs text-[var(--muted)]">
         แสดง {topics.length} จาก {total} กระทู้

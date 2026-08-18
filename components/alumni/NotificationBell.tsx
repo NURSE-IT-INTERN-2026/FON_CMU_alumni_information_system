@@ -24,7 +24,7 @@ export default function NotificationBell() {
   return (
     <Link
       href="/graduates/notifications"
-      aria-label="การแจ้งเตือน"
+      aria-label={count > 0 ? `การแจ้งเตือน (มี ${count > 99 ? "99+" : count} รายการที่ยังไม่ได้อ่าน)` : "การแจ้งเตือน"}
       className="relative inline-flex items-center justify-center rounded-md p-2 text-white hover:bg-white/10"
       title="การแจ้งเตือน"
     >
@@ -36,7 +36,7 @@ export default function NotificationBell() {
         />
       </svg>
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold text-[var(--primary-dark)]">
+        <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold text-[var(--primary-dark)]">
           {count > 99 ? "99+" : count}
         </span>
       )}

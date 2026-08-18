@@ -91,16 +91,28 @@ export default function FacetFilter({
     };
   }, [search, open, fetchValues]);
 
-  // Outside-click to close.
+  // Outside-tap/press to close (pointerdown covers touch + mouse) and Escape to
+  // close + return focus to the trigger.
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const toggle = (value: string) => {
@@ -117,7 +129,10 @@ export default function FacetFilter({
     <div className="relative" ref={containerRef}>
       <button
         type="button"
+        ref={triggerRef}
         disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         onClick={() => {
           // Opening the panel: clear any previous search and load all values
           // immediately. Done in the click handler (not an effect) so the
@@ -148,13 +163,19 @@ export default function FacetFilter({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div
+          // Phones: a fixed, nearly-full-width panel (the trigger is only half
+          // a grid cell wide there — an anchored dropdown would be unusable).
+          // sm+: the classic anchored dropdown under the trigger.
+          className="fixed inset-x-4 top-24 z-50 rounded-lg border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:top-full sm:z-30 sm:mt-1 sm:w-full"
+        >
           <div className="border-b border-gray-100 p-2">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหา..."
+              aria-label="ค้นหาตัวเลือก"
               className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
             />
           </div>
@@ -171,6 +192,7 @@ export default function FacetFilter({
                   <button
                     type="button"
                     key={v.value}
+                    aria-pressed={checked}
                     onClick={() => toggle(v.value)}
                     className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-50 ${
                       checked ? "bg-[var(--primary)]/5 text-[var(--primary)]" : "text-gray-700"
@@ -181,7 +203,9 @@ export default function FacetFilter({
                         type="checkbox"
                         readOnly
                         checked={checked}
-                        className="h-4 w-4 shrink-0 rounded border-gray-300"
+                        aria-hidden
+                        tabIndex={-1}
+                        className="h-4 w-4 shrink-0 rounded border-gray-300 pointer-events-none"
                       />
                       <span className="truncate">{display(v.value)}</span>
                     </span>

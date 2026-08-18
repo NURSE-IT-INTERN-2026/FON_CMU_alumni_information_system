@@ -8,6 +8,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { assetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
@@ -214,18 +215,15 @@ export default function EventDetailPage() {
         <ReportDialog resourceType="EVENT" resourceId={ev.id} open={reportOpen} onOpenChange={setReportOpen} />
       )}
 
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold">ลบกิจกรรม</h3>
-            <p className="mb-4 text-sm text-[var(--muted)]">การลบกิจกรรมจะลบการลงทะเบียนทั้งหมดด้วย ไม่สามารถย้อนกลับได้ (ผู้ดูแลสามารถกู้คืนจากถังขยะได้)</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmDelete(false)}>ยกเลิก</Button>
-              <Button variant="destructive" disabled={deleteEvent.isPending} onClick={() => deleteEvent.mutate()}>{deleteEvent.isPending ? "กำลังลบ..." : "ลบกิจกรรม"}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={(o) => { if (!o) setConfirmDelete(false); }}
+        title="ลบกิจกรรม"
+        description="การลบกิจกรรมจะลบการลงทะเบียนทั้งหมดด้วย ไม่สามารถย้อนกลับได้ (ผู้ดูแลสามารถกู้คืนจากถังขยะได้)"
+        confirmLabel="ลบกิจกรรม"
+        onConfirm={() => deleteEvent.mutate()}
+        loading={deleteEvent.isPending}
+      />
     </div>
   );
 }
