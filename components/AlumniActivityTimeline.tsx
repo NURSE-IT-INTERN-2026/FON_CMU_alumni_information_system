@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
+import { Modal } from "@/components/ui/modal";
 import {
   describeActivityLog,
   describeAuthEvent,
@@ -240,32 +241,19 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
       : null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={itemTitle(item)}
+      size="md"
     >
-      <div
-        className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[var(--foreground)]">
-            {itemTitle(item)}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[var(--muted)] hover:text-[var(--foreground)]"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
-          <ActorBadge actorType={item.actorType} />
-          <span>{fmt(item.createdAt)}</span>
-          {item.actorName && <span>• {item.actorName}</span>}
-        </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+        <ActorBadge actorType={item.actorType} />
+        <span>{fmt(item.createdAt)}</span>
+        {item.actorName && <span>• {item.actorName}</span>}
+      </div>
 
         {authLead && (
           <p className="mb-3 rounded-lg border border-[var(--border)] bg-gray-50 p-3 text-sm font-medium text-[var(--foreground)]">
@@ -328,7 +316,6 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
         {item.reason && (
           <div className="mt-3 text-xs text-[var(--muted)]">เหตุผล: {item.reason}</div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

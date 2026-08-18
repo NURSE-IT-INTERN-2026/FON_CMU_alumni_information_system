@@ -8,6 +8,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { assetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
@@ -207,17 +208,15 @@ export default function FeedPostPage() {
       {report && (
         <ReportDialog resourceType={report.type} resourceId={report.resourceId} open onOpenChange={(v) => { if (!v) setReport(null); }} />
       )}
-      {delComment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold">ลบความคิดเห็น</h3>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDelComment(null)}>ยกเลิก</Button>
-              <Button variant="destructive" disabled={removeComment.isPending} onClick={() => removeComment.mutate(delComment)}>ลบ</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!delComment}
+        onOpenChange={(o) => { if (!o) setDelComment(null); }}
+        title="ลบความคิดเห็น"
+        description="ต้องการลบความคิดเห็นนี้ใช่หรือไม่"
+        confirmLabel="ลบ"
+        onConfirm={() => { if (delComment) removeComment.mutate(delComment); }}
+        loading={removeComment.isPending}
+      />
     </div>
   );
 }

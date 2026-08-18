@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import SearchInput from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 const GROUPS_PAGE_SIZE = 12;
 
@@ -243,10 +244,27 @@ export default function AlumniGroupsPage() {
 
       {/* Create-group dialog */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="mb-4 text-lg font-semibold text-[var(--foreground)]">สร้างกลุ่มความสนใจ</h3>
-            <div className="space-y-3">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowCreate(false); }}
+          title="สร้างกลุ่มความสนใจ"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowCreate(false)} disabled={create.isPending}>
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={() => create.mutate()}
+                disabled={create.isPending || createTitle.trim().length < 2}
+              >
+                {create.isPending ? "กำลังสร้าง..." : "สร้างกลุ่ม"}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">ชื่อกลุ่ม</label>
                 <input
@@ -269,20 +287,8 @@ export default function AlumniGroupsPage() {
                 />
               </div>
               {createError && <p className="text-sm text-red-600">{createError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={() => setShowCreate(false)} disabled={create.isPending}>
-                  ยกเลิก
-                </Button>
-                <Button
-                  onClick={() => create.mutate()}
-                  disabled={create.isPending || createTitle.trim().length < 2}
-                >
-                  {create.isPending ? "กำลังสร้าง..." : "สร้างกลุ่ม"}
-                </Button>
-              </div>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

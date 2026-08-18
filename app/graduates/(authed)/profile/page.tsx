@@ -22,6 +22,8 @@ import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import SectionToggle from "@/components/form/SectionToggle";
 import RepeatableFieldArray, { type FieldDef } from "@/components/form/RepeatableFieldArray";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -415,50 +417,46 @@ export default function AlumniProfilePage() {
   return (
     <>
       {/* First-login modal */}
-      {showFirstLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
-              <svg className="h-6 w-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-              </svg>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">พบข้อมูลของท่านในระบบแล้ว</h3>
-            <p className="mb-6 text-sm text-purple-700">
-              พบข้อมูลของท่านในระบบแล้ว กรุณาตรวจสอบและแก้ไขข้อมูลตามต้องการ
-            </p>
-            <button
-              onClick={dismissFirstLoginModal}
-              className="w-full rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
-            >
-              ตกลง
-            </button>
-          </div>
+      <Modal
+        open={showFirstLoginModal}
+        onOpenChange={(o) => { if (!o) dismissFirstLoginModal(); }}
+        title="พบข้อมูลของท่านในระบบแล้ว"
+        size="sm"
+        showCloseButton={false}
+        footer={
+          <Button className="w-full" onClick={dismissFirstLoginModal}>ตกลง</Button>
+        }
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
+          <svg className="h-6 w-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
         </div>
-      )}
+        <p className="text-sm text-purple-700">
+          พบข้อมูลของท่านในระบบแล้ว กรุณาตรวจสอบและแก้ไขข้อมูลตามต้องการ
+        </p>
+      </Modal>
 
       {/* Admin-edit notification modal */}
-      {showAdminEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-              <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-              </svg>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-[var(--foreground)]">ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน</h3>
-            <p className="mb-6 text-sm text-purple-700">
-              ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน กรุณาตรวจสอบความถูกต้อง หากไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
-            </p>
-            <button
-              onClick={dismissAdminEditModal}
-              className="w-full rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
-            >
-              ตกลง
-            </button>
-          </div>
+      <Modal
+        open={showAdminEditModal}
+        onOpenChange={(o) => { if (!o) dismissAdminEditModal(); }}
+        title="ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน"
+        size="sm"
+        showCloseButton={false}
+        footer={
+          <Button className="w-full" onClick={dismissAdminEditModal}>ตกลง</Button>
+        }
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+          <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
         </div>
-      )}
+        <p className="text-sm text-purple-700">
+          ผู้ดูแลระบบได้แก้ไขข้อมูลของท่าน กรุณาตรวจสอบความถูกต้อง หากไม่ถูกต้องกรุณาติดต่อผู้ดูแลระบบ
+        </p>
+      </Modal>
 
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}

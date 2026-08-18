@@ -23,6 +23,9 @@ import SearchInput from "@/components/ui/search-input";
 import { awardPageFormSchema, type AwardPageFormData } from "@/lib/validations";
 import { assetUrl } from "@/lib/asset-url";
 import { useCanWrite } from "@/lib/role-context";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 interface Award {
   id: string;
@@ -810,50 +813,46 @@ export default function AwardsPage() {
         )}
       </div>
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">คุณต้องการลบข้อมูลรางวัลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ยืนยันการลบข้อมูล"
+        description="คุณต้องการลบข้อมูลรางวัลนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        onConfirm={confirmDelete}
+      />
 
       {photoPreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPhotoPreviewUrl(null)}>
-          <div className="relative max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setPhotoPreviewUrl(null)}
-              title="ปิด"
-              className="absolute -right-3 -top-3 z-10 rounded-full bg-white p-1.5 text-gray-700 shadow-lg hover:bg-gray-100"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <img src={assetUrl(photoPreviewUrl)} alt="รูปภาพรางวัล" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
-          </div>
-        </div>
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setPhotoPreviewUrl(null); }}
+          title="รูปภาพรางวัล"
+          size="lg"
+          scrollBody
+        >
+          <img src={assetUrl(photoPreviewUrl)} alt="รูปภาพรางวัล" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
+        </Modal>
       )}
 
       {showBulkDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการลบข้อมูล</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowBulkDeleteDialog(false); }}
+          title="ยืนยันการลบข้อมูล"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>ยกเลิก</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            คุณต้องการลบข้อมูล <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+          </p>
+        </Modal>
       )}
     </div>
   );

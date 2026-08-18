@@ -19,6 +19,9 @@ import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
 import SearchInput from "@/components/ui/search-input";
 import { useCanWrite } from "@/lib/role-context";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 // PRD §3.12: news lists show at most 9 cards per page.
 const NEWS_PAGE_SIZE = 9;
@@ -779,34 +782,34 @@ export default function NewsListPage() {
         </div>
       )}
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการยุติการเผยแพร่</h3>
-            <p className="mb-6 text-sm text-gray-600">คุณต้องการยุติการเผยแพร่ข่าวสารนี้หรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={confirmDelete} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">ยืนยัน</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => { if (!o) setDeleteId(null); }}
+        title="ยืนยันการยุติการเผยแพร่"
+        description="คุณต้องการยุติการเผยแพร่ข่าวสารนี้หรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ"
+        onConfirm={confirmDelete}
+      />
 
       {showBulkDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการยุติการเผยแพร่</h3>
-            <p className="mb-6 text-sm text-gray-600">
-              คุณต้องการยุติการเผยแพร่ข่าวสาร <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowBulkDeleteDialog(false)} className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">ยกเลิก</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setShowBulkDeleteDialog(false); }}
+          title="ยืนยันการยุติการเผยแพร่"
+          size="sm"
+          showCloseButton={false}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>ยกเลิก</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? "กำลังลบ..." : "ยืนยัน"}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-600">
+            คุณต้องการยุติการเผยแพร่ข่าวสาร <span className="font-bold text-red-600">{selectedCount}</span> รายการหรือไม่? สามารถกู้คืนได้ภายหลังโดยแก้ไขสถานะ
+          </p>
+        </Modal>
       )}
     </div>
   );
