@@ -15,6 +15,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { withTtlCache } from "@/lib/cache";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -205,10 +206,19 @@ export async function fetchCmuGraduatesLive(): Promise<CmuGraduate[]> {
 
 /** All CMU graduates from the LOCAL `cmu_graduates` table. Returns [] before
  *  the first admin sync — callers treat empty as "not yet synced" (surfaced via
- *  `fetchCmuGraduatesOrEmpty`'s `available` flag / the dashboard banner). */
+ *  `fetchCmuGraduatesOrEmpty`'s `available` flag / the dashboard banner).
+ *
+ *  TTL-cached 60s (same pattern as dashboard/alumni-count): this is a full
+ *  ~20k-row table read remapped per call, and several consumers hit it per
+ *  page load (the all-alumni table, facet values, the typeahead, exports).
+ *  `materializeCmuGraduates` busts the entry so a sync is visible instantly.
+ *  Consumers must treat the returned array as READ-ONLY (they all copy before
+ *  sorting/filtering — keep it that way). */
 export async function getCmuGraduatesLocal(): Promise<CmuGraduate[]> {
-  const rows = await prisma.cmuGraduate.findMany({ where: { deletedAt: null } });
-  return rows.map((r) => cmuGraduateRowToShape(r));
+  return withTtlCache("cmu-graduates-local", 60_000, async () => {
+    const rows = await prisma.cmuGraduate.findMany({ where: { deletedAt: null } });
+    return rows.map((r) => cmuGraduateRowToShape(r));
+  });
 }
 
 /** One local graduate by studentId (trimmed), or null if absent / soft-deleted. */
@@ -298,90 +308,14 @@ export function diffCmuGraduates(
 }
 
 // ---------------------------------------------------------------------------
-// Degree mapping
+// Degree mapping + filtering — moved to the client-safe
+// `lib/cmu-graduate-filters.ts` (shared verbatim with the all-alumni page's
+// client-side pipeline), re-exported here so existing server importers
+// (/api/cmu-alumni, /api/alumni/export) keep compiling unchanged.
 // ---------------------------------------------------------------------------
 
-/**
- * Map a CMU Registrar record's `level_id` (+ `major_name_th`) to our local
- * `DegreeLevel` enum value. Mirrors the predicate in the `/api/cmu-alumni`
- * route so filtering, the table view, and facet counts all agree.
- *
- *   level_id 5            → DOCTORAL
- *   level_id 3            → MASTER
- *   level_id 1            → BACHELOR
- *   level_id 2            → NURSING_ASSISTANT
- *   level_id 0 + nursing  → NURSING_ASSISTANT
- *   level_id 0 (other)    → ASSOCIATE
- *
- * Returns null if the level_id is unrecognized (so it is skipped in counts).
- */
-export function cmuLevelToEnum(
-  level_id: string,
-  major_name_th: string,
-): "DOCTORAL" | "MASTER" | "BACHELOR" | "NURSING_ASSISTANT" | "ASSOCIATE" | null {
-  switch (level_id) {
-    case "5":
-      return "DOCTORAL";
-    case "3":
-      return "MASTER";
-    case "1":
-      return "BACHELOR";
-    case "2":
-      return "NURSING_ASSISTANT";
-    case "0":
-      return major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล"
-        ? "NURSING_ASSISTANT"
-        : "ASSOCIATE";
-    default:
-      return null;
-  }
-}
-
-/** Facet/search filters applied to a CMU graduate list. `search` is a substring
- *  (trimmed + lower-cased internally). The three facet arrays are AND-ed; each
- *  matches the same way the `/api/cmu-alumni` list route filters. */
-export interface CmuGraduateFilters {
-  search?: string;
-  degreeLevels?: string[]; // DegreeLevel enum values, via `cmuLevelToEnum`
-  majors?: string[]; // trimmed `major_name_th`
-  graduationYears?: string[]; // trimmed `grad_year`
-}
-
-/**
- * Apply the search + facet filters to a CMU graduate list — the exact logic the
- * `/api/cmu-alumni` list route uses, factored out so the alumni Excel export can
- * filter the merged set the same way (no drift). Pure; returns a new array.
- */
-export function applyCmuGraduateFilters(
-  graduates: readonly CmuGraduate[],
-  { search, degreeLevels = [], majors = [], graduationYears = [] }: CmuGraduateFilters,
-): CmuGraduate[] {
-  const q = (search ?? "").trim().toLowerCase();
-  let filtered: CmuGraduate[] = q
-    ? graduates.filter((g) => {
-        const haystack = [g.name_th, g.surname_th, g.student_id, g.name_en, g.surname_en]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
-      })
-    : [...graduates];
-
-  if (degreeLevels.length || majors.length || graduationYears.length) {
-    filtered = filtered.filter((g) => {
-      if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id, g.major_name_th) ?? "")) {
-        return false;
-      }
-      if (majors.length && !majors.includes((g.major_name_th ?? "").trim())) {
-        return false;
-      }
-      if (graduationYears.length && !graduationYears.includes((g.grad_year ?? "").trim())) {
-        return false;
-      }
-      return true;
-    });
-  }
-  return filtered;
-}
+export { cmuLevelToEnum, applyCmuGraduateFilters } from "@/lib/cmu-graduate-filters";
+export type { CmuGraduateFilters, CmuGraduateFilterInput } from "@/lib/cmu-graduate-filters";
 
 // ---------------------------------------------------------------------------
 // Public read API (names kept; bodies now read LOCAL)
