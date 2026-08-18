@@ -278,7 +278,7 @@ export default function GroupDetailPage() {
                 >
                   {e.coverImageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={assetUrl(e.coverImageUrl)} alt="" className="h-32 w-full object-cover" />
+                    <img src={assetUrl(e.coverImageUrl)} alt={`รูปปกกิจกรรม ${e.title ?? ""}`.trim()} className="h-32 w-full object-cover" />
                   )}
                   <div className="p-4">
                     <h3 className="font-semibold text-[var(--foreground)]">{e.title}</h3>

@@ -8,6 +8,7 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useBulkSelection } from "@/lib/useBulkSelection";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PAGE_SIZE, PREFIX_OPTIONS, DEGREE_LEVEL_OPTIONS, BASE_PATH } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { ExportRangeButton } from "@/components/ExportRangeButton";
@@ -551,6 +552,7 @@ export default function AlumniCountPage() {
           <button
             onClick={() => setErrorMsg("")}
             className="ml-4 font-bold text-red-500 hover:text-red-700"
+            aria-label="ปิด"
           >
             &times;
           </button>
@@ -569,6 +571,7 @@ export default function AlumniCountPage() {
             <button
               onClick={() => setImportResult(null)}
               className="ml-4 font-bold text-green-500 hover:text-green-700"
+              aria-label="ปิด"
             >
               &times;
             </button>
@@ -792,50 +795,76 @@ export default function AlumniCountPage() {
                     className="text-white text-left"
                     style={{ backgroundColor: "#5b21b6" }}
                   >
-                    <th className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    <th scope="col" className="w-16 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       ลำดับ
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("studentId")}>
-                      รหัสนักศึกษา {renderSortIcon("studentId")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "studentId" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("studentId")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        รหัสนักศึกษา {renderSortIcon("studentId")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("cohort")}>
-                      รุ่น {renderSortIcon("cohort")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "cohort" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("cohort")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        รุ่น {renderSortIcon("cohort")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("prefix")}>
-                      คำนำหน้า {renderSortIcon("prefix")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "prefix" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("prefix")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        คำนำหน้า {renderSortIcon("prefix")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("firstName")}>
-                      ชื่อ {renderSortIcon("firstName")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "firstName" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("firstName")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ชื่อ {renderSortIcon("firstName")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("lastName")}>
-                      นามสกุล {renderSortIcon("lastName")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "lastName" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("lastName")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        นามสกุล {renderSortIcon("lastName")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("degreeLevel")}>
-                      ระดับการศึกษา {renderSortIcon("degreeLevel")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "degreeLevel" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("degreeLevel")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ระดับการศึกษา {renderSortIcon("degreeLevel")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("major")}>
-                      สาขาวิชา {renderSortIcon("major")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "major" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("major")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        สาขาวิชา {renderSortIcon("major")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("graduationYear")}>
-                      ปีสำเร็จการศึกษา {renderSortIcon("graduationYear")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "graduationYear" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("graduationYear")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ปีสำเร็จการศึกษา {renderSortIcon("graduationYear")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("birthDate")}>
-                      วันเกิด {renderSortIcon("birthDate")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "birthDate" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("birthDate")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        วันเกิด {renderSortIcon("birthDate")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("contactEmail")}>
-                      อีเมลติดต่อ {renderSortIcon("contactEmail")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "contactEmail" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("contactEmail")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        อีเมลติดต่อ {renderSortIcon("contactEmail")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("phones")}>
-                      เบอร์โทร {renderSortIcon("phones")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "phones" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("phones")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        เบอร์โทร {renderSortIcon("phones")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("homeAddress")}>
-                      ที่อยู่ปัจจุบัน {renderSortIcon("homeAddress")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "homeAddress" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("homeAddress")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        ที่อยู่ปัจจุบัน {renderSortIcon("homeAddress")}
+                      </button>
                     </th>
-                    <th className="cursor-pointer px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10" onClick={() => handleSort("remarks")}>
-                      หมายเหตุ {renderSortIcon("remarks")}
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap" aria-sort={sortField === "remarks" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => handleSort("remarks")} className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded">
+                        หมายเหตุ {renderSortIcon("remarks")}
+                      </button>
                     </th>
                     {canWrite && (
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                      <th scope="col" className="sticky-col-head px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                         จัดการ
                       </th>
                     )}
@@ -844,10 +873,11 @@ export default function AlumniCountPage() {
                 <tbody>
                   {tableLoading ? (
                     <tr>
-                      <td colSpan={15} className="px-4 py-12 text-center">
+                      <td colSpan={15} className="px-4 py-12 text-center" role="status" aria-live="polite">
                         <div className="flex justify-center">
                           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
                         </div>
+                        <span className="sr-only">กำลังโหลดข้อมูล</span>
                       </td>
                     </tr>
                   ) : alumni.length === 0 ? (
@@ -855,6 +885,8 @@ export default function AlumniCountPage() {
                       <td
                         colSpan={15}
                         className="px-4 py-12 text-center text-[var(--muted)]"
+                        role="status"
+                        aria-live="polite"
                       >
                         ไม่พบข้อมูล
                       </td>
@@ -869,7 +901,11 @@ export default function AlumniCountPage() {
                         <td className="px-4 py-3 text-center">
                           {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
-                        <td className="px-4 py-3">{a.studentId}</td>
+                        <td className="px-4 py-3">
+                          <Link href={`/management/alumni/${a.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                            {a.studentId}
+                          </Link>
+                        </td>
                         <td className="px-4 py-3 text-[var(--muted)]">
                           <OrangeCell resourceType="alumni" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} />
                         </td>
@@ -904,12 +940,13 @@ export default function AlumniCountPage() {
                           <OrangeCell resourceType="alumni" recordId={a.id} field="remarks" value={a.remarks || "-"} hotFields={hot[a.id]} />
                         </td>
                         {canWrite && (
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <td className="sticky-col px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               <button
                                 onClick={() => openEdit(a)}
                                 className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                                 title="แก้ไข"
+                                aria-label="แก้ไข"
                               >
                                 <svg
                                   className="h-4 w-4"
@@ -929,6 +966,7 @@ export default function AlumniCountPage() {
                                 onClick={() => setDeleteId(a.id)}
                                 className="rounded p-1.5 text-red-500 hover:bg-red-100"
                                 title="ลบ"
+                                aria-label="ลบ"
                               >
                                 <svg
                                   className="h-4 w-4"

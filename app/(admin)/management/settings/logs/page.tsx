@@ -304,7 +304,7 @@ export default function LogsPage() {
                 <th className="px-4 py-3">ผู้ใช้งาน</th>
                 <th className="px-4 py-3">กิจกรรม</th>
                 <th className="px-4 py-3">ประเภทข้อมูล</th>
-                <th className="px-4 py-3">รายละเอียด</th>
+                <th className="sticky-col-head px-4 py-3">รายละเอียด</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -360,7 +360,7 @@ export default function LogsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
-                    <td className="px-4 py-3">
+                    <td className="sticky-col px-4 py-3">
                       {log.action === "IMPORT" ? (
                         <ImportRowSummary
                           details={log.details}

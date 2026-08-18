@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PAGE_SIZE, BASE_PATH, MODEL_REP_NETWORKS as NETWORK_ORDER } from "@/lib/constants";
 import OrangeCell from "@/components/OrangeCell";
 import { ExportRangeButton } from "@/components/ExportRangeButton";
@@ -483,14 +484,21 @@ export default function ModelRepresentativesPage() {
 
   const tableHeader = (field: SortField, label: string, align: "left" | "center" = "left") => (
     <th
-      onClick={() => handleSort(field)}
-      className={`cursor-pointer select-none px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10`}
+      scope="col"
+      aria-sort={mgmtSortField === field ? (mgmtSortDir === "asc" ? "ascending" : "descending") : "none"}
+      className={`select-none px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider whitespace-nowrap`}
     >
-      {label}{" "}
-      <SortIcon
-        active={mgmtSortField === field}
-        dir={mgmtSortDir}
-      />
+      <button
+        type="button"
+        onClick={() => handleSort(field)}
+        className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded"
+      >
+        {label}{" "}
+        <SortIcon
+          active={mgmtSortField === field}
+          dir={mgmtSortDir}
+        />
+      </button>
     </th>
   );
 
@@ -524,6 +532,7 @@ export default function ModelRepresentativesPage() {
           <button
             onClick={() => setErrorMsg("")}
             className="ml-4 font-bold text-red-500 hover:text-red-700"
+            aria-label="ปิด"
           >
             &times;
           </button>
@@ -535,7 +544,7 @@ export default function ModelRepresentativesPage() {
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
             <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
-            <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
+            <button onClick={() => setImportResult(null)} aria-label="ปิด" className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
             <div className="mt-2 border-t border-green-200 pt-2">
@@ -780,7 +789,7 @@ export default function ModelRepresentativesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     ลำดับ
                   </th>
                   {tableHeader("network", "เครือข่าย")}
@@ -791,7 +800,7 @@ export default function ModelRepresentativesPage() {
                   {tableHeader("firstName", "ชื่อ")}
                   {tableHeader("lastName", "นามสกุล")}
                   {canWrite && (
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    <th scope="col" className="sticky-col-head px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                       จัดการ
                     </th>
                   )}
@@ -810,7 +819,11 @@ export default function ModelRepresentativesPage() {
                       <OrangeCell resourceType="model_representative" recordId={a.id} field="generation" value={a.generation} hotFields={hot[a.id]} />
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">
-                      {a.studentId || a.pendingStudentId || "-"}
+                      {a.studentId ? (
+                        <Link href={`/management/alumni/${a.studentId}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                          {a.studentId}
+                        </Link>
+                      ) : (a.pendingStudentId || "-")}
                       {a.pendingStudentId && !a.studentId ? (
                         <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span>
                       ) : null}
@@ -820,12 +833,13 @@ export default function ModelRepresentativesPage() {
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="firstName" value={a.firstName} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3"><OrangeCell resourceType="model_representative" recordId={a.id} field="lastName" value={a.lastName} hotFields={hot[a.id]} /></td>
                     {canWrite && (
-                      <td className="px-4 py-3 text-center">
+                      <td className="sticky-col px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => openEdit(a)}
                             className="rounded p-1.5 text-purple-600 hover:bg-purple-100"
                             title="แก้ไข"
+                            aria-label="แก้ไข"
                           >
                             <svg
                               className="h-4 w-4"
@@ -845,6 +859,7 @@ export default function ModelRepresentativesPage() {
                             onClick={() => setDeleteId(a.id)}
                             className="rounded p-1.5 text-red-500 hover:bg-red-100"
                             title="ลบ"
+                            aria-label="ลบ"
                           >
                             <svg
                               className="h-4 w-4"

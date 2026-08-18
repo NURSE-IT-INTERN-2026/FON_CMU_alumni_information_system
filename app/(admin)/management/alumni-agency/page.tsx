@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
@@ -497,7 +498,7 @@ export default function AlumniAgencyPage() {
       {errorMsg && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
           <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg("")} className="ml-4 text-red-500 hover:text-red-700 font-bold">&times;</button>
+          <button onClick={() => setErrorMsg("")} aria-label="ปิด" className="ml-4 text-red-500 hover:text-red-700 font-bold">&times;</button>
         </div>
       )}
 
@@ -505,7 +506,7 @@ export default function AlumniAgencyPage() {
         <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           <div className="flex items-center justify-between">
             <span>นำเข้าสำเร็จ {importResult.imported} รายการ{importResult.updated > 0 && ` (อัปเดต ${importResult.updated} รายการ)`}{importResult.pending && importResult.pending > 0 ? ` (รอเชื่อมโยง ${importResult.pending} รายการ — ไม่มีข้อมูลศิษย์เก่า)` : ""}</span>
-            <button onClick={() => setImportResult(null)} className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
+            <button onClick={() => setImportResult(null)} aria-label="ปิด" className="ml-4 text-green-500 hover:text-green-700 font-bold">&times;</button>
           </div>
           {importResult.errors.length > 0 && (
             <div className="mt-2 border-t border-green-200 pt-2">
@@ -762,19 +763,26 @@ export default function AlumniAgencyPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--primary)] text-white">
-                  <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
+                  <th scope="col" className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">ลำดับ</th>
                   {sortFields.map(({ field, label }) => (
                     <th
                       key={field}
-                      onClick={() => handleSort(field)}
-                      className="cursor-pointer select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap hover:bg-white/10"
+                      scope="col"
+                      aria-sort={sortField === field ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                      className="select-none px-4 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap"
                     >
-                      {label}
-                      <SortIcon active={sortField === field} dir={sortField === field ? sortDir : "asc"} />
+                      <button
+                        type="button"
+                        onClick={() => handleSort(field)}
+                        className="inline-flex cursor-pointer items-center gap-0.5 text-left hover:bg-white/10 rounded"
+                      >
+                        {label}
+                        <SortIcon active={sortField === field} dir={sortField === field ? sortDir : "asc"} />
+                      </button>
                     </th>
                   ))}
                   {canWrite && (
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
+                    <th scope="col" className="sticky-col-head px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">จัดการ</th>
                   )}
                 </tr>
               </thead>
@@ -782,7 +790,18 @@ export default function AlumniAgencyPage() {
                 {pagedAlumni.map((a, idx) => (
                   <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; if (selectMode) toggleSelect(a.id); else if (a.studentId) router.push(`/management/alumni/${a.studentId}`); }} className={`cursor-pointer border-b border-[var(--border)] transition-colors ${isSelected(a.id) ? "bg-orange-100 hover:bg-orange-200" : "hover:bg-gray-50"}`}>
                     <td className="px-4 py-3 text-center">{(page - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={(a.studentId || a.pendingStudentId) || "-"} hotFields={hot[a.id]} />{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="studentId" value={a.studentId ? (
+                      // Hot cell: OrangeCell already renders the value inside its own
+                      // history <button> — a Link there would nest interactive elements
+                      // (invalid HTML), so the profile link becomes a sibling instead.
+                      hot[a.id]?.includes("studentId") ? a.studentId : (
+                        <Link href={`/management/alumni/${a.studentId}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                          {a.studentId}
+                        </Link>
+                      )
+                    ) : (a.pendingStudentId || "-")} hotFields={hot[a.id]} />{a.studentId && hot[a.id]?.includes("studentId") ? (
+                      <Link href={`/management/alumni/${a.studentId}`} onClick={(e) => e.stopPropagation()} aria-label={`ดูโปรไฟล์ ${a.studentId}`} className="ml-1 text-[var(--primary)] hover:underline">↗</Link>
+                    ) : null}{a.pendingStudentId && !a.studentId ? <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] text-amber-700" title="ไม่มีข้อมูลศิษย์เก่าให้เชื่อมโยง">รอเชื่อมโยง</span> : null}</td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="cohort" value={a.cohort || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="major" value={a.major || "-"} hotFields={hot[a.id]} /></td>
                     <td className="px-4 py-3">{a.prefix || "-"}</td>
@@ -799,12 +818,12 @@ export default function AlumniAgencyPage() {
                     <td className="px-4 py-3 text-[var(--muted)] max-w-xs truncate"><OrangeCell resourceType={a.alumni ? "alumni" : "alumni_agency"} recordId={a.alumni ? a.alumni.id : a.id} field="homeAddress" value={getFieldValue(a, "homeAddress") || "-"} hotFields={a.alumni ? alumniHot[a.alumni.id] : hot[a.id]} /></td>
                     <td className="px-4 py-3 text-[var(--muted)]"><OrangeCell resourceType="alumni_agency" recordId={a.id} field="notes" value={a.notes || "-"} hotFields={hot[a.id]} /></td>
                     {canWrite && (
-                      <td className="px-4 py-3 text-center">
+                      <td className="sticky-col px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEdit(a)} className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
+                          <button onClick={() => openEdit(a)} aria-label="แก้ไข" className="rounded p-1.5 text-purple-600 hover:bg-purple-100" title="แก้ไข">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                           </button>
-                          <button onClick={() => setDeleteId(a.id)} className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
+                          <button onClick={() => setDeleteId(a.id)} aria-label="ลบ" className="rounded p-1.5 text-red-500 hover:bg-red-100" title="ลบ">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                           </button>
                         </div>

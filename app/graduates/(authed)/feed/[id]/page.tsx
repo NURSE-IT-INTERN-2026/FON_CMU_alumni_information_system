@@ -130,10 +130,10 @@ export default function FeedPostPage() {
         )}
         {post.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={assetUrl(post.imageUrl)} alt="" className="mt-3 max-h-96 w-full rounded-md object-cover" />
+          <img src={assetUrl(post.imageUrl)} alt="รูปภาพประกอบโพสต์" className="mt-3 max-h-96 w-full rounded-md object-cover" />
         )}
         <div className="mt-3 flex items-center gap-4 border-t border-[var(--border)] pt-2 text-sm">
-          <button onClick={() => like.mutate()} disabled={like.isPending} className={`font-medium ${post.likedByMe ? "text-[var(--primary)]" : "text-[var(--muted)]"} hover:opacity-80`}>
+          <button onClick={() => like.mutate()} disabled={like.isPending} aria-pressed={post.likedByMe} className={`font-medium ${post.likedByMe ? "text-[var(--primary)]" : "text-[var(--muted)]"} hover:opacity-80`}>
             {post.likedByMe ? "❤️" : "🤍"} {post.likeCount}
           </button>
           <span className="text-[var(--muted)]">💬 {post.commentCount}</span>

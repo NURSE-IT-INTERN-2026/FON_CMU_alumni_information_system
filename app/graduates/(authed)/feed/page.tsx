@@ -178,12 +178,13 @@ export default function AlumniFeedPage() {
                 {p.body && <ForumBody text={p.body} />}
                 {p.imageUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={assetUrl(p.imageUrl)} alt="" className="mt-3 max-h-96 w-full rounded-md object-cover" />
+                  <img src={assetUrl(p.imageUrl)} alt="รูปภาพประกอบโพสต์" className="mt-3 max-h-96 w-full rounded-md object-cover" />
                 )}
                 <div className="mt-3 flex items-center gap-4 border-t border-[var(--border)] pt-2 text-sm">
                   <button
                     onClick={() => like.mutate(p.id)}
                     disabled={like.isPending}
+                    aria-pressed={p.likedByMe}
                     className={`font-medium ${p.likedByMe ? "text-[var(--primary)]" : "text-[var(--muted)]"} hover:opacity-80`}
                   >
                     {p.likedByMe ? "❤️" : "🤍"} {p.likeCount}
