@@ -270,7 +270,6 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 |---|---|
 | `components/Header.tsx` · `Sidebar.tsx` · `Footer.tsx` | Admin chrome (header w/ mobile hamburger, collapsible sidebar, footer) |
 | `components/AlumniHeader.tsx` · `AlumniSidebar.tsx` | Alumni-portal chrome (nav items from the shared `lib/alumni-nav.ts` — edit nav there, not in the components) |
-| `components/data-table.tsx` | Reusable sortable/paginated table |
 | `components/table-pan/DragScrollController.tsx` | Drag-to-pan horizontal scroll for wide tables (see the drag-to-pan lesson) |
 | `components/OrangeCell.tsx` · `FieldHistoryModal.tsx` | Orange update indicators + per-field change-history modal |
 | `components/ui/*` | shadcn/ui primitives (button, dialog, table, select, pagination, …) |

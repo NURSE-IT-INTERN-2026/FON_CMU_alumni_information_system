@@ -21,11 +21,12 @@ export default async function PublicLayout({
     <RoleProvider role={session.user.role}>
       <DragScrollController />
       <div className="flex min-h-screen flex-col">
+        <a href="#main-content" className="skip-link">ข้ามไปเนื้อหาหลัก</a>
         <Header user={{ firstName: session.user.firstName, lastName: session.user.lastName }} />
         <div className="flex flex-1">
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
-            <main className="min-w-0 flex-1">{children}</main>
+            <main id="main-content" className="min-w-0 flex-1">{children}</main>
             <Footer />
           </div>
         </div>

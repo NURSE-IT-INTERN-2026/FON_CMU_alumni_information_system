@@ -23,6 +23,7 @@ export default function AlumniSidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={`block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-[var(--primary)] text-white"

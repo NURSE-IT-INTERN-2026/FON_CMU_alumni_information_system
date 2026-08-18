@@ -93,6 +93,74 @@ body {
   border-radius: 3px;
 }
 
+/* Accessibility foundations ------------------------------------------------- */
+
+/* Keyboard users get a visible ring on every focusable element. Many custom
+   buttons disable the default outline (`focus:outline-none`) with their own
+   focus ring; this is the safety net for anything that forgot one. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Respect the user's motion preference: kill animations/transitions globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skip-to-content link: visually hidden until keyboard-focused. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  z-index: 100;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Sticky table column (the trailing จัดการ actions column) — stays visible
+   while the wide management tables scroll horizontally on narrow screens.
+   Opaque background per row state so scrolled content doesn't bleed through. */
+.sticky-col,
+.sticky-col-head {
+  position: sticky;
+  right: 0;
+  background: var(--card, #fff);
+  box-shadow: -6px 0 8px -6px rgb(0 0 0 / 0.25);
+  background-clip: padding-box;
+}
+.sticky-col-head {
+  z-index: 2;
+}
+.sticky-col {
+  z-index: 1;
+}
+tbody tr:hover .sticky-col {
+  background: var(--secondary, #f1f5f9);
+}
+/* Bulk-selection highlight (orange) used across management tables. */
+tbody tr.bg-orange-50 .sticky-col,
+tbody tr[class*="bg-orange"] .sticky-col {
+  background: #fff7ed;
+}
+
 /* Table styling */
 table {
   border-collapse: collapse;

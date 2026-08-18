@@ -25,11 +25,12 @@ export default async function AuthedGraduatesLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
+      <a href="#main-content" className="skip-link">ข้ามไปเนื้อหาหลัก</a>
       <AlumniHeader alumni={session.alumni} />
       <div className="flex flex-1">
         <AlumniSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <main className="min-w-0 flex-1">{children}</main>
+          <main id="main-content" className="min-w-0 flex-1">{children}</main>
           <Footer />
         </div>
       </div>
