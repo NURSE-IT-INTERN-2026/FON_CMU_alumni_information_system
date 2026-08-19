@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_ITEMS, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
+import { NAV_GROUPS, NavGroup, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
 import { useRole, useCanWrite, useIsAdmin, roleLabel } from "@/lib/role-context";
 
 interface HeaderProps {
@@ -27,14 +27,19 @@ export default function Header({ user }: HeaderProps = {}) {
 
   // Keep this filter identical to Sidebar's so the mobile hamburger menu and
   // the desktop sidebar never disagree on which settings pages a role sees.
-  const items = showSettings
-    ? SETTINGS_NAV_ITEMS.filter((item) => {
-        if (item.superAdminOnly && !isSuperAdmin) return false;
-        if (item.adminOnly && !isAdmin) return false;
-        if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
-        return true;
-      })
-    : NAV_ITEMS;
+  // Settings mode renders as one headerless group (same as Sidebar).
+  const groups: NavGroup[] = showSettings
+    ? [
+        {
+          items: SETTINGS_NAV_ITEMS.filter((item) => {
+            if (item.superAdminOnly && !isSuperAdmin) return false;
+            if (item.adminOnly && !isAdmin) return false;
+            if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
+            return true;
+          }),
+        },
+      ]
+    : NAV_GROUPS;
 
   const toggleSettings = () => {
     setMobileMenuOpen(false);
@@ -170,27 +175,38 @@ export default function Header({ user }: HeaderProps = {}) {
       {mobileMenuOpen && (
         <nav className="border-t border-white/10 lg:hidden">
           <div className="space-y-1 px-4 py-3">
-            {items.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-white/20 text-white"
-                      : "text-white/90 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+            {groups.map((group, gi) => (
+              <div key={group.title ?? `nav-group-${gi}`}>
+                {group.title ? (
+                  <p className="px-3 pb-1 pt-3 text-xs font-semibold text-white/60">
+                    {group.title}
+                  </p>
+                ) : null}
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const isActive =
+                      item.href === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "text-white/90 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
             {showLogout && (
             <button
               type="button"

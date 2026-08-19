@@ -268,7 +268,7 @@ When adding/changing a route, keep this map honest (see Working Protocol "On tou
 
 | File | Purpose |
 |---|---|
-| `components/Header.tsx` · `Sidebar.tsx` · `Footer.tsx` | Admin chrome (header w/ mobile hamburger, collapsible sidebar, footer) |
+| `components/Header.tsx` · `Sidebar.tsx` · `Footer.tsx` | Admin chrome (header w/ mobile hamburger; sidebar + mobile menu render grouped `NAV_GROUPS` — headerless overview, ฐานข้อมูลศิษย์เก่า, ชุมชนศิษย์เก่า; edit nav in `lib/constants.ts`, both components must consume it identically; footer) |
 | `components/AlumniHeader.tsx` · `AlumniSidebar.tsx` | Alumni-portal chrome (nav items from the shared `lib/alumni-nav.ts` — edit nav there, not in the components) |
 | `components/table-pan/DragScrollController.tsx` | Drag-to-pan horizontal scroll for wide tables (see the drag-to-pan lesson) |
 | `components/ui/modal.tsx` · `components/confirm-dialog.tsx` | THE dialog shells (radix-based: focus trap/restore, Escape, aria-modal). NEVER hand-roll a `fixed inset-0` overlay — use `Modal` (forms/content) or `ConfirmDialog` (pure confirmations) |

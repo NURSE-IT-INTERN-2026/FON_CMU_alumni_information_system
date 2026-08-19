@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { NAV_ITEMS, SETTINGS_NAV_ITEMS } from "@/lib/constants";
+import { NAV_GROUPS, NavGroup, SETTINGS_NAV_ITEMS } from "@/lib/constants";
 import { useCanWrite, useIsAdmin, useRole } from "@/lib/role-context";
 import { apiFetch } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -17,14 +17,20 @@ export default function Sidebar() {
   const isSuperAdmin = role === "superadmin";
   const showSettings = pathname.startsWith("/management/settings");
 
-  const items = showSettings
-    ? SETTINGS_NAV_ITEMS.filter((item) => {
-        if (item.superAdminOnly && !isSuperAdmin) return false;
-        if (item.adminOnly && !isAdmin) return false;
-        if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
-        return true;
-      })
-    : NAV_ITEMS;
+  // Settings mode renders as one headerless group so a single render path
+  // (groups → optional section header → items) serves both menus.
+  const groups: NavGroup[] = showSettings
+    ? [
+        {
+          items: SETTINGS_NAV_ITEMS.filter((item) => {
+            if (item.superAdminOnly && !isSuperAdmin) return false;
+            if (item.adminOnly && !isAdmin) return false;
+            if (!item.adminOnly && !canWrite && item.href !== "/management/settings/profile") return false;
+            return true;
+          }),
+        },
+      ]
+    : NAV_GROUPS;
 
   // Pending alumni-account count — drives the red badge on the accounts menu
   // item so admins notice pending signups. Cached 30s (query default); only
@@ -40,29 +46,40 @@ export default function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--card-bg)] lg:block">
       <nav className="sticky top-22 flex h-[calc(100vh-5.5rem)] flex-col justify-between p-4">
-        <ul className="flex-1 space-y-1">
-          {items.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+        <ul className="flex-1 space-y-1 overflow-y-auto">
+          {groups.map((group, gi) => (
+            <li key={group.title ?? `nav-group-${gi}`}>
+              {group.title ? (
+                <p className="px-4 pb-1 pt-4 text-xs font-semibold text-[var(--foreground)]/60">
+                  {group.title}
+                </p>
+              ) : null}
+              <ul className="space-y-1">
+                {group.items.map((item) => {
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : pathname.startsWith(item.href);
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-[var(--primary)] text-white"
-                      : "text-[var(--foreground)] hover:bg-[var(--background)]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                          isActive
+                            ? "bg-[var(--primary)] text-white"
+                            : "text-[var(--foreground)] hover:bg-[var(--background)]"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
         </ul>
         {!showSettings && canWrite && (
           <Link

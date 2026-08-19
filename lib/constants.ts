@@ -39,20 +39,42 @@ export interface NavItem {
   superAdminOnly?: boolean;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { href: "/management/dashboard", label: "แผงควบคุม" },
-  { href: "/management/alumni-activity", label: "สถิติการเข้าใช้" },
-  { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
-  { href: "/management/awards", label: "รางวัล" },
-  { href: "/management/potentials", label: "ศักยภาพ" },
-  { href: "/management/associations", label: "สมาคม/ชมรม" },
-  { href: "/management/graduate-committee", label: "กรรมการบัณฑิต" },
-  { href: "/management/model-representatives", label: "ผู้แทนรุ่น" },
-  { href: "/management/alumni-agency", label: "ข้อมูลการทำงานศิษย์เก่า" },
-  { href: "/management/news", label: "ข่าวสาร" },
-  { href: "/management/forum", label: "กระดานสนทนา" },
-  { href: "/management/events", label: "กิจกรรม" },
-  { href: "/management/announcements", label: "ประกาศชุมชน" },
+export interface NavGroup {
+  /** Omitted → the group renders without a header (top-of-menu items). */
+  title?: string;
+  items: NavItem[];
+}
+
+// Admin main menu, grouped so alumni-DATA pages and alumni-COMMUNITY pages
+// are visually separated in the sidebar + mobile menu.
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      { href: "/management/dashboard", label: "แผงควบคุม" },
+      { href: "/management/alumni-activity", label: "สถิติการเข้าใช้" },
+    ],
+  },
+  {
+    title: "ฐานข้อมูลศิษย์เก่า",
+    items: [
+      { href: "/management/all-alumni", label: "ข้อมูลนักศึกษาเก่า" },
+      { href: "/management/awards", label: "รางวัล" },
+      { href: "/management/potentials", label: "ศักยภาพ" },
+      { href: "/management/associations", label: "สมาคม/ชมรม" },
+      { href: "/management/graduate-committee", label: "กรรมการบัณฑิต" },
+      { href: "/management/model-representatives", label: "ผู้แทนรุ่น" },
+      { href: "/management/alumni-agency", label: "ข้อมูลการทำงานศิษย์เก่า" },
+    ],
+  },
+  {
+    title: "ชุมชนศิษย์เก่า",
+    items: [
+      { href: "/management/news", label: "ข่าวสาร" },
+      { href: "/management/forum", label: "กระดานสนทนา" },
+      { href: "/management/events", label: "กิจกรรม" },
+      { href: "/management/announcements", label: "ประกาศชุมชน" },
+    ],
+  },
 ];
 
 export const SETTINGS_NAV_ITEMS: NavItem[] = [
