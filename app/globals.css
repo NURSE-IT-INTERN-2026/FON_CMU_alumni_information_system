@@ -167,9 +167,14 @@ table {
 }
 
 /* Drag-to-pan horizontal scroll: the whole table is grabbable; `grabbing` is
-   forced (over the rows' cursor-pointer) only while a drag is in progress. */
+   forced (over the rows' cursor-pointer) only while a drag is in progress.
+   `contain: paint` fences the table's scrollable overflow: Chromium leaks a
+   wide table's min-content out of the overflow-x-auto box into the DOCUMENT
+   scroll area (page-wide horizontal scroll + a blank band on the right on
+   narrow viewports; on mobile Chrome the viewport silently stretches instead). */
 .overflow-x-auto:has(table) {
   cursor: grab;
+  contain: paint;
 }
 .drag-panning,
 .drag-panning * {
