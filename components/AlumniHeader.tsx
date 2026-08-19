@@ -53,13 +53,15 @@ export default function AlumniHeader({ alumni }: AlumniHeaderProps) {
           }}
         />
 
-        <div className="relative mx-auto flex max-w-full items-center justify-between px-5 py-3 sm:px-7 lg:px-9">
-          {/* Logo & Title */}
+        <div className="relative mx-auto flex max-w-full items-center justify-between px-3 py-3 sm:px-7 lg:px-9">
+          {/* Logo & Title — logo steps down below lg (same min-content fix as
+              the admin Header: h-16 crest is ~193px wide and overflows narrow
+              viewports with a blank band on the right). */}
           <div className="flex shrink-0 items-center gap-3">
             <img
               src={`${BASE_PATH}/fon-cmu-logo.png`}
               alt="FON CMU Logo"
-              className="h-16 w-auto"
+              className="h-10 w-auto sm:h-12 lg:h-16"
             />
             <span className="hidden text-sm font-semibold leading-snug sm:block md:text-base">
               ระบบสารสนเทศศิษย์เก่า

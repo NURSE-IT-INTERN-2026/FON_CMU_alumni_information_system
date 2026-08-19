@@ -58,13 +58,15 @@ export default function Header({ user }: HeaderProps = {}) {
           }}
         />
 
-        <div className="relative mx-auto flex max-w-full items-center justify-between px-5 py-3 sm:px-7 lg:px-9">
-          {/* Logo & Title */}
+        <div className="relative mx-auto flex max-w-full items-center justify-between px-3 py-3 sm:px-7 lg:px-9">
+          {/* Logo & Title — logo steps down below lg so the row's min-content
+              fits ~265px; at h-16 the wide crest logo alone is ~193px and the
+              header overflows narrow viewports (blank band on the right). */}
           <div className="flex items-center gap-3 shrink-0">
             <img
               src={`${BASE_PATH}/fon-cmu-logo.png`}
               alt="FON CMU Logo"
-              className="h-16 w-auto"
+              className="h-10 w-auto sm:h-12 lg:h-16"
             />
             <span className="hidden text-sm font-semibold leading-snug sm:block md:text-base">
               ระบบสารสนเทศศิษย์เก่า
