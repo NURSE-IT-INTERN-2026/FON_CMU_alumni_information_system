@@ -9,6 +9,7 @@ import { resolveEventReader, resolveEventCreator, adminLogCtx, alumniLogCtx } fr
 import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { bangkokDatetimeLocalToIso } from "@/lib/event-format";
+import { resolveEventWindow } from "@/lib/event-calendar";
 import { loadGroup, requireGroupMember } from "@/lib/group-guard";
 import { handleZodError, eventCreateSchema } from "@/lib/validations";
 
@@ -43,12 +44,18 @@ export async function GET(request: NextRequest) {
     const scope = searchParams.get("scope") === "past" ? "past" : "upcoming";
     const now = new Date();
 
+    // Calendar month window (?from=&to=, ISO instants) takes precedence over
+    // the scope comparison — the month grid inherently spans past + future.
+    const window = resolveEventWindow(searchParams.get("from"), searchParams.get("to"));
+
     const where: Prisma.CommunityEventWhereInput = { deletedAt: null };
     // Group scoping (community V2): `groupId=none` = community-wide only.
     const groupId = searchParams.get("groupId");
     if (groupId === "none") where.groupId = null;
     else if (groupId) where.groupId = groupId;
-    if (scope === "upcoming") {
+    if (window) {
+      where.startAt = { gte: window.from, lt: window.to };
+    } else if (scope === "upcoming") {
       where.startAt = { gte: now };
     } else {
       where.startAt = { lt: now };
@@ -65,7 +72,7 @@ export async function GET(request: NextRequest) {
       prisma.communityEvent.findMany({
         where,
         include: ORGANIZER_INCLUDE,
-        orderBy: { startAt: scope === "upcoming" ? "asc" : "desc" },
+        orderBy: { startAt: window ? "asc" : scope === "upcoming" ? "asc" : "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

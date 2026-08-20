@@ -15,3 +15,20 @@ export const THAI_MONTH_ABBR = [
   "พ.ย.",
   "ธ.ค.",
 ];
+
+// Full Thai month names (index 0 = January) — e.g. calendar month labels.
+// (event-format.ts keeps its own private copies; this is the shared export.)
+export const THAI_MONTH_FULL = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];

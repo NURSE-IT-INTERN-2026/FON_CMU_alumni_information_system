@@ -9,7 +9,14 @@ import { assetUrl } from "@/lib/asset-url";
 import SearchInput from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
 import EventOrganizerView, { type EventOrganizer } from "@/components/events/EventOrganizer";
+import EventCalendarView from "@/components/events/EventCalendarView";
 import { formatEventDateThai } from "@/lib/event-format";
+import {
+  currentBangkokMonth,
+  monthRangeBangkok,
+  shiftMonth,
+  type MonthCursor,
+} from "@/lib/event-calendar";
 
 const PAGE_SIZE = 9;
 
@@ -34,6 +41,8 @@ export default function AlumniEventsPage() {
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [cursor, setCursor] = useState<MonthCursor>(currentBangkokMonth);
 
   // optedIn drives the "จัดกิจกรรม" button (only opted-in alumni may create).
   const { data: membership } = useQuery({
@@ -49,9 +58,35 @@ export default function AlumniEventsPage() {
       if (search) params.set("search", search);
       return apiFetch<Paged<EventItem>>(`/api/events?${params}`);
     },
+    enabled: view === "list",
   });
   const events = data?.data ?? [];
   const totalPages = data?.totalPages ?? 1;
+
+  // Calendar month query: ?from=&to= Bangkok month window + search. pageSize
+  // is server-capped at 100 — loop the (absurd) >100-events/month case only.
+  const { data: calEvents, isPending: calPending } = useQuery({
+    queryKey: queryKeys.events.month({ ...cursor, search }),
+    queryFn: async () => {
+      const range = monthRangeBangkok(cursor);
+      const out: EventItem[] = [];
+      let pageNum = 1;
+      for (;;) {
+        const params = new URLSearchParams({
+          page: String(pageNum),
+          pageSize: "100",
+          from: range.from,
+          to: range.to,
+        });
+        if (search) params.set("search", search);
+        const res = await apiFetch<Paged<EventItem>>(`/api/events?${params}`);
+        out.push(...res.data);
+        if (out.length >= res.total || res.data.length === 0) return out;
+        pageNum++;
+      }
+    },
+    enabled: view === "calendar",
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -66,19 +101,38 @@ export default function AlumniEventsPage() {
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="mb-5 flex gap-2">
-        {(["upcoming", "past"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => { setScope(s); setPage(1); }}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              scope === s ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"
-            }`}
-          >
-            {s === "upcoming" ? "กำลังจะมาถึง" : "ที่ผ่านมา"}
-          </button>
-        ))}
+      {/* Tabs + view toggle */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        {view === "list" ? (
+          <div className="flex gap-2">
+            {(["upcoming", "past"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => { setScope(s); setPage(1); }}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  scope === s ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"
+                }`}
+              >
+                {s === "upcoming" ? "กำลังจะมาถึง" : "ที่ผ่านมา"}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-[var(--muted)]">แสดงกิจกรรมรายเดือน</span>
+        )}
+        <div className="flex gap-2" role="group" aria-label="มุมมองการแสดงผล">
+          {(["list", "calendar"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                view === v ? "bg-[var(--primary)] text-white" : "border border-[var(--border)] bg-white hover:bg-gray-100"
+              }`}
+            >
+              {v === "list" ? "รายการ" : "ปฏิทิน"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-6">
@@ -89,6 +143,17 @@ export default function AlumniEventsPage() {
         />
       </div>
 
+      {view === "calendar" ? (
+        <EventCalendarView
+          events={calEvents ?? []}
+          cursor={cursor}
+          isPending={calPending}
+          onPrev={() => setCursor((c) => shiftMonth(c, -1))}
+          onNext={() => setCursor((c) => shiftMonth(c, 1))}
+          onToday={() => setCursor(currentBangkokMonth())}
+        />
+      ) : (
+        <>
       {isPending ? (
         <div className="flex justify-center py-16">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
@@ -143,6 +208,8 @@ export default function AlumniEventsPage() {
           <span className="px-2 text-sm text-[var(--muted)]">หน้า {page}/{totalPages}</span>
           <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>ถัดไป</Button>
         </div>
+      )}
+        </>
       )}
     </div>
   );
