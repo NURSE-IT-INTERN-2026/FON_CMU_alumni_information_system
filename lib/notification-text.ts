@@ -11,8 +11,6 @@ export type NotificationTypeValue =
   | "COMMENT_ON_MY_POST"
   | "RSVP_ON_MY_EVENT"
   | "NEW_GROUP_TOPIC"
-  | "MENTORSHIP_REQUEST"
-  | "MENTORSHIP_RESPONSE"
   | "REPORT_OUTCOME";
 
 function nameOf(a: AlumniPublicIdentity | { prefix: string; firstName: string; lastName: string }): string {
@@ -29,9 +27,6 @@ export function notificationLink(type: NotificationTypeValue, entityId?: string 
       return entityId ? `/graduates/feed/${entityId}` : "/graduates/feed";
     case "RSVP_ON_MY_EVENT":
       return entityId ? `/graduates/events/${entityId}` : "/graduates/events";
-    case "MENTORSHIP_REQUEST":
-    case "MENTORSHIP_RESPONSE":
-      return "/graduates/mentorship";
     case "REPORT_OUTCOME":
       return null; // No dedicated page — the title/body says it all.
   }
@@ -72,13 +67,6 @@ export function notificationText(
       return {
         title: actor ? `${actor} เริ่มการสนทนาใหม่ใน${input.groupTitle ?? "กลุ่ม"}` : "มีการสนทนาใหม่ในกลุ่มของคุณ",
         body: input.topicTitle ?? null,
-      };
-    case "MENTORSHIP_REQUEST":
-      return { title: actor ? `${actor} ส่งคำขอขอคำปรึกษาถึงคุณ` : "มีคำขอขอคำปรึกษาใหม่", body: null };
-    case "MENTORSHIP_RESPONSE":
-      return {
-        title: actor ? `${actor} ตอบกลับคำขอขอคำปรึกษาของคุณ` : "คำขอขอคำปรึกษาของคุณได้รับการตอบกลับ",
-        body: null,
       };
     case "REPORT_OUTCOME":
       return {

@@ -59,8 +59,6 @@ export type LogResource =
   | "community_group"
   | "group_membership"
   | "job_posting"
-  | "mentor_profile"
-  | "mentorship_request"
   | "event_photo"
   | "announcement";
 
