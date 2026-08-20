@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 # Alumni Information System — Faculty of Nursing, Chiang Mai University (FON CMU)
 
-**Date:** 2026-05-29 (revised 2026-07-30)
+**Date:** 2026-05-29 (revised 2026-08-20)
 **Author:** Lead Supervisor, Faculty of Nursing CMU
 **Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS 4, Prisma 7, PostgreSQL
 
@@ -14,7 +14,7 @@
 A web-based alumni information system for the Faculty of Nursing, Chiang Mai University (FON CMU), built and maintained by the faculty's lead supervisor. It serves two audiences:
 
 1. **Staff** (administrators) — manage alumni data through an admin workspace: filterable/sortable tables, full CRUD, Excel import/export, and a dashboard overview.
-2. **Graduates** (alumni) — sign up, log in, and maintain their own profile and education records, and read news published by the faculty.
+2. **Graduates** (alumni) — sign up, log in, and maintain their own profile and education records, read news published by the faculty, and take part in the opt-in alumni community (§3.24).
 
 **Primary goal:** let staff display alumni data in tables that can be filtered, sorted, searched, exported, and edited (including Excel import/export), and to give each graduate a self-service account over their own record.
 
@@ -22,6 +22,7 @@ Two capabilities that have grown beyond the original MVP scope are now core to t
 
 - **Alumni account self-service lifecycle** — graduates sign themselves up and verify email ownership, then a staff member approves the account before it can log in (§3.1.2–3.1.3).
 - **CMU Registrar materialization** — the faculty's graduate universe is pulled from the CMU Registrar into a local cache on demand; the all-alumni table, dashboard counts, and facets are all built on that cache (§3.19).
+- **Alumni community (ชุมชนศิษย์เก่า)** — an opt-in social layer for graduates: forum, events, activity feed, groups, directory, job board, mentorship, staff announcements, and in-app notifications (§3.24).
 
 > **Access policy:** there is **no public/anonymous browsing**. The system serves only the two audiences above. Every content page and data API requires an authenticated session (staff or graduate). Only the login page, sign-up, password-reset, and the authentication API endpoints are reachable without a session; an anonymous visitor sees only the login page.
 
@@ -47,6 +48,7 @@ Two capabilities that have grown beyond the original MVP scope are now core to t
 
 - An alumni record does **not** need to pre-exist for someone to sign up. The graduate enters their identity at sign-up; the system captures a verification snapshot for the staff reviewer, who decides whether to approve (§3.1.3).
 - An alumni can only ever view and edit the `Alumni` record linked to their account.
+- **Community exception (§3.24):** alumni see each other only through the community, and only through the **public-identity fields** (name, cohort, degree, photo) — never contact data. Forum/feed/groups/directory/mentorship additionally require an explicit **opt-in**; events, jobs, and announcements are broadcast to every ACTIVE alumni.
 
 ---
 
@@ -221,7 +223,7 @@ Reached via the settings navigation:
 ### 3.16 System Logs
 
 - Logs every action in a table: ชื่อ นามสกุล, ตำแหน่ง (role), กิจกรรม, รายละเอียด. 20 rows per page.
-- **กิจกรรม (activity) types:** เพิ่ม (CREATE), แก้ไข (UPDATE), ลบ (DELETE), ลบหลายรายการ (BULK_DELETE), นำเข้า (IMPORT), ส่งออก (EXPORT), กู้คืน (RESTORE), ลบถาวร (HARD_DELETE), สมัครสมาชิก (SIGNUP), อนุมัติ (APPROVE), ปฏิเสธ (REJECT), ยื่นคำขอใหม่ (REAPPLY), ยืนยันตัวตน (VERIFY_IDENTITY), ขอรีเซ็ตรหัสผ่าน (PASSWORD_RESET_REQUEST), รีเซ็ตรหัสผ่าน (PASSWORD_RESET_COMPLETE), ยืนยันอีเมล (EMAIL_VERIFY), ส่งอีเมลยืนยัน (EMAIL_VERIFY_REQUEST), เชื่อมโยงรายการที่ค้างอยู่ (LINK), ระงับ (SUSPEND).
+- **กิจกรรม (activity) types:** เพิ่ม (CREATE), แก้ไข (UPDATE), ลบ (DELETE), ลบหลายรายการ (BULK_DELETE), นำเข้า (IMPORT), ส่งออก (EXPORT), กู้คืน (RESTORE), ลบถาวร (HARD_DELETE), สมัครสมาชิก (SIGNUP), อนุมัติ (APPROVE), ปฏิเสธ (REJECT), ยื่นคำขอใหม่ (REAPPLY), ยืนยันตัวตน (VERIFY_IDENTITY), ขอรีเซ็ตรหัสผ่าน (PASSWORD_RESET_REQUEST), รีเซ็ตรหัสผ่าน (PASSWORD_RESET_COMPLETE), ยืนยันอีเมล (EMAIL_VERIFY), ส่งอีเมลยืนยัน (EMAIL_VERIFY_REQUEST), เชื่อมโยงรายการที่ค้างอยู่ (LINK), ระงับ (SUSPEND). Community resources (forum topics/replies, events, feed posts/comments, job postings, event photos, announcements) log through the same CREATE/UPDATE/DELETE actions.
 - **รายละเอียด (details):** an eye icon opens a modal explaining the change (field-level old/new values; for imports, a searchable per-record list of created/updated/failed rows).
 - **Update indicators (orange values):** when a record's data is updated, each admin alumni-data page reflects it. If a change affects every page (e.g. first/last name), it shows on **every** page. The updated value renders in **orange and is clickable**; clicking opens the per-field **update history** (old → new, who, when). Indicators cover both staff edits (`alumni`) and alumni self-edits (`alumni_profile`).
 - Supports filtering to alumni-only activities. Superadmin-only: bulk **hard-delete** of log entries (which is deliberately not itself logged).
@@ -244,6 +246,7 @@ Reached via the settings navigation:
 - The FON graduate universe is **materialized locally** (the `cmu_graduates` table — one row per registrar degree record, keyed by `studentId`) and **refreshed on demand** by staff from **การดึงข้อมูล** (`/management/settings/cmu-sync`). This local cache is the source for the all-alumni table, the dashboard person counts, the filter facets, and identity checks.
 - The sync page **auto-compares** the local cache vs the live registrar on load (counts + new/removed samples), offers a **ดึงข้อมูล** button to upsert the full remote set, and shows two read-only comparison tables: ข้อมูลในระบบ (local cache) vs ข้อมูลล่าสุดจากทะเบียน (live, with cache-missing rows badged ใหม่).
 - Until the first sync, the dashboard shows an amber "ยังไม่ได้ดึงข้อมูล CMU" banner and counts degrade to local-only.
+- The cache is also refreshed **automatically on the 1st of each month** (Asia/Bangkok) by an idempotent in-process scheduler, with a boot catch-up if the server was down on the 1st (opt-out `CMU_SYNC_CRON_DISABLED=1`; an external cron can instead call the sync endpoint with the `CMU_SYNC_SECRET` bearer token).
 
 ### 3.20 Alumni-Activity Analytics
 
@@ -265,7 +268,30 @@ Reached via the settings navigation:
 
 ### 3.23 Image Upload
 
-- A single upload endpoint accepts one image at a time: **PNG/JPG only** (validated by file signature, not the reported type), **max 5 MB**, stored under `public/uploads/` with a generated filename. Requires a write-permission staff session. Used by the news cover image and the awards image fields.
+**Two endpoints share one validation path** (PNG/JPG only — validated by file signature, not the reported type — max **5 MB**, stored under `public/uploads/` with a generated filename; both call the same helper):
+
+- **`/api/upload`** — requires a write-permission **staff** session. Used by the news cover image and the awards image fields.
+- **`/api/alumni-upload`** — requires an **opted-in alumni** session (§3.24). Used by the activity-feed photo and the community-profile photo.
+
+### 3.24 Alumni Community (ชุมชนศิษย์เก่า)
+
+An opt-in social layer for graduates, launched from the alumni-portal sidebar. **Two visibility models coexist on purpose:**
+
+- **Opt-in gated** (`Alumni.communityOptedInAt` must be set): forum, feed, groups, directory, mentorship. A logged-in alum who hasn't opted in gets 403 `NOT_OPTED_IN`. Staff are opt-in-exempt (they moderate).
+- **Broadcast** (every ACTIVE alum, no opt-in — a reunion is for the whole class): events, job board, staff announcements.
+
+The **public-identity select** (prefix, firstName, lastName, cohort, degreeLevel, photoUrl) is the single surface through which one alum's identity is exposed to another — contact fields are never selected by community queries. All community bodies are **plain text** (escaped + linkified on render), not rich text.
+
+- **Forum (กระดานสนทนา)** — `/graduates/forum`: topics + replies, searchable/sortable. Reports go to a staff moderation queue at `/management/forum` (resolve/dismiss); staff can hide (soft-delete) any content.
+- **Events (กิจกรรมและการพบปะ)** — `/graduates/events`: card list + **month-grid calendar view** (Thai/Buddhist-era month labels; รายการ/ปฏิทิน toggle). RSVP with guests; capacity = total headcount (attendees + guests) → "เต็มแล้ว" when full. Organizer is an opted-in alum **or** a staff member. Per-event **photo album** (upload gated to attendees/organizer/staff). Datetimes are Bangkok wall-clock.
+- **Activity feed (ฟีด)** — `/graduates/feed`: flat posts with likes (toggle), comments, and one optional photo (`/api/alumni-upload`).
+- **Groups (กลุ่ม)** — `/graduates/groups`: COHORT groups (auto-derived per cohort label; join your own cohort only) and INTEREST groups (created by staff or an opted-in alum; creator moderates). A group's "space" is **not a separate feed** — it's the forum topics and events scoped to the group.
+- **Directory (สมุดรายชื่อ)** — `/graduates/directory`: grid of opted-in members with a self-published profile (`CommunityProfile`: own photo, workplace/position/province/country, bio, self-published contact). Opting out hides the profile without deleting it.
+- **Job board (ประกาศงาน)** — `/graduates/jobs`: broadcast-read postings by staff or opted-in alumni; required expiry ≤ 90 days; expired items simply filter out (no cron).
+- **Mentorship (พี่เลี้ยง)** — `/graduates/mentorship`: volunteer mentors (capacity 1–10, pause without losing history); a mentee sends a request (PENDING → ACCEPTED/DECLINED/CANCELLED); the mentor's contact info is disclosed **only** in the accept response.
+- **Announcements (ประกาศชุมชนศิษย์เก่า)** — `/graduates/announcements`: staff plain-text announcements, pinned-first, optional expiry; a "ใหม่" badge via a per-alumni read watermark (no notification fan-out). Staff CRUD at `/management/announcements`.
+- **Notifications (แจ้งเตือน)** — `/graduates/notifications`: in-app center fed by best-effort emitters (reply to my topic, like/comment on my post, RSVP on my event, new group topic, mentorship request/response, report outcome). Title/body/link are pre-rendered snapshots; the unread badge polls from the header bell; read items purge after 90 days.
+- **Content reports** — one report system across forum topics/replies, events, feed posts/comments, job postings, and event photos → the same staff queue at `/management/forum`.
 
 ---
 
@@ -294,8 +320,12 @@ Reached via the settings navigation:
 |---------|--------|
 | Sign up (verify email, then await staff approval) | ✓ |
 | View / edit own profile + education | ✓ |
+| Use the opt-in community (forum, feed, groups, directory, mentorship) | ✓ (opt-in) |
+| View & RSVP events; view jobs & announcements | ✓ (broadcast) |
+| Create events / jobs / feed posts / group topics (opt-in) | ✓ |
+| Report community content | ✓ |
 | Re-apply after rejection; forgot/reset password | ✓ |
-| View other alumni's data | ✗ |
+| View other alumni's contact data | ✗ (community shows public identity only, §3.24) |
 | Access staff pages | ✗ |
 | Import / Export | ✗ |
 | Manage accounts | ✗ |
@@ -316,6 +346,13 @@ Reached via the settings navigation:
 | **AccountStatus** | UNVERIFIED, PENDING, ACTIVE, REJECTED (alumni account lifecycle, §3.1.3) |
 | **SessionType** | ADMIN, ALUMNI |
 | **ActorType** | ADMIN, ALUMNI, SYSTEM |
+| **RsvpStatus** | ATTENDING, DECLINED (community events, §3.24) |
+| **ContentReportStatus** | OPEN, RESOLVED, DISMISSED |
+| **ContentReportReason** | SPAM, HARASSMENT, INAPPROPRIATE, OTHER |
+| **ForumReportResource** | FORUM_TOPIC, FORUM_REPLY, EVENT, FEED_POST, FEED_COMMENT, JOB_POSTING, EVENT_PHOTO (one report system, §3.24) |
+| **GroupKind** | COHORT, INTEREST · **GroupRole**: MEMBER, MODERATOR (§3.24) |
+| **MentorshipStatus** | PENDING, ACCEPTED, DECLINED, CANCELLED (§3.24) |
+| **NotificationType** | REPLY_TO_MY_TOPIC, LIKE_ON_MY_POST, COMMENT_ON_MY_POST, RSVP_ON_MY_EVENT, NEW_GROUP_TOPIC, MENTORSHIP_REQUEST, MENTORSHIP_RESPONSE, REPORT_OUTCOME (§3.24) |
 
 ### Alumni
 Identity + login account for a graduate.
@@ -323,7 +360,8 @@ Identity + login account for a graduate.
 - **Contact:** `email` (login identity, unique) **vs** `contactEmail` (contact, distinct); `phones` (list); `homeAddress` (unified contact address, §3.9).
 - **Account lifecycle:** `passwordHash`?, `accountStatus`, `signupVerification` (JSON snapshot), `emailVerifiedAt`?, `rejectionReason`?/`rejectedAt`?, `suspendedAt`?, `tosAcceptedAt`?, `hasLoggedIn`, `lastLoginAt`?, `adminEditedAt`?.
 - **Primary-degree snapshot** (highest, auto-derived, §3.22): `degreeLevel`, `graduationYear`, `major`, `cohort`, `primaryEducationId` → `Education`.
-- **Relationships:** 1:N `Education`, `Award`, `Association`, `GraduateCommittee`, `Potential`, `ModelRepresentative`, `AlumniAgency`; soft-delete via `deletedAt`.
+- **Community:** `communityOptedInAt`? (the opt-in gate, §3.24), `announcementsLastReadAt`? (watermark for the ใหม่ badge).
+- **Relationships:** 1:N `Education`, `Award`, `Association`, `GraduateCommittee`, `Potential`, `ModelRepresentative`, `AlumniAgency`; the community tables FK to `Alumni.id` (§3.24); soft-delete via `deletedAt`.
 - *Note: workplace / country / province are **not** on `Alumni` — they live on `AlumniAgency` (§3.9, §10).*
 
 ### Education
@@ -356,6 +394,20 @@ Per-field old/new change rows (`resourceType`/`resourceId`/`field`/`oldValue`/`n
 ### PasswordReset · EmailVerification
 Token tables (one row per token) for the password-reset and signup email-verification flows: `alumniId`, unique `token`, `used`, `expiresAt`.
 
+### Alumni Community (§3.24)
+All FK to `Alumni.id`; plain-text bodies; soft-delete (`deletedAt`) everywhere except reports; denormalized counters maintained transactionally.
+
+- **ForumTopic · ForumReply** — opening post + title / reply; `replyCount`/`lastReplyAt` denormalized.
+- **ContentReport** — user report + staff review (OPEN/RESOLVED/DISMISSED); one report per (reporter, target); re-report re-opens.
+- **CommunityEvent · EventRsvp · EventPhoto** — event/reunion (dual organizer: alum XOR staff), RSVP (ATTENDING with `guestCount` / DECLINED, unique per event+alum), photo-album rows (bytes via `/api/alumni-upload`).
+- **FeedPost · FeedLike · FeedComment** — flat feed post (one optional photo); a like is a unique toggle row; `likeCount`/`commentCount` denormalized.
+- **CommunityProfile** — 1:1 self-published directory profile (own photo, workplace/position/province/country, bio, self-published contact).
+- **CommunityGroup · GroupMembership** — COHORT (auto-derived) / INTEREST group + unique membership (MEMBER/MODERATOR); `memberCount`/`topicCount` denormalized. Forum topics and events scope to a group via a nullable `groupId`.
+- **JobPosting** — job-board posting (dual author FKs: alum XOR staff), required `expiresAt` (≤ 90 days).
+- **MentorProfile · MentorshipRequest** — 1:1 mentor volunteer (expertise, capacity 1–10, `accepting` pause flag) + mentee request (PENDING → ACCEPTED/DECLINED/CANCELLED).
+- **Announcement** — staff announcement (plain text); `pinnedAt` floats to top; optional `expiresAt` hides.
+- **Notification** — in-app notification with pre-rendered Thai `title`/`body`/`link` snapshots; `readAt` null = unread.
+
 ---
 
 ## 6. Non-Functional Requirements
@@ -372,10 +424,9 @@ Token tables (one row per token) for the password-reset and signup email-verific
 ## 7. Out of Scope (Post-MVP)
 
 - Multi-language support (English).
-- Alumni-to-alumni socializing features beyond profile self-service (a long-term goal; current MVP scope is profile + education self-service and news).
 - A public/external API for third-party integrations.
 
-*(Email notifications and an alumni-activity analytics view were previously listed here; both are now shipped — §3.20, §3.21.)*
+*(Email notifications, an alumni-activity analytics view, and the alumni community were previously listed here; all are now shipped — §3.20, §3.21, §3.24.)*
 
 ---
 
@@ -401,6 +452,9 @@ Token tables (one row per token) for the password-reset and signup email-verific
 | `/management/model-representatives` | Staff | Model representatives (§3.8) |
 | `/management/alumni-agency` | Staff | Thailand/Abroad agency (§3.9) |
 | `/management/news` | Staff | News cards (§3.12) |
+| `/management/forum` | Staff | Community moderation & reports queue (executive read-only) (§3.24) |
+| `/management/events` | Staff | Community events — CRUD + attendee counts (executive read-only) (§3.24) |
+| `/management/announcements` | Staff (write) | Community announcements — CRUD + pin (§3.24) |
 | `/news/[id]` | Staff session | Full news article (staff see all statuses) |
 | `/management/settings/profile` | Staff | My account |
 | `/management/settings/users` | Admin/Superadmin | Account management — staff + alumni accounts (§3.15) |
@@ -420,6 +474,15 @@ Token tables (one row per token) for the password-reset and signup email-verific
 | `/graduates/tos` | First-time alumni | Terms of Service — accept to continue, or logout (§3.1.4) |
 | `/graduates/news` · `/graduates/news/[id]` | Alumni | Published news, read-only (default landing) (§3.17) |
 | `/graduates/profile` | Alumni | Self profile view/edit (§3.1.5) |
+| `/graduates/forum` · `/forum/new` · `/forum/[id]` | Alumni (opt-in) | Community forum (§3.24) |
+| `/graduates/feed` · `/feed/[id]` | Alumni (opt-in) | Activity feed (§3.24) |
+| `/graduates/events` · `/events/new` · `/events/[id]` | Alumni | Events — list/calendar view, RSVP (§3.24) |
+| `/graduates/groups` · `/groups/[slug]` | Alumni (opt-in) | Groups (§3.24) |
+| `/graduates/directory` · `/directory/[id]` | Alumni (opt-in) | Member directory (§3.24) |
+| `/graduates/jobs` | Alumni | Job board (§3.24) |
+| `/graduates/mentorship` | Alumni (opt-in) | Mentorship (§3.24) |
+| `/graduates/announcements` | Alumni | Staff announcements (§3.24) |
+| `/graduates/notifications` | Alumni | Notification center (§3.24) |
 
 ---
 
@@ -518,6 +581,32 @@ Each follows the standard pattern: `/` (GET list / POST create), `/[id]` (GET/PU
 | `/api/filter-facets` | GET | Staff | Facet values for filters (§3.10) |
 | `/api/field-changes` | GET | Staff | Per-field change history (orange indicators) |
 
+### 9.10 Alumni Community (§3.24)
+
+**Opt-in gated** (forum, feed, groups, directory, mentors, community-profile, alumni-upload): reads need staff or an opted-in alumni; writes need an opted-in alumni. **Broadcast** (events, jobs, announcements): reads need staff or any ACTIVE alumni. Staff moderation writes use the staff write permission. DELETE is a soft delete throughout.
+
+| Endpoint | Methods | Auth | Description |
+|----------|---------|------|-------------|
+| `/api/forum/topics` | GET, POST | Opt-in | Topics (`?search`, `?sort`, `?groupId=`) |
+| `/api/forum/topics/[id]` · `/replies` | GET,PUT,DELETE / GET,POST | Owner-or-staff / opted-in | Topic + replies |
+| `/api/forum/replies/[id]` | PUT, DELETE | Owner-or-staff | Reply edit/hide |
+| `/api/forum/reports` · `/[id]` | POST / GET, POST | Alum / staff | Report content; moderation queue + resolve/dismiss |
+| `/api/events` | GET, POST | Broadcast / staff-or-opted-in | List (`?scope`, `?search`, `?from=&to=` month window, `?groupId=`) / create |
+| `/api/events/[id]` · `/rsvp` | GET,PUT,DELETE / POST,DELETE | Broadcast / owner-or-staff / alum | Event detail + RSVP (capacity-enforced) |
+| `/api/events/[id]/photos` · `/photos/[photoId]` | GET,POST / DELETE | Broadcast / attendee-organizer-staff / uploader-or-staff | Photo album |
+| `/api/feed` · `/[id]` | GET,POST / GET,PUT,DELETE | Opt-in | Feed posts (PUT author-only; DELETE owner-or-staff) |
+| `/api/feed/[id]/like` · `/comments` · `/comments/[id]` | POST / GET,POST / PUT,DELETE | Opt-in | Like toggle, comments |
+| `/api/groups` · `/[slug]` · `/[slug]/membership` | GET,POST / GET,PUT,DELETE / POST,DELETE | Opt-in | List/create, manage (moderator-or-staff), join/leave (idempotent) |
+| `/api/directory` · `/[id]` | GET | Opt-in | Member directory + one public profile (404 when not opted-in) |
+| `/api/jobs` · `/[id]` | GET,POST / GET,PUT,DELETE | Broadcast / staff-or-opted-in / author-or-staff | Job board (`?scope=active|expired|mine`) |
+| `/api/mentors` | GET, PUT | Opt-in | Mentor list / upsert own profile |
+| `/api/mentorship-requests` · `/[id]` | GET,POST / POST | Opt-in | Requests + accept/decline/cancel (mentor contact disclosed on accept only) |
+| `/api/announcements` · `/[id]` · `/mark-read` | GET / GET,PUT,DELETE / POST | Broadcast / staff / alum | Announcements (`?since=true` new-count vs watermark) + watermark stamp |
+| `/api/notifications` · `/unread-count` | GET,POST / GET | Alum | Notification center + badge count |
+| `/api/community-profile` | GET, PUT | Opt-in | Own self-published profile (upsert) |
+| `/api/alumni-profile/community-membership` | POST | Alum | Opt-in / opt-out of the community |
+| `/api/alumni-upload` | POST | Opt-in | Alumni image upload (§3.23) |
+
 ---
 
 ## 10. Changes from the Original Spec
@@ -537,3 +626,6 @@ This appendix records decisions that diverge from the original 2026-05-29 spec, 
 - **Unlinked related rows** (`pendingStudentId`) + **auto-link at canonicalization** — introduced so imports can reference alumni not yet in the system without creating stub records.
 - **Pinned news** ("ประชาสัมพันธ์สำคัญ") — introduced.
 - **Email notifications** and **alumni-activity analytics** — previously "post-MVP"; **now shipped** (§3.20, §3.21).
+- **Alumni community** (forum, events, feed, groups, directory, jobs, mentorship, announcements, in-app notifications) — previously "post-MVP"; **now shipped** (§3.24). *Why:* the faculty wanted graduates to network; the opt-in gate + public-identity select keep the alumni-privacy rule intact for everyone who hasn't chosen to be visible. Includes the events **calendar view** (month grid with Thai/Buddhist-era labels, 2026-08).
+- **Image upload endpoints** — split into staff `/api/upload` and opt-in-alumni `/api/alumni-upload`, sharing one validation helper. *Why:* alumni photos (feed, community profile) needed the same rules without widening the admin-gated endpoint.
+- **CMU Registrar sync** — on-demand only → on-demand **plus a monthly in-process scheduler** (idempotent via the activity log; boot catch-up). *Why:* keep the cache fresh without an operator pressing the button.

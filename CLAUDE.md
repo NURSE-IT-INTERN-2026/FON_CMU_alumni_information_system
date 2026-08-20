@@ -128,8 +128,8 @@ app/
 │       ├── news/                 # News management (cards, not a table)
 │       ├── forum/                # Alumni community forum — moderation/reports queue (admin+superadmin; exec read-only)
 │       ├── events/               # Alumni community events — staff create/edit/delete + attendee counts
+│       ├── announcements/        # Community announcements — staff CRUD + pin toggle
 │       └── settings/{profile,users,logs,cmu-sync,trash}/  # cmu-sync = "การดึงข้อมูล" (admin+superadmin)
-├── admin/{alumni,news,users}/    # Admin-side views (verify purpose before editing)
 ├── graduates/                    # Alumni ("graduates") portal
 │   ├── layout.tsx
 │   ├── {signup,verify-email,forgot-password,reset-password,tos,reapply}/
