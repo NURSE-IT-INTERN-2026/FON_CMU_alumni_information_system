@@ -18,7 +18,7 @@ const MONTHS_TH_FULL = [
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ];
 
-function bangkokParts(d: Date) {
+export function bangkokParts(d: Date) {
   const bkk = new Date(d.getTime() + 7 * 3600 * 1000);
   return {
     year: bkk.getUTCFullYear(),

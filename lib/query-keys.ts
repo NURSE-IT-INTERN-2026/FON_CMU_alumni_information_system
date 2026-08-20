@@ -116,12 +116,14 @@ export const queryKeys = {
       ["forum", "reports", o] as const,
   },
 
-  // Alumni community events — list (upcoming/past) + detail. `.all` wipes
-  // everything event-related on a mutation.
+  // Alumni community events — list (upcoming/past), month-grid calendar, and
+  // detail. `.all` wipes everything event-related on a mutation.
   events: {
     all: ["events"] as const,
     list: (o: { page: number; search: string; scope: string }) =>
       ["events", "list", o] as const,
+    month: (o: { year: number; month: number; search: string }) =>
+      ["events", "month", o] as const,
     detail: (id: string) => ["events", "detail", id] as const,
   },
 
