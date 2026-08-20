@@ -36,7 +36,6 @@ describe("notificationLink — route mapping", () => {
     expect(notificationLink("REPLY_TO_MY_TOPIC", "t1")).toBe("/graduates/forum/t1");
     expect(notificationLink("COMMENT_ON_MY_POST", "p1")).toBe("/graduates/feed/p1");
     expect(notificationLink("RSVP_ON_MY_EVENT", "e1")).toBe("/graduates/events/e1");
-    expect(notificationLink("MENTORSHIP_REQUEST")).toBe("/graduates/mentorship");
     expect(notificationLink("REPORT_OUTCOME")).toBeNull();
   });
 });

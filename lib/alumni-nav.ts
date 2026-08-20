@@ -15,6 +15,5 @@ export const ALUMNI_NAV_ITEMS = [
   { href: "/graduates/directory", label: "ไดเรกทอรีศิษย์เก่า" },
   { href: "/graduates/events", label: "กิจกรรม" },
   { href: "/graduates/jobs", label: "ประกาศงาน" },
-  { href: "/graduates/mentorship", label: "พี่เลี้ยง" },
   { href: "/graduates/profile", label: "ข้อมูลส่วนตัว" },
 ] as const;
