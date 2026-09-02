@@ -15,6 +15,7 @@ import {
   bachelorCohortFromGradYear,
   isSamePersonByBirthday,
 } from "../lib/alumni-verify";
+import { cmuLevelToEnum } from "../lib/cmu-graduate-filters";
 import type { CmuGraduate } from "../lib/cmu-registrar";
 
 describe("normalizeFormBirthDate", () => {
@@ -127,14 +128,26 @@ describe("name + year helpers", () => {
 });
 
 describe("cmuLevelToDegree", () => {
-  it("maps level_id (+ major) to degree", () => {
+  it("maps level_id to degree (user-corrected 2026-09: 0=NA, 1=BACHELOR, 3=MASTER, 5=DOCTORAL, else ASSOCIATE)", () => {
     expect(cmuLevelToDegree("5")).toBe("DOCTORAL");
     expect(cmuLevelToDegree("3")).toBe("MASTER");
     expect(cmuLevelToDegree("1")).toBe("BACHELOR");
-    expect(cmuLevelToDegree("2")).toBe("NURSING_ASSISTANT");
-    expect(cmuLevelToDegree("0", "ประกาศนียบัตรผู้ช่วยพยาบาล")).toBe("NURSING_ASSISTANT");
-    expect(cmuLevelToDegree("0", "อื่นๆ")).toBe("ASSOCIATE");
-    expect(cmuLevelToDegree(undefined)).toBe("BACHELOR");
+    // "0" is unconditionally ประกาศนียบัตรผู้ช่วยพยาบาล — no major_name_th check.
+    expect(cmuLevelToDegree("0")).toBe("NURSING_ASSISTANT");
+    // Anything else (2, 4, unknown, empty) → อนุปริญญา.
+    expect(cmuLevelToDegree("2")).toBe("ASSOCIATE");
+    expect(cmuLevelToDegree("4")).toBe("ASSOCIATE");
+    expect(cmuLevelToDegree(undefined)).toBe("ASSOCIATE");
+    expect(cmuLevelToDegree("")).toBe("ASSOCIATE");
+    // CMU fields can carry trailing spaces.
+    expect(cmuLevelToDegree("1 ")).toBe("BACHELOR");
+  });
+  it("stays in sync with cmuLevelToEnum (lib/cmu-graduate-filters.ts)", () => {
+    for (const id of ["0", "1", "2", "3", "4", "5", "", "9", undefined, null]) {
+      expect(cmuLevelToEnum(id as string), `level_id ${JSON.stringify(id)}`).toBe(
+        cmuLevelToDegree(id),
+      );
+    }
   });
 });
 

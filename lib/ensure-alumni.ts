@@ -72,7 +72,7 @@ export function cmuToAlumniFields(g: CmuGraduate): CmuAlumniFields {
     firstName: (g.name_th ?? "").trim(),
     lastName: (g.surname_th ?? "").trim(),
     englishName: englishName || null,
-    degreeLevel: cmuLevelToDegree(g.level_id, g.major_name_th),
+    degreeLevel: cmuLevelToDegree(g.level_id),
     major,
     graduationYear: Number.isFinite(gradYearNum) && gradYearNum > 0 ? gradYearNum : null,
     cohort: gradYearStr || null,

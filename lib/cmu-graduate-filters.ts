@@ -25,38 +25,30 @@ export interface CmuGraduateFilterInput {
 }
 
 /**
- * Map a CMU Registrar record's `level_id` (+ `major_name_th`) to our local
- * `DegreeLevel` enum value. Mirrors the predicate in the `/api/cmu-alumni`
- * route so filtering, the table view, and facet counts all agree.
+ * Map a CMU Registrar record's `level_id` to our local `DegreeLevel` enum
+ * value. Mirrors `cmuLevelToDegree` (lib/alumni-verify.ts) so filtering, the
+ * table view, facet counts, and display all agree (user-corrected 2026-09).
  *
- *   level_id 5            → DOCTORAL
- *   level_id 3            → MASTER
+ *   level_id 0            → NURSING_ASSISTANT
  *   level_id 1            → BACHELOR
- *   level_id 2            → NURSING_ASSISTANT
- *   level_id 0 + nursing  → NURSING_ASSISTANT
- *   level_id 0 (other)    → ASSOCIATE
- *
- * Returns null if the level_id is unrecognized (so it is skipped in counts).
+ *   level_id 3            → MASTER
+ *   level_id 5            → DOCTORAL
+ *   anything else         → ASSOCIATE
  */
 export function cmuLevelToEnum(
   level_id: string,
-  major_name_th: string,
-): "DOCTORAL" | "MASTER" | "BACHELOR" | "NURSING_ASSISTANT" | "ASSOCIATE" | null {
-  switch (level_id) {
+): "DOCTORAL" | "MASTER" | "BACHELOR" | "NURSING_ASSISTANT" | "ASSOCIATE" {
+  switch (String(level_id ?? "").trim()) {
     case "5":
       return "DOCTORAL";
     case "3":
       return "MASTER";
     case "1":
       return "BACHELOR";
-    case "2":
-      return "NURSING_ASSISTANT";
     case "0":
-      return major_name_th === "ประกาศนียบัตรผู้ช่วยพยาบาล"
-        ? "NURSING_ASSISTANT"
-        : "ASSOCIATE";
+      return "NURSING_ASSISTANT";
     default:
-      return null;
+      return "ASSOCIATE";
   }
 }
 
@@ -92,7 +84,7 @@ export function applyCmuGraduateFilters<T extends CmuGraduateFilterInput>(
 
   if (degreeLevels.length || majors.length || graduationYears.length) {
     filtered = filtered.filter((g) => {
-      if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id, g.major_name_th) ?? "")) {
+      if (degreeLevels.length && !degreeLevels.includes(cmuLevelToEnum(g.level_id))) {
         return false;
       }
       if (majors.length && !majors.includes((g.major_name_th ?? "").trim())) {
