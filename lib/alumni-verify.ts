@@ -219,30 +219,27 @@ export function isYearLike(value: string | null | undefined): boolean {
 // CMU degree level mapping (mirrors app/api/cmu-alumni/route.ts logic)
 // ---------------------------------------------------------------------------
 
-const NURSING_ASSISTANT_MAJOR = "ประกาศนียบัตรผู้ช่วยพยาบาล";
-
-/** Map a CMU level_id (+ major_name_th) to our DegreeLevel enum value. */
+/**
+ * Map a CMU level_id to our DegreeLevel enum value (user-corrected 2026-09):
+ *   0 → NURSING_ASSISTANT, 1 → BACHELOR, 3 → MASTER, 5 → DOCTORAL,
+ *   anything else (2, 4, unknown, empty) → ASSOCIATE.
+ * Keep in sync with `cmuLevelToEnum` (lib/cmu-graduate-filters.ts) — the
+ * parity test in tests/alumni-verify.test.ts pins them together.
+ */
 export function cmuLevelToDegree(
   levelId: string | null | undefined,
-  // Optional: only consulted when levelId === "0" (to disambiguate
-  // NURSING_ASSISTANT vs ASSOCIATE); irrelevant for all other levels.
-  majorNameTh?: string | null | undefined,
 ): DegreeLevelValue {
-  switch (String(levelId ?? "")) {
+  switch (String(levelId ?? "").trim()) {
     case "5":
       return "DOCTORAL";
     case "3":
       return "MASTER";
-    case "2":
-      return "NURSING_ASSISTANT";
     case "1":
       return "BACHELOR";
     case "0":
-      return (majorNameTh ?? "").trim() === NURSING_ASSISTANT_MAJOR
-        ? "NURSING_ASSISTANT"
-        : "ASSOCIATE";
+      return "NURSING_ASSISTANT";
     default:
-      return "BACHELOR";
+      return "ASSOCIATE";
   }
 }
 
@@ -369,10 +366,8 @@ export function dedupeCmuGraduatesByPerson<T extends CmuPersonKeyInput>(
       bestByKey.set(key, g);
       continue;
     }
-    const prevRank =
-      DEGREE_RANK[cmuLevelToDegree(prev.level_id, prev.major_name_th)] ?? 0;
-    const curRank =
-      DEGREE_RANK[cmuLevelToDegree(g.level_id, g.major_name_th)] ?? 0;
+    const prevRank = DEGREE_RANK[cmuLevelToDegree(prev.level_id)] ?? 0;
+    const curRank = DEGREE_RANK[cmuLevelToDegree(g.level_id)] ?? 0;
     if (curRank > prevRank) bestByKey.set(key, g);
   }
 

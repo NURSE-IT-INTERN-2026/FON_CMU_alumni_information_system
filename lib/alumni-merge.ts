@@ -210,7 +210,7 @@ export function mergeAlumniTableRows(
     const derivedCohort =
       c.level_id === "1" && c.grad_year ? bachelorCohortFromGradYear(c.grad_year) : null;
     if (!dedupeView) {
-      const cmuDegreeLevel = cmuLevelToDegree(c.level_id, c.major_name_th);
+      const cmuDegreeLevel = cmuLevelToDegree(c.level_id);
       if (localRow) {
         merged.push({
           ...localRow,

@@ -225,7 +225,7 @@ function buildCmuVerification(
   const cmuCohort = normalizeYear(cmuGrad.grad_year)
     ? String(cmuGrad.grad_year ?? "").trim()
     : null;
-  const cmuDegree = cmuLevelToDegree(cmuGrad.level_id, cmuGrad.major_name_th);
+  const cmuDegree = cmuLevelToDegree(cmuGrad.level_id);
   const cmuMajor = cmuGrad.major_name_th?.trim() || null;
 
   // studentId / names / degreeLevel are always present on a real CMU record.

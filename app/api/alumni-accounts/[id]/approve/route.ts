@@ -44,7 +44,7 @@ export async function POST(
       cmuGrad = null;
     }
     const degreeLevel = cmuGrad
-      ? cmuLevelToDegree(cmuGrad.level_id, cmuGrad.major_name_th)
+      ? cmuLevelToDegree(cmuGrad.level_id)
       : alumni.degreeLevel;
     const gy = cmuGrad?.grad_year ? Number(cmuGrad.grad_year) : NaN;
 

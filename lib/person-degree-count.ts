@@ -95,7 +95,7 @@ export function groupPersonsByDegree(
   for (let i = 0; i < cmu.length; i++) {
     const g = cmu[i];
     const id = `c:${i}`;
-    const degree = cmuLevelToDegree(g.level_id, g.major_name_th);
+    const degree = cmuLevelToDegree(g.level_id);
     addEntity(id, {
       degreeRank: degree ? (DEGREE_RANK[degree] ?? 0) : 0,
       year: parseYear(g.grad_year),

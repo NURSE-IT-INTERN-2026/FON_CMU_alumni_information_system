@@ -100,7 +100,7 @@ export function isAlumniCmuBackedField(field: string): boolean {
 function cmuFieldValue(g: CmuGraduate, field: string): string | null {
   switch (field) {
     case "degreeLevel":
-      return cmuLevelToEnum(g.level_id, g.major_name_th);
+      return cmuLevelToEnum(g.level_id);
     case "major":
       return g.major_name_th || null;
     case "graduationYear":

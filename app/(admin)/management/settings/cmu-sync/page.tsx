@@ -340,8 +340,8 @@ const DEGREE_LEVEL_LABELS: Record<string, string> = Object.fromEntries(
   DEGREE_LEVEL_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-function degreeLabel(levelId: string, major: string): string {
-  return DEGREE_LEVEL_LABELS[cmuLevelToDegree(levelId, major)] ?? "—";
+function degreeLabel(levelId: string): string {
+  return DEGREE_LEVEL_LABELS[cmuLevelToDegree(levelId)] ?? "—";
 }
 
 /**
@@ -467,7 +467,7 @@ function CmuSourceTable({
                   <td className="px-4 py-3">{g.name_th || "—"}</td>
                   <td className="px-4 py-3">{g.surname_th || "—"}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {degreeLabel(g.level_id, g.major_name_th)}
+                    {degreeLabel(g.level_id)}
                   </td>
                   <td className="px-4 py-3">{g.major_name_th || "—"}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{g.grad_year || "—"}</td>

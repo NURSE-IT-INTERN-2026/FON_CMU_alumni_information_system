@@ -53,19 +53,15 @@ const thaiName = (g: CmuGraduate) =>
 const englishName = (g: CmuGraduate) =>
   [g.name_en, g.surname_en].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
 
-/** Map CMU level_id to the cohort label used on the model-representatives page. */
+/** Map CMU level_id to the cohort label used on the model-representatives page
+ *  (0=ผู้ช่วยพยาบาล, 1=ปริญญาพยาบาล, 3=ปริญญาโท, 5=ปริญญาเอก, else=อนุปริญญาพยาบาล). */
 function cohortLabel(g: CmuGraduate): string {
   const lvl = String(g.level_id ?? "").trim();
   if (lvl === "5") return "ปริญญาเอก";
   if (lvl === "3") return "ปริญญาโท";
-  if (lvl === "2") return "ผู้ช่วยพยาบาล";
   if (lvl === "1") return "ปริญญาพยาบาล";
-  if (lvl === "0") {
-    return String(g.major_name_th).includes("ผู้ช่วยพยาบาล")
-      ? "ผู้ช่วยพยาบาล"
-      : "อนุปริญญาพยาบาล";
-  }
-  return "ปริญญาพยาบาล";
+  if (lvl === "0") return "ผู้ช่วยพยาบาล";
+  return "อนุปริญญาพยาบาล";
 }
 
 async function writeSheet(
