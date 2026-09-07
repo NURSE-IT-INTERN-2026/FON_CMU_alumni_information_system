@@ -54,7 +54,7 @@ export async function POST(
     const rl = communityRateLimit(request, "post", COMMUNITY_POST_LIMIT);
     if (rl) return rl;
 
-    const post = await prisma.feedPost.findFirst({ where: { id: postId, deletedAt: null }, select: { id: true, authorId: true } });
+    const post = await prisma.feedPost.findFirst({ where: { id: postId, deletedAt: null }, select: { id: true, authorId: true, body: true } });
     if (!post) return NextResponse.json({ error: "ไม่พบโพสต์" }, { status: 404 });
 
     const v = feedCommentCreateSchema.parse(await request.json());
@@ -74,7 +74,13 @@ export async function POST(
       skipAlumniId: alumni.id,
     });
 
-    await logActivity(alumniLogCtx(alumni), "CREATE", "feed_comment", comment.id, { postId });
+    // postSnippet = the parent post's body excerpt (posts have no title), so
+    // the log identifies WHAT was commented on, matching forum replies'
+    // topicTitle.
+    await logActivity(alumniLogCtx(alumni), "CREATE", "feed_comment", comment.id, {
+      postId,
+      postSnippet: post.body.slice(0, 120),
+    });
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return handleZodError(error);

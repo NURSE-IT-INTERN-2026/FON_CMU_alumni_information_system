@@ -19,6 +19,11 @@ import {
   describeAuthEvent,
   readSectionChanges,
   sectionCountSummary,
+  LOG_ACTION_LABELS,
+  LOG_ACTION_COLORS,
+  LOG_RESOURCE_LABELS,
+  actionLabel,
+  resourceLabel,
   type ImportDetailView,
 } from "@/lib/log-detail";
 
@@ -42,54 +47,9 @@ interface ActivityLog {
   } | null;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  CREATE: "เพิ่มข้อมูล",
-  LOGIN: "เข้าสู่ระบบ",
-  UPDATE: "แก้ไขข้อมูล",
-  DELETE: "ลบข้อมูล",
-  BULK_DELETE: "ลบหลายรายการ",
-  IMPORT: "นำเข้าข้อมูล",
-  EXPORT: "ส่งออกข้อมูล",
-  SUSPEND: "ระงับบัญชี",
-  RESTORE: "ยกเลิกการระงับ",
-  HARD_DELETE: "ลบถาวร",
-  EMAIL_VERIFY: "ยืนยันอีเมล",
-  EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
-  REAPPLY: "ยื่นคำขอใหม่",
-  LINK: "เชื่อมโยงรายการ",
-};
-
-const ACTION_COLORS: Record<string, string> = {
-  CREATE: "bg-purple-100 text-purple-700",
-  LOGIN: "bg-emerald-100 text-emerald-700",
-  UPDATE: "bg-yellow-100 text-yellow-700",
-  DELETE: "bg-red-100 text-red-700",
-  BULK_DELETE: "bg-red-100 text-red-700",
-  IMPORT: "bg-purple-100 text-purple-700",
-  EXPORT: "bg-indigo-100 text-indigo-700",
-  SUSPEND: "bg-amber-100 text-amber-700",
-  RESTORE: "bg-green-100 text-green-700",
-  HARD_DELETE: "bg-red-100 text-red-700",
-  EMAIL_VERIFY: "bg-emerald-100 text-emerald-700",
-  EMAIL_VERIFY_REQUEST: "bg-sky-100 text-sky-700",
-  REAPPLY: "bg-sky-100 text-sky-700",
-  LINK: "bg-violet-100 text-violet-700",
-};
-
-const RESOURCE_LABELS: Record<string, string> = {
-  alumni: "ศิษย์เก่า",
-  award: "รางวัล",
-  association: "สมาคม/ชมรม",
-  graduate_committee: "กรรมการบัณฑิต",
-  potential: "ศักยภาพ",
-  model_representative: "ผู้แทนรุ่น",
-  alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
-  abroad_alumni: "ข้อมูลการทำงานศิษย์เก่า",  // legacy key for pre-rename log rows
-  news: "ข่าวสาร",
-  user: "ผู้ใช้งาน",
-  alumni_profile: "ข้อมูลส่วนตัวศิษย์เก่า",
-  education: "ประวัติการศึกษา",
-};
+// Action/resource badges + labels come from the shared maps in
+// `lib/log-detail.ts` (compile-checked for completeness against LogAction /
+// LogResource), so this page can never fall behind a new action/resource.
 
 const PAGE_SIZE = 20;
 
@@ -237,7 +197,7 @@ export default function LogsPage() {
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         >
           <option value="">ทุกประเภทข้อมูล</option>
-          {Object.entries(RESOURCE_LABELS).map(([value, label]) => (
+          {Object.entries(LOG_RESOURCE_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
@@ -248,7 +208,7 @@ export default function LogsPage() {
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         >
           <option value="">ทุกกิจกรรม</option>
-          {Object.entries(ACTION_LABELS).map(([value, label]) => (
+          {Object.entries(LOG_ACTION_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
@@ -356,11 +316,11 @@ export default function LogsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-600"}`}>
-                        {ACTION_LABELS[log.action] || log.action}
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${LOG_ACTION_COLORS[log.action as keyof typeof LOG_ACTION_COLORS] || "bg-gray-100 text-gray-600"}`}>
+                        {actionLabel(log.action)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{RESOURCE_LABELS[log.resource] || log.resource}</td>
+                    <td className="px-4 py-3 text-gray-700">{resourceLabel(log.resource)}</td>
                     <td className="sticky-col px-4 py-3">
                       {log.action === "IMPORT" ? (
                         <ImportRowSummary
@@ -467,13 +427,13 @@ function DetailModal({
   const countSummary = sectionCountSummary(log.details);
   const authLead =
     log.resource === "alumni_auth" ? describeAuthEvent(log.action, log.details) : null;
-  const resourceLabel = RESOURCE_LABELS[log.resource] ?? log.resource;
+  const resourceLabelText = resourceLabel(log.resource);
 
   return (
     <Modal
       open
       onOpenChange={(o) => { if (!o) onClose(); }}
-      title={resourceLabel}
+      title={resourceLabelText}
       description={formatDate(log.createdAt)}
       size="xl"
       scrollBody
@@ -488,8 +448,8 @@ function DetailModal({
         </>
       }
     >
-      <span className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-600"}`}>
-        {ACTION_LABELS[log.action] || log.action}
+      <span className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${LOG_ACTION_COLORS[log.action as keyof typeof LOG_ACTION_COLORS] || "bg-gray-100 text-gray-600"}`}>
+        {actionLabel(log.action)}
       </span>
 
       {/* Body — tailored to the action */}

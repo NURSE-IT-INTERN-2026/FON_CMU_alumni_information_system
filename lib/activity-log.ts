@@ -1,66 +1,10 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
+import type { LogAction, LogResource } from "@/lib/log-types";
 
-export type LogAction =
-  | "CREATE"
-  | "UPDATE"
-  | "DELETE"
-  | "IMPORT"
-  | "EXPORT"
-  | "BULK_DELETE"
-  | "SIGNUP"
-  | "LOGIN"
-  | "EMAIL_VERIFY_REQUEST"
-  | "EMAIL_VERIFY"
-  | "PASSWORD_RESET_REQUEST"
-  | "PASSWORD_RESET_COMPLETE"
-  | "APPROVE"
-  | "REJECT"
-  | "REAPPLY"
-  | "VERIFY_IDENTITY"
-  | "RESTORE"
-  | "SUSPEND"
-  | "HARD_DELETE"
-  | "LINK"
-  // Alumni community forum
-  | "OPT_IN"
-  | "OPT_OUT"
-  | "REPORT"
-  | "RESOLVE"
-  | "DISMISS";
-
-export type LogResource =
-  | "alumni"
-  | "award"
-  | "association"
-  | "graduate_committee"
-  | "potential"
-  | "model_representative"
-  | "alumni_agency"
-  | "news"
-  | "user"
-  | "alumni_profile"
-  | "alumni_auth"
-  | "cmu_alumni"
-  | "education"
-  // Alumni community forum
-  | "forum_topic"
-  | "forum_reply"
-  | "community"
-  | "content_report"
-  // Alumni community events
-  | "community_event"
-  | "event_rsvp"
-  // Alumni activity feed
-  | "feed_post"
-  | "feed_comment"
-  // Alumni community V2
-  | "community_profile"
-  | "community_group"
-  | "group_membership"
-  | "job_posting"
-  | "event_photo"
-  | "announcement";
+// The unions live in client-safe `lib/log-types.ts` so `lib/log-detail.ts` can
+// type its Thai label maps against them; re-exported here for existing callers.
+export type { LogAction, LogResource };
 
 interface AdminLogContext {
   actorType: "ADMIN";

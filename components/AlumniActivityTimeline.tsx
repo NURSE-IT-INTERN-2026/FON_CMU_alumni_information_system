@@ -9,8 +9,11 @@ import {
   describeActivityLog,
   describeAuthEvent,
   detailRows,
+  formatValue,
   readSectionChanges,
   sectionCountSummary,
+  FIELD_LABELS,
+  resourceLabel,
 } from "@/lib/log-detail";
 
 /**
@@ -24,56 +27,11 @@ import {
 
 type ActorType = "ADMIN" | "ALUMNI" | "SYSTEM";
 
-// Thai labels for tracked fields (change rows + field-item titles).
-const FIELD_LABELS: Record<string, string> = {
-  prefix: "คำนำหน้า",
-  firstName: "ชื่อ",
-  lastName: "นามสกุล",
-  englishName: "ชื่อภาษาอังกฤษ",
-  studentId: "รหัสนักศึกษา",
-  cohort: "รุ่นที่",
-  generation: "ลำดับรุ่น",
-  degreeLevel: "ระดับการศึกษา",
-  major: "สาขาวิชา",
-  graduationYear: "ปีที่จบ",
-  email: "อีเมล",
-  contactEmail: "อีเมลติดต่อ",
-  phones: "เบอร์โทรศัพท์",
-  phone: "เบอร์โทรศัพท์",
-  workplace: "สถานที่ทำงาน",
-  country: "ประเทศ",
-  homeAddress: "ที่อยู่ปัจจุบัน",
-  remarks: "หมายเหตุ",
-  notes: "หมายเหตุ",
-  awardName: "ชื่อรางวัล",
-  awardType: "ประเภทรางวัล",
-  year: "ปี (พ.ศ.)",
-  recordedYear: "ปีที่บันทึก (พ.ศ.)",
-  termYear: "ปี พ.ศ.",
-  description: "รายละเอียด",
-  associationName: "ชื่อสมาคม/ชมรม",
-  position: "ตำแหน่ง",
-  career: "อาชีพ",
-  link: "ลิงก์",
-  imageUrl: "รูปภาพ",
-};
-
-const RESOURCE_LABELS: Record<string, string> = {
-  alumni: "ข้อมูลศิษย์เก่า",
-  alumni_profile: "ข้อมูลส่วนตัว",
-  education: "การศึกษา",
-  award: "รางวัล",
-  association: "สมาคม/ชมรม",
-  graduate_committee: "กรรมการบัณฑิต",
-  potential: "ศักยภาพ",
-  model_representative: "ผู้แทนรุ่น",
-  alumni_agency: "ข้อมูลการทำงานศิษย์เก่า",
-};
-
 interface FieldChange {
   field: string;
-  oldValue: string | null;
-  newValue: string | null;
+  // Kept raw (not pre-stringified) so render can formatValue enums per field.
+  oldValue: unknown;
+  newValue: unknown;
 }
 
 interface FieldItem {
@@ -125,7 +83,8 @@ function ActorBadge({ actorType }: { actorType: ActorType }) {
 }
 
 /** Field changes for an activity item: linked rows, else the `details.changes`
- *  snapshot some routes embed (`{field, from, to}` → normalized). */
+ *  snapshot some routes embed (`{field, from, to}` → normalized). Values are
+ *  kept raw so `formatValue` can translate enum values per field. */
 function effectiveChanges(item: ActivityItem): FieldChange[] {
   if (item.changes.length > 0) return item.changes;
   const details = item.details as Record<string, unknown> | null;
@@ -135,8 +94,8 @@ function effectiveChanges(item: ActivityItem): FieldChange[] {
     .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
     .map((c) => ({
       field: String(c.field ?? ""),
-      oldValue: c.from == null ? null : String(c.from),
-      newValue: c.to == null ? null : String(c.to),
+      oldValue: c.from == null ? null : c.from,
+      newValue: c.to == null ? null : c.to,
     }));
 }
 
@@ -208,7 +167,7 @@ export default function AlumniActivityTimeline({ alumniId }: { alumniId: string 
                 item.resourceType !== "alumni" &&
                 item.resourceType !== "alumni_profile" && (
                   <span className="ml-1 text-[var(--muted)]">
-                    ({RESOURCE_LABELS[item.resourceType] ?? item.resourceType})
+                    ({resourceLabel(item.resourceType)})
                   </span>
                 )}
             </div>
@@ -269,9 +228,9 @@ function ActivityDetailModal({ item, onClose }: { item: TimelineItem; onClose: (
                   {FIELD_LABELS[c.field] ?? c.field}
                 </div>
                 <div className="mt-1">
-                  <span className="text-gray-400 line-through">{c.oldValue || "—"}</span>
+                  <span className="text-gray-400 line-through">{formatValue(c.field, c.oldValue)}</span>
                   <span className="mx-1.5 font-semibold text-orange-500">→</span>
-                  <span className="text-gray-800">{c.newValue || "—"}</span>
+                  <span className="text-gray-800">{formatValue(c.field, c.newValue)}</span>
                 </div>
               </div>
             ))}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BASE_PATH } from "@/lib/constants";
 import { Modal } from "@/components/ui/modal";
+import { FIELD_LABELS } from "@/lib/log-detail";
 
 interface HistoryEntry {
   oldValue: string | null;
@@ -56,13 +57,16 @@ export default function FieldHistoryModal({
   const fmt = (s: string) =>
     new Date(s).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
+  // Callers pass the raw DB column name; look up its Thai label for the title.
+  const fieldLabel = FIELD_LABELS[field] ?? field;
+
   return (
     <Modal
       open
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title={`ประวัติการแก้ไข: ${field}`}
+      title={`ประวัติการแก้ไข: ${fieldLabel}`}
       size="md"
     >
       {history === null ? (
