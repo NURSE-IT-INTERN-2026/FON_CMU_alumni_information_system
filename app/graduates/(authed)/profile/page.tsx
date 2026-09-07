@@ -28,6 +28,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import EducationSection from "@/components/EducationSection";
 import { SectionHeading } from "@/components/SectionHeading";
 import CommunityProfileSection from "@/components/community/CommunityProfileSection";
+import { useTour } from "@/components/tour/tour-provider";
 import { parsePhones, joinPhones } from "@/lib/parse-phone";
 import { formatBirthDateThaiSlash } from "@/lib/alumni-verify";
 
@@ -238,6 +239,7 @@ export default function AlumniProfilePage() {
   const [showAdminEditModal, setShowAdminEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { start: startTour } = useTour();
 
   const {
     register,
@@ -424,7 +426,17 @@ export default function AlumniProfilePage() {
         size="sm"
         showCloseButton={false}
         footer={
-          <Button className="w-full" onClick={dismissFirstLoginModal}>ตกลง</Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              className="hidden w-full lg:inline-flex"
+              onClick={() => { dismissFirstLoginModal(); startTour("alumni-profile"); }}
+            >
+              เริ่มการแนะนำ
+            </Button>
+            <Button variant="outline" className="w-full" onClick={dismissFirstLoginModal}>
+              ปิด
+            </Button>
+          </div>
         }
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
@@ -461,12 +473,13 @@ export default function AlumniProfilePage() {
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
+          <div data-tour="alumni-profile-heading">
             <h1 className="text-2xl font-bold text-[var(--foreground)]">ข้อมูลส่วนตัว</h1>
             <p className="text-sm text-purple-700">ดูและแก้ไขข้อมูลส่วนตัวของท่าน</p>
           </div>
           {!editMode && (
             <button
+              data-tour="alumni-profile-edit"
               onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); }}
               className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
             >
@@ -697,7 +710,7 @@ export default function AlumniProfilePage() {
             /* View mode */
             <div className="space-y-6">
               {/* ข้อมูลส่วนตัว */}
-              <div>
+              <div data-tour="alumni-profile-personal">
                 <SectionHeading title="ข้อมูลส่วนตัว" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InfoField label="คำนำหน้า" value={alumni.prefix} />
@@ -707,17 +720,19 @@ export default function AlumniProfilePage() {
                 </div>
               </div>
 
-              <EducationSection
-                alumniId={alumni.id}
-                listPath="/api/alumni-profile/educations"
-                canWrite
-                onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.me() })}
-              />
+              <div data-tour="alumni-profile-education">
+                <EducationSection
+                  alumniId={alumni.id}
+                  listPath="/api/alumni-profile/educations"
+                  canWrite
+                  onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.me() })}
+                />
+              </div>
 
               <div className="h-px bg-purple-100" />
 
               {/* Contact section */}
-              <div>
+              <div data-tour="alumni-profile-contact">
                 <SectionHeading title="ข้อมูลติดต่อ" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <InfoField label="อีเมล (เข้าสู่ระบบ)" value={alumni.email} />
@@ -825,7 +840,11 @@ export default function AlumniProfilePage() {
         </div>
 
         {/* Community profile (V2) — self-contained card, view mode only */}
-        {!editMode && <CommunityProfileSection />}
+        {!editMode && (
+          <div data-tour="alumni-profile-community">
+            <CommunityProfileSection />
+          </div>
+        )}
 
         {/* Danger zone — shown only while editing */}
         {editMode && (

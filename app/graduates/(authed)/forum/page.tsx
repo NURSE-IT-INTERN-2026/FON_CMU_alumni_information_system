@@ -104,8 +104,8 @@ export default function AlumniForumPage() {
   if (!membershipLoading && !optedIn) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-xl bg-white p-8 shadow-sm">
-          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]">กระดานสนทนาศิษย์เก่า</h1>
+        <div className="rounded-xl bg-white p-8 shadow-sm" data-tour="forum-join-card">
+          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]" data-tour="forum-heading">กระดานสนทนาศิษย์เก่า</h1>
           <p className="mb-4 text-sm leading-relaxed text-[var(--muted)]">
             กระดานสนทนาเป็นพื้นที่สำหรับศิษย์เก่าพบปะแลกเปลี่ยนความรู้ ประสบการณ์ และข่าวสาร
             การเข้าร่วมเป็นการให้ความยินยอมให้ศิษย์เก่าท่านอื่นที่เข้าร่วมเห็นข้อมูลของท่าน
@@ -155,9 +155,9 @@ export default function AlumniForumPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กระดานสนทนา</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="forum-heading">กระดานสนทนา</h1>
         <div className="flex items-center gap-2">
-          <Link href="/graduates/forum/new">
+          <Link href="/graduates/forum/new" data-tour="forum-new-topic">
             <Button>ตั้งกระทู้ใหม่</Button>
           </Link>
           <Button variant="ghost" onClick={() => setShowLeaveConfirm(true)} className="text-sm">
@@ -167,7 +167,7 @@ export default function AlumniForumPage() {
       </div>
 
       {/* Search + sort */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row" data-tour="forum-search">
         <SearchInput
           value={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -195,14 +195,14 @@ export default function AlumniForumPage() {
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : topics.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="forum-list">
           <p className="text-[var(--muted)]">ยังไม่มีกระทู้ในกระดานสนทนา</p>
           <Link href="/graduates/forum/new">
             <Button className="mt-4">ตั้งกระทู้ใหม่</Button>
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="forum-list">
           {topics.map((t) => (
             <Link
               key={t.id}

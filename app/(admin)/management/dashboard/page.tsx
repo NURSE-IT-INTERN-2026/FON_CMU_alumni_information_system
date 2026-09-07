@@ -330,7 +330,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Page Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="dashboard-heading">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
           แผงควบคุม
         </h1>
@@ -361,6 +361,7 @@ export default function DashboardPage() {
           by status: yellow=pending, green=active, red=rejected. */}
       <Link
         href="/management/settings/users?status=pending"
+        data-tour="dashboard-accounts"
         className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border-l-4 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
         style={{ borderLeftColor: "#5b21b6" }}
       >
@@ -388,6 +389,7 @@ export default function DashboardPage() {
       {/* Featured Alumni Count Card */}
       <Link
         href="/management/all-alumni"
+        data-tour="dashboard-total"
         className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
         style={{ borderLeftColor: "#5b21b6" }}
       >
@@ -490,6 +492,7 @@ export default function DashboardPage() {
       {/* Awards summary grouped by type (PRD §3.2) */}
       <Link
         href="/management/awards"
+        data-tour="dashboard-awards"
         className="group mb-4 block rounded-xl border-l-4 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-8"
         style={{ borderLeftColor: "#e8a838" }}
       >
@@ -558,7 +561,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent News Section */}
-      <section className="mt-10">
+      <section className="mt-10" data-tour="dashboard-recent-news">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-xl font-semibold text-[var(--primary)]">
             ข่าวสารล่าสุด
