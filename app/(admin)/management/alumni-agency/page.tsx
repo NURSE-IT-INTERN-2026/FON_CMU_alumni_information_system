@@ -450,7 +450,7 @@ export default function AlumniAgencyPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="alumni-agency-heading">
           ข้อมูลการทำงานศิษย์เก่า{isThailand ? " (ในประเทศ)" : " (ต่างประเทศ)"}
         </h1>
         {canWrite && (selectMode ? (
@@ -470,7 +470,7 @@ export default function AlumniAgencyPage() {
       </div>
 
       {/* Thailand / Abroad mode toggle (PRD §3.9) */}
-      <div className="mb-8 inline-flex rounded-lg border border-[var(--border)] bg-white p-1">
+      <div className="mb-8 inline-flex rounded-lg border border-[var(--border)] bg-white p-1" data-tour="alumni-agency-mode-toggle">
         <button
           type="button"
           onClick={() => switchMode("thailand")}
@@ -682,7 +682,7 @@ export default function AlumniAgencyPage() {
       )}
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row" data-tour="alumni-agency-filters">
         <SearchInput
           value={search}
           onSearch={applySearch}
@@ -712,7 +712,7 @@ export default function AlumniAgencyPage() {
       </div>
 
       {/* CRUD actions — always on for both tabs */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2" data-tour="alumni-agency-toolbar">
         {canWrite && (
           <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -752,13 +752,13 @@ export default function AlumniAgencyPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-12" data-tour="alumni-agency-table">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : alumni.length === 0 ? (
-        <div className="py-12 text-center text-[var(--muted)]">ไม่พบข้อมูล</div>
+        <div className="py-12 text-center text-[var(--muted)]" data-tour="alumni-agency-table">ไม่พบข้อมูล</div>
       ) : (
-        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="alumni-agency-table">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -77,7 +77,94 @@ describe("tourForPath", () => {
   });
 
   it("returns undefined for a page without a tour", () => {
-    expect(tourForPath("alumni", "/graduates/jobs")).toBeUndefined();
-    expect(tourForPath("admin", "/management/awards")).toBeUndefined();
+    expect(tourForPath("alumni", "/graduates/tos")).toBeUndefined();
+    expect(tourForPath("admin", "/management")).toBeUndefined();
+  });
+});
+
+describe("registry ordering (first-match-wins — specific patterns must precede their parents)", () => {
+  // tourForPath uses TOURS.find(): a string pattern matches its exact path or
+  // any child. If a parent pattern is listed before a pattern for one of its
+  // child pages, the parent silently swallows the child route. These probes
+  // pin the child-before-parent ordering.
+  it("no later string pattern is shadowed by an earlier pattern", () => {
+    for (const area of ["admin", "alumni"] as const) {
+      const patterns = allTours()
+        .filter((t) => t.area === area)
+        .map((t) => t.pathPattern);
+      for (let j = 0; j < patterns.length; j++) {
+        const later = patterns[j];
+        if (typeof later !== "string") continue;
+        for (let i = 0; i < j; i++) {
+          const earlier = patterns[i];
+          if (typeof earlier === "string") {
+            // A later string that is a child of an earlier one never matches.
+            expect(
+              later === earlier || later.startsWith(`${earlier}/`),
+              `"${later}" is shadowed by earlier string "${earlier}"`,
+            ).toBe(false);
+          } else {
+            // An earlier RegExp that matches a later string's path (or a
+            // child of it) steals that route.
+            expect(
+              earlier.test(later) || earlier.test(`${later}/probe`),
+              `"${later}" is shadowed by earlier RegExp ${earlier}`,
+            ).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("no later RegExp pattern is shadowed by an earlier string parent", () => {
+    for (const area of ["admin", "alumni"] as const) {
+      const patterns = allTours()
+        .filter((t) => t.area === area)
+        .map((t) => t.pathPattern);
+      for (let j = 0; j < patterns.length; j++) {
+        const later = patterns[j];
+        if (!(later instanceof RegExp)) continue;
+        for (let i = 0; i < j; i++) {
+          const earlier = patterns[i];
+          if (typeof earlier === "string") {
+            // The detail regex for /x/[id] also matches /x/new — so a parent
+            // string listed earlier swallows it (probe catches both shapes).
+            expect(
+              later.test(earlier) || later.test(`${earlier}/probe`),
+              `RegExp ${later} is shadowed by earlier string "${earlier}"`,
+            ).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("RegExp patterns are fully anchored with an optional trailing slash", () => {
+    for (const tour of allTours()) {
+      const p = tour.pathPattern;
+      if (!(p instanceof RegExp)) continue;
+      expect(p.source, `${tour.id} pattern ${p}`).toMatch(/^\^.*\\\/\?\$$/);
+    }
+  });
+});
+
+describe("golden tour resolution per route", () => {
+  const CASES: [string, string, string | undefined][] = [
+    // alumni
+    ["alumni", "/graduates/profile", "alumni-profile"],
+    // admin CRUD batch
+    ["admin", "/management/associations", "admin-associations"],
+    ["admin", "/management/graduate-committee", "admin-graduate-committee"],
+    ["admin", "/management/model-representatives", "admin-model-representatives"],
+    ["admin", "/management/potentials", "admin-potentials"],
+    ["admin", "/management/awards", "admin-awards"],
+    ["admin", "/management/alumni-agency", "admin-alumni-agency"],
+    // the /management/alumni prefix (batch 2's admin-alumni-detail) must not
+    // bleed onto sibling slugs — updated to its own tour in batch 2
+    ["admin", "/management/alumni-activity", undefined],
+  ];
+
+  it.each(CASES)("tourForPath(%j, %j) → %s", (area, path, expected) => {
+    expect(tourForPath(area as "admin" | "alumni", path)?.id ?? undefined).toBe(expected);
   });
 });
