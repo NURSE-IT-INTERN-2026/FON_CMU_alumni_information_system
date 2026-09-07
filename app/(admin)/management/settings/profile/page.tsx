@@ -42,11 +42,11 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-8 text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+      <h1 className="mb-8 text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-profile-heading">
         ข้อมูลส่วนตัว
       </h1>
 
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl bg-white shadow-sm" data-tour="settings-profile-card">
         <div className="divide-y divide-gray-100">
           {fields.map((field) => (
             <div

@@ -111,18 +111,18 @@ export default function AnnouncementsManagementPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">ประกาศชุมชนศิษย์เก่า</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]" data-tour="admin-announcements-heading">ประกาศชุมชนศิษย์เก่า</h1>
           <p className="text-sm text-[var(--muted)]">ประกาศสั้นถึงสมาชิกชุมชนศิษย์เก่า (แยกจากหน้าข่าวสาร)</p>
         </div>
-        {canWrite && <Button onClick={openCreate}>เพิ่มประกาศ</Button>}
+        {canWrite && <span data-tour="admin-announcements-create"><Button onClick={openCreate}>เพิ่มประกาศ</Button></span>}
       </div>
 
       {isPending ? (
         <div className="flex justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
       ) : announcements.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-[var(--muted)]">ยังไม่มีประกาศ</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="admin-announcements-list"><p className="text-[var(--muted)]">ยังไม่มีประกาศ</p></div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="admin-announcements-list">
           {announcements.map((a) => {
             const expired = a.expiresAt && new Date(a.expiresAt) < new Date();
             return (

@@ -358,11 +358,12 @@ export default function AdminAlumniProfilePage() {
             </svg>
             กลับ
           </button>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">ข้อมูลศิษย์เก่า</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]" data-tour="alumni-detail-heading">ข้อมูลศิษย์เก่า</h1>
           <p className="text-sm text-purple-700">ดูและแก้ไขข้อมูลศิษย์เก่ารายบุคคล</p>
         </div>
         {tab === "profile" && !editMode && canWrite && (
           <button
+            data-tour="alumni-detail-edit"
             onClick={() => { setEditMode(true); setErrorMsg(""); setSuccessMsg(""); }}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-light)]"
           >
@@ -373,7 +374,7 @@ export default function AdminAlumniProfilePage() {
 
       {/* View toggle */}
       {showTabs && (
-        <div className="inline-flex rounded-lg border border-[var(--border)] bg-white p-1">
+        <div className="inline-flex rounded-lg border border-[var(--border)] bg-white p-1" data-tour="alumni-detail-tabs">
           <button
             onClick={() => setTab("profile")}
             className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -514,7 +515,7 @@ export default function AdminAlumniProfilePage() {
           ) : (
             /* View mode */
             <div className="space-y-6">
-              <div>
+              <div data-tour="alumni-detail-personal">
                 <SectionHeading title="ข้อมูลส่วนตัว" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <HotInfoField label="คำนำหน้า" value={alumni.prefix} field="prefix" alumniId={alumni.id} hot={hot} />
@@ -524,12 +525,14 @@ export default function AdminAlumniProfilePage() {
                 </div>
               </div>
 
-              <EducationSection
-                alumniId={alumni.id}
-                listPath={`/api/alumni/${alumni.id}/educations`}
-                canWrite={canWrite}
-                onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.admin(id) })}
-              />
+              <div data-tour="alumni-detail-education">
+                <EducationSection
+                  alumniId={alumni.id}
+                  listPath={`/api/alumni/${alumni.id}/educations`}
+                  canWrite={canWrite}
+                  onChanged={() => qc.invalidateQueries({ queryKey: queryKeys.alumniProfile.admin(id) })}
+                />
+              </div>
 
               <div className="h-px bg-purple-100" />
 

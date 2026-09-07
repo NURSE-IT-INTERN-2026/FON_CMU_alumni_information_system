@@ -154,11 +154,11 @@ export default function ForumModerationPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กระดานสนทนา</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="admin-forum-heading">กระดานสนทนา</h1>
       </div>
 
       {/* Status filter tabs */}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex gap-2" data-tour="admin-forum-status-tabs">
         {CONTENT_REPORT_STATUS_VALUES.map((s) => (
           <button
             key={s}
@@ -179,15 +179,15 @@ export default function ForumModerationPage() {
       )}
 
       {isPending ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="admin-forum-reports">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : reports.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="admin-forum-reports">
           <p className="text-[var(--muted)]">ไม่มีรายงานในสถานะนี้</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="admin-forum-reports">
           {reports.map((r) => {
             const desc = describeReport(r);
             return (

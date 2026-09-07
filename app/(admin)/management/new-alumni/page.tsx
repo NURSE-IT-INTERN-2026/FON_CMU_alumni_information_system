@@ -281,7 +281,7 @@ export default function NewAlumniPage() {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Error branch — demoted so the main render keeps the page's single h1. */}
-        <h2 className="mb-4 text-2xl font-bold text-[var(--primary)]">เพิ่มข้อมูลศิษย์เก่า</h2>
+        <h2 className="mb-4 text-2xl font-bold text-[var(--primary)]" data-tour="new-alumni-heading">เพิ่มข้อมูลศิษย์เก่า</h2>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้
         </div>
@@ -295,7 +295,7 @@ export default function NewAlumniPage() {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">เพิ่มข้อมูลศิษย์เก่า</h1>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]" data-tour="new-alumni-heading">เพิ่มข้อมูลศิษย์เก่า</h1>
             <p className="text-sm text-[var(--muted)]">กรอกข้อมูลศิษย์เก่าและข้อมูลที่เกี่ยวข้อง</p>
           </div>
           <button
@@ -325,7 +325,7 @@ export default function NewAlumniPage() {
         <div className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Core editable fields */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-tour="new-alumni-core">
               <FormField label="รหัสนักศึกษา" required error={errors.studentId?.message} labelClassName={LABEL_CLASS}>
                 <FormInput registration={register("studentId")} error={errors.studentId?.message} className={INPUT_CLASS} placeholder="รหัสนักศึกษา" />
               </FormField>
@@ -372,7 +372,7 @@ export default function NewAlumniPage() {
 
             {/* Divider + "ข้อมูลเพิ่มเติม" header — groups the expandable sections,
                 exactly like the alumni-flow form. */}
-            <div className="border-t border-[var(--border)] pt-4">
+            <div className="border-t border-[var(--border)] pt-4" data-tour="new-alumni-sections">
               <h3 className="mb-1 text-sm font-semibold text-[var(--muted)]">ข้อมูลเพิ่มเติม</h3>
               <p className="mb-3 text-xs text-[var(--muted)]">เปิดส่วนที่ต้องการเพื่อเพิ่มหรือแก้ไขข้อมูล หากไม่ต้องการสามารถปล่อยว่างได้</p>
             </div>
@@ -508,7 +508,7 @@ export default function NewAlumniPage() {
             </SectionToggle>
 
             {/* Buttons — inside the card, matching the alumni-flow form */}
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-2" data-tour="new-alumni-submit">
               {canWrite && (
                 <button
                   type="submit"
