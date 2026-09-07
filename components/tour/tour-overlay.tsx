@@ -7,7 +7,9 @@ import { useTour } from "@/components/tour/tour-provider";
 import { useTargetRect } from "@/components/tour/use-target-rect";
 import {
   CARD_MAX_W,
+  VIEWPORT_MARGIN,
   centeredRect,
+  clampRectToViewport,
   computeTooltipPosition,
 } from "@/lib/tour-geometry";
 import { Button } from "@/components/ui/button";
@@ -30,7 +32,7 @@ export default function TourOverlay() {
   const running = status === "running";
 
   // Hooks must run before the idle early-return.
-  const { rect, viewport } = useTargetRect(step?.target ?? null, status !== "idle");
+  const { rect, viewport, topOffset } = useTargetRect(step?.target ?? null, status !== "idle");
   const prefersReduced = useReducedMotion();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const primaryBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -59,12 +61,27 @@ export default function TourOverlay() {
 
   // Bring the target into view when the step changes (programmatic scrolls
   // still work under radix's body scroll lock; the capture-phase listener in
-  // useTargetRect keeps the spotlight glued while smooth-scrolling).
+  // useTargetRect keeps the spotlight glued while smooth-scrolling). Targets
+  // TALLER than the viewport (big tables) are NOT centered — centering pushes
+  // the top (column headers) off-screen behind the sticky navbar — instead
+  // their top is parked just below the navbar.
   useEffect(() => {
     if (!running || !step?.target) return;
-    document
-      .querySelector(`[data-tour="${step.target}"]`)
-      ?.scrollIntoView({ block: "center", behavior: prefersReduced ? "auto" : "smooth" });
+    const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    if (!el) return;
+    const behavior: ScrollBehavior = prefersReduced ? "auto" : "smooth";
+    const header = document.querySelector<HTMLElement>("header");
+    const headerBottom = Math.max(0, header?.getBoundingClientRect().bottom ?? 0);
+    const r = el.getBoundingClientRect();
+    const fits = r.height <= window.innerHeight - headerBottom - VIEWPORT_MARGIN * 2;
+    if (fits) {
+      el.scrollIntoView({ block: "center", behavior });
+    } else {
+      window.scrollTo({
+        top: r.top + window.scrollY - headerBottom - VIEWPORT_MARGIN,
+        behavior,
+      });
+    }
   }, [running, stepIndex, step, prefersReduced]);
 
   if (status === "idle" || !tour || !step) return null;
@@ -74,7 +91,14 @@ export default function TourOverlay() {
   const measured = viewport.width > 0;
   const open = running && measured;
 
-  const spot = rect ?? centeredRect(viewport, CENTERED_HOLE.width, CENTERED_HOLE.height);
+  // Clamp the hole to the visible viewport (below the sticky header): without
+  // this a tall/wide target's raw rect extends off-screen and over the navbar,
+  // making the navbar fall inside the highlight hole.
+  const spot = clampRectToViewport(
+    rect ?? centeredRect(viewport, CENTERED_HOLE.width, CENTERED_HOLE.height),
+    viewport,
+    topOffset,
+  );
   const pos = step.target
     ? computeTooltipPosition(spot, viewport, cardSize, step.placement ?? "below")
     : {
