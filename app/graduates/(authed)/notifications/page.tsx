@@ -65,22 +65,24 @@ export default function NotificationsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="notifications-heading">
           การแจ้งเตือน {unreadCount > 0 && <span className="text-base font-normal text-[var(--muted)]">({unreadCount} ที่ยังไม่ได้อ่าน)</span>}
         </h1>
         {unreadCount > 0 && (
-          <Button variant="outline" onClick={() => markRead.mutate({ all: true })} disabled={markRead.isPending}>
-            {markRead.isPending ? "กำลังบันทึก..." : "ทำเครื่องหมายทั้งหมดว่าอ่านแล้ว"}
-          </Button>
+          <span data-tour="notifications-mark-all">
+            <Button variant="outline" onClick={() => markRead.mutate({ all: true })} disabled={markRead.isPending}>
+              {markRead.isPending ? "กำลังบันทึก..." : "ทำเครื่องหมายทั้งหมดว่าอ่านแล้ว"}
+            </Button>
+          </span>
         )}
       </div>
 
       {isPending ? (
-        <div className="flex justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
+        <div className="flex justify-center py-16" data-tour="notifications-list"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
       ) : notifications.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-[var(--muted)]">ยังไม่มีการแจ้งเตือน</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="notifications-list"><p className="text-[var(--muted)]">ยังไม่มีการแจ้งเตือน</p></div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" data-tour="notifications-list">
           {notifications.map((n) => {
             const content = (
               <div

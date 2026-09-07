@@ -14,6 +14,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/graduates/profile",
 }));
 
+// CONTRACT: this harness renders TOURS[0] — `alumni-profile` must remain the
+// registry's FIRST entry (lib/tours.ts) even as the alumni block is reordered.
+
 function HarnessInner() {
   const { start } = useTour();
   return (

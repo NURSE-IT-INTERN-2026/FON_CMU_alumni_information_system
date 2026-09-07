@@ -154,7 +154,7 @@ export default function GroupDetailPage() {
       </Link>
 
       {/* Group header */}
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm" data-tour="groups-detail-header">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[var(--primary)]">{group.title}</h1>
@@ -164,7 +164,8 @@ export default function GroupDetailPage() {
             {group.description && <p className="mt-2 text-sm">{group.description}</p>}
           </div>
           {optedIn && (
-            isMember ? (
+            <span data-tour="groups-detail-membership">
+            {isMember ? (
               <Button variant="outline" onClick={() => membership_.mutate("leave")} disabled={membership_.isPending}>
                 ออกจากกลุ่ม
               </Button>
@@ -172,14 +173,15 @@ export default function GroupDetailPage() {
               <Button onClick={() => membership_.mutate("join")} disabled={membership_.isPending}>
                 {membership_.isPending ? "กำลังเข้าร่วม..." : "เข้าร่วมกลุ่ม"}
               </Button>
-            )
+            )}
+            </span>
           )}
         </div>
         {joinError && <p className="mt-3 text-sm text-red-600">{joinError}</p>}
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 border-b border-[var(--border)]">
+      <div className="mb-4 flex gap-1 border-b border-[var(--border)]" data-tour="groups-detail-tabs">
         {([["topics", `การสนทนา (${group.topicCount})`], ["events", "กิจกรรม"]] as const).map(
           ([key, label]) => (
             <button
@@ -201,7 +203,7 @@ export default function GroupDetailPage() {
         <div className="space-y-4">
           {/* New topic (members only) */}
           {isMember && (
-            <div className="rounded-lg bg-white p-4 shadow-sm">
+            <div className="rounded-lg bg-white p-4 shadow-sm" data-tour="groups-detail-new-topic">
               <input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
@@ -230,15 +232,15 @@ export default function GroupDetailPage() {
           )}
 
           {topicsQ.isPending ? (
-            <div className="flex justify-center py-12">
+            <div className="flex justify-center py-12" data-tour="groups-detail-topics">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
             </div>
           ) : (topicsQ.data?.data ?? []).length === 0 ? (
-            <div className="rounded-lg bg-white py-12 text-center shadow-sm">
+            <div className="rounded-lg bg-white py-12 text-center shadow-sm" data-tour="groups-detail-topics">
               <p className="text-sm text-[var(--muted)]">ยังไม่มีการสนทนาในกลุ่มนี้</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" data-tour="groups-detail-topics">
               {(topicsQ.data?.data ?? []).map((t) => (
                 <Link
                   key={t.id}

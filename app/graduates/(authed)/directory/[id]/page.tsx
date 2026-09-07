@@ -71,7 +71,7 @@ export default function DirectoryMemberPage() {
         ← ไดเรกทอรีศิษย์เก่า
       </Link>
 
-      <div className="rounded-xl bg-white p-6 shadow-sm sm:p-8">
+      <div className="rounded-xl bg-white p-6 shadow-sm sm:p-8" data-tour="directory-detail-card">
         {/* Identity header */}
         <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
           {photoUrl ? (
@@ -98,7 +98,7 @@ export default function DirectoryMemberPage() {
 
         {/* Work + location */}
         {(p?.currentWorkplace || p?.currentPosition || p?.province || p?.country) && (
-          <div className="mt-6 grid grid-cols-1 gap-3 rounded-lg bg-[var(--background)] p-4 text-sm sm:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-3 rounded-lg bg-[var(--background)] p-4 text-sm sm:grid-cols-2" data-tour="directory-detail-work">
             {p?.currentWorkplace && (
               <p><span className="text-[var(--muted)]">สถานที่ทำงานปัจจุบัน:</span> {p.currentWorkplace}</p>
             )}
@@ -116,7 +116,7 @@ export default function DirectoryMemberPage() {
 
         {/* Bio */}
         {p?.bio && (
-          <div className="mt-6">
+          <div className="mt-6" data-tour="directory-detail-bio">
             <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">แนะนำตัว</h2>
             <ForumBody text={p.bio} />
           </div>
@@ -124,7 +124,7 @@ export default function DirectoryMemberPage() {
 
         {/* Published contact */}
         {hasContact && (
-          <div className="mt-6">
+          <div className="mt-6" data-tour="directory-detail-contact">
             <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">ข้อมูลติดต่อที่เผยแพร่</h2>
             <div className="space-y-1.5 text-sm">
               {contactRows

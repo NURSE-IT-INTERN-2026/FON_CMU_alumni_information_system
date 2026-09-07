@@ -190,13 +190,13 @@ export default function TopicDetailPage() {
           </div>
         ) : (
           <>
-            <h1 className="mb-3 text-xl font-bold text-[var(--foreground)] sm:text-2xl">{topic.title}</h1>
+            <h1 className="mb-3 text-xl font-bold text-[var(--foreground)] sm:text-2xl" data-tour="forum-detail-title">{topic.title}</h1>
             <div className="mb-4 flex items-center justify-between">
               <PhotoAvatar identity={topic.author} size="sm" />
               <span className="text-xs text-[var(--muted)]">{formatThaiDate(topic.createdAt)}</span>
             </div>
             <ForumBody text={topic.body} />
-            <div className="mt-5 flex items-center gap-2 border-t border-[var(--border)] pt-3">
+            <div className="mt-5 flex items-center gap-2 border-t border-[var(--border)] pt-3" data-tour="forum-detail-actions">
               <Button variant="ghost" size="sm" onClick={() => setReport({ type: "FORUM_TOPIC", resourceId: topic.id })}>
                 รายงาน
               </Button>
@@ -217,7 +217,7 @@ export default function TopicDetailPage() {
       </article>
 
       {/* Replies */}
-      <section className="mt-6 space-y-3">
+      <section className="mt-6 space-y-3" data-tour="forum-detail-replies">
         {repliesQ.isPending ? (
           <p className="py-6 text-center text-sm text-[var(--muted)]">กำลังโหลดความคิดเห็น…</p>
         ) : replies.length === 0 ? (
@@ -287,7 +287,7 @@ export default function TopicDetailPage() {
       </section>
 
       {/* Reply form */}
-      <section className="mt-6 rounded-lg bg-white p-4 shadow-sm">
+      <section className="mt-6 rounded-lg bg-white p-4 shadow-sm" data-tour="forum-detail-reply-form">
         <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">แสดงความคิดเห็น</label>
         <textarea
           rows={4}

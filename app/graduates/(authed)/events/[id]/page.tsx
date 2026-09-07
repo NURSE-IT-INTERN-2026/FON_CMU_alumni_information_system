@@ -111,11 +111,11 @@ export default function EventDetailPage() {
           </div>
         )}
         <div className="p-6">
-          <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)]">{ev.title}</h1>
+          <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)]" data-tour="events-detail-title">{ev.title}</h1>
           <p className="mb-1 text-sm font-medium text-[var(--primary)]">{formatEventDateTimeThai(ev.startAt)}</p>
           {ev.endAt && <p className="mb-3 text-xs text-[var(--muted)]">ถึง {formatEventDateTimeThai(ev.endAt)}</p>}
 
-          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--foreground)]">
+          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--foreground)]" data-tour="events-detail-info">
             {ev.location && <span>📍 {ev.location}</span>}
             {ev.onlineLink && (
               <a href={ev.onlineLink} target="_blank" rel="nofollow noopener noreferrer" className="text-[var(--primary)] hover:underline">🔗 ลิงก์ออนไลน์</a>
@@ -137,7 +137,7 @@ export default function EventDetailPage() {
       </article>
 
       {/* RSVP + capacity */}
-      <section className="mt-6 rounded-lg bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-lg bg-white p-5 shadow-sm" data-tour="events-detail-rsvp">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold">การเข้าร่วน</h2>
           <span className={`text-sm ${ev.isFull ? "text-red-600" : "text-[var(--muted)]"}`}>
@@ -193,7 +193,7 @@ export default function EventDetailPage() {
 
       {/* Attendees */}
       {ev.attendees.length > 0 && (
-        <section className="mt-6 rounded-lg bg-white p-5 shadow-sm">
+        <section className="mt-6 rounded-lg bg-white p-5 shadow-sm" data-tour="events-detail-attendees">
           <h2 className="mb-3 text-sm font-semibold">ผู้เข้าร่วน ({ev.headcount})</h2>
           <ul className="space-y-2">
             {ev.attendees.map((a) => (
@@ -207,7 +207,7 @@ export default function EventDetailPage() {
       )}
 
       {/* Photo album (community V2) */}
-      <div className="mt-6">
+      <div className="mt-6" data-tour="events-detail-album">
         <EventPhotoAlbum eventId={ev.id} />
       </div>
 

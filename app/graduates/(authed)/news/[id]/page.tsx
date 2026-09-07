@@ -58,10 +58,10 @@ export default async function AlumniNewsDetailPage({
 
       <article className="overflow-hidden rounded-lg bg-white shadow-sm">
         <div className="px-6 pt-6 sm:px-8 sm:pt-8">
-          <h1 className="mb-3 text-2xl font-bold text-[var(--foreground)] sm:text-3xl">
+          <h1 className="mb-3 text-2xl font-bold text-[var(--foreground)] sm:text-3xl" data-tour="news-detail-title">
             {news.title}
           </h1>
-          <p className="mb-6 text-sm text-[var(--muted)]">
+          <p className="mb-6 text-sm text-[var(--muted)]" data-tour="news-detail-meta">
             {[
               news.publishedAt ? formatThaiDate(new Date(news.publishedAt)) : null,
               edited
@@ -84,7 +84,7 @@ export default async function AlumniNewsDetailPage({
         )}
 
         <div
-          className="prose prose-sm sm:prose !max-w-none px-6 py-6 sm:px-8 sm:py-8"
+          className="prose prose-sm sm:prose !max-w-none px-6 py-6 sm:px-8 sm:py-8" data-tour="news-detail-body"
           dangerouslySetInnerHTML={{
             __html: sanitizeNewsBody(news.body),
           }}

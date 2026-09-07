@@ -125,14 +125,14 @@ export default function AlumniNewsPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="alumni-news-heading">
           ข่าวสารและกิจกรรม
         </h1>
       </div>
 
       {/* Pinned — ประชาสัมพันธ์สำคัญ */}
       {pinnedItems.length > 0 && (
-        <section className="mb-8">
+        <section className="mb-8" data-tour="alumni-news-pinned">
           <div className="mb-3 flex items-center gap-2">
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-600">
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6v4.2l2.1 3.4a1 1 0 0 1-.85 1.5H13v6.4a1 1 0 0 1-2 0v-6.4H7.75a1 1 0 0 1-.85-1.5L9 8.2V4Z" /></svg>
@@ -146,7 +146,7 @@ export default function AlumniNewsPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row" data-tour="alumni-news-search">
         <SearchInput
           value={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -156,15 +156,15 @@ export default function AlumniNewsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="alumni-news-grid">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="alumni-news-grid">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : news.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="alumni-news-grid">
           <svg className="mx-auto mb-4 h-12 w-12 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
@@ -172,7 +172,7 @@ export default function AlumniNewsPage() {
         </div>
       ) : (
         /* Card grid — same as admin view mode */
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" data-tour="alumni-news-grid">
           {news.map(renderNewsCard)}
         </div>
       )}
