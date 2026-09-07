@@ -41,8 +41,15 @@ export async function PUT(
       data: validated,
       include: INCLUDE,
     });
+    const topic = await prisma.forumTopic.findUnique({
+      where: { id: existing.topicId },
+      select: { title: true },
+    });
 
-    await logActivity(alumniLogCtx(alumni), "UPDATE", "forum_reply", id, { topicId: existing.topicId });
+    await logActivity(alumniLogCtx(alumni), "UPDATE", "forum_reply", id, {
+      topicId: existing.topicId,
+      topicTitle: topic?.title,
+    });
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -63,6 +70,7 @@ export async function DELETE(
 
     const existing = await prisma.forumReply.findFirst({
       where: { id, deletedAt: null },
+      include: { topic: { select: { title: true } } },
     });
     if (!existing) {
       return NextResponse.json({ error: "ไม่พบความคิดเห็น" }, { status: 404 });
@@ -106,6 +114,7 @@ export async function DELETE(
       : alumniLogCtx(who.alumni!);
     await logActivity(actor, "DELETE", "forum_reply", id, {
       topicId: existing.topicId,
+      topicTitle: existing.topic.title,
       ...(who.staff ? { moderation: true } : {}),
     });
 

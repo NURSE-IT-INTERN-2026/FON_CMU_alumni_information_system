@@ -12,6 +12,7 @@
  * `[object Object]` garbage.
  */
 import { AWARD_TYPE_LABELS, DEGREE_LEVEL_OPTIONS } from "@/lib/constants";
+import type { LogAction, LogResource } from "@/lib/log-types";
 
 /** English field key → Thai label. Unknown keys fall back to themselves. */
 export const FIELD_LABELS: Record<string, string> = {
@@ -57,6 +58,33 @@ export const FIELD_LABELS: Record<string, string> = {
   role: "บทบาท",
   remarks: "หมายเหตุ",
   notes: "หมายเหตุ",
+  phone: "เบอร์โทรศัพท์",
+  reason: "เหตุผล",
+  alumniName: "ชื่อศิษย์เก่า",
+  // community (V2) context — human labels logged alongside hidden uuid keys
+  topicTitle: "หัวข้อกระทู้",
+  postSnippet: "ตัวอย่างเนื้อหาโพสต์",
+  eventTitle: "ชื่อกิจกรรม",
+  groupTitle: "ชื่อกลุ่ม",
+  guestCount: "จำนวนแขกที่นำมาด้วย",
+  slug: "ชื่อย่อกลุ่ม (slug)",
+  moderation: "ดำเนินการโดยผู้ดูแล",
+  resourceType: "ประเภทเนื้อหาที่รายงาน",
+  updatedFields: "ส่วนที่แก้ไข",
+  // export / bulk-operation summaries
+  count: "จำนวน",
+  search: "คำค้นหา",
+  mode: "ช่วงข้อมูล",
+  range: "ช่วงแถว",
+  merged: "รวมข้อมูลจากทะเบียน มช.",
+  dedupe: "กรองซ้ำรายบุคคล",
+  bulk: "การดำเนินการ",
+  unpinned: "จำนวนที่ยกเลิกปักหมุด",
+  // auto-link (LINK) summaries
+  linkedCount: "จำนวนที่เชื่อมโยง",
+  homeMigrated: "ย้ายที่อยู่บ้านมายังข้อมูลศิษย์เก่า",
+  // trash restore / hard-delete
+  entity: "ประเภทรายการ",
   // import summary counts (rendered by ImportDetail; labels here are a fallback)
   fileName: "ไฟล์",
   attempted: "ทั้งหมดที่นำเข้า",
@@ -66,10 +94,74 @@ export const FIELD_LABELS: Record<string, string> = {
   imported: "นำเข้าแล้ว",
 };
 
-const NEWS_STATUS_LABELS: Record<string, string> = {
+// Merged Thai map for every enum-ish token writers store under `status`
+// (news DRAFT/PUBLISHED/DISCONTINUED + event RSVP ATTENDING/DECLINED). Tokens
+// don't collide today; if a future status token is reused with a different
+// meaning, split per-resource instead of extending this map.
+const STATUS_VALUE_LABELS: Record<string, string> = {
   DRAFT: "ร่าง",
   PUBLISHED: "เผยแพร่",
   DISCONTINUED: "ยุติเผยแพร่",
+  ATTENDING: "เข้าร่วม",
+  DECLINED: "ไม่เข้าร่วม",
+};
+
+const REPORT_RESOURCE_TYPE_LABELS: Record<string, string> = {
+  FORUM_TOPIC: "กระทู้",
+  FORUM_REPLY: "ความคิดเห็นในกระทู้",
+  EVENT: "กิจกรรม",
+  FEED_POST: "โพสต์",
+  FEED_COMMENT: "ความคิดเห็น",
+  JOB_POSTING: "ประกาศงาน",
+  EVENT_PHOTO: "รูปภาพกิจกรรม",
+};
+
+const EXPORT_MODE_LABELS: Record<string, string> = {
+  filtered: "ตามเงื่อนไขที่กรอง",
+  selected: "รายการที่เลือก",
+};
+
+const BULK_OP_LABELS: Record<string, string> = {
+  pin: "ปักหมุด",
+  publish: "เผยแพร่",
+};
+
+// Kebab trash-entity slug → Thai. Mirrors the keys of `TRASH_ENTITIES` in
+// `lib/trash.ts` (which imports Prisma, so the labels are duplicated here on
+// purpose — keep both in sync when an entity is added).
+const TRASH_ENTITY_LABELS: Record<string, string> = {
+  alumni: "ข้อมูลนักศึกษาเก่า",
+  awards: "รางวัล",
+  associations: "สมาคม/ชมรม",
+  "graduate-committee": "กรรมการบัณฑิต",
+  "model-representatives": "ผู้แทนรุ่น",
+  potentials: "ศักยภาพ",
+  "alumni-agency": "ข้อมูลการทำงานศิษย์เก่า",
+  "forum-topic": "กระทู้",
+  "forum-reply": "ความคิดเห็น",
+  "community-event": "กิจกรรม",
+  "feed-post": "โพสต์",
+  "feed-comment": "ความคิดเห็น",
+  "community-group": "กลุ่มศิษย์เก่า",
+  "job-posting": "ประกาศงาน",
+  "event-photo": "รูปภาพกิจกรรม",
+  announcement: "ประกาศชุมชน",
+};
+
+// `details.updatedFields` (community-profile self-edits) carries raw English
+// column names — mapped to Thai at render.
+const COMMUNITY_PROFILE_FIELD_LABELS: Record<string, string> = {
+  photoUrl: "รูปโปรไฟล์",
+  currentWorkplace: "สถานที่ทำงานปัจจุบัน",
+  currentPosition: "ตำแหน่งงานปัจจุบัน",
+  province: "จังหวัด",
+  country: "ประเทศ",
+  bio: "แนะนำตัว",
+  contactEmail: "อีเมลติดต่อ",
+  facebookUrl: "Facebook",
+  lineId: "LINE ID",
+  linkedinUrl: "LinkedIn",
+  otherLink: "ลิงก์อื่น ๆ",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -85,10 +177,23 @@ const META_KEYS = new Set([
   "changes",
   "action",
   "method",
+  // uuid joins / object payloads — machine identifiers, never human-useful.
+  // Where they matter, writers log a sibling Thai-labeled title/snippet.
+  "topicId",
+  "postId",
+  "eventId",
+  "groupId",
+  "reportId",
+  "resourceId",
+  "alumniId",
+  "ids",
+  "homeMigratedFrom",
+  "perEntity",
   // IMPORT details: the error array + its cap flags are rendered by the
   // dedicated ImportDetail component (via `extractImportDetails`), not as
   // generic rows. (The scalar counts created/updated/failed/attempted/fileName
   // are left in so a fallback still shows something useful.)
+  "errors",
   "errorsTruncated",
   "totalErrors",
   "op",
@@ -100,11 +205,15 @@ function labelFor(field: string): string {
 
 /** Pretty-print a single value, typed by the field it belongs to. */
 export function formatValue(field: string, value: unknown): string {
-  // pinnedAt is a timestamp-or-null whose meaning is the pin STATE, not a date;
-  // the legacy `pinned` boolean carries the same meaning. Handle before the
-  // null early-return so "unpinned" shows as "ไม่ได้ปักหมุด" instead of "—".
+  // pinnedAt is a timestamp-or-null whose meaning is the pin STATE, not a date.
+  // Handle before the null early-return so "unpinned" shows as "ไม่ได้ปักหมุด".
   if (field === "pinnedAt") return value == null || value === "" ? "ไม่ได้ปักหมุด" : "ปักหมุด";
-  if (field === "pinned") return value === true || value === "true" ? "ปักหมุด" : "ไม่ได้ปักหมุด";
+  // `pinned` is overloaded: a COUNT in news bulk-pin logs, a boolean elsewhere.
+  // Number check first, or a count like 3 renders as "ไม่ได้ปักหมุด".
+  if (field === "pinned") {
+    if (typeof value === "number") return `${value} รายการ`;
+    return value === true || value === "true" ? "ปักหมุด" : "ไม่ได้ปักหมุด";
+  }
   if (value === null || value === undefined || value === "") return "—";
   switch (field) {
     case "awardType":
@@ -114,9 +223,40 @@ export function formatValue(field: string, value: unknown): string {
       return found?.label ?? String(value);
     }
     case "status":
-      return NEWS_STATUS_LABELS[String(value)] ?? String(value);
+      return STATUS_VALUE_LABELS[String(value)] ?? String(value);
     case "role":
       return ROLE_LABELS[String(value)] ?? String(value);
+    case "resourceType":
+      return REPORT_RESOURCE_TYPE_LABELS[String(value)] ?? String(value);
+    case "mode":
+      return EXPORT_MODE_LABELS[String(value)] ?? String(value);
+    case "bulk":
+      return BULK_OP_LABELS[String(value)] ?? String(value);
+    case "entity":
+      return TRASH_ENTITY_LABELS[String(value)] ?? String(value);
+    case "updatedFields": {
+      // Array of raw English column names (community-profile self-edits) →
+      // Thai-joined list so the log isn't content-free.
+      if (Array.isArray(value)) {
+        const labels = value
+          .map((f) => COMMUNITY_PROFILE_FIELD_LABELS[String(f)] ?? FIELD_LABELS[String(f)] ?? String(f));
+        return labels.length > 0 ? labels.join(", ") : "—";
+      }
+      return String(value);
+    }
+    case "range": {
+      // Export row-window `{ start, end, total }` → one readable sentence.
+      if (typeof value === "object" && value !== null) {
+        const r = value as { start?: unknown; end?: unknown; total?: unknown };
+        const start = Number(r.start);
+        const end = Number(r.end);
+        const total = Number(r.total);
+        if ([start, end, total].every(Number.isFinite)) {
+          return `แถว ${start}–${end} จาก ${total} แถว`;
+        }
+      }
+      return "—";
+    }
   }
   if (typeof value === "boolean") return value ? "ใช่" : "ไม่ใช่";
   if (value instanceof Date) return value.toLocaleString("th-TH");
@@ -231,7 +371,9 @@ export function extractImportDetails(details: Record<string, unknown> | null): I
 // entry reads the same way on both surfaces.
 // ---------------------------------------------------------------------------
 
-const LOG_ACTION_LABELS: Record<string, string> = {
+// Typed as Record<LogAction/LogResource, string> so adding a new action or
+// resource without a Thai label is a COMPILE error, not a raw-string leak.
+export const LOG_ACTION_LABELS: Record<LogAction, string> = {
   CREATE: "เพิ่ม",
   UPDATE: "แก้ไข",
   DELETE: "ลบ",
@@ -239,21 +381,27 @@ const LOG_ACTION_LABELS: Record<string, string> = {
   EXPORT: "ส่งออก",
   BULK_DELETE: "ลบหลายรายการ",
   SIGNUP: "สมัครสมาชิก",
+  LOGIN: "เข้าสู่ระบบ",
+  EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
+  EMAIL_VERIFY: "ยืนยันอีเมล",
+  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรหัสผ่าน",
+  PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
   APPROVE: "อนุมัติ",
   REJECT: "ปฏิเสธ",
+  REAPPLY: "ยื่นคำขอใหม่",
+  VERIFY_IDENTITY: "ยืนยันตัวตน",
   RESTORE: "กู้คืน",
   SUSPEND: "ระงับ",
   HARD_DELETE: "ลบถาวร",
-  REAPPLY: "ยื่นคำขอใหม่",
-  VERIFY_IDENTITY: "ยืนยันตัวตน",
-  PASSWORD_RESET_REQUEST: "ขอรีเซ็ตรหัสผ่าน",
-  PASSWORD_RESET_COMPLETE: "รีเซ็ตรหัสผ่าน",
-  EMAIL_VERIFY: "ยืนยันอีเมล",
-  EMAIL_VERIFY_REQUEST: "ส่งอีเมลยืนยัน",
   LINK: "เชื่อมโยงรายการที่ค้างอยู่",
+  OPT_IN: "สมัครเข้าร่วม",
+  OPT_OUT: "ยกเลิกการเข้าร่วม",
+  REPORT: "รายงาน",
+  RESOLVE: "ดำเนินการรายงาน",
+  DISMISS: "ยกเลิกรายงาน",
 };
 
-const LOG_RESOURCE_LABELS: Record<string, string> = {
+export const LOG_RESOURCE_LABELS: Record<LogResource, string> = {
   alumni: "ข้อมูลศิษย์เก่า",
   alumni_profile: "ข้อมูลส่วนตัว",
   education: "ประวัติการศึกษา",
@@ -267,7 +415,69 @@ const LOG_RESOURCE_LABELS: Record<string, string> = {
   user: "ผู้ใช้",
   alumni_auth: "บัญชีศิษย์เก่า",
   cmu_alumni: "ทะเบียน มช.",
+  forum_topic: "กระทู้",
+  forum_reply: "ความคิดเห็น",
+  community: "ชุมชนศิษย์เก่า",
+  content_report: "รายงานเนื้อหา",
+  community_event: "กิจกรรม",
+  event_rsvp: "การลงทะเบียนเข้าร่วมกิจกรรม",
+  feed_post: "โพสต์",
+  feed_comment: "ความคิดเห็น",
+  community_profile: "โปรไฟล์ชุมชนศิษย์เก่า",
+  community_group: "กลุ่มศิษย์เก่า",
+  group_membership: "สมาชิกกลุ่ม",
+  job_posting: "ประกาศงาน",
+  event_photo: "รูปภาพกิจกรรม",
+  announcement: "ประกาศชุมชน",
 };
+
+/** Labels for resources that exist only in pre-rename log rows. */
+export const LEGACY_RESOURCE_LABELS: Record<string, string> = {
+  abroad_alumni: "ข้อมูลการทำงานศิษย์เก่า", // pre-rename alumni-agency rows
+};
+
+/** Badge color per action (System Logs page action column). */
+export const LOG_ACTION_COLORS: Record<LogAction, string> = {
+  CREATE: "bg-purple-100 text-purple-700",
+  LOGIN: "bg-emerald-100 text-emerald-700",
+  UPDATE: "bg-yellow-100 text-yellow-700",
+  DELETE: "bg-red-100 text-red-700",
+  BULK_DELETE: "bg-red-100 text-red-700",
+  IMPORT: "bg-purple-100 text-purple-700",
+  EXPORT: "bg-indigo-100 text-indigo-700",
+  SIGNUP: "bg-sky-100 text-sky-700",
+  EMAIL_VERIFY: "bg-emerald-100 text-emerald-700",
+  EMAIL_VERIFY_REQUEST: "bg-sky-100 text-sky-700",
+  PASSWORD_RESET_REQUEST: "bg-sky-100 text-sky-700",
+  PASSWORD_RESET_COMPLETE: "bg-emerald-100 text-emerald-700",
+  APPROVE: "bg-green-100 text-green-700",
+  REJECT: "bg-red-100 text-red-700",
+  REAPPLY: "bg-sky-100 text-sky-700",
+  VERIFY_IDENTITY: "bg-emerald-100 text-emerald-700",
+  SUSPEND: "bg-amber-100 text-amber-700",
+  RESTORE: "bg-green-100 text-green-700",
+  HARD_DELETE: "bg-red-100 text-red-700",
+  LINK: "bg-violet-100 text-violet-700",
+  OPT_IN: "bg-emerald-100 text-emerald-700",
+  OPT_OUT: "bg-gray-200 text-gray-700",
+  REPORT: "bg-amber-100 text-amber-700",
+  RESOLVE: "bg-green-100 text-green-700",
+  DISMISS: "bg-gray-200 text-gray-700",
+};
+
+/** Thai label for an action — shared map → raw string as last resort. */
+export function actionLabel(action: string): string {
+  return LOG_ACTION_LABELS[action as LogAction] ?? action;
+}
+
+/** Thai label for a resource — shared map → legacy aliases → raw string. */
+export function resourceLabel(resource: string): string {
+  return (
+    LOG_RESOURCE_LABELS[resource as LogResource] ??
+    LEGACY_RESOURCE_LABELS[resource] ??
+    resource
+  );
+}
 
 const SECTION_LABELS: Record<string, string> = {
   awards: "ข้อมูลรางวัล",
@@ -418,7 +628,7 @@ export function describeActivityLog(args: {
 }): string {
   const { action, resource } = args;
   const details: Record<string, unknown> | null = args.details ?? null;
-  const resourceLabel = LOG_RESOURCE_LABELS[resource] ?? resource;
+  const resourceLabelText = resourceLabel(resource);
 
   if (resource === "alumni_auth") return describeAuthEvent(action, details, true);
 
@@ -441,19 +651,19 @@ export function describeActivityLog(args: {
     if (resource === "alumni_profile") {
       return selfEditSurfaceLabel(details);
     }
-    return "แก้ไข" + resourceLabel;
+    return "แก้ไข" + resourceLabelText;
   }
 
   if (action === "CREATE") {
     if (resource === "education") {
       const deg = formatValue("degreeLevel", details?.degreeLevel);
-      return "เพิ่ม" + resourceLabel + (deg && deg !== "—" ? ` ${deg}` : "");
+      return "เพิ่ม" + resourceLabelText + (deg && deg !== "—" ? ` ${deg}` : "");
     }
-    return "เพิ่ม" + resourceLabel;
+    return "เพิ่ม" + resourceLabelText;
   }
-  if (action === "DELETE" || action === "HARD_DELETE") return "ลบ" + resourceLabel;
+  if (action === "DELETE" || action === "HARD_DELETE") return "ลบ" + resourceLabelText;
 
-  if (action === "IMPORT") return "นำเข้า" + resourceLabel;
+  if (action === "IMPORT") return "นำเข้า" + resourceLabelText;
 
   if (action === "LINK") {
     const count = details?.linkedCount;
@@ -461,6 +671,12 @@ export function describeActivityLog(args: {
     return typeof count === "number" ? `${base} ${count} รายการ` : base;
   }
 
-  const actionLabel = LOG_ACTION_LABELS[action] ?? action;
-  return actionLabel + resourceLabel;
+  // Standalone sentences — the resource suffix would duplicate meaning
+  // ("เข้าสู่ระบบผู้ใช้", "ดำเนินการรายงานรายงานเนื้อหา").
+  if (action === "LOGIN") return LOG_ACTION_LABELS.LOGIN;
+  if (action === "OPT_IN" || action === "OPT_OUT" || action === "RESOLVE" || action === "DISMISS") {
+    return LOG_ACTION_LABELS[action];
+  }
+
+  return actionLabel(action) + resourceLabelText;
 }

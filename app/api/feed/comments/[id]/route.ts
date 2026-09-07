@@ -30,7 +30,11 @@ export async function PUT(
 
     const v = feedCommentUpdateSchema.parse(await request.json());
     const updated = await prisma.feedComment.update({ where: { id }, data: { body: v.body ?? undefined }, include: INCLUDE });
-    await logActivity(alumniLogCtx(alumni), "UPDATE", "feed_comment", id, { postId: existing.postId });
+    const post = await prisma.feedPost.findUnique({ where: { id: existing.postId }, select: { body: true } });
+    await logActivity(alumniLogCtx(alumni), "UPDATE", "feed_comment", id, {
+      postId: existing.postId,
+      postSnippet: post?.body.slice(0, 120),
+    });
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) return handleZodError(error);
@@ -48,7 +52,10 @@ export async function DELETE(
     if ("error" in who) return who.error;
     const { id } = await params;
 
-    const existing = await prisma.feedComment.findFirst({ where: { id, deletedAt: null } });
+    const existing = await prisma.feedComment.findFirst({
+      where: { id, deletedAt: null },
+      include: { post: { select: { body: true } } },
+    });
     if (!existing) return NextResponse.json({ error: "ไม่พบความคิดเห็น" }, { status: 404 });
 
     const isOwner = who.alumni && existing.authorId === who.alumni.id;
@@ -67,7 +74,10 @@ export async function DELETE(
     const actor = who.staff
       ? { actorType: "ADMIN" as const, userId: who.staff.user.id, userEmail: who.staff.user.email, userRole: who.staff.user.role }
       : alumniLogCtx(who.alumni!);
-    await logActivity(actor, "DELETE", "feed_comment", id, { postId: existing.postId });
+    await logActivity(actor, "DELETE", "feed_comment", id, {
+      postId: existing.postId,
+      postSnippet: existing.post.body.slice(0, 120),
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/feed/comments/[id] error:", error);

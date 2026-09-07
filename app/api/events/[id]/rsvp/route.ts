@@ -67,7 +67,12 @@ export async function POST(
       existed ? "UPDATE" : "CREATE",
       "event_rsvp",
       rsvp.id,
-      { eventId, status: v.status, guestCount: v.status === "ATTENDING" ? guestCount : 0 },
+      {
+        eventId,
+        eventTitle: event.title,
+        status: v.status,
+        guestCount: v.status === "ATTENDING" ? guestCount : 0,
+      },
     );
 
     // Best-effort: tell the alumni organizer about a NEW attending RSVP.
@@ -104,10 +109,14 @@ export async function DELETE(
 
     const existing = await prisma.eventRsvp.findUnique({
       where: { eventId_alumniId: { eventId, alumniId: alumni.id } },
+      include: { event: { select: { title: true } } },
     });
     if (!existing) return NextResponse.json({ success: true }); // idempotent
     await prisma.eventRsvp.delete({ where: { id: existing.id } });
-    await logActivity(alumniLogCtx(alumni), "DELETE", "event_rsvp", existing.id, { eventId });
+    await logActivity(alumniLogCtx(alumni), "DELETE", "event_rsvp", existing.id, {
+      eventId,
+      eventTitle: existing.event.title,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/events/[id]/rsvp error:", error);

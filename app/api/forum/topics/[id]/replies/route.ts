@@ -109,6 +109,7 @@ export async function POST(
 
     await logActivity(alumniLogCtx(alumni), "CREATE", "forum_reply", reply.id, {
       topicId,
+      topicTitle: topic.title,
     });
 
     return NextResponse.json(reply, { status: 201 });
