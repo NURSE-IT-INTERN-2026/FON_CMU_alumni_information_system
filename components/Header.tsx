@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_GROUPS, NavGroup, SETTINGS_NAV_ITEMS, BASE_PATH } from "@/lib/constants";
 import { useRole, useCanWrite, useIsAdmin, roleLabel } from "@/lib/role-context";
+import { TourHelpButton } from "@/components/tour/TourHelpButton";
 
 interface HeaderProps {
   user?: {
@@ -84,6 +85,9 @@ export default function Header({ user }: HeaderProps = {}) {
                 <p className="text-xs text-white/60">{roleLabel(role)}</p>
               </div>
             )}
+
+            {/* Tour help 'i' button (desktop; renders only on pages with a tour) */}
+            {showLogout && <TourHelpButton area="admin" />}
 
             {/* Settings button (desktop) */}
             {showLogout && (

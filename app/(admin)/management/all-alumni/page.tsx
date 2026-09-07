@@ -526,7 +526,7 @@ export default function AlumniCountPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="all-alumni-heading">
           ข้อมูลนักศึกษาเก่า
         </h1>
         {canWrite && (selectMode ? (
@@ -539,7 +539,7 @@ export default function AlumniCountPage() {
             </button>
           </div>
         ) : (
-          <button onClick={enterSelect} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
+          <button onClick={enterSelect} data-tour="all-alumni-select" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
             เลือก
           </button>
         ))}
@@ -680,7 +680,7 @@ export default function AlumniCountPage() {
 
           {/* Action buttons */}
           {!editingId && (
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-4 flex flex-wrap gap-2" data-tour="all-alumni-toolbar">
               {canWrite && (
                 <button
                   onClick={() => router.push("/management/new-alumni")}
@@ -758,7 +758,7 @@ export default function AlumniCountPage() {
           )}
 
           {/* Search + view options */}
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-tour="all-alumni-search">
             <SearchInput
               value={search}
               onSearch={handleSearch}
@@ -780,7 +780,7 @@ export default function AlumniCountPage() {
           </div>
 
           {/* Facet filters */}
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3" data-tour="all-alumni-facets">
             <FacetFilter entity="alumni" field="degreeLevel" label="ระดับการศึกษา" valueLabels={DEGREE_LEVEL_LABELS} selected={filters.degreeLevel ?? []} onChange={(v) => setFilter("degreeLevel", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />
             <FacetFilter entity="alumni" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />
             <FacetFilter entity="alumni" field="graduationYear" label="ปีที่สำเร็จการศึกษา" selected={filters.graduationYear ?? []} onChange={(v) => setFilter("graduationYear", v)} queryParams={{ dedupe: dedupeView ? "true" : "false" }} />

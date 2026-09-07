@@ -91,9 +91,9 @@ export default function AlumniEventsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กิจกรรมและการพบปะ</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="events-heading">กิจกรรมและการพบปะ</h1>
         {optedIn ? (
-          <Link href="/graduates/events/new">
+          <Link href="/graduates/events/new" data-tour="events-create">
             <Button>จัดกิจกรรม</Button>
           </Link>
         ) : (
@@ -104,7 +104,7 @@ export default function AlumniEventsPage() {
       {/* Tabs + view toggle */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         {view === "list" ? (
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-tour="events-scope-tabs">
             {(["upcoming", "past"] as const).map((s) => (
               <button
                 key={s}
@@ -120,7 +120,7 @@ export default function AlumniEventsPage() {
         ) : (
           <span className="text-xs text-[var(--muted)]">แสดงกิจกรรมรายเดือน</span>
         )}
-        <div className="flex gap-2" role="group" aria-label="มุมมองการแสดงผล">
+        <div className="flex gap-2" role="group" aria-label="มุมมองการแสดงผล" data-tour="events-view-toggle">
           {(["list", "calendar"] as const).map((v) => (
             <button
               key={v}
@@ -135,7 +135,7 @@ export default function AlumniEventsPage() {
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6" data-tour="events-search">
         <SearchInput
           value={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -163,11 +163,11 @@ export default function AlumniEventsPage() {
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="events-grid">
           <p className="text-[var(--muted)]">{scope === "upcoming" ? "ยังไม่มีกิจกรรมที่กำลังจะมาถึง" : "ยังไม่มีกิจกรรมที่ผ่านมา"}</p>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" data-tour="events-grid">
           {events.map((e) => (
             <Link
               key={e.id}
