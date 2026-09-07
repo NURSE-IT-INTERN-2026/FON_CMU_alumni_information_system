@@ -120,7 +120,7 @@ export default function TrashPage() {
   if (!isSuperAdmin) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)]">รายการที่ถูกลบ</h1>
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)]" data-tour="settings-trash-heading">รายการที่ถูกลบ</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้ ต้องเป็นผู้ดูแลระบบขั้นสูงเท่านั้น
         </div>
@@ -134,7 +134,7 @@ export default function TrashPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รายการที่ถูกลบ</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-trash-heading">รายการที่ถูกลบ</h1>
         <p className="mt-1 text-sm text-gray-500">
           รายการที่ถูกลบชั่วคราว สามารถกู้คืน หรือลบถาวรได้ (ผู้ดูแลระบบขั้นสูงเท่านั้น)
         </p>
@@ -148,7 +148,7 @@ export default function TrashPage() {
       )}
 
       {/* Entity selector + search */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center" data-tour="settings-trash-filters">
         <select
           value={entity}
           onChange={(e) => { setEntity(e.target.value); setPage(1); }}
@@ -167,19 +167,19 @@ export default function TrashPage() {
       </div>
 
       {isPending ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="settings-trash-table">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="settings-trash-table">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : records.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="settings-trash-table">
           <p className="text-[var(--muted)]">ไม่พบรายการที่ถูกลบ</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-lg bg-white shadow-sm" data-tour="settings-trash-table">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--primary)] text-white">

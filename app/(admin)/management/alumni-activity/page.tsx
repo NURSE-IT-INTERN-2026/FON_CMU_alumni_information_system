@@ -438,7 +438,7 @@ export default function AlumniActivityPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="alumni-activity-heading">
           สถิติการใช้งานศิษย์เก่า
         </h1>
         <p className="mt-1 text-[var(--muted)]">
@@ -447,7 +447,7 @@ export default function AlumniActivityPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="alumni-activity-kpis">
         <KpiCard
           label="บัญชีศิษย์เก่าทั้งหมด"
           value={data.accounts.total}
@@ -488,7 +488,7 @@ export default function AlumniActivityPage() {
 
       {/* Line graphs — one line per degree level (mirrors the dashboard's
           all-alumni graph) */}
-      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2" data-tour="alumni-activity-charts">
         <DegreeLineChart
           title="จำนวนศิษย์เก่าที่ใช้งานต่อเดือน"
           points={activePoints}
@@ -506,7 +506,7 @@ export default function AlumniActivityPage() {
       </div>
 
       {/* Engagement recency */}
-      <section>
+      <section data-tour="alumni-activity-recency">
         <h2 className="mb-4 text-lg font-semibold text-[var(--primary)]">
           การมีส่วนร่วมล่าสุด
         </h2>

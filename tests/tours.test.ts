@@ -159,9 +159,19 @@ describe("golden tour resolution per route", () => {
     ["admin", "/management/potentials", "admin-potentials"],
     ["admin", "/management/awards", "admin-awards"],
     ["admin", "/management/alumni-agency", "admin-alumni-agency"],
-    // the /management/alumni prefix (batch 2's admin-alumni-detail) must not
-    // bleed onto sibling slugs — updated to its own tour in batch 2
-    ["admin", "/management/alumni-activity", undefined],
+    // admin batch 2
+    ["admin", "/management/alumni-activity", "admin-alumni-activity"],
+    ["admin", "/management/new-alumni", "admin-new-alumni"],
+    ["admin", "/management/alumni/550123456", "admin-alumni-detail"],
+    ["admin", "/management/alumni/550123456/", "admin-alumni-detail"],
+    ["admin", "/management/forum", "admin-forum"],
+    ["admin", "/management/events", "admin-events"],
+    ["admin", "/management/announcements", "admin-announcements"],
+    ["admin", "/management/settings/profile", "admin-settings-profile"],
+    ["admin", "/management/settings/users", "admin-settings-users"],
+    ["admin", "/management/settings/logs", "admin-settings-logs"],
+    ["admin", "/management/settings/cmu-sync", "admin-settings-cmu-sync"],
+    ["admin", "/management/settings/trash", "admin-settings-trash"],
   ];
 
   it.each(CASES)("tourForPath(%j, %j) → %s", (area, path, expected) => {

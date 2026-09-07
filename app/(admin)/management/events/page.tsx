@@ -71,11 +71,11 @@ export default function AdminEventsPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กิจกรรม</h1>
-        {canWrite && <Button onClick={() => setCreateOpen(true)}>สร้างกิจกรรม</Button>}
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="admin-events-heading">กิจกรรม</h1>
+        {canWrite && <span data-tour="admin-events-create"><Button onClick={() => setCreateOpen(true)}>สร้างกิจกรรม</Button></span>}
       </div>
 
-      <div className="mb-5 flex gap-2">
+      <div className="mb-5 flex gap-2" data-tour="admin-events-scope-tabs">
         {(["upcoming", "past"] as const).map((s) => (
           <button
             key={s}
@@ -92,15 +92,15 @@ export default function AdminEventsPage() {
       {error && <div className="mb-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
       {isPending ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="admin-events-list">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="admin-events-list">
           <p className="text-[var(--muted)]">ยังไม่มีกิจกรรม</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="admin-events-list">
           {events.map((e) => (
             <div key={e.id} className="rounded-lg bg-white p-4 shadow-sm">
               <div className="mb-2 flex items-start justify-between gap-3">

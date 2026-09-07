@@ -190,7 +190,7 @@ export default function LogsPage() {
   if (role === "executive") {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">บันทึกกิจกรรม</h1>
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-logs-heading">บันทึกกิจกรรม</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้
         </div>
@@ -201,13 +201,14 @@ export default function LogsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-logs-heading">
           บันทึกกิจกรรม
         </h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">ทั้งหมด {total.toLocaleString()} รายการ</span>
           {canDeleteLogs && !selectionMode && (
             <button
+              data-tour="settings-logs-select"
               onClick={() => setSelectionMode(true)}
               className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 cursor-pointer"
             >
@@ -218,7 +219,7 @@ export default function LogsPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6 flex flex-wrap gap-3" data-tour="settings-logs-filters">
         <select
           value={sourceFilter}
           onChange={(e) => { setSourceFilter(e.target.value); handleFilterChange(); }}
@@ -289,7 +290,7 @@ export default function LogsPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm" data-tour="settings-logs-table">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">กำลังโหลด...</div>
         ) : isError ? (

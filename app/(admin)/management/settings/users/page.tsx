@@ -101,7 +101,7 @@ export default function UsersPage() {
   if (!canWrite) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">จัดการผู้ใช้งาน</h1>
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-users-heading">จัดการผู้ใช้งาน</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้
         </div>
@@ -112,13 +112,13 @@ export default function UsersPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="settings-users-heading">
           จัดการผู้ใช้งาน
         </h1>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1" data-tour="settings-users-tabs">
         <button
           onClick={() => setActiveTab("admin")}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
@@ -495,7 +495,7 @@ function AlumniAccountsTab({
       )}
 
       {pendingCount > 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" data-tour="settings-users-pending">
           <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
           <span>มีคำขอลงทะเบียนรอการอนุมัติ <strong>{pendingCount}</strong> รายการ</span>
           {statusFilter !== "PENDING" && (
@@ -507,7 +507,7 @@ function AlumniAccountsTab({
       )}
 
       {/* Search + status filter */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3" data-tour="settings-users-search">
         <SearchInput
           value={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -526,7 +526,7 @@ function AlumniAccountsTab({
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="settings-users-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

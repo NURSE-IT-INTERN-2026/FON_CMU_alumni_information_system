@@ -93,7 +93,7 @@ export default function CmuSyncPage() {
   if (role === "executive") {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl">การดึงข้อมูล</h1>
+        <h1 className="mb-4 text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="cmu-sync-heading">การดึงข้อมูล</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           คุณไม่มีสิทธิ์เข้าถึงหน้านี้
         </div>
@@ -109,7 +109,7 @@ export default function CmuSyncPage() {
           <CloudDownload className="h-7 w-7" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+          <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="cmu-sync-heading">
             การดึงข้อมูล
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -146,12 +146,12 @@ export default function CmuSyncPage() {
 
       {/* Sync-status banner */}
       {comparing ? (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-[var(--muted)]">
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-[var(--muted)]" data-tour="cmu-sync-status">
           <RefreshCw className="h-4 w-4 animate-spin" />
           กำลังตรวจสอบเทียบกับระบบทะเบียน...
         </div>
       ) : remoteUnreachable ? (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700" data-tour="cmu-sync-status">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-medium">ไม่สามารถติดต่อระบบทะเบียนได้ในขณะนี้</p>
@@ -161,7 +161,7 @@ export default function CmuSyncPage() {
           </div>
         </div>
       ) : data && data.localCount === 0 ? (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800" data-tour="cmu-sync-status">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-medium">ยังไม่ได้ดึงข้อมูล CMU</p>
@@ -171,7 +171,7 @@ export default function CmuSyncPage() {
           </div>
         </div>
       ) : data && data.inSync ? (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800" data-tour="cmu-sync-status">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-medium">ข้อมูลตรงกัน</p>
@@ -181,7 +181,7 @@ export default function CmuSyncPage() {
           </div>
         </div>
       ) : data ? (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800" data-tour="cmu-sync-status">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-medium">ข้อมูลไม่ตรงกัน</p>
@@ -206,7 +206,7 @@ export default function CmuSyncPage() {
       ) : null}
 
       {/* Stat row */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3" data-tour="cmu-sync-stats">
         <StatCard label="จำนวนในระบบ" value={data?.localCount} muted="รายการที่ดึงเข้าแล้ว" />
         <StatCard label="จำนวนจากทะเบียน" value={data?.remoteCount} muted="CMU Registrar" />
         <div className="rounded-xl border bg-white p-5 shadow-sm">
@@ -218,7 +218,7 @@ export default function CmuSyncPage() {
       </div>
 
       {/* Action */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" data-tour="cmu-sync-actions">
         <button
           onClick={() => {
             setSuccessMsg("");
@@ -257,7 +257,7 @@ export default function CmuSyncPage() {
 
       {/* Local cache vs live CMU — only once the local cache is populated. */}
       {showTables && (
-        <div className="mt-10">
+        <div className="mt-10" data-tour="cmu-sync-compare">
           <h2 className="text-lg font-semibold text-[var(--primary)]">
             เปรียบเทียบข้อมูลในระบบกับระบบทะเบียน
           </h2>
