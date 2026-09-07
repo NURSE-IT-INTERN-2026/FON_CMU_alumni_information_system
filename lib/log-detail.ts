@@ -465,6 +465,22 @@ export const LOG_ACTION_COLORS: Record<LogAction, string> = {
   DISMISS: "bg-gray-200 text-gray-700",
 };
 
+// Actor highlighting — ADMIN actors are badged by their role on the System
+// Logs page (`ActivityLog.userRole` is denormalized on the row, so no join is
+// needed). Alumni (green "ศิษย์เก่า") and SYSTEM (gray "ระบบ") badges are
+// actor-type level and rendered inline on the page.
+export const ACTOR_ROLE_LABELS: Record<string, string> = {
+  superadmin: "ผู้ดูแลระบบสูงสุด",
+  admin: "ผู้ดูแลระบบ",
+  executive: "ผู้บริหาร",
+};
+
+export const ACTOR_ROLE_COLORS: Record<string, string> = {
+  superadmin: "bg-purple-100 text-purple-700",
+  admin: "bg-blue-100 text-blue-700",
+  executive: "bg-amber-100 text-amber-700",
+};
+
 /** Thai label for an action — shared map → raw string as last resort. */
 export function actionLabel(action: string): string {
   return LOG_ACTION_LABELS[action as LogAction] ?? action;

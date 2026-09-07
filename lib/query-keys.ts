@@ -56,7 +56,7 @@ export const queryKeys = {
       page: number;
       resource: string;
       action: string;
-      source: string;
+      role: string;
     }) => ["logs", "list", o] as const,
   },
 
