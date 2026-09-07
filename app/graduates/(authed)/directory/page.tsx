@@ -79,8 +79,8 @@ export default function AlumniDirectoryPage() {
   if (!membershipLoading && !optedIn) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-xl bg-white p-8 shadow-sm">
-          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]">ไดเรกทอรีศิษย์เก่า</h1>
+        <div className="rounded-xl bg-white p-8 shadow-sm" data-tour="directory-join-card">
+          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]" data-tour="directory-heading">ไดเรกทอรีศิษย์เก่า</h1>
           <p className="mb-4 text-sm leading-relaxed text-[var(--muted)]">
             ไดเรกทอรีศิษย์เก่าเป็นทะเบียนสมาชิกชุมชนศิษย์เก่าที่เข้าร่วมโดยสมัครใจ
             การเข้าร่วมเป็นการให้ความยินยอมให้ศิษย์เก่าท่านอื่นที่เข้าร่วมค้นหาและเห็นข้อมูลของท่าน
@@ -114,14 +114,14 @@ export default function AlumniDirectoryPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">ไดเรกทอรีศิษย์เก่า</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="directory-heading">ไดเรกทอรีศิษย์เก่า</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           ค้นหาเพื่อนศิษย์เก่าสมาชิกชุมชน {total > 0 && `(${total} สมาชิก)`}
         </p>
       </div>
 
       {/* Search + filters */}
-      <div className="mb-6 space-y-3">
+      <div className="mb-6 space-y-3" data-tour="directory-search">
         <SearchInput
           value={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -166,19 +166,19 @@ export default function AlumniDirectoryPage() {
 
       {/* Member grid */}
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="directory-grid">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="directory-grid">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : members.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="directory-grid">
           <p className="text-[var(--muted)]">ไม่พบสมาชิกที่ตรงกับการค้นหา</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-tour="directory-grid">
           {members.map((m) => (
             <Link
               key={m.id}

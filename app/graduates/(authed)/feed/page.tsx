@@ -103,8 +103,8 @@ export default function AlumniFeedPage() {
   if (!membershipLoading && !optedIn) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-xl bg-white p-8 shadow-sm">
-          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]">ฟีดศิษย์เก่า</h1>
+        <div className="rounded-xl bg-white p-8 shadow-sm" data-tour="feed-join-card">
+          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]" data-tour="feed-heading">ฟีดศิษย์เก่า</h1>
           <p className="mb-4 text-sm leading-relaxed text-[var(--muted)]">
             ฟีดเป็นพื้นที่แบ่งปันความคืบหน้า ภาพ และประสบการณ์ระหว่างศิษย์เก่า
             การเข้าร่วมเป็นการให้ความยินยอมให้ศิษย์เก่าที่เข้าร่วมเห็นข้อมูลของท่านบนโพสต์ของท่าน
@@ -125,10 +125,10 @@ export default function AlumniFeedPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-2xl font-bold text-[var(--primary)] sm:text-3xl">ฟีดศิษย์เก่า</h1>
+      <h1 className="mb-6 text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="feed-heading">ฟีดศิษย์เก่า</h1>
 
       {/* Composer */}
-      <div className="mb-6 rounded-lg bg-white p-4 shadow-sm">
+      <div className="mb-6 rounded-lg bg-white p-4 shadow-sm" data-tour="feed-composer">
         <textarea
           className="w-full resize-none rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm"
           rows={3}
@@ -158,15 +158,15 @@ export default function AlumniFeedPage() {
 
       {/* Stream */}
       {isPending ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="feed-stream">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <p className="py-10 text-center text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
+        <p className="py-10 text-center text-red-600" data-tour="feed-stream">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
       ) : posts.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[var(--muted)]">ยังไม่มีโพสต์ เริ่มแบ่งปันสิ่งแรกได้เลย</p>
+        <p className="py-10 text-center text-sm text-[var(--muted)]" data-tour="feed-stream">ยังไม่มีโพสต์ เริ่มแบ่งปันสิ่งแรกได้เลย</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="feed-stream">
           {posts.map((p) => {
             const isOwn = !!myId && myId === p.authorId;
             return (

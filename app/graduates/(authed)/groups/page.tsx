@@ -149,8 +149,8 @@ export default function AlumniGroupsPage() {
   if (!membershipLoading && !optedIn) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-xl bg-white p-8 shadow-sm">
-          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]">กลุ่มศิษย์เก่า</h1>
+        <div className="rounded-xl bg-white p-8 shadow-sm" data-tour="groups-join-card">
+          <h1 className="mb-3 text-2xl font-bold text-[var(--primary)]" data-tour="groups-heading">กลุ่มศิษย์เก่า</h1>
           <p className="mb-6 text-sm leading-relaxed text-[var(--muted)]">
             กลุ่มศิษย์เก่าเป็นพื้นที่สำหรับรุ่นและกลุ่มความสนใจต่าง ๆ ของสมาชิกชุมชนศิษย์เก่า
             กรุณาเข้าร่วมชุมชนก่อนใช้งาน
@@ -175,13 +175,13 @@ export default function AlumniGroupsPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กลุ่มศิษย์เก่า</h1>
-        <Button onClick={() => setShowCreate(true)}>สร้างกลุ่มความสนใจ</Button>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="groups-heading">กลุ่มศิษย์เก่า</h1>
+        <span data-tour="groups-create"><Button onClick={() => setShowCreate(true)}>สร้างกลุ่มความสนใจ</Button></span>
       </div>
 
       {/* My-cohort quick join */}
       {myCohort && !myCohortGroup?.isMember && (
-        <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-lg border border-purple-200 bg-purple-50 p-4 sm:flex-row sm:items-center">
+        <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-lg border border-purple-200 bg-purple-50 p-4 sm:flex-row sm:items-center" data-tour="groups-cohort-banner">
           <p className="text-sm text-[var(--primary-dark)]">
             ท่านจบการศึกษารุ่น <strong>{myCohort}</strong> — เข้าร่วมกลุ่มรุ่นของท่านเพื่อติดตามข่าวสารและกิจกรรมของรุ่น
           </p>
@@ -193,7 +193,7 @@ export default function AlumniGroupsPage() {
       {joinError && <p className="mb-4 text-sm text-red-600">{joinError}</p>}
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-6" data-tour="groups-search">
         <SearchInput
           value={search}
           onSearch={setSearch}
@@ -203,15 +203,15 @@ export default function AlumniGroupsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="groups-sections">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="groups-sections">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8" data-tour="groups-sections">
           {/* Cohort groups */}
           <section>
             <h2 className="mb-3 text-sm font-semibold text-[var(--primary-dark)]">กลุ่มรุ่น</h2>

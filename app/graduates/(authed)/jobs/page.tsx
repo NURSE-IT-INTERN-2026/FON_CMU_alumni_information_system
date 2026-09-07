@@ -117,11 +117,12 @@ export default function AlumniJobsPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">ประกาศงาน</h1>
+          <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="jobs-heading">ประกาศงาน</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">โอกาสทางอาชีพจากศิษย์เก่าและคณะ</p>
         </div>
         {/* Staff OR opted-in alumni may post (server decides; non-opted-in gets 403).
             Default expiry = 30 days out, computed on open (not during render). */}
+        <span data-tour="jobs-create">
         <Button
           onClick={() => {
             setForm({ ...form, expiresAt: isoToDatetimeLocal(new Date(Date.now() + 30 * 86400000).toISOString()) });
@@ -130,10 +131,11 @@ export default function AlumniJobsPage() {
         >
           ลงประกาศงาน
         </Button>
+        </span>
       </div>
 
       {/* Search + filters */}
-      <div className="mb-6 space-y-3">
+      <div className="mb-6 space-y-3" data-tour="jobs-filters">
         <SearchInput value={search} onSearch={(v) => { setSearch(v); setPage(1); }} placeholder="ค้นหาตำแหน่ง สถานที่ทำงาน..." formClassName="w-full" />
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -150,13 +152,13 @@ export default function AlumniJobsPage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
+        <div className="flex justify-center py-16" data-tour="jobs-list"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="jobs-list"><p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p></div>
       ) : jobs.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-[var(--muted)]">ยังไม่มีประกาศงาน</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="jobs-list"><p className="text-[var(--muted)]">ยังไม่มีประกาศงาน</p></div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="jobs-list">
           {jobs.map((j) => (
             <div key={j.id} className="rounded-lg bg-white p-5 shadow-sm">
               <div className="mb-2 flex items-start justify-between gap-3">

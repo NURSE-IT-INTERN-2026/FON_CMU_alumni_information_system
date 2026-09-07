@@ -98,16 +98,19 @@ describe("registry ordering (first-match-wins — specific patterns must precede
         for (let i = 0; i < j; i++) {
           const earlier = patterns[i];
           if (typeof earlier === "string") {
-            // A later string that is a child of an earlier one never matches.
+            // A later string whose EXACT path is claimed by an earlier one
+            // never matches.
             expect(
               later === earlier || later.startsWith(`${earlier}/`),
               `"${later}" is shadowed by earlier string "${earlier}"`,
             ).toBe(false);
           } else {
-            // An earlier RegExp that matches a later string's path (or a
-            // child of it) steals that route.
+            // An earlier RegExp matching the later string's exact path steals
+            // that route (e.g. a detail regex listed before the /new string).
+            // Deeper children under the string are the regex's by design —
+            // that layering is intended, so no probe check here.
             expect(
-              earlier.test(later) || earlier.test(`${later}/probe`),
+              earlier.test(later),
               `"${later}" is shadowed by earlier RegExp ${earlier}`,
             ).toBe(false);
           }
@@ -127,10 +130,12 @@ describe("registry ordering (first-match-wins — specific patterns must precede
         for (let i = 0; i < j; i++) {
           const earlier = patterns[i];
           if (typeof earlier === "string") {
-            // The detail regex for /x/[id] also matches /x/new — so a parent
-            // string listed earlier swallows it (probe catches both shapes).
+            // A parent string listed BEFORE its detail regex swallows the
+            // detail routes (probe = a typical [id] child). On the string's
+            // EXACT path the string tour SHOULD win (the /new-before-regex
+            // rule), so only the child probe is a failure.
             expect(
-              later.test(earlier) || later.test(`${earlier}/probe`),
+              later.test(`${earlier}/probe`),
               `RegExp ${later} is shadowed by earlier string "${earlier}"`,
             ).toBe(false);
           }
@@ -152,6 +157,24 @@ describe("golden tour resolution per route", () => {
   const CASES: [string, string, string | undefined][] = [
     // alumni
     ["alumni", "/graduates/profile", "alumni-profile"],
+    ["alumni", "/graduates/forum/new", "alumni-forum-new"],
+    ["alumni", "/graduates/forum/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f", "alumni-forum-detail"],
+    ["alumni", "/graduates/forum/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f/", "alumni-forum-detail"],
+    ["alumni", "/graduates/forum", "alumni-forum"],
+    ["alumni", "/graduates/events/new", "alumni-events-new"],
+    ["alumni", "/graduates/events/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f", "alumni-events-detail"],
+    ["alumni", "/graduates/events", "alumni-events"],
+    ["alumni", "/graduates/feed/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f", "alumni-feed-detail"],
+    ["alumni", "/graduates/feed", "alumni-feed"],
+    ["alumni", "/graduates/directory/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f", "alumni-directory-detail"],
+    ["alumni", "/graduates/directory", "alumni-directory"],
+    ["alumni", "/graduates/groups/cohort-25", "alumni-groups-detail"],
+    ["alumni", "/graduates/groups", "alumni-groups"],
+    ["alumni", "/graduates/news/9af1c3d5-2ea1-4b8e-9d0a-6f5b7c8d9e0f", "alumni-news-detail"],
+    ["alumni", "/graduates/news", "alumni-news"],
+    ["alumni", "/graduates/jobs", "alumni-jobs"],
+    ["alumni", "/graduates/announcements", "alumni-announcements"],
+    ["alumni", "/graduates/notifications", "alumni-notifications"],
     // admin CRUD batch
     ["admin", "/management/associations", "admin-associations"],
     ["admin", "/management/graduate-committee", "admin-graduate-committee"],

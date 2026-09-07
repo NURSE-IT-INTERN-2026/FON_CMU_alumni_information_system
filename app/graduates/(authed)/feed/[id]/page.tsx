@@ -104,7 +104,7 @@ export default function FeedPostPage() {
       <Link href="/graduates/feed" className="text-sm text-[var(--muted)] hover:text-[var(--primary)]">← กลับสู่ฟีด</Link>
 
       {/* Post */}
-      <article className="mt-4 rounded-lg bg-white p-5 shadow-sm">
+      <article className="mt-4 rounded-lg bg-white p-5 shadow-sm" data-tour="feed-detail-post">
         <div className="mb-3 flex items-center justify-between">
           <PhotoAvatar identity={post.author} size="sm" />
           <span className="text-xs text-[var(--muted)]">{formatThaiDate(post.createdAt)}</span>
@@ -132,7 +132,7 @@ export default function FeedPostPage() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={assetUrl(post.imageUrl)} alt="รูปภาพประกอบโพสต์" className="mt-3 max-h-96 w-full rounded-md object-cover" />
         )}
-        <div className="mt-3 flex items-center gap-4 border-t border-[var(--border)] pt-2 text-sm">
+        <div className="mt-3 flex items-center gap-4 border-t border-[var(--border)] pt-2 text-sm" data-tour="feed-detail-actions">
           <button onClick={() => like.mutate()} disabled={like.isPending} aria-pressed={post.likedByMe} className={`font-medium ${post.likedByMe ? "text-[var(--primary)]" : "text-[var(--muted)]"} hover:opacity-80`}>
             {post.likedByMe ? "❤️" : "🤍"} {post.likeCount}
           </button>
@@ -144,7 +144,7 @@ export default function FeedPostPage() {
       </article>
 
       {/* Comments */}
-      <section className="mt-6 space-y-3">
+      <section className="mt-6 space-y-3" data-tour="feed-detail-comments">
         <h2 className="text-sm font-semibold">ความคิดเห็น ({post.commentCount})</h2>
         {post.comments.length === 0 ? (
           <p className="py-4 text-center text-sm text-[var(--muted)]">ยังไม่มีความคิดเห็น</p>
@@ -188,7 +188,7 @@ export default function FeedPostPage() {
       </section>
 
       {/* Add comment */}
-      <section className="mt-4 rounded-lg bg-white p-3 shadow-sm">
+      <section className="mt-4 rounded-lg bg-white p-3 shadow-sm" data-tour="feed-detail-comment-form">
         <textarea
           className="w-full resize-none rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm"
           rows={2}

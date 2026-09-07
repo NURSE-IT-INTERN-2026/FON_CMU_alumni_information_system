@@ -56,10 +56,10 @@ export default function NewEventPage() {
       <Link href="/graduates/events" className="text-sm text-[var(--muted)] hover:text-[var(--primary)]">
         ← กลับสู่กิจกรรม
       </Link>
-      <h1 className="mt-2 mb-6 text-2xl font-bold text-[var(--primary)]">จัดกิจกรรม</h1>
+      <h1 className="mt-2 mb-6 text-2xl font-bold text-[var(--primary)]" data-tour="events-new-heading">จัดกิจกรรม</h1>
 
       <div className="space-y-5 rounded-lg bg-white p-6 shadow-sm">
-        <div>
+        <div data-tour="events-new-title">
           <label className="mb-1 block text-sm font-medium">ชื่อกิจกรรม <span className="text-red-500">*</span></label>
           <input className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.title} onChange={set("title")} maxLength={200} />
         </div>
@@ -70,7 +70,7 @@ export default function NewEventPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+          <div data-tour="events-new-datetime">
             <label className="mb-1 block text-sm font-medium">เริ่ม <span className="text-red-500">*</span></label>
             <input type="datetime-local" className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.startAt} onChange={set("startAt")} />
           </div>
@@ -81,7 +81,7 @@ export default function NewEventPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+          <div data-tour="events-new-location">
             <label className="mb-1 block text-sm font-medium">สถานที่</label>
             <input className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.location} onChange={set("location")} placeholder="เช่น ห้องประชุม 200 ปี มช." />
           </div>
@@ -92,7 +92,7 @@ export default function NewEventPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+          <div data-tour="events-new-capacity">
             <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วน <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
             <input type="number" min={1} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.capacity} onChange={set("capacity")} placeholder="รวมผู้ร่วมเดินทาง" />
           </div>

@@ -53,7 +53,7 @@ export default function AlumniAnnouncementsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">ประกาศจากคณะ</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="announcements-heading">ประกาศจากคณะ</h1>
         {newCount > 0 && (
           <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
             ใหม่ {newCount}
@@ -62,13 +62,13 @@ export default function AlumniAnnouncementsPage() {
       </div>
 
       {isPending ? (
-        <div className="flex justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
+        <div className="flex justify-center py-16" data-tour="announcements-list"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" /></div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="announcements-list"><p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p></div>
       ) : announcements.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm"><p className="text-[var(--muted)]">ยังไม่มีประกาศ</p></div>
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="announcements-list"><p className="text-[var(--muted)]">ยังไม่มีประกาศ</p></div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="announcements-list">
           {announcements.map((a) => (
             <div
               key={a.id}

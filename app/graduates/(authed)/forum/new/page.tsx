@@ -41,11 +41,11 @@ export default function NewTopicPage() {
         <Link href="/graduates/forum" className="text-sm text-[var(--muted)] hover:text-[var(--primary)]">
           ← กลับสู่กระดานสนทนา
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-[var(--primary)]">ตั้งกระทู้ใหม่</h1>
+        <h1 className="mt-2 text-2xl font-bold text-[var(--primary)]" data-tour="forum-new-heading">ตั้งกระทู้ใหม่</h1>
       </div>
 
       <div className="space-y-5 rounded-lg bg-white p-6 shadow-sm">
-        <div>
+        <div data-tour="forum-new-title">
           <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
             หัวข้อ <span className="text-red-500">*</span>
           </label>
@@ -60,7 +60,7 @@ export default function NewTopicPage() {
           <p className="mt-1 text-right text-xs text-[var(--muted)]">{title.length}/{TITLE_MAX}</p>
         </div>
 
-        <div>
+        <div data-tour="forum-new-body">
           <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
             เนื้อหา <span className="text-red-500">*</span>
           </label>
@@ -77,7 +77,7 @@ export default function NewTopicPage() {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2" data-tour="forum-new-submit">
           <Link href="/graduates/forum">
             <Button variant="outline" disabled={submitting}>ยกเลิก</Button>
           </Link>
