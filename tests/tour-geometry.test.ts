@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   padRect,
   centeredRect,
+  clampRectToViewport,
   computeTooltipPosition,
   TOUR_GAP,
   type Rect,
@@ -36,6 +37,42 @@ describe("centeredRect", () => {
     const out = centeredRect({ width: 200, height: 400 }, 320, 160);
     expect(out.width).toBe(184); // 200 - 2*8 margin
     expect(out.height).toBe(160);
+  });
+});
+
+describe("clampRectToViewport", () => {
+  const HEADER = 88; // sticky navbar bottom at lg
+
+  it("clamps a tall table rect to the visible area below the sticky header", () => {
+    // A table taller than the viewport, scrolled so its top is above the fold.
+    const out = clampRectToViewport(rect(100, -400, 1080, 1200), VP, HEADER);
+    expect(out.y).toBe(HEADER + 8); // 96 — thead slice pinned below the navbar
+    expect(out.height).toBe(VP.height - 8 - (HEADER + 8));
+    expect(out.x).toBe(100);
+    expect(out.width).toBe(1080); // width untouched when it fits
+  });
+
+  it("never enlarges an already-visible rect", () => {
+    const r = rect(120, 200, 300, 80);
+    expect(clampRectToViewport(r, VP, HEADER)).toEqual(r);
+  });
+
+  it("clamps a wide rect past the right edge", () => {
+    const out = clampRectToViewport(rect(600, 200, 1500, 100), VP, HEADER);
+    expect(out.x).toBe(600);
+    expect(out.width).toBe(VP.width - 8 - 600);
+  });
+
+  it("collapses a rect entirely above the viewport instead of covering the navbar", () => {
+    const out = clampRectToViewport(rect(100, -300, 400, 50), VP, HEADER);
+    expect(out.height).toBe(0);
+    expect(out.y).toBe(HEADER + 8);
+  });
+
+  it("treats topOffset=0 as a plain viewport clamp", () => {
+    const out = clampRectToViewport(rect(0, -50, 400, 200), VP, 0);
+    expect(out.y).toBe(8);
+    expect(out.height).toBe(142);
   });
 });
 

@@ -7,6 +7,13 @@ export interface TargetMeasurement {
   /** Padded, viewport-relative spotlight rect; null when the target is absent (or the step is centered). */
   rect: Rect | null;
   viewport: Viewport;
+  /**
+   * Bottom edge of the page's sticky header (both authed layouts render one
+   * `<header class="sticky top-0 z-50 …">` as the first element; the tour
+   * overlay portals to body and contains no `<header>`). Spotlight rects are
+   * clamped below it so the hole never covers the navbar. 0 when absent.
+   */
+  topOffset: number;
 }
 
 /**
@@ -23,6 +30,7 @@ export function useTargetRect(target: string | null, active: boolean): TargetMea
   const [measurement, setMeasurement] = useState<TargetMeasurement>({
     rect: null,
     viewport: { width: 0, height: 0 },
+    topOffset: 0,
   });
 
   useEffect(() => {
@@ -43,10 +51,14 @@ export function useTargetRect(target: string | null, active: boolean): TargetMea
           observed = el;
           if (el) observer.observe(el);
         }
+        // Keep the header under observation too (its height drives topOffset).
+        const header = document.querySelector<HTMLElement>("header");
+        if (header) observer.observe(header);
         const r = el?.getBoundingClientRect();
         setMeasurement({
           rect: r ? padRect({ x: r.left, y: r.top, width: r.width, height: r.height }, TOUR_PAD) : null,
           viewport: { width: window.innerWidth, height: window.innerHeight },
+          topOffset: Math.max(0, header?.getBoundingClientRect().bottom ?? 0),
         });
       });
     }

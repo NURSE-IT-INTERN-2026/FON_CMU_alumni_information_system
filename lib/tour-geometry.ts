@@ -26,8 +26,8 @@ export const TOUR_PAD = 8;
 export const TOUR_GAP = 12;
 /** Max tooltip-card width (also the width basis before measuring). */
 export const CARD_MAX_W = 340;
-/** Minimum distance the card keeps from the viewport edges. */
-const VIEWPORT_MARGIN = 8;
+/** Minimum distance the card/spotlight keeps from the viewport edges. */
+export const VIEWPORT_MARGIN = 8;
 
 const OPPOSITE: Record<StepPlacement, StepPlacement> = {
   below: "above",
@@ -71,6 +71,34 @@ export function centeredRect(vp: Viewport, w: number, h: number): Rect {
     y: (vp.height - height) / 2,
     width,
     height,
+  };
+}
+
+/**
+ * Clamp a spotlight rect to the visible viewport: y within
+ * [topOffset+margin, vp.height-margin] and x within [margin, vp.width-margin],
+ * where topOffset is the sticky header's bottom edge. Without this, a target
+ * taller/wider than the viewport (wide tables, long lists) produces a hole
+ * that extends off-screen and over the sticky navbar — making the navbar look
+ * "highlighted" and hiding the table's thead behind it. Never enlarges the
+ * rect; a rect entirely outside the band collapses to a zero-size sliver at
+ * the boundary (spotlight effectively hidden instead of mis-covering).
+ */
+export function clampRectToViewport(
+  r: Rect,
+  vp: Viewport,
+  topOffset: number,
+  margin: number = VIEWPORT_MARGIN,
+): Rect {
+  const top = Math.max(topOffset + margin, r.y);
+  const bottom = Math.min(vp.height - margin, r.y + r.height);
+  const left = Math.max(margin, r.x);
+  const right = Math.min(vp.width - margin, r.x + r.width);
+  return {
+    x: left,
+    y: top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
   };
 }
 
