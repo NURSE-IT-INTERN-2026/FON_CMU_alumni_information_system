@@ -22,6 +22,8 @@ import {
   LOG_ACTION_LABELS,
   LOG_ACTION_COLORS,
   LOG_RESOURCE_LABELS,
+  ACTOR_ROLE_LABELS,
+  ACTOR_ROLE_COLORS,
   actionLabel,
   resourceLabel,
   type ImportDetailView,
@@ -51,6 +53,14 @@ interface ActivityLog {
 // `lib/log-detail.ts` (compile-checked for completeness against LogAction /
 // LogResource), so this page can never fall behind a new action/resource.
 
+// Actor filter options: the three admin roles (shared labels) plus the two
+// actor types. Values match the `role` param of GET /api/logs.
+const ACTOR_FILTER_OPTIONS: { value: string; label: string }[] = [
+  ...Object.entries(ACTOR_ROLE_LABELS).map(([value, label]) => ({ value, label })),
+  { value: "alumni", label: "ศิษย์เก่า" },
+  { value: "system", label: "ระบบ" },
+];
+
 const PAGE_SIZE = 20;
 
 function formatDate(dateStr: string) {
@@ -69,7 +79,7 @@ export default function LogsPage() {
   const [page, setPage] = useState(1);
   const [resourceFilter, setResourceFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [detailLog, setDetailLog] = useState<ActivityLog | null>(null);
 
   // Log deletion is superadmin-only (irreversible audit changes).
@@ -92,13 +102,13 @@ export default function LogsPage() {
   const qc = useQueryClient();
 
   const { data: logsData, isPending: loading, isError } = useQuery({
-    queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, source: sourceFilter }),
+    queryKey: queryKeys.logs.list({ page, resource: resourceFilter, action: actionFilter, role: roleFilter }),
     enabled: role !== "executive",
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
       if (resourceFilter) params.set("resource", resourceFilter);
       if (actionFilter) params.set("action", actionFilter);
-      if (sourceFilter) params.set("source", sourceFilter);
+      if (roleFilter) params.set("role", roleFilter);
       return apiFetch<{ data: ActivityLog[]; total: number }>(`/api/logs?${params}`);
     },
   });
@@ -181,14 +191,14 @@ export default function LogsPage() {
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-3" data-tour="settings-logs-filters">
         <select
-          value={sourceFilter}
-          onChange={(e) => { setSourceFilter(e.target.value); handleFilterChange(); }}
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); handleFilterChange(); }}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         >
-          <option value="">ทุกแหล่งที่มา</option>
-          <option value="admin">ผู้ดูแลระบบ</option>
-          <option value="alumni">ศิษย์เก่า</option>
-          <option value="system">ระบบ</option>
+          <option value="">ทุกบทบาท</option>
+          {ACTOR_FILTER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
 
         <select
@@ -309,6 +319,11 @@ export default function LogsPage() {
                         )}
                         {isAlumniActor && (
                           <span className="inline-block rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">ศิษย์เก่า</span>
+                        )}
+                        {!isSystemActor && !isAlumniActor && log.userRole && (
+                          <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ACTOR_ROLE_COLORS[log.userRole] || "bg-gray-100 text-gray-600"}`}>
+                            {ACTOR_ROLE_LABELS[log.userRole] || log.userRole}
+                          </span>
                         )}
                         {actorSub && (
                           <span className="text-xs text-gray-400">{actorSub}</span>

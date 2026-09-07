@@ -6,6 +6,8 @@ import {
   LOG_ACTION_COLORS,
   LOG_RESOURCE_LABELS,
   LEGACY_RESOURCE_LABELS,
+  ACTOR_ROLE_LABELS,
+  ACTOR_ROLE_COLORS,
   actionLabel,
   resourceLabel,
   formatValue,
@@ -85,6 +87,18 @@ describe("log label completeness", () => {
     expect(hasThai(resourceLabel("abroad_alumni"))).toBe(true);
     expect(actionLabel("SOMETHING_NEW")).toBe("SOMETHING_NEW");
     expect(resourceLabel("something_new")).toBe("something_new");
+  });
+});
+
+describe("actor role highlighting", () => {
+  it("labels and colors every admin role distinctly", () => {
+    for (const role of ["superadmin", "admin", "executive"]) {
+      expect(hasThai(ACTOR_ROLE_LABELS[role]), `role ${role} lacks a Thai label`).toBe(true);
+      expect(ACTOR_ROLE_COLORS[role], `role ${role} lacks a badge color`).toBeTruthy();
+    }
+    // Distinct colors so the highlight actually distinguishes roles.
+    const colors = ["superadmin", "admin", "executive"].map((r) => ACTOR_ROLE_COLORS[r]);
+    expect(new Set(colors).size).toBe(3);
   });
 });
 

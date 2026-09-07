@@ -23,15 +23,20 @@ export async function GET(request: NextRequest) {
     const resource = searchParams.get("resource") || "";
     const action = searchParams.get("action") || "";
     const userId = searchParams.get("userId") || "";
-    const source = searchParams.get("source") || "";
+    // Actor filter: an admin role (superadmin/admin/executive) narrows to that
+    // role; "alumni"/"system" select the non-admin actor types.
+    const role = searchParams.get("role") || "";
 
     const where: Record<string, unknown> = {};
     if (resource) where.resource = resource;
     if (action) where.action = action;
     if (userId) where.userId = userId;
-    if (source === "alumni") where.actorType = "ALUMNI";
-    else if (source === "admin") where.actorType = "ADMIN";
-    else if (source === "system") where.actorType = "SYSTEM";
+    if (role === "alumni") where.actorType = "ALUMNI";
+    else if (role === "system") where.actorType = "SYSTEM";
+    else if (role === "superadmin" || role === "admin" || role === "executive") {
+      where.actorType = "ADMIN";
+      where.userRole = role;
+    }
 
     const [data, total] = await Promise.all([
       prisma.activityLog.findMany({
