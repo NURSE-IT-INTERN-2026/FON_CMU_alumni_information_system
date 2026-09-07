@@ -506,7 +506,7 @@ export default function ModelRepresentativesPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="model-representatives-heading">
           รายชื่อเครือข่ายศิษย์เก่าทุกรุ่นทุกหลักสูตร
         </h1>
         {canWrite && (selectMode ? (
@@ -691,7 +691,7 @@ export default function ModelRepresentativesPage() {
 
       {/* Manage mode: action buttons */}
       {(
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2" data-tour="model-representatives-toolbar">
           {canWrite && (
             <button
               onClick={openCreate}
@@ -755,7 +755,7 @@ export default function ModelRepresentativesPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row" data-tour="model-representatives-search">
         <SearchInput
           value={search}
           onSearch={applySearch}
@@ -765,26 +765,26 @@ export default function ModelRepresentativesPage() {
       </div>
 
       {/* Facet filters */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3" data-tour="model-representatives-facets">
         <FacetFilter entity="model-representatives" field="cohort" label="เครือข่าย" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
         <FacetFilter entity="model-representatives" field="generation" label="รุ่นที่" selected={filters.generation ?? []} onChange={(v) => setFilter("generation", v)} />
         <FacetFilter entity="model-representatives" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-12" data-tour="model-representatives-table">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="flex justify-center py-16 text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
+        <div className="flex justify-center py-16 text-red-600" data-tour="model-representatives-table">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
       ) : (
         /* ===== MANAGE MODE: flat table ===== */
         filteredAlumni.length === 0 ? (
-          <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+          <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="model-representatives-table">
             <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="model-representatives-table">
             <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

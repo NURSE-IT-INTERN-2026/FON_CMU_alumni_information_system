@@ -304,7 +304,7 @@ export default function GraduateCommitteePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">กรรมการบัณฑิต</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="graduate-committee-heading">กรรมการบัณฑิต</h1>
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
             <button onClick={() => (isAllSelected(committees.map((c) => c.id)) ? deselectPage(committees.map((c) => c.id)) : selectAll(committees.map((c) => c.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
@@ -445,7 +445,7 @@ export default function GraduateCommitteePage() {
       )}
 
       {(
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2" data-tour="graduate-committee-toolbar">
           {canWrite && (
             <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -494,7 +494,7 @@ export default function GraduateCommitteePage() {
       )}
 
       {/* Search & Filters */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3" data-tour="graduate-committee-search">
         <SearchInput
           value={search}
           onSearch={applySearch}
@@ -504,7 +504,7 @@ export default function GraduateCommitteePage() {
       </div>
 
       {/* Facet filters */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4" data-tour="graduate-committee-facets">
         <FacetFilter entity="graduate-committee" field="cohort" label="รุ่นที่" selected={filters.cohort ?? []} onChange={(v) => setFilter("cohort", v)} />
         <FacetFilter entity="graduate-committee" field="termYear" label="ปี พ.ศ." selected={filters.termYear ?? []} onChange={(v) => setFilter("termYear", v)} />
         <FacetFilter entity="graduate-committee" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
@@ -513,19 +513,19 @@ export default function GraduateCommitteePage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="graduate-committee-table">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="graduate-committee-table">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : committees.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="graduate-committee-table">
           <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="graduate-committee-table">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

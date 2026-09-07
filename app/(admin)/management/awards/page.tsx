@@ -387,7 +387,7 @@ export default function AwardsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">รางวัลที่ได้รับ</h1>
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="awards-heading">รางวัลที่ได้รับ</h1>
         {canWrite && (selectMode ? (
           <div className="flex items-center gap-2">
             <button onClick={() => (isAllSelected(awards.map((a) => a.id)) ? deselectPage(awards.map((a) => a.id)) : selectAll(awards.map((a) => a.id)))} className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-gray-50">
@@ -565,7 +565,7 @@ export default function AwardsPage() {
 
       {/* Award type summary cards */}
       {Object.keys(typeCounts).length > 0 && (
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3" data-tour="awards-stats">
           {[
             {
               key: "INTERNATIONAL",
@@ -613,7 +613,7 @@ export default function AwardsPage() {
       )}
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row" data-tour="awards-filters">
         <SearchInput
           value={search}
           onSearch={handleSearch}
@@ -623,13 +623,13 @@ export default function AwardsPage() {
       </div>
 
       {/* Facet filters */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-2" data-tour="awards-facets">
         <FacetFilter entity="awards" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
         <FacetFilter entity="awards" field="awardType" label="ประเภท" selected={filters.awardType ?? []} onChange={(v) => setFilter("awardType", v)} valueLabels={AWARD_TYPE_LABELS} />
       </div>
 
       {!showForm && (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2" data-tour="awards-toolbar">
           {canWrite && (
             <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -678,7 +678,7 @@ export default function AwardsPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="awards-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

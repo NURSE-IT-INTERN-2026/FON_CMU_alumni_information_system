@@ -290,7 +290,7 @@ export default function PotentialsPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl">
+        <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="potentials-heading">
           ศักยภาพ
         </h1>
         {canWrite && (selectMode ? (
@@ -428,7 +428,7 @@ export default function PotentialsPage() {
       )}
 
       {(
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2" data-tour="potentials-toolbar">
           {/* keep existing add button but update the wrapper */}
           {canWrite && (
             <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
@@ -478,7 +478,7 @@ export default function PotentialsPage() {
       )}
 
       {/* Search */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row" data-tour="potentials-search">
         <SearchInput
           value={search}
           onSearch={handleSearch}
@@ -488,7 +488,7 @@ export default function PotentialsPage() {
       </div>
 
       {/* Facet filters */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4" data-tour="potentials-facets">
         <FacetFilter entity="potentials" field="major" label="สาขาวิชา" selected={filters.major ?? []} onChange={(v) => setFilter("major", v)} />
         <FacetFilter entity="potentials" field="career" label="อาชีพ" selected={filters.career ?? []} onChange={(v) => setFilter("career", v)} />
         <FacetFilter entity="potentials" field="position" label="ตำแหน่ง" selected={filters.position ?? []} onChange={(v) => setFilter("position", v)} />
@@ -497,19 +497,19 @@ export default function PotentialsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16" data-tour="potentials-table">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
         </div>
       ) : isError ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="potentials-table">
           <p className="text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
         </div>
       ) : potentials.length === 0 ? (
-        <div className="rounded-lg bg-white py-16 text-center shadow-sm">
+        <div className="rounded-lg bg-white py-16 text-center shadow-sm" data-tour="potentials-table">
           <p className="text-[var(--muted)]">ไม่พบข้อมูล</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg bg-white shadow-sm" data-tour="potentials-table">
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
