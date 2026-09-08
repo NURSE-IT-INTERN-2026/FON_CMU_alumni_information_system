@@ -6,12 +6,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { BASE_PATH } from "@/lib/constants";
 
 /**
  * Notification center (community V2) — the logged-in alum's own list, unread
- * first. Stored `link` values are basePath-relative; rendered with BASE_PATH
- * prepended.
+ * first. Stored `link` values are basePath-relative; next/link auto-prepends
+ * the configured basePath, so the href must NOT be prefixed manually.
  */
 
 interface NotificationItem {
@@ -105,7 +104,7 @@ export default function NotificationsPage() {
               </div>
             );
             return n.link ? (
-              <Link key={n.id} href={`${BASE_PATH}${n.link}`} onClick={() => !n.readAt && markRead.mutate({ ids: [n.id] })}>
+              <Link key={n.id} href={n.link} onClick={() => !n.readAt && markRead.mutate({ ids: [n.id] })}>
                 {content}
               </Link>
             ) : (

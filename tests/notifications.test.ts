@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { notificationLink, notificationText } from "@/lib/notification-text";
 import { GROUP_NOTIFY_CAP } from "@/lib/notification-emitter";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
@@ -37,6 +39,41 @@ describe("notificationLink — route mapping", () => {
     expect(notificationLink("COMMENT_ON_MY_POST", "p1")).toBe("/graduates/feed/p1");
     expect(notificationLink("RSVP_ON_MY_EVENT", "e1")).toBe("/graduates/events/e1");
     expect(notificationLink("REPORT_OUTCOME")).toBeNull();
+  });
+});
+
+// --- Static guard: next/link auto-prepends basePath — never prefix manually --- //
+// The app runs under `basePath: "/alumni"`; `next/link` hrefs and
+// `router.push/replace` get the prefix automatically, so a manual
+// `${BASE_PATH}` produces `/alumni/alumni/...` → 404 (notification-center bug,
+// fixed 2026-09). Manual prefixes are ONLY correct on raw `<a href>`,
+// `window.location`, and plain `fetch` — this scan flags just the auto-prefix
+// surfaces so those stay untouched.
+const LINK_BASEPATH_RE = /<Link\b[^>]*href=\{`\$\{BASE_PATH\}/;
+const ROUTER_BASEPATH_RE = /router\.(push|replace)\(`\$\{BASE_PATH\}/;
+
+function listSourceFiles(root: string): string[] {
+  return fs
+    .readdirSync(root, { recursive: true })
+    .map((p) => String(p))
+    .filter((p) => /\.(tsx|ts)$/.test(p))
+    .map((p) => path.join(root, p).split(path.sep).join("/"));
+}
+
+describe("no double basePath on next/link hrefs (static scan)", () => {
+  const roots = ["app", "components"].map((r) => path.resolve(process.cwd(), r));
+  const files = roots.flatMap(listSourceFiles);
+
+  it("found the source directories (sanity)", () => {
+    expect(files.length, "expected to discover app/components source files").toBeGreaterThan(0);
+  });
+
+  it("never manually prefixes a next/link href or router.push with BASE_PATH", () => {
+    const offenders = files.filter((f) => {
+      const content = fs.readFileSync(f, "utf8");
+      return LINK_BASEPATH_RE.test(content) || ROUTER_BASEPATH_RE.test(content);
+    });
+    expect(offenders, "next/link auto-prepends basePath — remove the manual ${BASE_PATH}").toEqual([]);
   });
 });
 

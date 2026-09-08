@@ -934,7 +934,8 @@ model Notification {
   entityId  String?
   title     String
   body      String?
-  // Route-internal path (no basePath — added at render like assetUrl).
+  // Route-internal path (basePath-relative — render via next/link, which
+  // auto-prepends basePath; never prefix manually).
   link      String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
