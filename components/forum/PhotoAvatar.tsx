@@ -29,7 +29,7 @@ export default function PhotoAvatar({
     .join(" · ");
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex min-w-0 items-center gap-2.5">
       {identity.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

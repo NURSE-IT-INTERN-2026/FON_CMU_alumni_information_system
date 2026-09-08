@@ -187,13 +187,13 @@ export default function AlumniEventsPage() {
                 )}
               </div>
               <div className="p-4">
-                <h3 className="mb-1 line-clamp-2 text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{e.title}</h3>
+                <h3 className="mb-1 line-clamp-2 break-words text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)]">{e.title}</h3>
                 <p className="mb-3 text-xs font-medium text-[var(--primary)]">{formatEventDateThai(e.startAt)}</p>
-                <p className="mb-3 line-clamp-1 text-sm text-[var(--muted)]">{e.location || (e.onlineLink ? "ออนไลน์" : "—")}</p>
+                <p className="mb-3 line-clamp-1 break-words text-sm text-[var(--muted)]">{e.location || (e.onlineLink ? "ออนไลน์" : "—")}</p>
                 <div className="flex items-center justify-between">
                   <EventOrganizerView organizer={e.organizer} />
                   <span className={`shrink-0 text-xs ${e.isFull ? "text-red-600" : "text-[var(--muted)]"}`}>
-                    {e.isFull ? "เต็มแล้ว" : `${e.headcount} เข้าร่วน`}
+                    {e.isFull ? "เต็มแล้ว" : `${e.headcount} เข้าร่วม`}
                   </span>
                 </div>
               </div>
