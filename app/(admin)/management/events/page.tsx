@@ -8,8 +8,9 @@ import { useCanWrite } from "@/lib/role-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import EventFormDialog, { type EventFormValues } from "@/components/events/EventFormDialog";
-import EventOrganizerView, { type EventOrganizer } from "@/components/events/EventOrganizer";
-import { formatEventDateTimeThai, isoToDatetimeLocal } from "@/lib/event-format";
+import EventCard from "@/components/events/EventCard";
+import { type EventOrganizer } from "@/components/events/EventOrganizer";
+import { isoToDatetimeLocal } from "@/lib/event-format";
 
 interface AdminEvent {
   id: string;
@@ -19,6 +20,7 @@ interface AdminEvent {
   endAt: string | null;
   location: string | null;
   onlineLink: string | null;
+  coverImageUrl: string | null;
   capacity: number | null;
   guestLimit: number;
   organizer: EventOrganizer;
@@ -38,7 +40,7 @@ function toFormValues(e: AdminEvent): EventFormValues {
     onlineLink: e.onlineLink ?? "",
     capacity: e.capacity != null ? String(e.capacity) : "",
     guestLimit: String(e.guestLimit),
-    coverImageUrl: "",
+    coverImageUrl: e.coverImageUrl ?? "",
   };
 }
 
@@ -69,7 +71,7 @@ export default function AdminEventsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--primary)] sm:text-3xl" data-tour="admin-events-heading">กิจกรรม</h1>
         {canWrite && <span data-tour="admin-events-create"><Button onClick={() => setCreateOpen(true)}>สร้างกิจกรรม</Button></span>}
@@ -100,29 +102,20 @@ export default function AdminEventsPage() {
           <p className="text-[var(--muted)]">ยังไม่มีกิจกรรม</p>
         </div>
       ) : (
-        <div className="space-y-3" data-tour="admin-events-list">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" data-tour="admin-events-list">
           {events.map((e) => (
-            <div key={e.id} className="rounded-lg bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-[var(--foreground)]">{e.title}</h3>
-                  <p className="text-xs font-medium text-[var(--primary)]">{formatEventDateTimeThai(e.startAt)}</p>
-                </div>
-                <span className={`shrink-0 text-xs ${e.isFull ? "text-red-600" : "text-[var(--muted)]"}`}>
-                  {e.headcount}{e.capacity ? `/${e.capacity}` : ""} ท่าน
-                </span>
-              </div>
-              <p className="mb-3 line-clamp-2 text-sm text-[var(--muted)]">{e.description}</p>
-              <div className="flex items-center justify-between">
-                <EventOrganizerView organizer={e.organizer} />
-                {canWrite && (
-                  <div className="flex gap-2">
+            <EventCard
+              key={e.id}
+              event={e}
+              footer={
+                canWrite ? (
+                  <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(toFormValues(e))}>แก้ไข</Button>
                     <Button variant="ghost" size="sm" className="text-red-600" onClick={() => setDeleting(e)}>ลบ</Button>
                   </div>
-                )}
-              </div>
-            </div>
+                ) : undefined
+              }
+            />
           ))}
         </div>
       )}
