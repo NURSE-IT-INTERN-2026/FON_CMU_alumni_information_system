@@ -164,7 +164,7 @@ export const queryKeys = {
   // Job board (alumni community V2).
   jobs: {
     all: ["jobs"] as const,
-    list: (o: { page: number; search: string; province: string; scope: string }) =>
+    list: (o: { page: number; search: string; province: string; scope: string; country: string }) =>
       ["jobs", "list", o] as const,
     detail: (id: string) => ["jobs", "detail", id] as const,
   },
