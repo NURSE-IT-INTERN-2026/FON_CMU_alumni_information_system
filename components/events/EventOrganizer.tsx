@@ -13,13 +13,13 @@ export default function EventOrganizerView({ organizer }: { organizer: EventOrga
   if (!organizer) return <span className="text-xs text-[var(--muted)]">ผู้จัดถูกลบแล้ว</span>;
   if (organizer.type === "alumni") return <PhotoAvatar identity={organizer} size="sm" />;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[11px] font-semibold text-white">
         เจ้า
       </span>
-      <div className="leading-tight">
+      <div className="min-w-0 leading-tight">
         <p className="text-sm font-medium text-[var(--foreground)]">เจ้าหน้าที่</p>
-        <p className="text-xs text-[var(--muted)]">{organizer.name}</p>
+        <p className="truncate text-xs text-[var(--muted)]">{organizer.name}</p>
       </div>
     </div>
   );

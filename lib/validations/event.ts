@@ -19,8 +19,8 @@ const DESC_MAX = 10000;
 
 export const RSVP_STATUS_VALUES = ["ATTENDING", "DECLINED"] as const;
 export const RSVP_STATUS_LABELS: Record<string, string> = {
-  ATTENDING: "เข้าร่วน",
-  DECLINED: "ไม่เข้าร่วน",
+  ATTENDING: "เข้าร่วม",
+  DECLINED: "ไม่เข้าร่วม",
 };
 
 const titleField = z.string().trim().min(1, MSG.titleRequired).max(TITLE_MAX, MSG.titleTooLong);

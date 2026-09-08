@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api-client";
+import { BASE_PATH } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 
 export default function NewEventPage() {
@@ -20,6 +21,30 @@ export default function NewEventPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  // Cover bytes go through the opt-in-alumni upload route (same 5MB/PNG+JPG
+  // rules as the admin /api/upload); the URL is attached to the event on POST.
+  async function uploadCover(file: File) {
+    setUploadingCover(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${BASE_PATH}/api/alumni-upload`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? "อัปโหลดไม่สำเร็จ");
+      }
+      const { url } = await res.json();
+      setCoverUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "อัปโหลดรูปไม่สำเร็จ");
+    } finally {
+      setUploadingCover(false);
+    }
+  }
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -42,6 +67,7 @@ export default function NewEventPage() {
           onlineLink: form.onlineLink.trim() || undefined,
           capacity: form.capacity ? Number(form.capacity) : undefined,
           guestLimit: Number(form.guestLimit) || 0,
+          coverImageUrl: coverUrl ?? undefined,
         },
       });
       router.push(`/graduates/events/${created.id}`);
@@ -69,6 +95,23 @@ export default function NewEventPage() {
           <textarea className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" rows={5} value={form.description} onChange={set("description")} maxLength={10000} />
         </div>
 
+        <div>
+          <label className="mb-1 block text-sm font-medium">รูปปก <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            className="text-sm"
+            disabled={uploadingCover}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadCover(f);
+              e.target.value = "";
+            }}
+          />
+          {uploadingCover && <p className="mt-1 text-xs text-[var(--muted)]">กำลังอัปโหลด...</p>}
+          {coverUrl && <p className="mt-1 text-xs text-green-600">อัปโหลดรูปปกแล้ว</p>}
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div data-tour="events-new-datetime">
             <label className="mb-1 block text-sm font-medium">เริ่ม <span className="text-red-500">*</span></label>
@@ -93,7 +136,7 @@ export default function NewEventPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div data-tour="events-new-capacity">
-            <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วน <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
+            <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วม <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
             <input type="number" min={1} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.capacity} onChange={set("capacity")} placeholder="รวมผู้ร่วมเดินทาง" />
           </div>
           <div>
@@ -106,7 +149,7 @@ export default function NewEventPage() {
 
         <div className="flex justify-end gap-2">
           <Link href="/graduates/events"><Button variant="outline" disabled={submitting}>ยกเลิก</Button></Link>
-          <Button onClick={submit} disabled={submitting}>{submitting ? "กำลังบันทึก..." : "สร้างกิจกรรม"}</Button>
+          <Button onClick={submit} disabled={submitting || uploadingCover}>{submitting ? "กำลังบันทึก..." : "สร้างกิจกรรม"}</Button>
         </div>
       </div>
     </div>

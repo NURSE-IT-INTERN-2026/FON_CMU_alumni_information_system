@@ -137,7 +137,7 @@ export default function EventFormDialog({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วน</label>
+              <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วม</label>
               <input type="number" min={1} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.capacity} onChange={set("capacity")} />
             </div>
             <div>
