@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { Button } from "@/components/ui/button";
 
 export default function NewEventPage() {
@@ -27,6 +28,11 @@ export default function NewEventPage() {
   // Cover bytes go through the opt-in-alumni upload route (same 5MB/PNG+JPG
   // rules as the admin /api/upload); the URL is attached to the event on POST.
   async function uploadCover(file: File) {
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setUploadingCover(true);
     setError(null);
     try {

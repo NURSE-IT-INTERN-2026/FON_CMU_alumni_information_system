@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { assetUrl } from "@/lib/asset-url";
 
 /**
@@ -56,6 +57,11 @@ export default function EventPhotoAlbum({ eventId }: { eventId: string }) {
   });
 
   async function handleFile(file: File) {
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setUploading(true);
     setError(null);
     try {

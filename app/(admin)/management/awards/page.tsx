@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import FormField from "@/components/form/FormField";
 import FormInput from "@/components/form/FormInput";
 import FormSelect from "@/components/form/FormSelect";
+import { validateImageFile } from "@/lib/upload-limits";
 import { AWARD_TYPE_LABELS, AWARD_TYPE_OPTIONS, PAGE_SIZE, BASE_PATH } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEntityList } from "@/lib/use-entity-list";
@@ -238,12 +239,9 @@ export default function AwardsPage() {
   // path in the form's `imageUrl` field. Uses raw fetch (not apiFetch) because
   // the upload is multipart FormData, not JSON.
   const uploadImage = async (file: File): Promise<string | null> => {
-    if (!file.type.match(/^image\/(jpeg|png)$/)) {
-      setErrorMsg("อนุญาตเฉพาะไฟล์ JPG และ PNG เท่านั้น");
-      return null;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("ขนาดไฟล์ต้องไม่เกิน 5MB");
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setErrorMsg(invalid);
       return null;
     }
     try {

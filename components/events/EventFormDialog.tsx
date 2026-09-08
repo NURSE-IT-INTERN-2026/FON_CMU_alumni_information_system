@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import {
   Dialog,
   DialogContent,
@@ -51,17 +52,25 @@ export default function EventFormDialog({
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function uploadCover(file: File) {
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch(`${BASE_PATH}/api/upload`, { method: "POST", body: fd });
-      if (!res.ok) throw new Error("อัปโหลดไม่สำเร็จ");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? "อัปโหลดไม่สำเร็จ");
+      }
       const { url } = await res.json();
       setForm((f) => ({ ...f, coverImageUrl: url }));
-    } catch {
-      setError("อัปโหลดรูปไม่สำเร็จ");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "อัปโหลดรูปไม่สำเร็จ");
     } finally {
       setUploading(false);
     }
