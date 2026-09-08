@@ -103,21 +103,24 @@ export function TourProvider({ area, userId, children }: TourProviderProps) {
     void (async () => {
       const first = next.steps[0];
       const startWait = Math.max(DEFAULT_START_WAIT_MS, first.waitFor ?? 0);
-      const ready = await waitForStep(first, startWait);
+      await waitForStep(first, startWait);
       if (token !== runToken.current) return;
 
-      let index = 0;
-      if (!ready) {
-        // First target never appeared — scan for any step that is ready now.
-        index = next.steps.findIndex((s) => isStepReady(s));
-        if (index === -1) {
-          toast.info("ยังไม่มีเนื้อหาให้แนะนำในหน้านี้ โปรดลองอีกครั้งเมื่อข้อมูลโหลดเสร็จ");
-          setStatus("idle");
-          setTour(null);
-          return;
-        }
+      // Drop steps whose targets are absent at open and run the walk on a
+      // filtered clone — the overlay's counter/dots/isLast all read
+      // tour.steps, so numbering adapts and dropped steps cost no wait.
+      // target:null steps are always kept (closing card / advance() fallback);
+      // the waitFor-skip in advance() remains the mid-walk-unmount fallback.
+      const active: TourDefinition = { ...next, steps: next.steps.filter(isStepReady) };
+      if (!active.steps.some((s) => s.target !== null)) {
+        // No targeted step ever mounted — don't run a closing-card-only tour.
+        toast.info("ยังไม่มีเนื้อหาให้แนะนำในหน้านี้ โปรดลองอีกครั้งเมื่อข้อมูลโหลดเสร็จ");
+        setStatus("idle");
+        setTour(null);
+        return;
       }
-      setStepIndex(index);
+      setTour(active);
+      setStepIndex(0);
       setStatus("running");
     })();
   }

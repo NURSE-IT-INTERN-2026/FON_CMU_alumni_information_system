@@ -17,13 +17,13 @@ vi.mock("next/navigation", () => ({
 // CONTRACT: this harness renders TOURS[0] — `alumni-profile` must remain the
 // registry's FIRST entry (lib/tours.ts) even as the alumni block is reordered.
 
-function HarnessInner() {
+function HarnessInner({ omitTarget }: { omitTarget?: string }) {
   const { start } = useTour();
   return (
     <>
       <button onClick={() => start("alumni-profile")}>start-tour</button>
       {TOURS[0].steps
-        .filter((s) => s.target !== null)
+        .filter((s) => s.target !== null && s.target !== omitTarget)
         .map((s) => (
           <div key={s.target} data-tour={s.target as string}>
             {s.target}
@@ -33,10 +33,10 @@ function HarnessInner() {
   );
 }
 
-function Harness() {
+function Harness({ omitTarget }: { omitTarget?: string }) {
   return (
     <TourProvider area="alumni" userId="test-user-1">
-      <HarnessInner />
+      <HarnessInner omitTarget={omitTarget} />
     </TourProvider>
   );
 }
@@ -72,6 +72,38 @@ describe("product tour runtime", () => {
 
     fireEvent.click(screen.getByText("ก่อนหน้า"));
     await waitFor(() => expect(screen.getByText("ข้อมูลส่วนตัวของท่าน")).toBeTruthy());
+  });
+
+  it("drops absent-target steps at start and renumbers the walk (adaptive step count)", async () => {
+    // Omit registry step 1's target (alumni-profile-edit) → 7-step tour walks as 6.
+    // The waitFor's default 1s timeout doubles as the no-stall tripwire: the old
+    // engine burned DEFAULT_STEP_WAIT_MS (3000ms) skipping an absent step.
+    render(<Harness omitTarget="alumni-profile-edit" />);
+    fireEvent.click(screen.getByText("start-tour"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(screen.getByText(/ขั้นที่ 1\/6/)).toBeTruthy();
+    expect(dialog.querySelectorAll("span.rounded-full")).toHaveLength(6); // progress dots
+
+    fireEvent.click(screen.getByText("ถัดไป"));
+    // Registry step 2 is the next card — the absent step was DROPPED, not skipped
+    // (a skip would show "ขั้นที่ 3/7" and stall 3s first).
+    await waitFor(() => expect(screen.getByText(/ขั้นที่ 2\/6/)).toBeTruthy());
+    expect(screen.getByText("ข้อมูลส่วนตัว")).toBeTruthy();
+
+    // Walk to the end: closing card is numbered last and still completes the tour.
+    for (let i = 2; i < 6; i++) {
+      fireEvent.click(screen.getByText("ถัดไป"));
+      if (i < 5) {
+        const stepLabel = new RegExp(`ขั้นที่ ${i + 1}/6`);
+        await waitFor(() => expect(screen.getByText(stepLabel)).toBeTruthy());
+      }
+    }
+    await waitFor(() => expect(screen.getByText("เสร็จสิ้น")).toBeTruthy());
+    fireEvent.click(screen.getByText("เสร็จสิ้น"));
+    await waitFor(() =>
+      expect(window.localStorage.getItem("tour-completed:alumni-profile:test-user-1")).toBe("true"),
+    );
   });
 
   it("records completion in localStorage when the last step's เสร็จสิ้น is clicked, and ข้าม does not", async () => {
