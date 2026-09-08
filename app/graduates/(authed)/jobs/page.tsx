@@ -138,12 +138,14 @@ export default function AlumniJobsPage() {
       <div className="mb-6 space-y-3" data-tour="jobs-filters">
         <SearchInput value={search} onSearch={(v) => { setSearch(v); setPage(1); }} placeholder="ค้นหาตำแหน่ง สถานที่ทำงาน..." formClassName="w-full" />
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            list="jobs-provinces" value={province}
+          <select
+            value={province}
             onChange={(e) => { setProvince(e.target.value); setPage(1); }}
-            placeholder="จังหวัด" className={`${inputClass} sm:w-56`}
-          />
-          <datalist id="jobs-provinces">{THAI_PROVINCES.map((p) => <option key={p} value={p} />)}</datalist>
+            className={`${inputClass} sm:w-56`}
+          >
+            <option value="">ทุกจังหวัด</option>
+            {THAI_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
           <select value={scope} onChange={(e) => { setScope(e.target.value); setPage(1); }} className={`${inputClass} sm:w-44`}>
             {JOB_SCOPE_VALUES.map((s) => <option key={s} value={s}>{JOB_SCOPE_LABELS[s]}</option>)}
           </select>
