@@ -7,6 +7,7 @@ import { useBulkSelection } from "@/lib/useBulkSelection";
 import { canSelect, resolveSelectAllTargetIds, pinToggleKind, type NewsStatus } from "@/lib/news-selection";
 import Link from "next/link";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { assetUrl, prefixUploadsInHtml } from "@/lib/asset-url";
 import { ImageEditorDialog } from "@/components/news/ImageEditorDialog";
 import RichTextEditor from "@/components/news/RichTextEditor";
@@ -121,12 +122,9 @@ export default function NewsListPage() {
   const [coverEditing, setCoverEditing] = useState(false);
 
   const uploadImage = async (file: File): Promise<string | null> => {
-    if (!file.type.match(/^image\/(jpeg|png)$/)) {
-      setErrorMsg("อนุญาตเฉพาะไฟล์ JPG และ PNG เท่านั้น");
-      return null;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("ขนาดไฟล์ต้องไม่เกิน 5MB");
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setErrorMsg(invalid);
       return null;
     }
     try {

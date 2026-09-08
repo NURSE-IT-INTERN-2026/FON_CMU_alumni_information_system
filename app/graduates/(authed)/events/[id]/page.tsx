@@ -8,6 +8,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { assetUrl } from "@/lib/asset-url";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
@@ -86,6 +87,13 @@ export default function EventDetailPage() {
   // Bytes go through /api/alumni-upload, then the URL is PUT onto the event —
   // a null file means "remove" (the route normalizes "" to null).
   async function saveCover(file: File | null) {
+    if (file) {
+      const invalid = validateImageFile(file);
+      if (invalid) {
+        setCoverError(invalid);
+        return;
+      }
+    }
     setCoverBusy(true);
     setCoverError(null);
     try {

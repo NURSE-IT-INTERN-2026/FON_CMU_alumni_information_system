@@ -8,6 +8,7 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { SectionHeading } from "@/components/SectionHeading";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { assetUrl } from "@/lib/asset-url";
 import { THAI_PROVINCES } from "@/lib/thai-provinces";
 
@@ -132,6 +133,11 @@ export default function CommunityProfileSection() {
   });
 
   async function uploadPhoto(file: File) {
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setFormError(invalid);
+      return;
+    }
     setUploading(true);
     setFormError(null);
     try {

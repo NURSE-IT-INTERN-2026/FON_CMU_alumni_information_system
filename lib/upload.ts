@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { MAX_FILE_SIZE } from "@/lib/upload-limits";
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+// Re-exported for the route files (`import { MAX_FILE_SIZE, saveImageUpload }
+// from "@/lib/upload"`); the constant itself lives in client-safe
+// lib/upload-limits.ts so browser code shares one source.
+export { MAX_FILE_SIZE };
 
 // Magic-byte signatures for allowed image types (validate real content, not the
 // client-reported Content-Type). Only the extension is needed downstream.

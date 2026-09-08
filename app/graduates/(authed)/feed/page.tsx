@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { BASE_PATH } from "@/lib/constants";
+import { validateImageFile } from "@/lib/upload-limits";
 import { assetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -69,6 +70,11 @@ export default function AlumniFeedPage() {
   });
 
   async function uploadPhoto(file: File) {
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setComposerError(invalid);
+      return;
+    }
     setUploading(true);
     setComposerError(null);
     try {
