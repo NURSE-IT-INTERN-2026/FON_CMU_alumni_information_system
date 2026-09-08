@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { BASE_PATH } from "@/lib/constants";
+import { assetUrl } from "@/lib/asset-url";
 import { validateImageFile } from "@/lib/upload-limits";
 import { Button } from "@/components/ui/button";
 
@@ -24,17 +25,19 @@ export default function NewEventPage() {
   const [submitting, setSubmitting] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   // Cover bytes go through the opt-in-alumni upload route (same 5MB/PNG+JPG
   // rules as the admin /api/upload); the URL is attached to the event on POST.
+  // Cover errors render under the picker (the shared `error` is for submit).
   async function uploadCover(file: File) {
     const invalid = validateImageFile(file);
     if (invalid) {
-      setError(invalid);
+      setCoverError(invalid);
       return;
     }
     setUploadingCover(true);
-    setError(null);
+    setCoverError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -46,7 +49,7 @@ export default function NewEventPage() {
       const { url } = await res.json();
       setCoverUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "อัปโหลดรูปไม่สำเร็จ");
+      setCoverError(e instanceof Error ? e.message : "อัปโหลดรูปไม่สำเร็จ");
     } finally {
       setUploadingCover(false);
     }
@@ -103,19 +106,62 @@ export default function NewEventPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium">รูปปก <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
-          <input
-            type="file"
-            accept="image/png,image/jpeg"
-            className="text-sm"
-            disabled={uploadingCover}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void uploadCover(f);
-              e.target.value = "";
-            }}
-          />
-          {uploadingCover && <p className="mt-1 text-xs text-[var(--muted)]">กำลังอัปโหลด...</p>}
-          {coverUrl && <p className="mt-1 text-xs text-green-600">อัปโหลดรูปปกแล้ว</p>}
+          {coverUrl ? (
+            <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
+              <div className="aspect-video w-full bg-gray-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={assetUrl(coverUrl)} alt="ตัวอย่างรูปปก" className="h-full w-full object-cover" />
+              </div>
+              <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                <label className="cursor-pointer rounded-md bg-white/90 px-2.5 py-1.5 text-xs font-medium text-[var(--primary-dark)] shadow-sm hover:bg-white">
+                  {uploadingCover ? "กำลังอัปโหลด..." : "เปลี่ยนรูป"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="sr-only"
+                    disabled={uploadingCover}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void uploadCover(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setCoverUrl(null); setCoverError(null); }}
+                  disabled={uploadingCover}
+                  className="rounded-md bg-white/90 px-2.5 py-1.5 text-xs font-medium text-red-600 shadow-sm hover:bg-white disabled:opacity-50"
+                >
+                  ลบรูปปก
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label className="flex aspect-video w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--border)] bg-gray-50 hover:border-[var(--primary)]/50 hover:bg-[var(--primary)]/5">
+              {uploadingCover ? (
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary)] border-t-transparent" />
+              ) : (
+                <svg className="h-10 w-10 text-[var(--primary)]/40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0V11.25a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v7.5" />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{uploadingCover ? "กำลังอัปโหลด..." : "อัปโหลดรูปปก"}</span>
+              <span className="text-xs text-[var(--muted)]">รองรับ JPG / PNG ขนาดไม่เกิน 5MB</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                className="sr-only"
+                disabled={uploadingCover}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void uploadCover(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {coverError && <p className="mt-1 text-xs text-red-600">{coverError}</p>}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
