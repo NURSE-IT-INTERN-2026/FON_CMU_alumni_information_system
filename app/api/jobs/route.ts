@@ -10,6 +10,8 @@ import { communityRateLimit, COMMUNITY_POST_LIMIT } from "@/lib/community-rate-l
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
 import { bangkokDatetimeLocalToIso } from "@/lib/event-format";
 import { handleZodError, jobCreateSchema } from "@/lib/validations";
+import { jobCountryWhere, isThailandFilter } from "@/lib/job-country";
+import { isThailandCountry } from "@/lib/alumni-agency-region";
 
 /**
  * Community V2 job board. Mirrors the events visibility model: broadcast READ
@@ -44,27 +46,53 @@ export async function GET(request: NextRequest) {
     );
     const search = (searchParams.get("search") || "").trim();
     const province = (searchParams.get("province") || "").trim();
+    const country = (searchParams.get("country") || "").trim();
     const scopeParam = searchParams.get("scope") || "active";
     const scope = (["active", "expired", "mine"] as const).includes(scopeParam as never)
       ? (scopeParam as "active" | "expired" | "mine")
       : "active";
     const now = new Date();
 
+    // Conditions are collected into an AND array (search's OR is one
+    // condition) so the country filter can carry its own OR without
+    // colliding with the search OR.
     const where: Prisma.JobPostingWhereInput = { deletedAt: null };
     if (scope === "active") where.expiresAt = { gte: now };
     else if (scope === "expired") where.expiresAt = { lt: now };
     if (scope === "mine" && reader.alumni) where.authorAlumniId = reader.alumni.id;
-    if (province) where.province = province;
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: "insensitive" } },
-        { workplace: { contains: search, mode: "insensitive" } },
-        { position: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
 
-    const [jobs, total] = await Promise.all([
+    const conditions: Prisma.JobPostingWhereInput[] = [];
+    const countryFilter = jobCountryWhere(country);
+    if (countryFilter) conditions.push(countryFilter);
+    if (province) {
+      // Under Thailand the client sends canonical Thai province names (select)
+      // — exact match. Other countries are free text (e.g. "Central") — contains.
+      conditions.push(
+        isThailandFilter(country)
+          ? { province }
+          : { province: { contains: province, mode: "insensitive" } },
+      );
+    }
+    if (search) {
+      conditions.push({
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { workplace: { contains: search, mode: "insensitive" } },
+          { position: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+    if (conditions.length) where.AND = conditions;
+
+    // Distinct non-null countries for the filter dropdown (scope-scoped only,
+    // NOT narrowed by country/province/search so the list stays stable while
+    // filtering). Thai spellings are excluded — Thailand is a fixed option.
+    const countryListWhere: Prisma.JobPostingWhereInput = { deletedAt: null };
+    if (scope === "active") countryListWhere.expiresAt = { gte: now };
+    else if (scope === "expired") countryListWhere.expiresAt = { lt: now };
+
+    const [jobs, total, countryRows] = await Promise.all([
       prisma.jobPosting.findMany({
         where,
         include: AUTHOR_INCLUDE,
@@ -73,6 +101,11 @@ export async function GET(request: NextRequest) {
         take: pageSize,
       }),
       prisma.jobPosting.count({ where }),
+      prisma.jobPosting.findMany({
+        where: countryListWhere,
+        select: { country: true },
+        distinct: ["country"],
+      }),
     ]);
 
     const data = jobs.map((j) => ({
@@ -80,8 +113,15 @@ export async function GET(request: NextRequest) {
       author: shapeAuthor(j),
       expired: j.expiresAt < now,
     }));
+    const countries = [
+      ...new Set(
+        countryRows
+          .map((r) => r.country?.trim())
+          .filter((c): c is string => !!c && !isThailandCountry(c)),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "th"));
 
-    return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+    return NextResponse.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize), countries });
   } catch (error) {
     console.error("GET /api/jobs error:", error);
     return NextResponse.json({ error: "เกิดข้อผิดพลาดในการดึงข้อมูลประกาศงาน" }, { status: 500 });

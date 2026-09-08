@@ -12,6 +12,7 @@ import ForumBody from "@/components/forum/ForumBody";
 import ReportDialog from "@/components/forum/ReportDialog";
 import PhotoAvatar from "@/components/forum/PhotoAvatar";
 import { THAI_PROVINCES } from "@/lib/thai-provinces";
+import { JOBS_DEFAULT_COUNTRY, isThailandFilter } from "@/lib/job-country";
 import { JOB_SCOPE_VALUES, JOB_SCOPE_LABELS } from "@/lib/validations";
 import { isoToDatetimeLocal } from "@/lib/event-format";
 import type { AlumniPublicIdentity } from "@/lib/forum-identity";
@@ -50,6 +51,10 @@ interface Paged<T> {
   total: number;
   totalPages: number;
 }
+interface JobsResponse extends Paged<JobItem> {
+  /** Distinct non-Thai countries on live posts (for the country filter). */
+  countries: string[];
+}
 
 const inputClass =
   "w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm";
@@ -58,6 +63,7 @@ export default function AlumniJobsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [country, setCountry] = useState(JOBS_DEFAULT_COUNTRY);
   const [province, setProvince] = useState("");
   const [scope, setScope] = useState<string>("active");
   const [showCreate, setShowCreate] = useState(false);
@@ -79,19 +85,22 @@ export default function AlumniJobsPage() {
   const optedIn = membership?.optedIn ?? false;
 
   const { data: jobsData, isPending: loading, isError } = useQuery({
-    queryKey: queryKeys.jobs.list({ page, search, province, scope }),
+    queryKey: queryKeys.jobs.list({ page, search, province, scope, country }),
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page), pageSize: String(JOBS_PAGE_SIZE), scope,
       });
       if (search) params.set("search", search);
+      if (country) params.set("country", country);
       if (province) params.set("province", province);
-      return apiFetch<Paged<JobItem>>(`/api/jobs?${params}`);
+      return apiFetch<JobsResponse>(`/api/jobs?${params}`);
     },
   });
 
   const jobs = jobsData?.data ?? [];
   const totalPages = jobsData?.totalPages ?? 1;
+  const countries = jobsData?.countries ?? [];
+  const thailand = isThailandFilter(country);
 
   const create = useMutation({
     mutationFn: () => apiFetch("/api/jobs", { method: "POST", json: form }),
@@ -139,13 +148,34 @@ export default function AlumniJobsPage() {
         <SearchInput value={search} onSearch={(v) => { setSearch(v); setPage(1); }} placeholder="ค้นหาตำแหน่ง สถานที่ทำงาน..." formClassName="w-full" />
         <div className="flex flex-col gap-2 sm:flex-row">
           <select
-            value={province}
-            onChange={(e) => { setProvince(e.target.value); setPage(1); }}
-            className={`${inputClass} sm:w-56`}
+            value={country}
+            onChange={(e) => { setCountry(e.target.value); setProvince(""); setPage(1); }}
+            className={`${inputClass} sm:w-44`}
+            aria-label="ประเทศ"
           >
-            <option value="">ทุกจังหวัด</option>
-            {THAI_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+            <option value="">ทุกประเทศ</option>
+            <option value={JOBS_DEFAULT_COUNTRY}>{JOBS_DEFAULT_COUNTRY}</option>
+            {countries.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          {thailand ? (
+            <select
+              value={province}
+              onChange={(e) => { setProvince(e.target.value); setPage(1); }}
+              className={`${inputClass} sm:w-56`}
+              aria-label="จังหวัด"
+            >
+              <option value="">ทุกจังหวัด</option>
+              {THAI_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          ) : (
+            <input
+              value={province}
+              onChange={(e) => { setProvince(e.target.value); setPage(1); }}
+              placeholder="จังหวัด/รัฐ"
+              aria-label="จังหวัด/รัฐ"
+              className={`${inputClass} sm:w-56`}
+            />
+          )}
           <select value={scope} onChange={(e) => { setScope(e.target.value); setPage(1); }} className={`${inputClass} sm:w-44`}>
             {JOB_SCOPE_VALUES.map((s) => <option key={s} value={s}>{JOB_SCOPE_LABELS[s]}</option>)}
           </select>
