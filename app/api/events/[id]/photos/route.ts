@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/activity-log";
 import { resolveEventReader, alumniLogCtx } from "@/lib/event-guard";
 import { communityRateLimit, COMMUNITY_UPLOAD_LIMIT } from "@/lib/community-rate-limit";
 import { SELECT_ALUMNI_PUBLIC_IDENTITY } from "@/lib/forum-identity";
-import { canUploadEventPhoto } from "@/lib/event-photo-gate";
+import { canUploadEventPhoto, MAX_EVENT_PHOTOS } from "@/lib/event-photo-gate";
 import { handleZodError, eventPhotoCreateSchema } from "@/lib/validations";
 
 /**
@@ -93,6 +93,16 @@ export async function POST(
       return NextResponse.json(
         { error: "อัปโหลดรูปได้เฉพาะผู้ที่ลงทะเบียนเข้าร่วมกิจกรรมนี้", code: "NOT_ATTENDEE" },
         { status: 403 },
+      );
+    }
+
+    // Per-event album cap (soft-deleted photos don't count — deleting frees
+    // a slot), enforced like the RSVP capacity check: count then create.
+    const photoCount = await prisma.eventPhoto.count({ where: { eventId: id, deletedAt: null } });
+    if (photoCount >= MAX_EVENT_PHOTOS) {
+      return NextResponse.json(
+        { error: `อัปโหลดรูปได้สูงสุด ${MAX_EVENT_PHOTOS} รูปต่อกิจกรรม`, code: "ALBUM_FULL" },
+        { status: 400 },
       );
     }
 
