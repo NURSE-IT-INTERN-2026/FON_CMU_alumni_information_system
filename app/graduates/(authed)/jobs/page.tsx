@@ -62,7 +62,7 @@ export default function AlumniJobsPage() {
   const [scope, setScope] = useState<string>("active");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
-    title: "", workplace: "", position: "", province: "", country: "",
+    title: "", workplace: "", province: "", country: "",
     description: "", applyUrl: "", contactInfo: "",
     expiresAt: "",
   });
@@ -98,7 +98,7 @@ export default function AlumniJobsPage() {
     onSuccess: () => {
       setShowCreate(false);
       setFormError(null);
-      setForm({ ...form, title: "", workplace: "", position: "", description: "", applyUrl: "", contactInfo: "" });
+      setForm({ ...form, title: "", workplace: "", description: "", applyUrl: "", contactInfo: "" });
       qc.invalidateQueries({ queryKey: queryKeys.jobs.all });
     },
     onError: (e) => setFormError(e instanceof ApiError ? e.message : "เกิดข้อผิดพลาดในการลงประกาศ"),
@@ -265,15 +265,11 @@ export default function AlumniJobsPage() {
                 <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">ตำแหน่งงาน *</label>
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} className={inputClass} />
               </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">สถานที่ทำงาน *</label>
+                <input value={form.workplace} onChange={(e) => setForm({ ...form, workplace: e.target.value })} maxLength={200} className={inputClass} />
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">สถานที่ทำงาน *</label>
-                  <input value={form.workplace} onChange={(e) => setForm({ ...form, workplace: e.target.value })} maxLength={200} className={inputClass} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">ตำแหน่ง</label>
-                  <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} maxLength={200} className={inputClass} />
-                </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">จังหวัด</label>
                   <input list="jobs-create-provinces" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className={inputClass} />
