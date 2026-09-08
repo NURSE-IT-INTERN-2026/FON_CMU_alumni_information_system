@@ -9,6 +9,7 @@ const MSG = {
   titleTooLong: "ชื่อกิจกรรมต้องไม่เกิน 200 ตัวอักษร",
   descTooLong: "รายละเอียดต้องไม่เกิน 10,000 ตัวอักษร",
   badCapacity: "จำนวนผู้เข้าร่วมสูงสุดต้องมากกว่า 0",
+  capacityRequired: "กรุณาระบุจำนวนผู้เข้าร่วมสูงสุด",
   badGuestLimit: "จำนวนผู้ร่วมเดินทางสูงสุดต้องไม่ติดลบ",
   badGuestCount: "จำนวนผู้ร่วมเดินทางต้องไม่ติดลบ",
   badLink: "ลิงก์ไม่ถูกต้อง",
@@ -36,6 +37,12 @@ const linkField = z
   .optional()
   .or(z.literal(""));
 const capacityField = z.number().int().min(1, MSG.badCapacity).optional();
+// Creation REQUIRES a capacity ≥ 1 (every event caps headcount); updates stay
+// partial via the optional variant above.
+const capacityRequiredField = z
+  .number({ error: MSG.capacityRequired })
+  .int()
+  .min(1, MSG.badCapacity);
 const guestLimitField = z.number().int().min(0, MSG.badGuestLimit).default(0);
 const coverField = z.string().optional().nullable();
 
@@ -46,7 +53,7 @@ const eventShape = {
   endAt: endField,
   location: locationField,
   onlineLink: linkField,
-  capacity: capacityField,
+  capacity: capacityRequiredField,
   guestLimit: guestLimitField,
   coverImageUrl: coverField,
   // Optional group scope (community V2): the group's slug or id. Membership

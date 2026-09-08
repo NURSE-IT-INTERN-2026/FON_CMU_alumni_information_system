@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         location: v.location?.trim() || null,
         onlineLink: v.onlineLink?.trim() || null,
         coverImageUrl: v.coverImageUrl || null,
-        capacity: v.capacity ?? null,
+        capacity: v.capacity,
         guestLimit: v.guestLimit,
       },
       include: ORGANIZER_INCLUDE,

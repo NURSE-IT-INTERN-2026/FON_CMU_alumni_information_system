@@ -19,7 +19,6 @@ export default function NewEventPage() {
     location: "",
     onlineLink: "",
     capacity: "",
-    guestLimit: "0",
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +61,10 @@ export default function NewEventPage() {
     if (!form.title.trim()) return setError("กรุณากรอกชื่อกิจกรรม");
     if (!form.startAt) return setError("กรุณาระบุวันเวลาเริ่มกิจกรรม");
     if (form.endAt && form.endAt <= form.startAt) return setError("เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่มต้น");
+    const cap = Number(form.capacity);
+    if (!form.capacity.trim() || !Number.isInteger(cap) || cap < 1) {
+      return setError("กรุณากรอกจำนวนผู้เข้าร่วมสูงสุด (ตั้งแต่ 1 ขึ้นไป)");
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -74,8 +77,7 @@ export default function NewEventPage() {
           endAt: form.endAt || undefined,
           location: form.location.trim() || undefined,
           onlineLink: form.onlineLink.trim() || undefined,
-          capacity: form.capacity ? Number(form.capacity) : undefined,
-          guestLimit: Number(form.guestLimit) || 0,
+          capacity: cap,
           coverImageUrl: coverUrl ?? undefined,
         },
       });
@@ -104,7 +106,7 @@ export default function NewEventPage() {
           <textarea className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" rows={5} value={form.description} onChange={set("description")} maxLength={10000} />
         </div>
 
-        <div>
+        <div data-tour="events-new-cover">
           <label className="mb-1 block text-sm font-medium">รูปปก <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
           {coverUrl ? (
             <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
@@ -186,15 +188,9 @@ export default function NewEventPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div data-tour="events-new-capacity">
-            <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วม <span className="text-[var(--muted)]">(ไม่บังคับ)</span></label>
-            <input type="number" min={1} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.capacity} onChange={set("capacity")} placeholder="รวมผู้ร่วมเดินทาง" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">ผู้ร่วมเดินทางสูงสุด/ท่าน</label>
-            <input type="number" min={0} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.guestLimit} onChange={set("guestLimit")} />
-          </div>
+        <div data-tour="events-new-capacity">
+          <label className="mb-1 block text-sm font-medium">จำกัดผู้เข้าร่วม <span className="text-red-500">*</span></label>
+          <input type="number" min={1} className="w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm" value={form.capacity} onChange={set("capacity")} placeholder="จำนวนผู้เข้าร่วมสูงสุด" />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
