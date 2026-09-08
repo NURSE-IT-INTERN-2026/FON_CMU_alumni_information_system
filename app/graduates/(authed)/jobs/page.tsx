@@ -295,7 +295,7 @@ export default function AlumniJobsPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">วันที่ปิดรับสมัคร * (ไม่เกิน 90 วัน)</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--primary-dark)]">วันที่ปิดรับสมัคร *</label>
                 <input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className={inputClass} />
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
