@@ -235,10 +235,7 @@ export default function EventDetailPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={cancelRsvp.isPending} onClick={() => cancelRsvp.mutate()}>ยกเลิกการเข้าร่วม</Button>
-              <Button variant="ghost" size="sm" disabled={rsvpMut.isPending} onClick={() => rsvpMut.mutate({ status: "DECLINED" })}>ไม่เข้าร่วม</Button>
-            </div>
+            <Button variant="outline" size="sm" disabled={cancelRsvp.isPending} onClick={() => cancelRsvp.mutate()}>ยกเลิกการเข้าร่วม</Button>
           </div>
         ) : ev.myRsvp?.status === "DECLINED" ? (
           <div className="flex items-center justify-between">
