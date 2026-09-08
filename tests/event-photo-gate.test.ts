@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canUploadEventPhoto, canDeleteEventPhoto } from "@/lib/event-photo-gate";
+import { canUploadEventPhoto, canDeleteEventPhoto, MAX_EVENT_PHOTOS } from "@/lib/event-photo-gate";
 import { eventPhotoCreateSchema } from "@/lib/validations/event-photo";
 import { announcementCreateSchema } from "@/lib/validations/announcement";
+
+describe("MAX_EVENT_PHOTOS — per-event album cap", () => {
+  it("is 5 (POST /api/events/[id]/photos rejects the 6th with ALBUM_FULL; soft-deleted don't count)", () => {
+    expect(MAX_EVENT_PHOTOS).toBe(5);
+  });
+});
 
 describe("canUploadEventPhoto — permission matrix", () => {
   const attendees = ["a-1", "a-2"];

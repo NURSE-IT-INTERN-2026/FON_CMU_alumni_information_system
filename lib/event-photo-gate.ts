@@ -3,6 +3,10 @@
  * A photo may be uploaded by: an ATTENDING alum, the alumni organizer, or
  * staff. Extracted so it's unit-testable independent of the DB reads.
  */
+
+/** Per-event album cap (counts non-deleted photos; deleting frees a slot). */
+export const MAX_EVENT_PHOTOS = 5;
+
 export function canUploadEventPhoto(viewer: {
   isStaff: boolean;
   alumniId?: string;
